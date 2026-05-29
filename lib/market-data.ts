@@ -7,6 +7,14 @@ const CACHE_TTL_MS = 30_000;
 const MIN_LIQUIDITY_USD = 100;
 const MIN_VOLUME_24H_USD = 1;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
+const STABLE_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE"]);
+const KNOWN_TOKEN_ADDRESSES = new Map(
+  TOKENS.flatMap((token) => {
+    if (token.contractAddress) return [[token.contractAddress.toLowerCase(), token.symbol] as const];
+    if (token.symbol === "ETH") return [["0x4200000000000000000000000000000000000006", token.symbol] as const];
+    return [];
+  }),
+);
 
 type GeckoPool = {
   id: string;
@@ -75,6 +83,10 @@ function verifiedBySymbol(symbol: string) {
   return TOKENS.some((token) => token.symbol.toUpperCase() === symbol.toUpperCase());
 }
 
+function symbolOverride(address: string, fallback: string) {
+  return KNOWN_TOKEN_ADDRESSES.get(address.toLowerCase()) ?? fallback.toUpperCase();
+}
+
 function formatAddress(value: string): Address | null {
   return /^0x[a-fA-F0-9]{40}$/.test(value) ? (value as Address) : null;
 }
@@ -93,14 +105,58 @@ async function fetchGeckoPage(page: number) {
   return (await response.json()) as GeckoResponse;
 }
 
+type PoolSide = {
+  token: GeckoToken | undefined;
+  address: string;
+  priceUsd: number;
+  change24h: number | null;
+};
+
+function sideFromPool(pool: GeckoPool, byAddress: Map<string, GeckoToken>, side: "base" | "quote"): PoolSide | null {
+  const id =
+    side === "base"
+      ? pool.relationships?.base_token?.data?.id
+      : pool.relationships?.quote_token?.data?.id;
+  const address = tokenAddressFromId(id);
+  if (!address) return null;
+  const token = byAddress.get(address.toLowerCase());
+  const priceUsd = num(
+    side === "base" ? pool.attributes?.base_token_price_usd : pool.attributes?.quote_token_price_usd,
+  );
+  if (!priceUsd) return null;
+
+  const baseId = pool.relationships?.base_token?.data?.id;
+  const baseAddress = tokenAddressFromId(baseId);
+  const base = byAddress.get(baseAddress.toLowerCase());
+  const baseSymbol = String(base?.attributes?.symbol ?? "").toUpperCase();
+  const rawChange = num(pool.attributes?.price_change_percentage?.h24);
+  const change24h =
+    STABLE_SYMBOLS.has(String(token?.attributes?.symbol ?? "").toUpperCase())
+      ? null
+      : side === "quote" && STABLE_SYMBOLS.has(baseSymbol)
+        ? -rawChange
+        : rawChange;
+
+  return { token, address, priceUsd, change24h };
+}
+
 /**
- * Reads World Chain pool data and derives a token-level 24h gainer list.
+ * Reads GeckoTerminal World Chain pool data and derives token-level market data.
  */
-export async function getWorldChainMarkets() {
+export async function getWorldChainMarketCatalog() {
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
   try {
-    const pages = await Promise.all([1, 2, 3].map(fetchGeckoPage));
+    const settledPages = await Promise.allSettled([1, 2, 3, 4, 5].map(fetchGeckoPage));
+    const pages = settledPages
+      .filter((result): result is PromiseFulfilledResult<GeckoResponse> => result.status === "fulfilled")
+      .map((result) => result.value);
+    if (!pages.length) {
+      settledPages.forEach((result) => {
+        if (result.status === "rejected") console.error(result.reason);
+      });
+      throw new Error("No GeckoTerminal World Chain pages returned");
+    }
     const byAddress = new Map<string, GeckoToken>();
     for (const page of pages) {
       for (const token of page.included ?? []) {
@@ -111,36 +167,37 @@ export async function getWorldChainMarkets() {
 
     const best = new Map<string, MarketToken>();
     for (const pool of pages.flatMap((page) => page.data ?? [])) {
-      const baseAddress = tokenAddressFromId(pool.relationships?.base_token?.data?.id);
-      const base = byAddress.get(baseAddress.toLowerCase());
-      const symbol = String(base?.attributes?.symbol ?? "").toUpperCase();
-      if (!symbol || EXCLUDED_TOP_SYMBOLS.has(symbol)) continue;
-
-      const priceUsd = num(pool.attributes?.base_token_price_usd);
-      const change24h = num(pool.attributes?.price_change_percentage?.h24);
       const volume24hUsd = num(pool.attributes?.volume_usd?.h24);
       const liquidityUsd = num(pool.attributes?.reserve_in_usd);
-      if (!priceUsd || !Number.isFinite(change24h)) continue;
       if (liquidityUsd < MIN_LIQUIDITY_USD || volume24hUsd < MIN_VOLUME_24H_USD) continue;
 
-      const current = best.get(symbol);
-      if (current && current.liquidityUsd >= liquidityUsd) continue;
+      for (const side of ["base", "quote"] as const) {
+        const marketSide = sideFromPool(pool, byAddress, side);
+        if (!marketSide) continue;
 
-      best.set(symbol, {
-        symbol,
-        name: base?.attributes?.name ?? symbol,
-        address: formatAddress(base?.attributes?.address ?? baseAddress),
-        priceUsd,
-        change24h,
-        volume24hUsd,
-        liquidityUsd,
-        logoUrl: base?.attributes?.image_url ?? null,
-        poolAddress: pool.attributes?.address ?? pool.id,
-        verified: verifiedBySymbol(symbol),
-      });
+        const rawSymbol = String(marketSide.token?.attributes?.symbol ?? "").toUpperCase();
+        const symbol = symbolOverride(marketSide.address, rawSymbol);
+        if (!symbol) continue;
+
+        const current = best.get(symbol);
+        if (current && current.liquidityUsd >= liquidityUsd) continue;
+
+        best.set(symbol, {
+          symbol,
+          name: marketSide.token?.attributes?.name ?? TOKENS.find((token) => token.symbol === symbol)?.name ?? symbol,
+          address: formatAddress(marketSide.token?.attributes?.address ?? marketSide.address),
+          priceUsd: marketSide.priceUsd,
+          change24h: marketSide.change24h,
+          volume24hUsd,
+          liquidityUsd,
+          logoUrl: marketSide.token?.attributes?.image_url ?? null,
+          poolAddress: pool.attributes?.address ?? pool.id,
+          verified: verifiedBySymbol(symbol),
+        });
+      }
     }
 
-    const data = [...best.values()].sort((a, b) => (b.change24h ?? 0) - (a.change24h ?? 0)).slice(0, 10);
+    const data = [...best.values()].sort((a, b) => b.liquidityUsd - a.liquidityUsd);
     cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
     lastGood = data;
     return data;
@@ -148,4 +205,16 @@ export async function getWorldChainMarkets() {
     console.error("Failed to fetch World Chain market data", error);
     return lastGood;
   }
+}
+
+/**
+ * Returns the top 24h gainers from GeckoTerminal World Chain pools.
+ */
+export async function getWorldChainMarkets() {
+  const catalog = await getWorldChainMarketCatalog();
+  return catalog
+    .filter((market) => !EXCLUDED_TOP_SYMBOLS.has(market.symbol))
+    .filter((market) => market.change24h !== null && Number.isFinite(Number(market.change24h)))
+    .sort((a, b) => (b.change24h ?? 0) - (a.change24h ?? 0))
+    .slice(0, 10);
 }

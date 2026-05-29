@@ -876,14 +876,25 @@ function enhancePrototypeMarket() {
           '</div>';
         }).join("");
       }
+      function registerMarketsFromPriceMeta(payload){
+        try {
+          var markets = payload && payload.meta && Array.isArray(payload.meta.markets) ? payload.meta.markets : [];
+          markets.forEach(registerMarketToken);
+        } catch(e) {}
+      }
       applyTokenLogos();
       if (typeof renderGainers === "function") {
         renderGainers = function(){
           var box = document.getElementById("gainersList");
-          if (box) box.innerHTML = '<div class="import-load">读取 World Chain 链上行情...</div>';
-          fetch("/api/tokens/top", { cache: "no-store" })
-            .then(function(res){ return res.ok ? res.json() : []; })
-            .then(function(markets){ renderGainersFromMarkets(Array.isArray(markets) ? markets : []); })
+          if (box) box.innerHTML = '<div class="import-load">读取 GeckoTerminal 行情...</div>';
+          Promise.all([
+            fetch("/api/tokens/top", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
+            fetch("/api/prices", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
+          ])
+            .then(function(results){
+              registerMarketsFromPriceMeta(results[1]);
+              renderGainersFromMarkets(Array.isArray(results[0]) ? results[0] : []);
+            })
             .catch(function(){ renderGainersFromMarkets([]); });
         };
         renderGainers();

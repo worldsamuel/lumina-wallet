@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { TOKENS } from "@/lib/tokens";
-import { getWorldChainMarkets } from "@/lib/market-data";
+import { getWorldChainMarketCatalog } from "@/lib/market-data";
 
 const CACHE_TTL_MS = 30_000;
 
@@ -12,6 +12,7 @@ type PriceMeta = {
   last_updated_at: Record<string, number>;
   liquidity_usd: Record<string, number>;
   volume_24h_usd: Record<string, number>;
+  markets: unknown[];
 };
 
 type PricePayload = Record<string, number | string | PriceMeta> & {
@@ -32,6 +33,7 @@ function fallbackPrices(): PricePayload {
       last_updated_at: {},
       liquidity_usd: {},
       volume_24h_usd: {},
+      markets: [],
     },
   };
 }
@@ -48,7 +50,8 @@ export async function GET() {
   }
 
   try {
-    const markets = await getWorldChainMarkets();
+    const markets = await getWorldChainMarketCatalog();
+    if (!markets.length) throw new Error("No GeckoTerminal World Chain markets returned");
     const marketBySymbol = new Map(markets.map((market) => [market.symbol, market]));
     const prices = Object.fromEntries(
       TOKENS.map((token) => [token.symbol, marketBySymbol.get(token.symbol)?.priceUsd ?? token.priceUsd]),
@@ -72,6 +75,7 @@ export async function GET() {
         last_updated_at: {},
         liquidity_usd: liquidity,
         volume_24h_usd: volume,
+        markets: TOKENS.map((token) => marketBySymbol.get(token.symbol)).filter(Boolean),
       },
     };
 
