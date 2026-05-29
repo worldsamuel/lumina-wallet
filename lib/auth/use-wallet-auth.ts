@@ -6,7 +6,7 @@ import { useAuthStore } from "./store";
 import type { WalletAuthPayload } from "./wallet-auth-types";
 
 const STATEMENT = "Sign in to Lumina";
-const MOCK_ADDRESS = "0x4a3a000000000000000000000000000000006F2d";
+const MOCK_ADDRESS = "0x4a3a000000000000000000000000000000006f2d";
 const MOCK_USERNAME = "lumina-demo";
 
 type WalletAuthStatus = "checking" | "not-installed" | "authenticating" | "authenticated" | "error";

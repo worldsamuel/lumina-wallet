@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { prototypeMarkup } from "./prototype-markup";
 import { prototypeScript } from "./prototype-script";
 import { shortenAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
 import { useBackendConfigSync } from "@/lib/backend/use-backend-config";
+import { useChainBalanceSync } from "@/lib/chain/use-chain-balance-sync";
 
 type PrototypeRuntimeProps = {
   initialView: string;
@@ -46,13 +47,16 @@ const tabByView: Record<string, string> = {
  */
 export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const [prototypeReady, setPrototypeReady] = useState(false);
   const { address, error, login, logout, status } = useWalletAuth();
   useBackendConfigSync(status === "authenticated");
+  useChainBalanceSync(status === "authenticated" && prototypeReady, address);
 
   useEffect(() => {
     const host = hostRef.current;
     if (!host || status !== "authenticated") return;
 
+    setPrototypeReady(false);
     host.innerHTML = prototypeMarkup;
     const scriptEl = document.createElement("script");
     scriptEl.text = prototypeScript;
@@ -70,6 +74,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       }
       window.setTabByName?.(tabByView[initialView] ?? "Home");
       if (initialView === "about") appendLegalLinks(host);
+      setPrototypeReady(true);
     });
 
     window.loginBack = () => {
@@ -80,6 +85,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     };
 
     return () => {
+      setPrototypeReady(false);
       host.innerHTML = "";
     };
   }, [address, initialView, login, logout, status]);

@@ -148,6 +148,19 @@
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
   .asset .spark { width: 80px; height: 34px; }
   .asset .vals { text-align: right; white-space: nowrap; } .asset .vals .amt { font-weight: 700; font-size: 15px; } .asset .vals .usd { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+  .asset-skeleton { pointer-events: none; }
+  .asset-skeleton .coin,
+  .asset-skeleton .sym,
+  .asset-skeleton .full,
+  .asset-skeleton .spark,
+  .asset-skeleton .amt,
+  .asset-skeleton .usd { background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.11), rgba(255,255,255,0.05)); background-size: 200% 100%; animation: shimmer 1.4s infinite; color: transparent; border-radius: 999px; }
+  .asset-skeleton .sym { width: 64px; height: 18px; }
+  .asset-skeleton .full { width: 96px; height: 14px; }
+  .asset-skeleton .spark { border-radius: 12px; }
+  .asset-skeleton .amt { width: 72px; height: 16px; margin-left: auto; }
+  .asset-skeleton .usd { width: 58px; height: 14px; margin: 8px 0 0 auto; }
+  @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
   .add-token { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 17px; color: var(--green); font-weight: 600; font-size: 15px; cursor: pointer; }
   .backup { margin: 16px var(--pad-screen) 0; display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px; cursor: pointer; }
   .backup .shield { width: 48px; height: 48px; border-radius: 14px; background: radial-gradient(circle at 40% 30%, rgba(74,222,128,0.35), rgba(74,222,128,0.08)); display: grid; place-items: center; color: var(--green); flex-shrink: 0; }
@@ -453,4 +466,128 @@ button, input, select {
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.asset-detail-screen {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  padding: calc(env(safe-area-inset-top) + 18px) var(--pad-screen) 40px;
+}
+
+.asset-back {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-dim);
+  text-decoration: none;
+  font-size: 14px;
+  margin-bottom: 22px;
+}
+
+.asset-detail-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 28px 22px;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+}
+
+.asset-detail-card h1 {
+  margin: 10px 0 4px;
+  font-size: 30px;
+  line-height: 1.1;
+}
+
+.asset-detail-card p {
+  color: var(--text-dim);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.asset-detail-card button {
+  margin-top: 22px;
+  background: var(--green);
+  color: #042;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.asset-detail-logo {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin: 0 auto;
+  font-size: 24px;
+  font-weight: 800;
+  background: var(--surface-2);
+}
+
+.asset-detail-logo.wld {
+  background: #fff;
+  color: #000;
+}
+
+.asset-detail-logo.usdc {
+  background: var(--blue);
+  color: #fff;
+}
+
+.asset-detail-logo.eth {
+  background: #1c2536;
+  color: #9fb7ff;
+}
+
+.asset-detail-balance {
+  margin-top: 28px;
+  font-size: 34px;
+  font-weight: 850;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.asset-detail-usd {
+  color: var(--text-mute);
+  margin-top: 8px;
+  font-size: 15px;
+}
+
+.asset-detail-loading,
+.asset-detail-error {
+  margin-top: 28px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.asset-detail-error {
+  color: var(--red);
+}
+
+.asset-detail-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.asset-detail-actions a {
+  text-decoration: none;
+  border-radius: 14px;
+  padding: 14px;
+  font-weight: 800;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.asset-detail-actions a:last-child {
+  background: var(--green);
+  color: #042;
+  border-color: transparent;
 }
