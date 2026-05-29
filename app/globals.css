@@ -333,3 +333,56 @@ button, input, select {
 .phone {
   color: var(--text);
 }
+
+.mini-auth-screen {
+  min-height: 100dvh;
+  width: 100%;
+  max-width: var(--phone-max);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px;
+  text-align: center;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.mini-auth-logo {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--green);
+  display: grid;
+  place-items: center;
+  font-size: 36px;
+  font-weight: 800;
+}
+
+.mini-auth-screen h1 {
+  max-width: 340px;
+  font-size: 26px;
+  line-height: 1.15;
+  font-weight: 800;
+}
+
+.mini-auth-screen p {
+  max-width: 320px;
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.mini-auth-screen button {
+  margin-top: 10px;
+  background: var(--green);
+  color: #042;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 28px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}

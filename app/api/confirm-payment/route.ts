@@ -1,6 +1,10 @@
-import { MiniAppPaymentSuccessPayload } from "@worldcoin/minikit-js";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+
+type MiniAppPaymentSuccessPayload = {
+  reference: string;
+  transaction_id: string;
+};
 
 interface IRequestPayload {
   payload: MiniAppPaymentSuccessPayload;

@@ -1,13 +1,12 @@
-"use client"; // Required for Next.js
+"use client";
 
-import { MiniKit } from "@worldcoin/minikit-js";
-import { ReactNode, useEffect } from "react";
+import { MiniKitProvider as WorldMiniKitProvider } from "@worldcoin/minikit-js/minikit-provider";
+import type { ReactNode } from "react";
 
 export default function MiniKitProvider({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    MiniKit.install();
-    console.log(MiniKit.isInstalled());
-  }, []);
-
-  return <>{children}</>;
+  return (
+    <WorldMiniKitProvider props={{ appId: process.env.NEXT_PUBLIC_WORLD_APP_ID }}>
+      {children}
+    </WorldMiniKitProvider>
+  );
 }

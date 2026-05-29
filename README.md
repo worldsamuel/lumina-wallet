@@ -24,9 +24,9 @@ To use the application, you'll need to:
      - `WLD_CLIENT_ID`
      - `WLD_CLIENT_SECRET`
 
-2. **Configure Action**
-   - In the Developer Portal, create an action in the "Incognito Actions" section
-   - Use the same action name in `components/Verify/index.tsx`
+2. **Configure MiniKit**
+   - Add the deployed HTTPS URL to the World Developer Portal
+   - Configure wallet auth and MiniKit payments from the same app
 
 View docs: [Docs](https://docs.world.org/)
 

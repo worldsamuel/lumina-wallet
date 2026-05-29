@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import MiniKitProvider from "@/components/minikit-provider";
 import dynamic from "next/dynamic";
-import NextAuthProvider from "@/components/next-auth-provider";
 import { CurrencyProvider } from "@/lib/currency-provider";
 import { LanguageProvider } from "@/lib/i18n/language-provider";
 
@@ -32,15 +31,13 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-stone-50 text-zinc-950">
-        <NextAuthProvider>
-          <ErudaProvider>
-            <MiniKitProvider>
-              <LanguageProvider>
-                <CurrencyProvider>{children}</CurrencyProvider>
-              </LanguageProvider>
-            </MiniKitProvider>
-          </ErudaProvider>
-        </NextAuthProvider>
+        <ErudaProvider>
+          <MiniKitProvider>
+            <LanguageProvider>
+              <CurrencyProvider>{children}</CurrencyProvider>
+            </LanguageProvider>
+          </MiniKitProvider>
+        </ErudaProvider>
       </body>
     </html>
   );
