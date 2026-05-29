@@ -643,7 +643,31 @@ function enhancePrototypeHome() {
         if (name === "search") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
         return "";
       }
+      function fixSignedMoney(){
+        if (!window.__luminaHomeMoneyFix && typeof formatMoney === "function") {
+          window.__luminaHomeMoneyFix = true;
+          var rawFormatMoney = formatMoney;
+          formatMoney = function(usd){
+            var n = Number(usd);
+            if (!Number.isFinite(n)) return rawFormatMoney(usd);
+            return n < 0 ? "-" + rawFormatMoney(Math.abs(n)) : rawFormatMoney(n);
+          };
+        }
+        if (!window.__luminaHomeRenderMoneyFix && typeof renderMoney === "function") {
+          window.__luminaHomeRenderMoneyFix = true;
+          var rawRenderMoney = renderMoney;
+          renderMoney = function(){
+            rawRenderMoney();
+            var subEl = document.getElementById("balSub");
+            if (subEl && typeof change24hUsdNum !== "undefined") {
+              var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
+              subEl.textContent = sign + formatMoney(change24hUsdNum) + " (24h)";
+            }
+          };
+        }
+      }
       function ensureHomeShell() {
+        fixSignedMoney();
         var home = document.getElementById("view-home");
         if (!home || home.dataset.luminaHomeV2 === "1") return;
         home.dataset.luminaHomeV2 = "1";
