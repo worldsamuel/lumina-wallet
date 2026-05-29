@@ -1,33 +1,83 @@
-## This template provides a minimal setup to get Next.js working with MiniKit
+# Lumina Wallet
 
-## Setup
+Lumina Wallet is a Next.js 14 World Mini App. The v22 user prototype is routed through App Router, MiniKit walletAuth identifies the World App wallet, and admin-managed configuration is stored in PostgreSQL through Prisma.
+
+## Local Setup
 
 ```bash
-cp .env.example .env
-pnpm i
-pnpm dev
-
+npm install
+cp .env.example .env.local
+npm run dev
 ```
 
-To run as a mini app choose a production app in the dev portal and use NGROK to tunnel. Set the `NEXTAUTH_URL` and the redirect url if using sign in with worldcoin to that ngrok url
+Open `http://localhost:3000`. A normal browser should show `Please open this app inside World App`. For UI-only local preview, use `http://localhost:3000/?mockWorld=1`.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Supabase Database
 
-To use the application, you'll need to:
+1. Create the Supabase project.
+2. Copy the shared transaction pooler URI to `DATABASE_URL`.
+3. Copy the session pooler URI to `DIRECT_URL`.
+4. Replace `[PASSWORD]` in both URLs.
+5. Keep `DATABASE_URL`, `DIRECT_URL`, `WORLD_APP_SECRET`, `SESSION_SECRET`, `ADMIN_SESSION_SECRET`, and `ADMIN_INITIAL_PASSWORD` out of git.
 
-1. **Get World ID Credentials**
-   From the [World ID Developer Portal](https://developer.worldcoin.org/):
+## Prisma
 
-   - Create a new app to get your `APP_ID`
-   - Get `DEV_PORTAL_API_KEY` from the API Keys section
-   - Navigate to "Sign in with World ID" page to get:
-     - `WLD_CLIENT_ID`
-     - `WLD_CLIENT_SECRET`
+Generate the client:
 
-2. **Configure MiniKit**
-   - Add the deployed HTTPS URL to the World Developer Portal
-   - Configure wallet auth and MiniKit payments from the same app
+```bash
+npx prisma generate
+```
 
-View docs: [Docs](https://docs.world.org/)
+Create and apply a migration:
 
-[Developer Portal](https://developer.worldcoin.org/)
+```bash
+npx prisma migrate dev --name init_backend
+```
+
+Seed default data:
+
+```bash
+npm run db:seed
+```
+
+Deploy migrations in production:
+
+```bash
+npm run prisma:migrate
+```
+
+## Changing Database Fields
+
+1. Edit `prisma/schema.prisma`.
+2. Run `npx prisma validate`.
+3. Run `npx prisma migrate dev --name describe_change`.
+4. Update seed data if defaults changed.
+5. Run `npm run build`.
+6. Commit the schema and generated migration folder.
+
+## Admin Bootstrap
+
+Set `ADMIN_INITIAL_PASSWORD` before `npm run db:seed`. The seed creates:
+
+- username: `admin`
+- password: value of `ADMIN_INITIAL_PASSWORD`
+
+Admin login sets an httpOnly `admin_session` cookie. Write routes record `AuditLog` rows.
+
+## Useful API Checks
+
+```bash
+curl http://localhost:3000/api/tokens
+curl http://localhost:3000/api/announcements
+curl http://localhost:3000/api/content/help
+curl http://localhost:3000/api/currency-rates
+curl http://localhost:3000/api/fees
+```
+
+## World Mini App
+
+Configure the deployed HTTPS URL in the World Developer Portal and set:
+
+- `NEXT_PUBLIC_WORLD_APP_ID`
+- `WORLD_APP_SECRET`
+- `SESSION_SECRET`

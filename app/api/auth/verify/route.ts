@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { consumeNonce } from "@/lib/auth/nonce-store";
 import { getSessionMaxAgeSeconds, signSession } from "@/lib/auth/session";
 import type { WalletAuthPayload } from "@/lib/auth/wallet-auth-types";
+import { db } from "@/lib/db";
 
 type VerifyRequestBody = {
   nonce: string;
@@ -25,6 +26,12 @@ export async function POST(req: NextRequest) {
   if (!verification.isValid) {
     return NextResponse.json({ error: "Invalid wallet signature." }, { status: 401 });
   }
+
+  await db.user.upsert({
+    where: { address: payload.address },
+    update: { lastLoginAt: new Date() },
+    create: { address: payload.address, lastLoginAt: new Date() },
+  });
 
   const token = signSession({
     address: payload.address,

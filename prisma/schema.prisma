@@ -6,33 +6,69 @@ datasource db {
   provider = "postgresql"
 }
 
-model UserProfile {
-  id             String   @id @default(cuid())
-  worldUserId    String?  @unique
-  walletAddress  String?
-  displayName    String?
-  locale         String   @default("en")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  activityEvents WalletActivity[]
+model User {
+  id          String    @id @default(cuid())
+  worldId     String?   @unique
+  address     String    @unique
+  createdAt   DateTime  @default(now())
+  lastLoginAt DateTime?
 }
 
-model WalletActivity {
-  id            String      @id @default(cuid())
-  userProfileId String?
-  userProfile   UserProfile? @relation(fields: [userProfileId], references: [id])
-  type          String
-  assetSymbol   String
-  amount        Decimal
-  status        String
-  txHash        String?
-  metadata      Json?
-  createdAt     DateTime    @default(now())
+model Token {
+  id           String   @id @default(cuid())
+  symbol       String   @unique
+  name         String
+  contractAddr String?  @unique
+  decimals     Int      @default(18)
+  logoUrl      String?
+  status       String   @default("pending")
+  onTopRanking Boolean  @default(false)
+  createdAt    DateTime @default(now())
 }
 
-model AdminSetting {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  value     Json
+model Announcement {
+  id          Int      @id @default(autoincrement())
+  tag         String
+  titleI18n   Json
+  bodyI18n    Json
+  publishedAt DateTime @default(now())
+}
+
+model ContentPage {
+  key      String   @id
+  bodyI18n Json
   updatedAt DateTime @updatedAt
+}
+
+model FeeConfig {
+  businessType String   @id
+  percent      Decimal  @db.Decimal(5, 4)
+  recipient    String?
+  updatedAt    DateTime @updatedAt
+}
+
+model CurrencyRate {
+  code      String   @id
+  name      String
+  symbol    String
+  rate      Decimal  @db.Decimal(20, 8)
+  updatedAt DateTime @updatedAt
+}
+
+model AdminUser {
+  id           String    @id @default(cuid())
+  username     String    @unique
+  passwordHash String
+  role         String    @default("admin")
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  adminId   String
+  action    String
+  target    String?
+  payload   Json?
+  createdAt DateTime @default(now())
 }

@@ -5,6 +5,7 @@ import { prototypeMarkup } from "./prototype-markup";
 import { prototypeScript } from "./prototype-script";
 import { shortenAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
+import { useBackendConfigSync } from "@/lib/backend/use-backend-config";
 
 type PrototypeRuntimeProps = {
   initialView: string;
@@ -44,6 +45,7 @@ const tabByView: Record<string, string> = {
 export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const { address, error, login, logout, status } = useWalletAuth();
+  useBackendConfigSync(status === "authenticated");
 
   useEffect(() => {
     const host = hostRef.current;
