@@ -37,6 +37,16 @@ export const TOKENS: readonly TokenConfig[] = [
     priceUsd: 1,
   },
   {
+    symbol: "USDT",
+    name: "Tether USD",
+    decimals: 6,
+    logo: "USDT",
+    className: "usdt",
+    contractAddress: "0x102d758f688a4c1c5a80b116bd945d4455460282" as Address,
+    coingeckoId: "tether",
+    priceUsd: 1,
+  },
+  {
     symbol: "ETH",
     name: "Ether",
     decimals: 18,

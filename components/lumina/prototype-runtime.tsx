@@ -89,6 +89,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeDetail();
       enhancePrototypeEarn();
       enhancePrototypeTokens();
+      enhancePrototypeBuiltinTokenLogos();
       enhancePrototypeHome();
       enhancePrototypeMarket();
       enhancePrototypeSwapQuote();
@@ -161,7 +162,7 @@ function exposeEarnWalletConfirm() {
 function resetPrototypePortfolio() {
   const source = `
     assets = [];
-    balances = { WLD: "0", USDC: "0", ETH: "0" };
+    balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0" };
     availMap = {};
     totalUsdNum = 0;
     change24hUsdNum = 0;
@@ -261,6 +262,76 @@ function wireRealReceiveLinks(host: HTMLDivElement) {
         window.location.href = `/receive${window.location.search}`;
       };
     });
+}
+
+/**
+ * Provides stable built-in token marks independent of GeckoTerminal image availability.
+ */
+function enhancePrototypeBuiltinTokenLogos() {
+  const source = `
+    (function(){
+      function mark(symbol){
+        var sym = String(symbol || "").toUpperCase();
+        if (sym === "WLD") return '<svg class="lumina-token-mark wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+        if (sym === "USDC") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 7v18M20.2 10.8c-1-.9-2.4-1.5-4.2-1.5-2.7 0-4.7 1.4-4.7 3.6 0 2.4 2.3 3.1 4.8 3.7 2.4.6 3.9 1 3.9 2.9 0 2-1.8 3.3-4.3 3.3-1.9 0-3.6-.7-5-2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
+        if (sym === "USDT") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9h16v4H8zM14 13h4v9h-4z" fill="#fff"/><ellipse cx="16" cy="14" rx="8" ry="2.5" fill="none" stroke="#fff" stroke-width="1.8"/></svg>';
+        if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l8 13-8 4.6L8 16 16 3z" fill="#8aa3d8"/><path d="M16 22.4L8 17.7 16 29l8-11.3-8 4.7z" fill="#b8c8ff"/><path d="M16 20.6V3l8 13-8 4.6z" fill="#dfe6ff" opacity=".38"/></svg>';
+        return "";
+      }
+      window.__luminaTokenLogoHtml = function(symbol, fallback){
+        return mark(symbol) || fallback || String(symbol || "?").slice(0, 3).toUpperCase();
+      };
+      tokenFull.USDT = tokenFull.USDT || "Tether USD";
+      tokenLogo.WLD = mark("WLD");
+      tokenLogo.USDC = mark("USDC");
+      tokenLogo.USDT = mark("USDT");
+      tokenLogo.ETH = mark("ETH");
+      dotColor.WLD = "#fff";
+      dotColor.USDC = "var(--blue)";
+      dotColor.USDT = "#26a17b";
+      dotColor.ETH = "#1c2536";
+      prices.USDT = prices.USDT || 1;
+      balances.USDT = balances.USDT || "0";
+      availMap.USDT = availMap.USDT || "0 USDT";
+      if (typeof selectSendToken === "function") {
+        selectSendToken = function(sym){
+          sendCurrentToken = sym;
+          var ic = document.getElementById("sendTokIc");
+          var symEl = document.getElementById("sendTokSym");
+          var fullEl = document.getElementById("sendTokFull");
+          if(!ic) return;
+          ic.innerHTML = window.__luminaTokenLogoHtml(sym, tokenLogo[sym]);
+          ic.className = "coin " + String(sym || "").toLowerCase();
+          ic.style.background = dotColor[sym] || "var(--surface-2)";
+          ic.style.color = (sym === "WLD") ? "#000" : "#fff";
+          symEl.textContent = sym;
+          fullEl.textContent = tokenFull[sym] || sym;
+          var avail = availMap[sym];
+          if(!avail){
+            var b = (typeof balances !== "undefined" && balances[sym]) ? balances[sym] : "0";
+            avail = b + " " + sym;
+          }
+          var at = document.getElementById("availTxt");
+          if(at) at.textContent = t("available") + ": " + avail;
+        };
+      }
+      if (typeof renderTokenList === "function") {
+        renderTokenList = function(filter){
+          filter = (filter || "").toLowerCase();
+          var rows = Object.keys(prices).filter(function(sym){
+            if (!filter) return true;
+            return sym.toLowerCase().indexOf(filter) >= 0 || (tokenFull[sym]||"").toLowerCase().indexOf(filter) >= 0;
+          }).map(function(sym){
+            var badge = customTokens[sym] ? '<span class="custom-badge">已导入</span>' : '';
+            var color = sym === "WLD" ? "#000" : "#fff";
+            return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic coin ' + String(sym).toLowerCase() + '" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
+          }).join('');
+          document.getElementById("tokenModalList").innerHTML = rows || '<div class="import-load">没有匹配的代币</div>';
+        };
+      }
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance built-in token logos");
 }
 
 /**
@@ -752,8 +823,9 @@ function enhancePrototypeHome() {
       }
       function rowHtml(asset, index, imported){
         var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openDetail(' + index + ')';
+        var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
         return '<div class="asset home-v2-asset" onclick="' + open + '">' +
-          '<div class="coin ' + (asset.cls || "custom") + '">' + (asset.logo || tokenInitialHome(asset.sym)) + '</div>' +
+          '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (typeof formatMoney === "function" ? formatMoney(asset.usdNum || 0) : "$0.00") + '</div></div>' +
           '<span class="home-asset-chev">›</span>' +
@@ -792,6 +864,7 @@ function enhancePrototypeMarket() {
         return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
       }
       function iconFor(symbol, fallback){
+        if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, fallback);
         if (String(symbol).toUpperCase() === "WLD") return worldLogo();
         return fallback || String(symbol || "?").slice(0, 3).toUpperCase();
       }
@@ -817,9 +890,12 @@ function enhancePrototypeMarket() {
         el.innerHTML = iconFor(symbol, fallback);
       }
       function applyTokenLogos(){
-        tokenLogo.WLD = worldLogo();
+        tokenLogo.WLD = iconFor("WLD", "");
+        tokenLogo.USDC = iconFor("USDC", "");
+        tokenLogo.USDT = iconFor("USDT", "");
+        tokenLogo.ETH = iconFor("ETH", "");
         (assets || []).forEach(function(asset){
-          if (asset.sym === "WLD") asset.logo = worldLogo();
+          if (["WLD","USDC","USDT","ETH"].indexOf(asset.sym) >= 0) asset.logo = iconFor(asset.sym, asset.logo);
         });
       }
       function registerMarketToken(market){
@@ -827,7 +903,7 @@ function enhancePrototypeMarket() {
         prices[sym] = market.priceUsd || 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
         tokenFull[sym] = market.name || sym;
-        tokenLogo[sym] = iconFor(sym, market.symbol);
+        tokenLogo[sym] = iconFor(sym, tokenLogo[sym] || market.symbol);
         tokenChanges24h = tokenChanges24h || {};
         tokenChanges24h[sym] = market.change24h;
         window.__luminaMarketBySymbol[sym] = market;
@@ -1098,7 +1174,7 @@ function enhancePrototypeDetail() {
       }
 
       function detailTokenIcon(asset) {
-        return asset.sym === "WLD" ? detailWorldLogo() : (asset.logo || asset.sym.charAt(0));
+        return window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || asset.sym.charAt(0)) : (asset.sym === "WLD" ? detailWorldLogo() : (asset.logo || asset.sym.charAt(0)));
       }
 
       function compactUsd(value) {
