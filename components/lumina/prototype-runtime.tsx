@@ -636,40 +636,91 @@ function enhancePrototypeDetail() {
         USDC: "0x79a02482a880bce3f13e09da970dc34db4cd24d1"
       };
       var seriesByRange = {
-        "1H": [44,48,51,49,54,58,55,62,65,63,68,71,69],
-        "1D": [48,54,58,56,49,45,52,60,67,68,57,50,43,45,54,62,66,57,51],
-        "1W": [38,42,47,52,49,55,61,58,64,69,66,72,75,70,77,80,76],
+        "1D": [35,40,39,43,38,41,47,54,57,66,65,71,58,54,48,44,39,42,51,56,64,62,71,77,77,69,65,65],
+        "1W": [40,44,47,43,52,59,63,61,67,71,69,74,78,73,80,84,82],
         "1M": [62,65,63,55,51,57,66,73,74,62,54,48,39,41,53,61,67,58],
-        "1Y": [28,35,41,38,47,55,62,59,66,74,70,78,82,76,86,90,87]
+        "1Y": [28,35,41,38,47,55,62,59,66,74,70,78,82,76,86,90,87],
+        "ALL": [22,25,29,34,32,39,45,44,51,57,63,60,66,72,76,73,80,84,82]
       };
 
       function chartSvg(range) {
         var values = seriesByRange[range] || seriesByRange["1D"];
         var width = 430;
-        var height = 178;
+        var height = 230;
         var min = Math.min.apply(null, values);
         var max = Math.max.apply(null, values);
         var span = Math.max(1, max - min);
         var points = values.map(function(v, i) {
-          var x = (i / (values.length - 1)) * width;
-          var y = 28 + ((max - v) / span) * 86;
+          var x = 18 + (i / (values.length - 1)) * (width - 36);
+          var y = 82 + ((max - v) / span) * 88;
           return [x, y];
         });
         var line = points.map(function(p, i) {
           return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1);
         }).join(" ");
-        var area = line + " L " + width + " " + height + " L 0 " + height + " Z";
+        var last = points[points.length - 1];
+        var area = line + " L " + last[0].toFixed(1) + " 190 L 18 190 Z";
         return '<svg viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none" aria-hidden="true">' +
           '<defs><linearGradient id="luminaDetailArea" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" stop-color="#4ade80" stop-opacity="0.42"/>' +
+          '<stop offset="0%" stop-color="#4ade80" stop-opacity="0.46"/>' +
           '<stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>' +
           '</linearGradient></defs>' +
           '<path d="'+area+'" fill="url(#luminaDetailArea)"/>' +
-          '<path d="'+line+'" fill="none" stroke="#4ade80" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<path d="'+line+'" fill="none" stroke="#4ade80" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="6" fill="#4ade80"/>' +
+          '<text x="18" y="213" fill="#9da39d" font-size="15">00:00</text>' +
+          '<text x="202" y="213" fill="#9da39d" font-size="15">12:00</text>' +
+          '<text x="372" y="213" fill="#9da39d" font-size="15">24:00</text>' +
           '</svg>';
       }
 
+      function detailIcon(name) {
+        if (name === "activity") {
+          return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2h7l4 4v16H5V2h3z"/><path d="M14 2v5h5"/><path d="M8 12h8M8 16h8"/></svg>';
+        }
+        if (name === "globe") {
+          return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>';
+        }
+        if (name === "star") {
+          return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2 7.5 14 3 9.6l6.2-.9z"/></svg>';
+        }
+        if (name === "more") {
+          return '<svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
+        }
+        return "";
+      }
+
+      function ensureDetailShell() {
+        var view = document.getElementById("view-detail");
+        if (!view || view.dataset.luminaDetailV2 === "1") return;
+        view.dataset.luminaDetailV2 = "1";
+        view.innerHTML =
+          '<div class="detail-v2-topbar">' +
+            '<button class="detail-v2-back" onclick="go(\\'home\\'); setTabByName(\\'Home\\')" aria-label="Back"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
+            '<div class="detail-v2-token"><div class="detail-v2-token-icon" id="detCoin">◉</div><div><div class="detail-v2-symbol" id="detTitle">WLD</div><div class="detail-v2-name" id="detName">Worldcoin</div></div></div>' +
+            '<div class="detail-v2-tools"><button type="button">' + detailIcon("star") + '</button><button type="button">' + detailIcon("more") + '</button></div>' +
+          '</div>' +
+          '<section class="detail-v2-hero">' +
+            '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
+            '<div class="detail-v2-fiat" id="detUsd">≈ $0.00</div>' +
+            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em>Today</em></div>' +
+          '</section>' +
+          '<section class="detail-v2-chart-card">' +
+            '<div class="range-row detail-v2-ranges"><div class="range sel">1D</div><div class="range">1W</div><div class="range">1M</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
+            '<div class="detail-chart" id="detChart"></div>' +
+          '</section>' +
+          '<div class="detail-actions detail-v2-actions">' +
+            '<button class="btn-ghost" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
+            '<button class="btn-primary" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
+          '</div>' +
+          '<section class="detail-v2-menu">' +
+            '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +
+            '<a id="detExplorer" target="_blank" rel="noreferrer"><span>' + detailIcon("globe") + '</span><strong>View on Explorer</strong><i>›</i></a>' +
+          '</section>';
+      }
+
       function renderRange(range) {
+        ensureDetailShell();
         var chart = document.getElementById("detChart");
         if (chart) chart.innerHTML = chartSvg(range);
         document.querySelectorAll("#view-detail .range").forEach(function(el) {
@@ -677,20 +728,8 @@ function enhancePrototypeDetail() {
         });
       }
 
-      function ensureExplorer() {
-        var actions = document.querySelector("#view-detail .detail-actions");
-        if (!actions || document.getElementById("detExplorer")) return;
-        var link = document.createElement("a");
-        link.id = "detExplorer";
-        link.className = "explorer-link";
-        link.target = "_blank";
-        link.rel = "noreferrer";
-        link.textContent = "View on Worldscan";
-        actions.insertAdjacentElement("afterend", link);
-      }
-
       function updateExplorer() {
-        ensureExplorer();
+        ensureDetailShell();
         var link = document.getElementById("detExplorer");
         if (!link) return;
         var sym = "";
@@ -700,20 +739,43 @@ function enhancePrototypeDetail() {
         var contract = contracts[sym];
         if (contract) {
           link.href = "https://worldscan.org/token/" + contract;
-          link.textContent = sym + " on Worldscan";
           return;
         }
         var address = window.__luminaUserAddress || "";
         link.href = address ? "https://worldscan.org/address/" + address : "https://worldscan.org";
-        link.textContent = "View wallet on Worldscan";
+      }
+
+      function formatFiat(value) {
+        try { return formatMoney(value || 0); } catch(e) { return "$" + Number(value || 0).toFixed(2); }
+      }
+
+      function updateDetailContent(asset) {
+        ensureDetailShell();
+        var coin = document.getElementById("detCoin");
+        coin.textContent = asset.logo || asset.sym.charAt(0);
+        coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
+        document.getElementById("detTitle").textContent = asset.sym;
+        document.getElementById("detName").textContent = asset.full || asset.sym;
+        document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
+        document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
+        var change = 0;
+        try { change = tokenChanges24h && tokenChanges24h[asset.sym] ? tokenChanges24h[asset.sym] : 3.2; } catch(e) { change = 3.2; }
+        var pill = document.getElementById("detChangePill");
+        var up = change >= 0;
+        pill.className = up ? "up" : "down";
+        pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
       if (previousOpenDetail) {
         openDetail = function(index) {
-          previousOpenDetail(index);
+          currentDetailIdx = index;
+          var asset = assets[index];
+          if (!asset) return;
+          updateDetailContent(asset);
           renderRange("1D");
           updateExplorer();
+          go("detail"); setTabByName("Home");
         };
       }
 
@@ -727,6 +789,7 @@ function enhancePrototypeDetail() {
         }, true);
       }
 
+      ensureDetailShell();
       renderRange("1D");
       updateExplorer();
     })();
