@@ -67,6 +67,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
         window.go?.(targetView);
       }
       window.setTabByName?.(tabByView[initialView] ?? "Home");
+      if (initialView === "about") appendLegalLinks(host);
     });
 
     window.loginBack = () => {
@@ -146,4 +147,22 @@ function updatePrototypeAddress(host: HTMLDivElement, address: string | null) {
   if (chipLabel) chipLabel.textContent = label;
   const meAddr = host.querySelector(".me-addr");
   if (meAddr) meAddr.textContent = label;
+}
+
+/**
+ * Adds public legal document links to the prototype About view without rewriting the source HTML string.
+ */
+function appendLegalLinks(host: HTMLDivElement) {
+  const aboutContent = host.querySelector("#aboutContent");
+  if (!aboutContent || aboutContent.querySelector(".legal-link-card")) return;
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "article legal-link-card";
+  wrapper.innerHTML = [
+    "<h2>Legal</h2>",
+    "<p>Review Lumina's public legal documents for World Mini App review and user transparency.</p>",
+    '<a class="legal-link-row" href="/privacy">隐私政策 / Privacy Policy <span aria-hidden="true">›</span></a>',
+    '<a class="legal-link-row" href="/terms">服务条款 / Terms of Service <span aria-hidden="true">›</span></a>',
+  ].join("");
+  aboutContent.appendChild(wrapper);
 }
