@@ -1,6 +1,6 @@
 import { verifySiweMessage } from "@worldcoin/minikit-js/siwe";
 import { NextRequest, NextResponse } from "next/server";
-import { consumeNonce } from "@/lib/auth/nonce-store";
+import { consumeNonce, isNonceFormatValid, WALLET_AUTH_NONCE_COOKIE } from "@/lib/auth/nonce-store";
 import { getSessionMaxAgeSeconds, signSession } from "@/lib/auth/session";
 import type { WalletAuthPayload } from "@/lib/auth/wallet-auth-types";
 import { db } from "@/lib/db";
@@ -17,21 +17,39 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Malformed walletAuth payload." }, { status: 400 });
   }
 
-  if (!consumeNonce(nonce)) {
+  if (!isNonceFormatValid(nonce)) {
+    return NextResponse.json({ error: "Invalid nonce format." }, { status: 400 });
+  }
+
+  const nonceCookie = req.cookies.get(WALLET_AUTH_NONCE_COOKIE)?.value;
+  const nonceMatchesCookie = nonceCookie === nonce;
+  const nonceMatchesMemory = consumeNonce(nonce);
+
+  if (!nonceMatchesCookie && !nonceMatchesMemory) {
     return NextResponse.json({ error: "Invalid or expired nonce." }, { status: 401 });
   }
 
-  const verification = await verifySiweMessage(payload, nonce, "Sign in to Lumina");
+  let verification: Awaited<ReturnType<typeof verifySiweMessage>>;
+  try {
+    verification = await verifySiweMessage(payload, nonce, "Sign in to Lumina");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Signature verification failed.";
+    return NextResponse.json({ error: message }, { status: 401 });
+  }
 
   if (!verification.isValid) {
     return NextResponse.json({ error: "Invalid wallet signature." }, { status: 401 });
   }
 
-  await db.user.upsert({
-    where: { address: payload.address },
-    update: { lastLoginAt: new Date() },
-    create: { address: payload.address, lastLoginAt: new Date() },
-  });
+  try {
+    await db.user.upsert({
+      where: { address: payload.address },
+      update: { lastLoginAt: new Date() },
+      create: { address: payload.address, lastLoginAt: new Date() },
+    });
+  } catch (error) {
+    console.error("Failed to persist walletAuth user", error);
+  }
 
   const token = signSession({
     address: payload.address,
@@ -39,6 +57,7 @@ export async function POST(req: NextRequest) {
   });
 
   const res = NextResponse.json({ address: payload.address });
+  res.cookies.delete(WALLET_AUTH_NONCE_COOKIE);
   res.cookies.set("session", token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

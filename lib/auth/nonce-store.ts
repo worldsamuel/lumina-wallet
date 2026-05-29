@@ -1,4 +1,6 @@
 const NONCE_TTL_MS = 5 * 60 * 1000;
+export const WALLET_AUTH_NONCE_COOKIE = "siwe";
+export const WALLET_AUTH_NONCE_MAX_AGE_SECONDS = NONCE_TTL_MS / 1000;
 
 type NonceEntry = {
   expiresAt: number;
@@ -31,4 +33,8 @@ export function consumeNonce(nonce: string) {
   if (!entry) return false;
   nonceStore.delete(nonce);
   return entry.expiresAt > Date.now();
+}
+
+export function isNonceFormatValid(nonce: string) {
+  return /^[a-zA-Z0-9]{8,}$/.test(nonce);
 }

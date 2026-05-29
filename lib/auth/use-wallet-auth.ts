@@ -29,7 +29,10 @@ async function verifyWalletAuth(nonce: string, payload: WalletAuthPayload) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ nonce, payload }),
   });
-  if (!response.ok) throw new Error("Wallet signature verification failed.");
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? "Wallet signature verification failed.");
+  }
   return (await response.json()) as { address: string };
 }
 
