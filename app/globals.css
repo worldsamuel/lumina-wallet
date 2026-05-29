@@ -325,9 +325,9 @@
   .detail-v2-topbar { display: grid; grid-template-columns: 54px 1fr 44px; align-items: center; gap: 12px; }
   .detail-v2-back { width: 42px; height: 42px; border: none; background: transparent; color: var(--text); display: grid; place-items: center; cursor: pointer; }
   .detail-v2-token { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: 0; }
-  .detail-v2-token-icon { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 20px; flex-shrink: 0; }
-  .detail-v2-symbol { font-size: 18px; font-weight: 900; line-height: 1.1; }
-  .detail-v2-name { margin-top: 3px; color: #b5bbb5; font-size: 13px; line-height: 1.1; }
+  .detail-v2-token-icon { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; overflow: hidden; font-weight: 800; font-size: 20px; flex-shrink: 0; }
+  .detail-v2-symbol { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; font-weight: 900; line-height: 1.1; }
+  .detail-v2-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 3px; color: #b5bbb5; font-size: 13px; line-height: 1.1; }
   .detail-v2-tools { display: flex; justify-content: flex-end; align-items: center; gap: 12px; color: #8f958f; }
   .detail-v2-tools button { width: 30px; height: 34px; display: grid; place-items: center; border: none; background: transparent; color: inherit; cursor: pointer; }
   .detail-v2-hero { text-align: center; padding: 52px 0 36px; }
@@ -339,12 +339,13 @@
   .detail-v2-change span.down { background: rgba(248,113,113,0.14); color: var(--red); }
   .detail-v2-change span.none { background: rgba(255,255,255,0.06); color: var(--text-mute); }
   .detail-v2-change em { font-style: normal; }
-  .detail-v2-chart-card { margin: 0; background: linear-gradient(160deg, rgba(20,22,20,0.98), rgba(12,13,12,0.98)); border: 1px solid rgba(255,255,255,0.04); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 46px rgba(0,0,0,0.28); }
-  .detail-v2-ranges { margin: 0; padding: 14px 16px 0; }
+  .detail-v2-chart-card { margin: 0; background: linear-gradient(180deg, rgba(14,26,17,0.98), rgba(12,13,12,0.98)); border: 1px solid rgba(255,255,255,0.04); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 46px rgba(0,0,0,0.28); }
+  .detail-v2-ranges { margin: 0; padding: 0 16px 14px; }
   .detail-v2-ranges .range { min-width: 52px; padding: 9px 0; font-size: 15px; font-weight: 800; }
   .detail-v2-ranges .range.sel { background: rgba(255,255,255,0.045); color: var(--green); }
   .detail-v2-chart-card .detail-chart { margin: 0; height: 230px; }
   .market-candles { width: 100%; height: 100%; display: block; }
+  .market-trend { filter: drop-shadow(0 0 18px rgba(74,222,128,0.12)); }
   .pool-info-modal { display: none; position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center; padding: 18px; }
   .pool-info-modal.open { display: flex; }
   .pool-info-sheet { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 22px; background: #101210; padding: 22px; color: var(--text); box-shadow: 0 24px 70px rgba(0,0,0,0.45); position: relative; }

@@ -16,14 +16,14 @@ export async function GET(req: NextRequest) {
   const pool = url.searchParams.get("pool") ?? "";
   const range = (url.searchParams.get("range") ?? "1D").toUpperCase();
   const config =
-    range === "1W"
-      ? { timeframe: "hour", aggregate: "4", limit: "42" }
-      : range === "1M"
-        ? { timeframe: "day", aggregate: "1", limit: "30" }
-        : range === "1Y"
-          ? { timeframe: "day", aggregate: "7", limit: "52" }
-          : range === "ALL"
-            ? { timeframe: "day", aggregate: "14", limit: "120" }
+    range === "1H"
+      ? { timeframe: "minute", aggregate: "5", limit: "12" }
+      : range === "1D"
+        ? { timeframe: "hour", aggregate: "1", limit: "24" }
+        : range === "1W"
+          ? { timeframe: "hour", aggregate: "4", limit: "42" }
+          : range === "1Y"
+            ? { timeframe: "day", aggregate: "7", limit: "52" }
             : { timeframe: "hour", aggregate: "1", limit: "24" };
 
   try {

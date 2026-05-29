@@ -292,8 +292,14 @@ function enhancePrototypeBuiltinTokenLogos() {
         if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l8 13-8 4.6L8 16 16 3z" fill="#8aa3d8"/><path d="M16 22.4L8 17.7 16 29l8-11.3-8 4.7z" fill="#b8c8ff"/><path d="M16 20.6V3l8 13-8 4.6z" fill="#dfe6ff" opacity=".38"/></svg>';
         return "";
       }
+      function initial(symbol){
+        return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
+      }
       window.__luminaTokenLogoHtml = function(symbol, fallback){
-        return mark(symbol) || fallback || String(symbol || "?").slice(0, 3).toUpperCase();
+        if (mark(symbol)) return mark(symbol);
+        var fb = String(fallback || "");
+        if (fb.indexOf("<svg") >= 0 || fb.indexOf("<img") >= 0) return fb;
+        return initial(symbol);
       };
       tokenFull.USDT = tokenFull.USDT || "Tether USD";
       tokenLogo.WLD = mark("WLD");
@@ -1158,7 +1164,19 @@ function enhancePrototypeActivity() {
           .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; renderActivity(); })
           .catch(function(){ activityItems = []; renderActivity(); });
       };
+      if (!window.__luminaActivityGoWrapped && typeof go === "function") {
+        window.__luminaActivityGoWrapped = true;
+        var previousGo = go;
+        go = function(name){
+          previousGo(name);
+          if (name === "activity") setTimeout(window.__luminaRefreshActivity, 80);
+        };
+      }
       window.__luminaRefreshActivity();
+      setInterval(function(){
+        var view = document.getElementById("view-activity");
+        if (view && view.classList.contains("active")) window.__luminaRefreshActivity();
+      }, 20000);
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance real activity");
@@ -1265,31 +1283,63 @@ function enhancePrototypeDetail() {
         chart.innerHTML = '<div class="market-detail-state">读取 K 线...</div>';
         fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
-          .then(function(data){ chart.innerHTML = candleSvg(Array.isArray(data.candles) ? data.candles : []); })
-          .catch(function(){ chart.innerHTML = candleSvg([]); });
+          .then(function(data){
+            var candles = Array.isArray(data.candles) ? data.candles : [];
+            chart.innerHTML = trendSvg(candles);
+            updateRangeChange(candles, range || "1D", asset);
+          })
+          .catch(function(){ chart.innerHTML = trendSvg([]); });
       }
-      function candleSvg(candles){
+      function updateRangeChange(candles, range, asset){
+        var pill = document.getElementById("detChangePill");
+        var label = document.getElementById("detChangeLabel");
+        if (label) label.textContent = range;
+        if (!pill) return;
+        var change = null;
+        if (candles && candles.length) {
+          var first = candles[0];
+          var last = candles[candles.length - 1];
+          var start = Number(first.open || first[1] || first.close || first[4] || 0);
+          var end = Number(last.close || last[4] || 0);
+          if (start > 0 && Number.isFinite(end)) change = ((end - start) / start) * 100;
+        }
+        if (change === null || !Number.isFinite(change)) {
+          try { change = tokenChanges24h && tokenChanges24h[asset.sym] !== undefined ? tokenChanges24h[asset.sym] : null; } catch(e) { change = null; }
+        }
+        if (change === null || change === undefined || !Number.isFinite(Number(change))) {
+          pill.className = "none";
+          pill.textContent = "无行情";
+          return;
+        }
+        var up = Number(change) >= 0;
+        pill.className = up ? "up" : "down";
+        pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
+      }
+      function trendSvg(candles){
         if (!candles.length) return '<div class="market-detail-state"><strong>暂无 K 线</strong><span>GeckoTerminal 暂无该池子的 OHLCV 数据。</span></div>';
-        var width = 420, height = 190, pad = 16;
-        var highs = candles.map(function(c){ return Number(c.high || c[2] || 0); });
-        var lows = candles.map(function(c){ return Number(c.low || c[3] || 0); });
-        var max = Math.max.apply(null, highs), min = Math.min.apply(null, lows);
+        var width = 420, height = 214, padX = 16, padY = 24;
+        var closes = candles.map(function(c){ return Number(c.close || c[4] || 0); }).filter(function(v){ return Number.isFinite(v) && v > 0; });
+        if (closes.length < 2) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
+        var max = Math.max.apply(null, closes), min = Math.min.apply(null, closes);
         if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
-        function y(v){ return pad + (max - v) / (max - min) * (height - pad * 2); }
-        var step = (width - pad * 2) / candles.length;
-        var body = candles.map(function(c, i){
-          var open = Number(c.open || c[1] || 0), high = Number(c.high || c[2] || 0), low = Number(c.low || c[3] || 0), close = Number(c.close || c[4] || 0);
-          var x = pad + i * step + step / 2;
-          var up = close >= open;
-          var color = up ? "#4ade80" : "#f87171";
-          var top = y(Math.max(open, close));
-          var h = Math.max(2, Math.abs(y(open) - y(close)));
-          return '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + y(high).toFixed(1) + '" y2="' + y(low).toFixed(1) + '" stroke="' + color + '" stroke-width="1.5"/>' +
-            '<rect x="' + (x - Math.max(2, step * 0.3)).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + Math.max(3, step * 0.6).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.2" fill="' + color + '"/>';
-        }).join("");
-        return '<svg class="market-candles" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
-          '<defs><linearGradient id="chartFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(74,222,128,0.12)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient></defs>' +
-          '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="url(#chartFade)"/>' + body + '</svg>';
+        function y(v){ return padY + (max - v) / (max - min) * (height - padY * 2); }
+        var points = closes.map(function(v, i){
+          var x = padX + (i / Math.max(1, closes.length - 1)) * (width - padX * 2);
+          return [x, y(v)];
+        });
+        var line = points.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
+        var last = points[points.length - 1];
+        var firstClose = closes[0];
+        var lastClose = closes[closes.length - 1];
+        var up = lastClose >= firstClose;
+        var color = up ? "#4ade80" : "#f87171";
+        var area = line + " L " + last[0].toFixed(1) + " " + (height - 10) + " L " + padX + " " + (height - 10) + " Z";
+        return '<svg class="market-candles market-trend" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
+          '<defs><linearGradient id="trendFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity="0.22"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+          '<path d="' + area + '" fill="url(#trendFade)"/>' +
+          '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="5.5" fill="' + color + '"/>' +
+          '</svg>';
       }
       window.openPoolInfo = function(){
         var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
@@ -1324,11 +1374,11 @@ function enhancePrototypeDetail() {
           '<section class="detail-v2-hero">' +
             '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
             '<div class="detail-v2-fiat" id="detUsd">≈ $0.00</div>' +
-            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em>Today</em></div>' +
+            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em id="detChangeLabel">1D</em></div>' +
           '</section>' +
           '<section class="detail-v2-chart-card">' +
-            '<div class="range-row detail-v2-ranges"><div class="range sel">1D</div><div class="range">1W</div><div class="range">1M</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
             '<div class="detail-chart" id="detChart"></div>' +
+            '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
             '<button class="btn-ghost" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
