@@ -33,6 +33,31 @@
   .icon-btn.dot::after { content: ""; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); }
   #bellBtn { position: relative; }
   .bell-dot { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); }
+  /* World App already provides the top chrome, so the Mini App keeps its own content header compact. */
+  .header { display: none; }
+  .addr-chip { display: none !important; }
+  .view > .subhead,
+  .view > .swap-head { height: 0; padding: 0 var(--pad-screen); margin: 0; position: relative; z-index: 12; }
+  .view > .subhead h1,
+  .view > .swap-head h1 { display: none; }
+  .view > .subhead .back-btn,
+  .view > .swap-head .back-btn { position: absolute; top: 10px; left: var(--pad-screen); width: 34px; height: 34px; background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  #view-swap .swap-head .back-btn { display: none; }
+  .view > .swap-head .gear { position: absolute; top: 15px; right: var(--pad-screen); margin: 0; color: var(--text); background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  #view-home .balance-card,
+  #view-earn .earn-hero,
+  #view-me .me-card { margin-top: 10px; }
+  #view-swap .swap-box,
+  #view-activity .act-filter,
+  #view-detail .detail-top,
+  #view-receive .qr-wrap,
+  #view-send .form-card,
+  #view-backup > div,
+  #view-pin .me-group,
+  #view-level #levelCards,
+  #view-apps > p,
+  #view-help #helpContent,
+  #view-about #aboutContent { margin-top: 10px !important; }
   .ann-item { padding: 16px var(--pad-screen); border-bottom: 1px solid var(--line); cursor: default; }
   .ann-item:last-child { border-bottom: none; }
   .ann-item .ann-top { display: flex; align-items: center; gap: 8px; }
