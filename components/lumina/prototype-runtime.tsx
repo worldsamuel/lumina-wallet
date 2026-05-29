@@ -74,6 +74,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       }
       window.setTabByName?.(tabByView[initialView] ?? "Home");
       if (initialView === "about") appendLegalLinks(host);
+      wireRealReceiveLinks(host);
       setPrototypeReady(true);
     });
 
@@ -173,4 +174,18 @@ function appendLegalLinks(host: HTMLDivElement) {
     '<a class="legal-link-row" href="/terms">服务条款 / Terms of Service <span aria-hidden="true">›</span></a>',
   ].join("");
   aboutContent.appendChild(wrapper);
+}
+
+/**
+ * Sends receive entry points to the real React receive route instead of the old prototype view.
+ */
+function wireRealReceiveLinks(host: HTMLDivElement) {
+  host
+    .querySelectorAll<HTMLElement>("[onclick*=\"go('receive')\"], [onclick*='go(\"receive\")']")
+    .forEach((el) => {
+      el.onclick = (event) => {
+        event.preventDefault();
+        window.location.href = `/receive${window.location.search}`;
+      };
+    });
 }

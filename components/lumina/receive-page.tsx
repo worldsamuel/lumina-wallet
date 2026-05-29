@@ -1,6 +1,7 @@
 "use client";
 
 import { QRCodeSVG } from "qrcode.react";
+import Link from "next/link";
 import { useState } from "react";
 import { useAuthStore, useUserAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
@@ -24,6 +25,10 @@ export function ReceivePage() {
   if (status === "checking" || status === "authenticating") {
     return (
       <main className="receive-screen">
+        <Link className="receive-back" href="/">
+          <span aria-hidden="true">‹</span>
+          返回
+        </Link>
         <div className="receive-card receive-state">
           <div className="mini-auth-logo">L</div>
           <h1>Connecting wallet</h1>
@@ -36,6 +41,10 @@ export function ReceivePage() {
   if (!address) {
     return (
       <main className="receive-screen">
+        <Link className="receive-back" href="/">
+          <span aria-hidden="true">‹</span>
+          返回
+        </Link>
         <div className="receive-card receive-state">
           <div className="mini-auth-logo">L</div>
           <h1>请先登录</h1>
@@ -48,14 +57,15 @@ export function ReceivePage() {
 
   return (
     <main className="receive-screen">
+      <Link className="receive-back" href="/">
+        <span aria-hidden="true">‹</span>
+        返回
+      </Link>
       <section className="receive-card">
-        <div className="receive-title">
-          <span>Receive</span>
-          <strong>World Chain</strong>
-        </div>
+        <strong className="receive-chain">World Chain</strong>
         {username ? <div className="receive-username">@{username}</div> : null}
         <div className="receive-qr" aria-label="Wallet address QR code">
-          <QRCodeSVG value={address} size={240} bgColor="#ffffff" fgColor="#000000" level="M" />
+          <QRCodeSVG value={address} size={196} bgColor="#ffffff" fgColor="#000000" level="M" />
         </div>
         <code className="receive-address">{address}</code>
       </section>

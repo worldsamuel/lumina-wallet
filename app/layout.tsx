@@ -30,7 +30,7 @@ export default function RootLayout({
   );
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className="bg-stone-50 text-zinc-950">
+      <body className="bg-black text-white">
         <ErudaProvider>
           <MiniKitProvider>
             <LanguageProvider>
