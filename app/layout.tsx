@@ -3,6 +3,8 @@ import "./globals.css";
 import MiniKitProvider from "@/components/minikit-provider";
 import dynamic from "next/dynamic";
 import NextAuthProvider from "@/components/next-auth-provider";
+import { CurrencyProvider } from "@/lib/currency-provider";
+import { LanguageProvider } from "@/lib/i18n/language-provider";
 
 export const metadata: Metadata = {
   title: "Lumina Wallet",
@@ -32,7 +34,11 @@ export default function RootLayout({
       <body className="bg-stone-50 text-zinc-950">
         <NextAuthProvider>
           <ErudaProvider>
-            <MiniKitProvider>{children}</MiniKitProvider>
+            <MiniKitProvider>
+              <LanguageProvider>
+                <CurrencyProvider>{children}</CurrencyProvider>
+              </LanguageProvider>
+            </MiniKitProvider>
           </ErudaProvider>
         </NextAuthProvider>
       </body>
