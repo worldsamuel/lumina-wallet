@@ -165,13 +165,14 @@
   .recv-note { color: var(--text-mute); font-size: 13px; margin: 16px var(--pad-screen) 0; text-align: center; line-height: 1.5; }
   .copy-btn { margin: 18px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--green); color: #042; border: none; border-radius: var(--radius-md); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; }
   .copy-btn:active { opacity: 0.85; }
-  .receive-screen { max-width: var(--phone-max); min-height: 100vh; margin: 0 auto; padding: 12px var(--pad-screen) 110px; background: var(--bg); color: var(--text); }
-  .receive-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 24px; text-align: center; }
+  .receive-screen { max-width: var(--phone-max); min-height: 100vh; margin: 0 auto; padding: 12px var(--pad-screen) 110px; background: var(--bg); color: var(--text); overflow-x: hidden; }
+  .receive-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; text-align: center; overflow: hidden; }
   .receive-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-dim); font-size: 14px; margin-bottom: 18px; }
   .receive-title strong { color: #cfd; font-size: 13px; font-weight: 700; background: var(--surface-3); border-radius: var(--radius-pill); padding: 7px 12px; }
   .receive-username { color: var(--green); font-size: 18px; font-weight: 800; margin: 0 0 18px; }
-  .receive-qr { width: 240px; height: 240px; display: grid; place-items: center; margin: 0 auto 20px; padding: 14px; background: #fff; border-radius: 18px; }
-  .receive-address { display: block; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; color: #d7ddd7; font-size: 12px; line-height: 1.55; word-break: break-all; white-space: normal; }
+  .receive-qr { width: min(240px, calc(100vw - 96px)); aspect-ratio: 1 / 1; display: grid; place-items: center; margin: 0 auto 20px; padding: 12px; background: #fff; border-radius: 18px; overflow: hidden; }
+  .receive-qr svg { width: 100%; height: 100%; display: block; }
+  .receive-address { display: block; max-width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; color: #d7ddd7; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
   .receive-note-live { color: var(--text-mute); font-size: 13px; line-height: 1.55; margin: 16px 8px 0; text-align: center; }
   .receive-copy { margin-top: 18px; width: 100%; background: var(--green); color: #042; border: none; border-radius: var(--radius-md); padding: 16px; font-size: 16px; font-weight: 800; cursor: pointer; }
   .receive-copy:active { opacity: 0.88; transform: scale(0.99); }
