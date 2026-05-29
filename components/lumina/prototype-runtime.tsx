@@ -16,6 +16,8 @@ declare global {
     doLogout?: () => void;
     go?: (name: string) => void;
     loginBack?: () => void;
+    openAnnouncements?: () => void;
+    openLangModal?: () => void;
     setTabByName?: (name: string) => void;
   }
 }

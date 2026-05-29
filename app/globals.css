@@ -61,14 +61,14 @@
   .ann-item { padding: 16px var(--pad-screen); border-bottom: 1px solid var(--line); cursor: default; }
   .ann-item:last-child { border-bottom: none; }
   .ann-item .ann-top { display: flex; align-items: center; gap: 8px; }
-  .ann-item .ann-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
-  .ann-item .ann-tag.notice { background: rgba(74,222,128,0.12); color: var(--green); }
-  .ann-item .ann-tag.warning { background: rgba(245,196,81,0.12); color: #f5c451; }
-  .ann-item .ann-tag.urgent { background: rgba(248,113,113,0.12); color: var(--red); }
-  .ann-item .ann-time { margin-left: auto; color: var(--text-mute); font-size: 11px; }
-  .ann-item .ann-title { font-weight: 700; font-size: 15px; margin-top: 8px; }
-  .ann-item .ann-body { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin-top: 6px; }
-  .ann-empty { padding: 40px var(--pad-screen); text-align: center; color: var(--text-mute); font-size: 14px; }
+  .ann-item .ann-tag { font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 7px; }
+  .ann-item .ann-tag.notice { background: rgba(74,222,128,0.18); color: #62ee95; }
+  .ann-item .ann-tag.warning { background: rgba(245,196,81,0.18); color: #ffd56b; }
+  .ann-item .ann-tag.urgent { background: rgba(248,113,113,0.18); color: #ff8a8a; }
+  .ann-item .ann-time { margin-left: auto; color: #a8aea8; font-size: 12px; }
+  .ann-item .ann-title { color: var(--text); font-weight: 800; font-size: 16px; margin-top: 11px; }
+  .ann-item .ann-body { color: #c6cbc6; font-size: 15px; line-height: 1.65; margin-top: 8px; }
+  .ann-empty { padding: 40px var(--pad-screen); text-align: center; color: #b9beb9; font-size: 14px; }
   /* Help / About 文章样式 */
   .article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; }
   .article h2 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
@@ -130,11 +130,12 @@
   .balance-change .sub { color: #2faf5e; font-weight: 500; }
   .human-pill { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-size: 14px; }
   .human-pill .seal { color: var(--green); display: inline-flex; }
-  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); padding: 22px var(--pad-screen) 6px; }
-  .action { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px 4px 12px; text-align: center; cursor: pointer; transition: transform .12s ease, background .2s; }
+  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 22px var(--pad-screen) 6px; }
+  .action { background: #101210; border: 1px solid #2a2d2a; border-radius: 18px; min-height: 102px; padding: 18px 4px 13px; text-align: center; cursor: pointer; transition: transform .12s ease, background .2s; }
   .action:active { transform: scale(0.95); background: var(--surface-2); }
-  .action .ring { width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid rgba(74,222,128,0.4); display: grid; place-items: center; margin: 0 auto 8px; color: var(--green); }
-  .action .lbl { font-size: 13px; color: var(--text-dim); }
+  .action .ring { width: 58px; height: 58px; border-radius: 50%; border: 2px solid #2f8f55 !important; display: grid; place-items: center; margin: 0 auto 10px; color: var(--green); background: transparent; box-shadow: none !important; filter: none !important; }
+  .action .ring svg { width: 28px; height: 28px; stroke-width: 2.2; filter: none !important; }
+  .action .lbl { font-size: 15px; color: #9ca39c; line-height: 1.1; }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }
   .section-head .link { color: var(--green); font-size: 15px; cursor: pointer; }
@@ -240,16 +241,16 @@
   .slip-opt.sel { border-color: var(--green); color: var(--green); background: rgba(74,222,128,0.08); }
   .slip-custom { width: 72px; flex: 1; padding: 7px 10px !important; font-size: 13px !important; border-radius: 8px !important; }
   /* 代币选择弹窗 */
-  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; z-index: 80; }
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.42); display: none; align-items: flex-end; justify-content: center; z-index: 80; }
   .modal-mask.open { display: flex; animation: fade .2s ease; }
-  .modal { width: 100%; max-width: var(--phone-max); background: #0c0d0c; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid var(--line); padding: 8px 0 24px; max-height: 70vh; overflow-y: auto; }
-  .modal-grip { width: 40px; height: 4px; border-radius: 4px; background: #444; margin: 8px auto 14px; }
-  .modal h3 { font-size: 17px; padding: 0 var(--pad-screen) 12px; }
+  .modal { width: 100%; max-width: var(--phone-max); background: #111311; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid #303330; padding: 8px 0 24px; max-height: 76vh; overflow-y: auto; box-shadow: 0 -18px 55px rgba(0,0,0,0.45); }
+  .modal-grip { width: 44px; height: 5px; border-radius: 5px; background: #666a66; margin: 8px auto 18px; }
+  .modal h3 { font-size: 18px; color: var(--text); font-weight: 800; padding: 0 var(--pad-screen) 14px; }
   .modal .tk-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); cursor: pointer; }
-  .modal .tk-row:active { background: var(--surface-2); }
+  .modal .tk-row:active { background: #1a1d1a; }
   .modal .tk-row .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
-  .modal .tk-row .mid { flex: 1; } .modal .tk-row .mid .s { font-weight: 700; } .modal .tk-row .mid .f { color: var(--text-mute); font-size: 12px; margin-top: 2px; }
-  .modal .tk-row .bal { text-align: right; font-size: 13px; color: var(--text-dim); }
+  .modal .tk-row .mid { flex: 1; } .modal .tk-row .mid .s { color: var(--text); font-weight: 700; } .modal .tk-row .mid .f { color: #a2a8a2; font-size: 12px; margin-top: 2px; }
+  .modal .tk-row .bal { text-align: right; font-size: 13px; color: #b9beb9; }
   .tk-search { padding: 0 var(--pad-screen) 8px; }
   .tk-search input { width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; color: var(--text); font-size: 14px; outline: none; }
   .tk-search input:focus { border-color: rgba(74,222,128,0.5); }
