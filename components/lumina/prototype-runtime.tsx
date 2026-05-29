@@ -90,6 +90,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeEarn();
       enhancePrototypeTokens();
       enhancePrototypeHome();
+      enhancePrototypeMarket();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -780,6 +781,127 @@ function enhancePrototypeHome() {
 }
 
 /**
+ * Replaces fake gainers and placeholder token changes with World Chain pool market data.
+ */
+function enhancePrototypeMarket() {
+  const source = `
+    (function(){
+      window.__luminaMarketBySymbol = window.__luminaMarketBySymbol || {};
+      function worldLogo(){
+        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      }
+      function iconFor(symbol, fallback){
+        if (String(symbol).toUpperCase() === "WLD") return worldLogo();
+        return fallback || String(symbol || "?").slice(0, 3).toUpperCase();
+      }
+      function coinHtml(asset){
+        return '<div class="coin ' + (asset.cls || "custom") + '">' + iconFor(asset.sym, asset.logo) + '</div>';
+      }
+      function moneyCompact(value){
+        var n = Number(value || 0);
+        if (!Number.isFinite(n)) return "$0";
+        if (n >= 1000000) return "$" + (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + "M";
+        if (n >= 1000) return "$" + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K";
+        return "$" + n.toFixed(0);
+      }
+      function formatMarketPrice(value){
+        var n = Number(value || 0);
+        if (!n) return "No price";
+        if (n < 0.0001) return "$" + n.toExponential(2);
+        if (n < 1) return "$" + n.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+        return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+      }
+      function setIcon(el, symbol, fallback){
+        if (!el) return;
+        el.innerHTML = iconFor(symbol, fallback);
+      }
+      function applyTokenLogos(){
+        tokenLogo.WLD = worldLogo();
+        (assets || []).forEach(function(asset){
+          if (asset.sym === "WLD") asset.logo = worldLogo();
+        });
+      }
+      function registerMarketToken(market){
+        var sym = market.symbol;
+        prices[sym] = market.priceUsd || 0;
+        dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
+        tokenFull[sym] = market.name || sym;
+        tokenLogo[sym] = iconFor(sym, market.symbol);
+        tokenChanges24h = tokenChanges24h || {};
+        tokenChanges24h[sym] = market.change24h;
+        window.__luminaMarketBySymbol[sym] = market;
+        if (balances[sym] === undefined) balances[sym] = "0";
+      }
+      function openMarketDetail(symbol){
+        var market = window.__luminaMarketBySymbol[symbol];
+        if (!market) return;
+        registerMarketToken(market);
+        var idx = (assets || []).findIndex(function(asset){ return asset.sym === symbol && asset.marketOnly; });
+        if (idx < 0) {
+          idx = assets.length;
+          assets.push({
+            sym: symbol,
+            full: market.name || symbol,
+            amt: (balances[symbol] || "0") + " " + symbol,
+            usdNum: 0,
+            cls: symbol === "WLD" ? "wld" : "custom",
+            logo: iconFor(symbol, symbol),
+            marketOnly: true,
+            marketAddress: market.address,
+            marketChange24h: market.change24h
+          });
+        }
+        openDetail(idx);
+      }
+      window.openMarketDetail = openMarketDetail;
+      function renderGainersFromMarkets(markets){
+        var box = document.getElementById("gainersList");
+        if (!box) return;
+        if (!markets.length) {
+          box.innerHTML = '<div class="import-load">World Chain 暂无满足流动性条件的 24h 涨幅数据</div>';
+          return;
+        }
+        box.innerHTML = markets.map(function(g, i){
+          registerMarketToken(g);
+          var rankCls = i < 3 ? "rank top" : "rank";
+          var bg = g.symbol === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
+          var color = g.symbol === "WLD" ? "#000" : "#fff";
+          var pctClass = Number(g.change24h || 0) >= 0 ? "pct" : "pct down";
+          return '<div class="gainer" onclick="openMarketDetail(\\'' + g.symbol + '\\')">' +
+            '<div class="' + rankCls + '">' + (i + 1) + '</div>' +
+            '<div class="ic" style="background:' + bg + ';color:' + color + '">' + iconFor(g.symbol, g.symbol.slice(0, 3)) + '</div>' +
+            '<div class="mid"><div class="s">' + g.symbol + '</div><div class="p">' + formatMarketPrice(g.priceUsd) + '</div></div>' +
+            '<div class="chg"><div class="' + pctClass + '">' + (Number(g.change24h || 0) >= 0 ? "+" : "") + Number(g.change24h || 0).toFixed(2) + '%</div><div class="vol">Vol ' + moneyCompact(g.volume24hUsd) + '</div></div>' +
+          '</div>';
+        }).join("");
+      }
+      applyTokenLogos();
+      if (typeof renderGainers === "function") {
+        renderGainers = function(){
+          var box = document.getElementById("gainersList");
+          if (box) box.innerHTML = '<div class="import-load">读取 World Chain 链上行情...</div>';
+          fetch("/api/tokens/top", { cache: "no-store" })
+            .then(function(res){ return res.ok ? res.json() : []; })
+            .then(function(markets){ renderGainersFromMarkets(Array.isArray(markets) ? markets : []); })
+            .catch(function(){ renderGainersFromMarkets([]); });
+        };
+        renderGainers();
+      }
+      var previousRenderAssets = typeof renderAssets === "function" ? renderAssets : null;
+      if (previousRenderAssets && !window.__luminaMarketRenderAssets) {
+        window.__luminaMarketRenderAssets = true;
+        renderAssets = function(){
+          applyTokenLogos();
+          previousRenderAssets();
+          document.querySelectorAll(".coin.wld").forEach(function(el){ setIcon(el, "WLD", ""); });
+        };
+      }
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance market data");
+}
+
+/**
  * Adds interactive market ranges and a Worldscan link to the preserved prototype detail view.
  */
 function enhancePrototypeDetail() {
@@ -842,6 +964,43 @@ function enhancePrototypeDetail() {
         return "";
       }
 
+      function detailWorldLogo(){
+        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      }
+
+      function detailTokenIcon(asset) {
+        return asset.sym === "WLD" ? detailWorldLogo() : (asset.logo || asset.sym.charAt(0));
+      }
+
+      function compactUsd(value) {
+        var n = Number(value || 0);
+        if (!Number.isFinite(n)) return "$0";
+        if (n >= 1000000) return "$" + (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + "M";
+        if (n >= 1000) return "$" + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K";
+        return "$" + n.toFixed(0);
+      }
+
+      function marketForAsset(asset) {
+        var map = window.__luminaMarketBySymbol || {};
+        return map[asset.sym] || null;
+      }
+
+      function renderMarketCard(asset) {
+        var market = marketForAsset(asset);
+        var chart = document.getElementById("detChart");
+        if (!chart) return;
+        if (!market || !market.liquidityUsd) {
+          chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
+          return;
+        }
+        chart.innerHTML =
+          '<div class="market-detail-state live"><strong>World Chain pool</strong>' +
+          '<div class="market-stat-row"><span>24h Volume</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>Liquidity</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>Pool</span><b>' + String(market.poolAddress || "").slice(0, 6) + "..." + String(market.poolAddress || "").slice(-4) + '</b></div>' +
+          '</div>';
+      }
+
       function ensureDetailShell() {
         var view = document.getElementById("view-detail");
         if (!view || view.dataset.luminaDetailV2 === "1") return;
@@ -873,6 +1032,14 @@ function enhancePrototypeDetail() {
 
       function renderRange(range) {
         ensureDetailShell();
+        var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
+        if (asset) {
+          renderMarketCard(asset);
+          document.querySelectorAll("#view-detail .range").forEach(function(el) {
+            el.classList.toggle("sel", el.textContent.trim() === range);
+          });
+          return;
+        }
         var chart = document.getElementById("detChart");
         if (chart) chart.innerHTML = chartSvg(range);
         document.querySelectorAll("#view-detail .range").forEach(function(el) {
@@ -904,18 +1071,25 @@ function enhancePrototypeDetail() {
       function updateDetailContent(asset) {
         ensureDetailShell();
         var coin = document.getElementById("detCoin");
-        coin.textContent = asset.logo || asset.sym.charAt(0);
+        coin.innerHTML = detailTokenIcon(asset);
         coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
         document.getElementById("detTitle").textContent = asset.sym;
         document.getElementById("detName").textContent = asset.full || asset.sym;
         document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
         document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
-        var change = 0;
-        try { change = tokenChanges24h && tokenChanges24h[asset.sym] ? tokenChanges24h[asset.sym] : 3.2; } catch(e) { change = 3.2; }
+        var change = null;
+        try { change = tokenChanges24h && tokenChanges24h[asset.sym] !== undefined ? tokenChanges24h[asset.sym] : null; } catch(e) { change = null; }
         var pill = document.getElementById("detChangePill");
+        if (change === null || change === undefined || !Number.isFinite(Number(change))) {
+          pill.className = "none";
+          pill.textContent = "无行情";
+          renderMarketCard(asset);
+          return;
+        }
         var up = change >= 0;
         pill.className = up ? "up" : "down";
         pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
+        renderMarketCard(asset);
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;

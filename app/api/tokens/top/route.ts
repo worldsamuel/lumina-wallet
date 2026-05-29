@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { db } from "@/lib/db";
+import { getWorldChainMarkets } from "@/lib/market-data";
 
 export function OPTIONS() {
   return optionsResponse();
@@ -12,9 +12,6 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
 
-  const tokens = await db.token.findMany({
-    where: { status: "verified", onTopRanking: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const tokens = await getWorldChainMarkets();
   return jsonResponse(tokens);
 }

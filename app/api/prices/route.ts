@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { TOKENS } from "@/lib/tokens";
+import { getWorldChainMarkets } from "@/lib/market-data";
 
 const CACHE_TTL_MS = 30_000;
-const COINGECKO_URL = "https://api.coingecko.com/api/v3/simple/price";
 
 export const dynamic = "force-dynamic";
 
 type PriceMeta = {
-  source: "coingecko" | "cache" | "fallback";
-  changes_24h: Record<string, number>;
+  source: "worldchain" | "cache" | "fallback";
+  changes_24h: Record<string, number | null>;
   last_updated_at: Record<string, number>;
+  liquidity_usd: Record<string, number>;
+  volume_24h_usd: Record<string, number>;
 };
 
 type PricePayload = Record<string, number | string | PriceMeta> & {
@@ -26,14 +28,16 @@ function fallbackPrices(): PricePayload {
     updated_at: new Date().toISOString(),
     meta: {
       source: "fallback",
-      changes_24h: Object.fromEntries(TOKENS.map((token) => [token.symbol, 0])),
+      changes_24h: Object.fromEntries(TOKENS.map((token) => [token.symbol, null])),
       last_updated_at: {},
+      liquidity_usd: {},
+      volume_24h_usd: {},
     },
   };
 }
 
 /**
- * Returns current CoinGecko token prices with a 30-second in-memory cache.
+ * Returns current World Chain on-chain token prices with a 30-second in-memory cache.
  */
 export async function GET() {
   if (cachedPrices && cachedPrices.expiresAt > Date.now()) {
@@ -43,42 +47,31 @@ export async function GET() {
     });
   }
 
-  const params = new URLSearchParams({
-    ids: TOKENS.map((token) => token.coingeckoId).join(","),
-    vs_currencies: "usd",
-    include_24hr_change: "true",
-    include_last_updated_at: "true",
-  });
-
   try {
-    const response = await fetch(`${COINGECKO_URL}?${params}`, {
-      headers: { accept: "application/json" },
-      next: { revalidate: 30 },
-    });
-    if (!response.ok) throw new Error(`CoinGecko responded ${response.status}`);
-
-    const body = (await response.json()) as Record<
-      string,
-      { usd?: number; usd_24h_change?: number; last_updated_at?: number }
-    >;
-
+    const markets = await getWorldChainMarkets();
+    const marketBySymbol = new Map(markets.map((market) => [market.symbol, market]));
     const prices = Object.fromEntries(
-      TOKENS.map((token) => [token.symbol, body[token.coingeckoId]?.usd ?? token.priceUsd]),
+      TOKENS.map((token) => [token.symbol, marketBySymbol.get(token.symbol)?.priceUsd ?? token.priceUsd]),
     );
     const changes = Object.fromEntries(
-      TOKENS.map((token) => [token.symbol, body[token.coingeckoId]?.usd_24h_change ?? 0]),
+      TOKENS.map((token) => [token.symbol, marketBySymbol.get(token.symbol)?.change24h ?? null]),
     );
-    const updated = Object.fromEntries(
-      TOKENS.map((token) => [token.symbol, body[token.coingeckoId]?.last_updated_at ?? 0]),
+    const liquidity = Object.fromEntries(
+      TOKENS.map((token) => [token.symbol, marketBySymbol.get(token.symbol)?.liquidityUsd ?? 0]),
+    );
+    const volume = Object.fromEntries(
+      TOKENS.map((token) => [token.symbol, marketBySymbol.get(token.symbol)?.volume24hUsd ?? 0]),
     );
 
     const data: PricePayload = {
       ...prices,
       updated_at: new Date().toISOString(),
       meta: {
-        source: "coingecko",
+        source: "worldchain",
         changes_24h: changes,
-        last_updated_at: updated,
+        last_updated_at: {},
+        liquidity_usd: liquidity,
+        volume_24h_usd: volume,
       },
     };
 

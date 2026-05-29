@@ -28,9 +28,11 @@ export type PricesResponse = Record<string, number | string | PriceMeta> & {
 };
 
 type PriceMeta = {
-  source: "coingecko" | "cache" | "fallback";
-  changes_24h: Record<string, number>;
+  source: "worldchain" | "cache" | "fallback";
+  changes_24h: Record<string, number | null>;
   last_updated_at: Record<string, number>;
+  liquidity_usd?: Record<string, number>;
+  volume_24h_usd?: Record<string, number>;
 };
 
 type PrototypeAsset = {

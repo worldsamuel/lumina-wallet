@@ -40,7 +40,7 @@ export function AssetPage({ symbol }: AssetPageProps) {
   const priceUsd =
     typeof prices.data?.[upperSymbol] === "number" ? (prices.data[upperSymbol] as number) : token?.priceUsd ?? 0;
   const usdValue = balance ? (Number.parseFloat(balance.formatted || "0") || 0) * priceUsd : 0;
-  const change24h = prices.data?.meta?.changes_24h?.[upperSymbol] ?? 0;
+  const change24h = prices.data?.meta?.changes_24h?.[upperSymbol] ?? null;
 
   if (status === "not-installed") {
     return (
@@ -91,7 +91,15 @@ export function AssetPage({ symbol }: AssetPageProps) {
               {formatTokenAmount(balance.formatted)} {balance.symbol}
             </div>
             <div className="asset-detail-usd">
-              ${usdValue.toFixed(2)} · <span className={change24h >= 0 ? "asset-up" : "asset-down"}>{formatChange(change24h)}</span> (24h)
+              ${usdValue.toFixed(2)}
+              {change24h === null ? (
+                <span> · 无 24h 行情</span>
+              ) : (
+                <>
+                  {" "}
+                  · <span className={change24h >= 0 ? "asset-up" : "asset-down"}>{formatChange(change24h)}</span> (24h)
+                </>
+              )}
             </div>
           </>
         ) : (
