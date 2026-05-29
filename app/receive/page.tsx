@@ -1,8 +1,8 @@
-import { RouteView } from "@/components/lumina/route-view";
+import { ReceivePage } from "@/components/lumina/receive-page";
 
 /**
- * Renders the Lumina v22 receive view.
+ * Renders the real wallet receive view.
  */
 export default function Page() {
-  return <RouteView view="receive" />;
+  return <ReceivePage />;
 }

@@ -7,6 +7,7 @@ import type { WalletAuthPayload } from "./wallet-auth-types";
 
 const STATEMENT = "Sign in to Lumina";
 const MOCK_ADDRESS = "0x4a3a000000000000000000000000000000006F2d";
+const MOCK_USERNAME = "lumina-demo";
 
 type WalletAuthStatus = "checking" | "not-installed" | "authenticating" | "authenticated" | "error";
 
@@ -40,7 +41,7 @@ async function verifyWalletAuth(nonce: string, payload: WalletAuthPayload) {
  * Runs the World MiniKit walletAuth login flow and stores the authenticated wallet address.
  */
 export function useWalletAuth() {
-  const { address, setAddress, clear } = useAuthStore();
+  const { address, setUser, clear } = useAuthStore();
   const [status, setStatus] = useState<WalletAuthStatus>("checking");
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +51,7 @@ export function useWalletAuth() {
     setError(null);
 
     if (mockMode) {
-      setAddress(MOCK_ADDRESS);
+      setUser({ address: MOCK_ADDRESS, username: MOCK_USERNAME });
       setStatus("authenticated");
       return;
     }
@@ -68,13 +69,20 @@ export function useWalletAuth() {
       const result = await MiniKit.walletAuth({ nonce, statement: STATEMENT });
       const payload = result.data as WalletAuthPayload;
       const verified = await verifyWalletAuth(nonce, payload);
-      setAddress(verified.address);
+      const miniKitUser = MiniKit.user as { username?: string; walletAddress?: string } | undefined;
+      const userAddress = miniKitUser?.walletAddress ?? verified.address ?? payload.address;
+      const userProfile = await MiniKit.getUserByAddress(userAddress).catch(() => null);
+      const username =
+        miniKitUser?.username ??
+        (userProfile as { username?: string } | null)?.username ??
+        null;
+      setUser({ address: userAddress, username });
       setStatus("authenticated");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wallet authentication failed.");
       setStatus("error");
     }
-  }, [mockMode, setAddress]);
+  }, [mockMode, setUser]);
 
   const logout = useCallback(async () => {
     await fetch("/api/auth/logout", { method: "POST" });
