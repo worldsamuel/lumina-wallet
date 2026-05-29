@@ -88,6 +88,10 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       wireRealReceiveLinks(host);
       enhancePrototypeDetail();
       enhancePrototypeEarn();
+      enhancePrototypeTokens();
+      if (initialView === "allassets") {
+        (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
+      }
       setPrototypeReady(true);
     });
 
@@ -425,6 +429,199 @@ function enhancePrototypeEarn() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance Earn prototype");
+}
+
+/**
+ * Replaces prototype token import mocks with live ERC-20 metadata and a risk-aware all-assets view.
+ */
+function enhancePrototypeTokens() {
+  const source = `
+    (function(){
+      var importStoreKey = "lumina_imported_tokens_v1";
+      var hiddenStoreKey = "lumina_hidden_risk_tokens_v1";
+
+      function readJson(key, fallback){
+        try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; }
+      }
+      function writeJson(key, value){
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
+      }
+      function tokenInitial(symbol){
+        symbol = String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase();
+        return symbol || "?";
+      }
+      function riskLabel(score){
+        if (score === "high") return "High risk";
+        if (score === "mid") return "Risk";
+        return "Verified";
+      }
+      function riskClass(score){
+        return score === "high" ? "high" : (score === "mid" ? "mid" : "low");
+      }
+      function formatImportedAmount(value){
+        var n = Number.parseFloat(String(value || "0"));
+        if (!Number.isFinite(n) || n === 0) return "0";
+        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 });
+      }
+      function importedList(){
+        var list = readJson(importStoreKey, []);
+        return Array.isArray(list) ? list : [];
+      }
+      function hiddenSet(){
+        var list = readJson(hiddenStoreKey, []);
+        return new Set(Array.isArray(list) ? list.map(function(x){ return String(x).toLowerCase(); }) : []);
+      }
+      function saveImported(token){
+        var list = importedList().filter(function(item){
+          return String(item.address).toLowerCase() !== String(token.address).toLowerCase();
+        });
+        list.unshift(token);
+        writeJson(importStoreKey, list);
+      }
+      function registerImportedToken(token){
+        var key = token.symbol;
+        if (prices[key] && token.address) key = token.symbol + "_" + token.address.slice(-4).toUpperCase();
+        var score = token.risk && token.risk.score ? token.risk.score : "mid";
+        prices[key] = 0;
+        tokenFull[key] = token.name || token.symbol;
+        tokenLogo[key] = tokenInitial(token.symbol);
+        dotColor[key] = "linear-gradient(135deg,#202820,#324036)";
+        balances[key] = formatImportedAmount(token.formatted);
+        availMap[key] = balances[key] + " " + key;
+        customTokens[key] = {
+          address: token.address,
+          decimals: token.decimals,
+          name: token.name,
+          risk: score,
+          sourceSymbol: token.symbol,
+          verified: !!token.verified
+        };
+        return key;
+      }
+      function restoreImportedTokens(){
+        importedList().forEach(function(token){ registerImportedToken(token); });
+      }
+      function renderScanRows(risk){
+        var checks = risk && Array.isArray(risk.checks) ? risk.checks : [];
+        return checks.map(function(c){
+          var level = c.level === "danger" ? "danger" : (c.level === "warn" ? "warn" : "pass");
+          return '<div class="scan-row ' + level + '"><span class="dot3"></span><span class="k">' + c.key + '</span><span class="v">' + c.value + '</span></div>';
+        }).join("");
+      }
+
+      showImportPreview = async function(addr){
+        var owner = window.__luminaUserAddress || "";
+        var preview = document.getElementById("importPreview");
+        preview.innerHTML = '<div class="import-load">Reading token contract...</div>';
+        try {
+          var res = await fetch("/api/token-info?address=" + encodeURIComponent(addr) + "&owner=" + encodeURIComponent(owner), { cache: "no-store" });
+          var token = await res.json();
+          if (!res.ok) throw new Error(token.error || "Unable to read token");
+          var score = token.risk && token.risk.score ? token.risk.score : "mid";
+          var needAck = score !== "low";
+          var btnAttr = needAck ? ' disabled id="impBtn"' : ' id="impBtn"';
+          var ackHtml = needAck
+            ? '<div class="ack" id="impAck" onclick="toggleImpAck()"><span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#042" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>This token is not verified. Importing it may expose you to honeypot, high-tax, fake-token, or no-liquidity risk.</span></div>'
+            : "";
+          preview.innerHTML =
+            '<div class="import-card">' +
+              '<div class="hd">' +
+                '<div class="ic token-initial">' + tokenInitial(token.symbol) + '</div>' +
+                '<div class="mid"><div class="s">' + token.symbol + '</div><div class="f">' + token.name + ' · Balance ' + formatImportedAmount(token.formatted) + '</div></div>' +
+              '</div>' +
+              '<div class="addr">' + token.address + '</div>' +
+              '<div class="scan-rows">' + renderScanRows(token.risk) + '</div>' +
+              '<div class="risk-score ' + riskClass(score) + '"><span class="big">' + riskLabel(score) + '</span><span class="txt">Risk affects display and swap/send protection. High-risk tokens are hidden from Home and shown in View All.</span></div>' +
+              ackHtml +
+              '<button class="btn"' + btnAttr + ' onclick="doImportFromInfo()">' + (needAck ? "Import anyway" : "Import") + ' ' + token.symbol + '</button>' +
+            '</div>';
+          window.__luminaImportCandidate = token;
+        } catch(e) {
+          preview.innerHTML = '<div class="import-err">' + (e && e.message ? e.message : "Unable to read token") + '</div>';
+        }
+      };
+
+      doImportFromInfo = function(){
+        var token = window.__luminaImportCandidate;
+        if (!token) return;
+        saveImported(token);
+        var key = registerImportedToken(token);
+        if ((token.risk && token.risk.score) === "high") {
+          var hidden = Array.from(hiddenSet());
+          hidden.push(String(token.address).toLowerCase());
+          writeJson(hiddenStoreKey, Array.from(new Set(hidden)));
+        }
+        document.getElementById("tkSearch").value = "";
+        document.getElementById("importPreview").innerHTML = "";
+        toast("Imported " + token.symbol);
+        pickToken(key);
+      };
+
+      doImport = function(sym, addr, score){
+        showImportPreview(addr);
+      };
+
+      function assetIconHtml(symbol, className, logo) {
+        return '<div class="coin ' + (className || "custom") + '">' + (logo || tokenInitial(symbol)) + '</div>';
+      }
+      function importedAssetRow(token, hidden) {
+        var key = Object.keys(customTokens).find(function(sym){
+          return customTokens[sym] && String(customTokens[sym].address).toLowerCase() === String(token.address).toLowerCase();
+        }) || token.symbol;
+        var score = token.risk && token.risk.score ? token.risk.score : "mid";
+        var badge = '<span class="asset-risk ' + riskClass(score) + '">' + riskLabel(score) + '</span>';
+        return '<div class="asset all-asset-row risk-token" onclick="openImportedRisk(\\'' + token.address + '\\')">' +
+          '<div class="coin custom">' + tokenInitial(token.symbol) + '</div>' +
+          '<div class="name"><div class="sym">' + token.symbol + ' ' + badge + '</div><div class="full">' + token.name + '</div></div>' +
+          '<div class="asset-contract">' + String(token.address).slice(0, 6) + "..." + String(token.address).slice(-4) + '</div>' +
+          '<div class="vals"><div class="amt">' + (balances[key] || formatImportedAmount(token.formatted)) + ' ' + token.symbol + '</div><div class="usd">' + (hidden ? "Hidden on Home" : "Imported") + '</div></div>' +
+        '</div>';
+      }
+
+      function ensureAllAssetsView(){
+        if (document.getElementById("view-allassets")) return;
+        var view = document.createElement("div");
+        view.className = "view";
+        view.id = "view-allassets";
+        view.innerHTML =
+          '<div class="subhead"><button class="back-btn" onclick="go(\\'home\\'); setTabByName(\\'Home\\')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1>All assets</h1></div>' +
+          '<div class="all-assets-note">Verified assets appear on Home. Imported high-risk tokens are hidden there and listed here for review.</div>' +
+          '<div class="assets all-assets-list" id="allAssetList"></div>';
+        document.querySelector(".phone").appendChild(view);
+      }
+      function renderAllAssets(){
+        ensureAllAssetsView();
+        var hidden = hiddenSet();
+        var verifiedRows = (assets || []).map(function(a, i){
+          return '<div class="asset all-asset-row" onclick="openDetail(' + i + ')">' +
+            assetIconHtml(a.sym, a.cls, a.logo) +
+            '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk low">Verified</span></div><div class="full">' + a.full + '</div></div>' +
+            '<div></div><div class="vals"><div class="amt">' + a.amt + '</div><div class="usd">' + formatMoney(a.usdNum || 0) + '</div></div></div>';
+        });
+        var importedRows = importedList().map(function(token){
+          return importedAssetRow(token, hidden.has(String(token.address).toLowerCase()));
+        });
+        document.getElementById("allAssetList").innerHTML = verifiedRows.concat(importedRows).join("") || '<div class="article-empty">No assets detected yet</div>';
+      }
+      window.openAllAssets = function(){
+        renderAllAssets();
+        go("allassets");
+        setTabByName("Home");
+      };
+      window.openImportedRisk = function(address){
+        var token = importedList().find(function(item){ return String(item.address).toLowerCase() === String(address).toLowerCase(); });
+        if (!token) return;
+        toast((token.risk && token.risk.score === "high") ? "High risk token" : "Imported token");
+      };
+
+      var viewAll = document.querySelector(".section-head .link[data-i18n='viewAll']");
+      if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
+
+      restoreImportedTokens();
+      ensureAllAssetsView();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance token import");
 }
 
 /**

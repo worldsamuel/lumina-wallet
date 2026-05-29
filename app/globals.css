@@ -149,9 +149,19 @@
   .asset .coin { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
   .coin.wld { background: #fff; color: #000; } .coin.usdc { background: var(--blue); color: #fff; }
   .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
+  .coin.custom, .token-initial { background: linear-gradient(135deg,#202820,#324036); color: var(--green); border: 1px solid rgba(74,222,128,0.28); font-size: 12px; letter-spacing: 0; }
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
   .asset .spark { width: 80px; height: 34px; }
   .asset .vals { text-align: right; white-space: nowrap; } .asset .vals .amt { font-weight: 700; font-size: 15px; } .asset .vals .usd { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+  .asset-risk { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; }
+  .asset-risk.low { background: rgba(74,222,128,0.13); color: var(--green); }
+  .asset-risk.mid { background: rgba(245,196,81,0.13); color: #f5c451; }
+  .asset-risk.high { background: rgba(248,113,113,0.14); color: var(--red); }
+  .asset-contract { color: var(--text-mute); font-size: 12px; text-align: right; }
+  .all-assets-note { margin: 64px var(--pad-screen) 12px; color: var(--text-dim); font-size: 13px; line-height: 1.55; }
+  .all-assets-list { margin-top: 0; }
+  .all-assets-list .asset { grid-template-columns: 44px minmax(0,1fr) 74px auto; }
+  .risk-token .name .sym { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
   .asset-skeleton { pointer-events: none; }
   .asset-skeleton .coin,
   .asset-skeleton .sym,
