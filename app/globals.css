@@ -59,6 +59,7 @@
   #view-apps > p,
   #view-help #helpContent,
   #view-about #aboutContent { margin-top: 10px !important; }
+  #view-send .form-card { margin-top: 64px !important; }
   .ann-item { padding: 16px var(--pad-screen); border-bottom: 1px solid var(--line); cursor: default; }
   .ann-item:last-child { border-bottom: none; }
   .ann-item .ann-top { display: flex; align-items: center; gap: 8px; }
@@ -245,14 +246,17 @@
   .detail-top { text-align: center; padding: 6px var(--pad-screen) 0; }
   .detail-coin { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px; display: grid; place-items: center; font-weight: 700; font-size: 20px; }
   .detail-amt { font-size: 32px; font-weight: 800; } .detail-usd { color: var(--text-dim); font-size: 15px; margin-top: 4px; }
-  .detail-chart { margin: 22px var(--pad-screen) 0; height: 140px; }
-  .detail-chart svg { width: 100%; height: 100%; }
-  .range-row { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
-  .range { padding: 6px 14px; border-radius: var(--radius-pill); font-size: 13px; color: var(--text-dim); cursor: pointer; }
+  .detail-chart { margin: 18px 0 0; width: 100%; height: 178px; overflow: hidden; }
+  .detail-chart svg { width: 100%; height: 100%; display: block; }
+  .range-row { display: flex; justify-content: space-between; gap: 6px; margin: 16px var(--pad-screen) 0; }
+  .range { min-width: 48px; padding: 10px 0; border-radius: var(--radius-pill); font-size: 16px; color: var(--text-dim); text-align: center; cursor: pointer; transition: color .15s ease, background .15s ease, transform .12s ease; }
+  .range:active { transform: scale(0.94); }
   .range.sel { background: var(--surface-2); color: var(--green); }
-  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px var(--pad-screen) 0; }
-  .detail-actions button { padding: 15px; border-radius: var(--radius-md); border: none; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 22px var(--pad-screen) 0; }
+  .detail-actions button { min-height: 56px; padding: 15px; border-radius: var(--radius-md); border: none; font-size: 16px; font-weight: 800; cursor: pointer; }
   .btn-primary { background: var(--green); color: #042; } .btn-ghost { background: var(--surface-2); color: var(--text); }
+  .explorer-link { display: flex; align-items: center; justify-content: center; min-height: 48px; margin: 14px var(--pad-screen) 0; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); color: #a6ada6; text-decoration: none; font-size: 14px; font-weight: 800; }
+  .explorer-link:active { background: var(--surface-2); color: var(--green); }
   /* Swap 增强:汇率详情/价格影响 */
   .swap-detail { margin: 14px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
   .swap-detail .ln { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; }
