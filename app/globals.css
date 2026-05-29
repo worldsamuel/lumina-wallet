@@ -442,6 +442,7 @@
   .unv-warn .ack2.checked .box { background: var(--red); }
   .unv-warn .ack2.checked .box svg { display: block; } .unv-warn .ack2 .box svg { display: none; }
   .send-submit:disabled { background: var(--surface-3); color: var(--text-mute); cursor: not-allowed; }
+  .send-submit.quote-only { background: var(--surface-3); color: var(--text-mute); border: 1px solid var(--line); }
   /* 涨幅榜 */
   .gainers-head { display: flex; align-items: center; justify-content: space-between; padding: 26px var(--pad-screen) 4px; }
   .gainers-head .l { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }

@@ -91,6 +91,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeTokens();
       enhancePrototypeHome();
       enhancePrototypeMarket();
+      enhancePrototypeSwapQuote();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -160,7 +161,7 @@ function exposeEarnWalletConfirm() {
 function resetPrototypePortfolio() {
   const source = `
     assets = [];
-    balances = {};
+    balances = { WLD: "0", USDC: "0", ETH: "0" };
     availMap = {};
     totalUsdNum = 0;
     change24hUsdNum = 0;
@@ -899,6 +900,123 @@ function enhancePrototypeMarket() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance market data");
+}
+
+/**
+ * Connects the Swap view to read-only Uniswap v3 quotes. It does not submit transactions.
+ */
+function enhancePrototypeSwapQuote() {
+  const source = `
+    (function(){
+      var quoteTimer = null;
+      var quoteSeq = 0;
+      function shortAmount(value){
+        var n = Number(value);
+        if (!Number.isFinite(n)) return "—";
+        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 8 : 6 });
+      }
+      function slippageBps(){
+        var txt = (document.getElementById("slipTxt") && document.getElementById("slipTxt").textContent || "0.5%").replace("%", "");
+        var n = Number(txt);
+        return Number.isFinite(n) ? Math.round(n * 100) : 50;
+      }
+      function feeEl(){
+        var rows = document.querySelectorAll(".swap-detail .ln");
+        return rows[3] ? rows[3].querySelector("span:last-child") : null;
+      }
+      function setSwapButtonPending(){
+        var btn = document.getElementById("swapBtn");
+        if (!btn) return;
+        btn.classList.add("quote-only");
+        btn.disabled = false;
+        btn.onclick = function(){ toast("真实兑换交易即将上线"); };
+      }
+      function setQuoteState(message, impactClass){
+        var buy = document.getElementById("buyAmt");
+        var rate = document.getElementById("rateTxt");
+        var impact = document.getElementById("impactTxt");
+        var gas = feeEl();
+        if (buy) buy.value = "—";
+        if (rate) rate.textContent = message;
+        if (impact) { impact.textContent = "—"; impact.className = impactClass || "impact-mid"; }
+        if (gas) gas.textContent = "—";
+      }
+      function applyQuote(data){
+        var buy = document.getElementById("buyAmt");
+        var rate = document.getElementById("rateTxt");
+        var impact = document.getElementById("impactTxt");
+        var gas = feeEl();
+        var amountIn = Number(data.fromAmount);
+        var amountOut = Number(data.toAmount);
+        if (buy) buy.value = shortAmount(data.toAmount);
+        if (rate && amountIn > 0 && amountOut > 0) {
+          rate.textContent = "1 " + data.fromToken + " ≈ " + shortAmount(amountOut / amountIn) + " " + data.toToken + " · " + data.route.join(" → ");
+        }
+        if (impact) {
+          var p = Number(data.priceImpact || 0);
+          impact.textContent = p < 0.01 ? "<0.01%" : p.toFixed(2) + "%";
+          impact.className = p < 1 ? "impact-low" : (p < 3 ? "impact-mid" : "impact-high");
+        }
+        if (gas) gas.textContent = data.gasLabel || (data.gas ? "~" + Number(data.gas).toLocaleString() + " gas" : "—");
+      }
+      async function requestQuote(){
+        setSwapButtonPending();
+        var sell = document.getElementById("sellAmt");
+        var amount = sell ? String(sell.value || "").trim() : "";
+        if (!amount || Number(amount) <= 0) {
+          setQuoteState("输入卖出数量获取报价");
+          return;
+        }
+        if (customTokens && (customTokens[swapState.sell] || customTokens[swapState.buy])) {
+          setQuoteState("导入代币暂不支持报价,需要先验证池子和 approve 风险", "impact-high");
+          return;
+        }
+        var seq = ++quoteSeq;
+        setQuoteState("正在读取真实 DEX 报价...");
+        try {
+          var res = await fetch("/api/swap/quote", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              fromToken: swapState.sell,
+              toToken: swapState.buy,
+              fromAmount: amount,
+              slippageBps: slippageBps()
+            })
+          });
+          var data = await res.json();
+          if (seq !== quoteSeq) return;
+          if (!res.ok) throw new Error(data.error || "No quote");
+          applyQuote(data);
+        } catch(e) {
+          if (seq !== quoteSeq) return;
+          setQuoteState(e && e.message ? e.message : "报价失败", "impact-high");
+        }
+      }
+      function scheduleQuote(){
+        clearTimeout(quoteTimer);
+        quoteTimer = setTimeout(requestQuote, 280);
+      }
+      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
+      if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
+        window.__luminaQuoteRefreshWrapped = true;
+        refreshSwapLabels = function(){
+          previousRefresh();
+          scheduleQuote();
+        };
+      }
+      recalc = scheduleQuote;
+      confirmSwap = function(){ toast("功能即将上线: 当前只显示报价,不会发起交易"); };
+      document.querySelectorAll(".slip-opt").forEach(function(el){
+        el.addEventListener("click", scheduleQuote);
+      });
+      var customSlip = document.querySelector(".slip-custom");
+      if (customSlip) customSlip.addEventListener("input", scheduleQuote);
+      setSwapButtonPending();
+      scheduleQuote();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance swap quote");
 }
 
 /**
