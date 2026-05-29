@@ -492,6 +492,7 @@ function enhancePrototypeTokens() {
         customTokens[key] = {
           address: token.address,
           decimals: token.decimals,
+          formatted: balances[key],
           name: token.name,
           risk: score,
           sourceSymbol: token.symbol,
@@ -679,7 +680,7 @@ function enhancePrototypeHome() {
         var top = document.createElement("div");
         top.className = "home-v2-top";
         top.innerHTML =
-          '<button class="home-chain-pill" type="button"><span>' + homeIcon("world") + '</span><strong>World Chain</strong><i>⌄</i></button>' +
+          '<div class="home-chain-wrap"><button class="home-chain-pill" type="button" onclick="toggleHomeChainMenu()"><span>' + homeIcon("world") + '</span><strong>World Chain</strong><i>⌄</i></button><div class="home-chain-menu" id="homeChainMenu"><button type="button"><b>World Chain</b><small>Active network</small></button></div></div>' +
           '<div class="home-top-actions"><button type="button" class="home-round verified">' + homeIcon("verified") + '</button><button type="button" class="home-round bell" onclick="openAnnouncements()">' + homeIcon("bell") + '<em></em></button></div>';
         home.insertBefore(top, home.firstChild);
 
@@ -709,6 +710,31 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase() || "?";
       }
+      window.toggleHomeChainMenu = function(){
+        var menu = document.getElementById("homeChainMenu");
+        if (menu) menu.classList.toggle("open");
+      };
+      window.openImportedTokenHome = function(sym){
+        var meta = customTokens && customTokens[sym] ? customTokens[sym] : null;
+        if (!meta) return;
+        var formatted = balances[sym] || meta.formatted || "0";
+        var idx = (assets || []).findIndex(function(a){ return a.custom && a.sym === sym; });
+        if (idx < 0) {
+          idx = assets.length;
+          assets.push({
+            sym: sym,
+            full: tokenFull[sym] || meta.name || sym,
+            amt: formatted + " " + sym,
+            usdNum: 0,
+            cls: "custom",
+            logo: tokenLogo[sym] || tokenInitialHome(sym),
+            custom: true
+          });
+        } else {
+          assets[idx].amt = formatted + " " + sym;
+        }
+        openDetail(idx);
+      };
       function importedHomeRows(filter){
         var rows = [];
         try {
@@ -717,13 +743,13 @@ function enhancePrototypeHome() {
             if (meta.risk === "high") return;
             var full = tokenFull[sym] || meta.name || sym;
             if (filter && (sym + " " + full).toLowerCase().indexOf(filter) < 0) return;
-            rows.push({ sym: sym, full: full, amt: (balances[sym] || "0") + " " + sym, usdNum: 0, cls: "custom", logo: tokenLogo[sym] || tokenInitialHome(sym), custom: true });
+            rows.push({ sym: sym, full: full, amt: (balances[sym] || meta.formatted || "0") + " " + sym, usdNum: 0, cls: "custom", logo: tokenLogo[sym] || tokenInitialHome(sym), custom: true });
           });
         } catch(e) {}
         return rows;
       }
       function rowHtml(asset, index, imported){
-        var open = imported ? 'openImportedRisk(\\'' + ((customTokens[asset.sym] || {}).address || "") + '\\')' : 'openDetail(' + index + ')';
+        var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openDetail(' + index + ')';
         return '<div class="asset home-v2-asset" onclick="' + open + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + (asset.logo || tokenInitialHome(asset.sym)) + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
@@ -739,7 +765,7 @@ function enhancePrototypeHome() {
         var search = document.getElementById("homeTokenSearch");
         if (search) filter = String(search.value || "").toLowerCase().trim();
         var verified = (assets || []).filter(function(a){
-          return !filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0;
+          return !a.custom && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
         });
         var html = verified.map(function(a, i){ return rowHtml(a, i, false); }).join("");
         html += importedHomeRows(filter).map(function(a){ return rowHtml(a, 0, true); }).join("");
@@ -810,9 +836,6 @@ function enhancePrototypeDetail() {
         if (name === "globe") {
           return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>';
         }
-        if (name === "star") {
-          return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2 7.5 14 3 9.6l6.2-.9z"/></svg>';
-        }
         if (name === "more") {
           return '<svg width="23" height="23" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>';
         }
@@ -827,7 +850,7 @@ function enhancePrototypeDetail() {
           '<div class="detail-v2-topbar">' +
             '<button class="detail-v2-back" onclick="go(\\'home\\'); setTabByName(\\'Home\\')" aria-label="Back"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
             '<div class="detail-v2-token"><div class="detail-v2-token-icon" id="detCoin">◉</div><div><div class="detail-v2-symbol" id="detTitle">WLD</div><div class="detail-v2-name" id="detName">Worldcoin</div></div></div>' +
-            '<div class="detail-v2-tools"><button type="button">' + detailIcon("star") + '</button><button type="button">' + detailIcon("more") + '</button></div>' +
+            '<div class="detail-v2-tools"><button type="button">' + detailIcon("more") + '</button></div>' +
           '</div>' +
           '<section class="detail-v2-hero">' +
             '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
