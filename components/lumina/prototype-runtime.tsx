@@ -93,6 +93,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeHome();
       enhancePrototypeMarket();
       enhancePrototypeSwapQuote();
+      enhancePrototypeActivity();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -521,7 +522,7 @@ function enhancePrototypeTokens() {
         try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
       }
       function tokenInitial(symbol){
-        symbol = String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase();
+        symbol = String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase();
         return symbol || "?";
       }
       function riskLabel(score){
@@ -754,7 +755,7 @@ function enhancePrototypeHome() {
         top.className = "home-v2-top";
         top.innerHTML =
           '<div class="home-chain-wrap"><button class="home-chain-pill" type="button" onclick="toggleHomeChainMenu()"><span>' + homeIcon("world") + '</span><strong>World Chain</strong><i>⌄</i></button><div class="home-chain-menu" id="homeChainMenu"><button type="button"><b>World Chain</b><small>Active network</small></button></div></div>' +
-          '<div class="home-top-actions"><button type="button" class="home-round verified">' + homeIcon("verified") + '</button><button type="button" class="home-round bell" onclick="openAnnouncements()">' + homeIcon("bell") + '<em></em></button></div>';
+          '<div class="home-top-actions"><button type="button" class="home-round verified">' + homeIcon("verified") + '</button><button type="button" class="home-round bell" onclick="openAnnouncements()">' + homeIcon("bell") + '<em style="display:none"></em></button></div>';
         home.insertBefore(top, home.firstChild);
 
         var section = home.querySelector(".section-head");
@@ -781,7 +782,7 @@ function enhancePrototypeHome() {
         }
       }
       function tokenInitialHome(symbol){
-        return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase() || "?";
+        return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
@@ -1107,6 +1108,50 @@ function enhancePrototypeSwapQuote() {
 }
 
 /**
+ * Replaces prototype Activity rows with real World Chain transfer history.
+ */
+function enhancePrototypeActivity() {
+  const source = `
+    (function(){
+      var activityItems = [];
+      function emptyActivity(message){
+        return '<div style="text-align:center;color:var(--text-mute);padding:42px var(--pad-screen);font-size:14px;line-height:1.5;">' + message + '</div>';
+      }
+      function itemHtml(a){
+        var plus = a.type === "in" ? " plus" : "";
+        return '<div class="act-item" onclick="openExplorer(\\'' + a.hash + '\\')" style="cursor:pointer;">' +
+          '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
+          '<div class="act-mid"><div class="t">' + a.title + ' <span style="color:var(--text-mute);font-size:11px;">↗</span></div><div class="s">' + a.subtitle + '</div></div>' +
+          '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + (a.status || "Completed") + '</div></div>' +
+        '</div>';
+      }
+      renderActivity = function(){
+        var box = document.getElementById("actList");
+        if (!box) return;
+        var items = activityItems.filter(function(item){ return actFilter === "all" || item.type === actFilter; });
+        box.innerHTML = items.length ? items.map(itemHtml).join("") : emptyActivity("暂无真实链上活动");
+      };
+      window.__luminaRefreshActivity = function(){
+        var box = document.getElementById("actList");
+        if (box) box.innerHTML = emptyActivity("读取 World Chain 链上活动...");
+        var address = window.__luminaUserAddress || "";
+        if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+          activityItems = [];
+          renderActivity();
+          return;
+        }
+        fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : []; })
+          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; renderActivity(); })
+          .catch(function(){ activityItems = []; renderActivity(); });
+      };
+      window.__luminaRefreshActivity();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance real activity");
+}
+
+/**
  * Adds interactive market ranges and a Worldscan link to the preserved prototype detail view.
  */
 function enhancePrototypeDetail() {
@@ -1198,12 +1243,59 @@ function enhancePrototypeDetail() {
           chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
           return;
         }
-        chart.innerHTML =
-          '<div class="market-detail-state live"><strong>World Chain pool</strong>' +
+        renderMarketChart(asset, "1D");
+      }
+      function renderMarketChart(asset, range) {
+        var market = marketForAsset(asset);
+        var chart = document.getElementById("detChart");
+        if (!chart || !market || !market.poolAddress) return;
+        chart.innerHTML = '<div class="market-detail-state">读取 K 线...</div>';
+        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
+          .then(function(data){ chart.innerHTML = candleSvg(Array.isArray(data.candles) ? data.candles : []); })
+          .catch(function(){ chart.innerHTML = candleSvg([]); });
+      }
+      function candleSvg(candles){
+        if (!candles.length) return '<div class="market-detail-state"><strong>暂无 K 线</strong><span>GeckoTerminal 暂无该池子的 OHLCV 数据。</span></div>';
+        var width = 420, height = 190, pad = 16;
+        var highs = candles.map(function(c){ return Number(c.high || c[2] || 0); });
+        var lows = candles.map(function(c){ return Number(c.low || c[3] || 0); });
+        var max = Math.max.apply(null, highs), min = Math.min.apply(null, lows);
+        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
+        function y(v){ return pad + (max - v) / (max - min) * (height - pad * 2); }
+        var step = (width - pad * 2) / candles.length;
+        var body = candles.map(function(c, i){
+          var open = Number(c.open || c[1] || 0), high = Number(c.high || c[2] || 0), low = Number(c.low || c[3] || 0), close = Number(c.close || c[4] || 0);
+          var x = pad + i * step + step / 2;
+          var up = close >= open;
+          var color = up ? "#4ade80" : "#f87171";
+          var top = y(Math.max(open, close));
+          var h = Math.max(2, Math.abs(y(open) - y(close)));
+          return '<line x1="' + x.toFixed(1) + '" x2="' + x.toFixed(1) + '" y1="' + y(high).toFixed(1) + '" y2="' + y(low).toFixed(1) + '" stroke="' + color + '" stroke-width="1.5"/>' +
+            '<rect x="' + (x - Math.max(2, step * 0.3)).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + Math.max(3, step * 0.6).toFixed(1) + '" height="' + h.toFixed(1) + '" rx="1.2" fill="' + color + '"/>';
+        }).join("");
+        return '<svg class="market-candles" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
+          '<defs><linearGradient id="chartFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(74,222,128,0.12)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient></defs>' +
+          '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="url(#chartFade)"/>' + body + '</svg>';
+      }
+      window.openPoolInfo = function(){
+        var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
+        var market = asset ? marketForAsset(asset) : null;
+        if (!market) { toast("暂无 pool 信息"); return; }
+        var modal = document.getElementById("poolInfoModal");
+        if (!modal) {
+          modal = document.createElement("div");
+          modal.id = "poolInfoModal";
+          modal.className = "pool-info-modal";
+          document.body.appendChild(modal);
+        }
+        modal.innerHTML =
+          '<div class="pool-info-sheet"><button class="pool-close" onclick="document.getElementById(\\'poolInfoModal\\').classList.remove(\\'open\\')">×</button><strong>World Chain pool</strong>' +
           '<div class="market-stat-row"><span>24h Volume</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
           '<div class="market-stat-row"><span>Liquidity</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
           '<div class="market-stat-row"><span>Pool</span><b>' + String(market.poolAddress || "").slice(0, 6) + "..." + String(market.poolAddress || "").slice(-4) + '</b></div>' +
           '</div>';
+        modal.classList.add("open");
       }
 
       function ensureDetailShell() {
@@ -1214,7 +1306,7 @@ function enhancePrototypeDetail() {
           '<div class="detail-v2-topbar">' +
             '<button class="detail-v2-back" onclick="go(\\'home\\'); setTabByName(\\'Home\\')" aria-label="Back"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
             '<div class="detail-v2-token"><div class="detail-v2-token-icon" id="detCoin">◉</div><div><div class="detail-v2-symbol" id="detTitle">WLD</div><div class="detail-v2-name" id="detName">Worldcoin</div></div></div>' +
-            '<div class="detail-v2-tools"><button type="button">' + detailIcon("more") + '</button></div>' +
+            '<div class="detail-v2-tools"><button type="button" onclick="openPoolInfo()">' + detailIcon("more") + '</button></div>' +
           '</div>' +
           '<section class="detail-v2-hero">' +
             '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
@@ -1239,9 +1331,10 @@ function enhancePrototypeDetail() {
         ensureDetailShell();
         var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
         if (asset) {
-          renderMarketCard(asset);
+          renderMarketChart(asset, range);
           document.querySelectorAll("#view-detail .range").forEach(function(el) {
             el.classList.toggle("sel", el.textContent.trim() === range);
+            el.onclick = function(){ renderRange(el.textContent.trim()); };
           });
           return;
         }
@@ -1249,6 +1342,7 @@ function enhancePrototypeDetail() {
         if (chart) chart.innerHTML = chartSvg(range);
         document.querySelectorAll("#view-detail .range").forEach(function(el) {
           el.classList.toggle("sel", el.textContent.trim() === range);
+          el.onclick = function(){ renderRange(el.textContent.trim()); };
         });
       }
 

@@ -137,22 +137,23 @@
   #view-home { padding-top: 0; padding-bottom: 118px; }
   #view-home .home-v2-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px var(--pad-screen) 14px; }
   #view-home .home-chain-wrap { position: relative; min-width: 0; }
-  #view-home .home-chain-pill { min-width: 0; height: 38px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px 0 7px; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-pill); background: rgba(16,18,16,0.96); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 14px 34px rgba(0,0,0,0.24); cursor: pointer; }
-  #view-home .home-chain-pill span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; color: #f4f7f4; background: #070807; box-shadow: 0 0 0 1px rgba(74,222,128,0.28); position: relative; flex-shrink: 0; }
-  #view-home .home-chain-pill span svg { width: 25px; height: 25px; }
+  #view-home .home-chain-pill { min-width: 0; height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px 0 6px; border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-pill); background: rgba(16,18,16,0.96); color: var(--text); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 14px 34px rgba(0,0,0,0.24); cursor: pointer; }
+  #view-home .home-chain-pill span { width: 23px; height: 23px; border-radius: 50%; display: grid; place-items: center; color: #f4f7f4; background: #070807; box-shadow: 0 0 0 1px rgba(74,222,128,0.28); position: relative; flex-shrink: 0; }
+  #view-home .home-chain-pill span svg { width: 20px; height: 20px; }
   #view-home .home-chain-pill span::before,
   #view-home .home-chain-pill span::after { content: ""; position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--green); top: 2px; box-shadow: 0 0 11px rgba(74,222,128,0.7); }
   #view-home .home-chain-pill span::before { left: 1px; }
   #view-home .home-chain-pill span::after { right: 1px; }
-  #view-home .home-chain-pill strong { font-size: 14px; font-weight: 850; letter-spacing: 0; white-space: nowrap; }
-  #view-home .home-chain-pill i { color: #c5cbc5; font-style: normal; font-size: 14px; transform: translateY(-1px); }
+  #view-home .home-chain-pill strong { font-size: 12px; font-weight: 850; letter-spacing: 0; white-space: nowrap; }
+  #view-home .home-chain-pill i { color: #c5cbc5; font-style: normal; font-size: 12px; transform: translateY(-1px); }
   #view-home .home-chain-menu { display: none; position: absolute; left: 0; top: calc(100% + 8px); min-width: 168px; z-index: 30; padding: 8px; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; background: rgba(16,18,16,0.98); box-shadow: 0 18px 42px rgba(0,0,0,0.36); }
   #view-home .home-chain-menu.open { display: block; }
   #view-home .home-chain-menu button { width: 100%; min-height: 48px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; border: none; border-radius: 10px; background: rgba(74,222,128,0.08); color: var(--text); padding: 8px 10px; text-align: left; cursor: pointer; }
   #view-home .home-chain-menu b { font-size: 13px; line-height: 1.1; }
   #view-home .home-chain-menu small { color: var(--green); font-size: 11px; font-weight: 700; }
   #view-home .home-top-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  #view-home .home-round { width: 44px; height: 44px; border: 1px solid rgba(255,255,255,0.07); border-radius: 50%; background: #101210; color: #e9eee9; display: grid; place-items: center; position: relative; cursor: pointer; box-shadow: 0 12px 28px rgba(0,0,0,0.22); }
+  #view-home .home-round { width: 36px; height: 36px; border: 1px solid rgba(255,255,255,0.07); border-radius: 50%; background: #101210; color: #e9eee9; display: grid; place-items: center; position: relative; cursor: pointer; box-shadow: 0 12px 28px rgba(0,0,0,0.22); }
+  #view-home .home-round svg { width: 19px; height: 19px; }
   #view-home .home-round.verified { color: var(--green); }
   #view-home .home-round.bell em { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px #101210; }
   #view-home .balance-card { min-height: 194px; margin: 0 var(--pad-screen); padding: 28px 22px 22px; border-radius: 24px; border-color: rgba(255,255,255,0.12); background: radial-gradient(80% 120% at 108% 44%, rgba(74,222,128,0.22), rgba(74,222,128,0.05) 38%, transparent 64%), linear-gradient(100deg, #0c0d0c 0%, #101410 54%, #081009 100%); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.05), 0 22px 70px rgba(0,0,0,0.24); }
@@ -343,6 +344,12 @@
   .detail-v2-ranges .range { min-width: 52px; padding: 9px 0; font-size: 15px; font-weight: 800; }
   .detail-v2-ranges .range.sel { background: rgba(255,255,255,0.045); color: var(--green); }
   .detail-v2-chart-card .detail-chart { margin: 0; height: 230px; }
+  .market-candles { width: 100%; height: 100%; display: block; }
+  .pool-info-modal { display: none; position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center; padding: 18px; }
+  .pool-info-modal.open { display: flex; }
+  .pool-info-sheet { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 22px; background: #101210; padding: 22px; color: var(--text); box-shadow: 0 24px 70px rgba(0,0,0,0.45); position: relative; }
+  .pool-info-sheet strong { display: block; font-size: 19px; margin-bottom: 16px; }
+  .pool-close { position: absolute; right: 14px; top: 12px; width: 30px; height: 30px; border: none; border-radius: 50%; background: rgba(255,255,255,0.06); color: var(--text); font-size: 22px; line-height: 1; }
   .detail-v2-actions { margin: 22px 0 0; }
   .detail-v2-actions button { min-height: 64px; border-radius: 19px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; font-size: 18px; }
   .detail-v2-actions .btn-ghost { background: var(--surface); color: var(--text); }
