@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { MiniKit } from "@worldcoin/minikit-js";
 import { prototypeMarkup } from "./prototype-markup";
 import { prototypeScript } from "./prototype-script";
 import { shortenAddress } from "@/lib/auth/store";
@@ -21,8 +22,15 @@ declare global {
     openLangModal?: () => void;
     setTabByName?: (name: string) => void;
     __luminaUserAddress?: string;
+    __luminaConfirmEarnAction?: (input: EarnConfirmInput) => Promise<boolean>;
   }
 }
+
+type EarnConfirmInput = {
+  action: "deposit" | "withdraw";
+  amount: string;
+  product: string;
+};
 
 const tabByView: Record<string, string> = {
   home: "Home",
@@ -62,6 +70,8 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     const scriptEl = document.createElement("script");
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
+    resetPrototypePortfolio();
+    exposeEarnWalletConfirm();
 
     requestAnimationFrame(() => {
       updatePrototypeAddress(host, address);
@@ -77,6 +87,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       if (initialView === "about") appendLegalLinks(host);
       wireRealReceiveLinks(host);
       enhancePrototypeDetail();
+      enhancePrototypeEarn();
       setPrototypeReady(true);
     });
 
@@ -110,6 +121,58 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   }
 
   return <div ref={hostRef} />;
+}
+
+function exposeEarnWalletConfirm() {
+  window.__luminaConfirmEarnAction = async ({ action, amount, product }) => {
+    const message = `Lumina Earn ${action}: ${amount} into ${product}`;
+    if (new URL(window.location.href).searchParams.get("mockWorld") === "1") {
+      return window.confirm(message);
+    }
+
+    const miniKit = MiniKit as unknown as {
+      commandsAsync?: { signMessage?: (input: { message: string }) => Promise<unknown> };
+      signMessage?: (input: { message: string }) => Promise<unknown>;
+    };
+    const signMessage = miniKit.commandsAsync?.signMessage ?? miniKit.signMessage;
+    if (!signMessage) {
+      return window.confirm(message);
+    }
+
+    try {
+      const result = await signMessage({ message });
+      return !JSON.stringify(result).toLowerCase().includes("error");
+    } catch {
+      return false;
+    }
+  };
+}
+
+/**
+ * Clears prototype demo balances before live chain data arrives so stale placeholder money never flashes.
+ */
+function resetPrototypePortfolio() {
+  const source = `
+    assets = [];
+    balances = {};
+    availMap = {};
+    totalUsdNum = 0;
+    change24hUsdNum = 0;
+    if (document.querySelector(".balance-change")) {
+      document.querySelector(".balance-change").childNodes[0].textContent = "+0.00% ";
+      document.querySelector(".balance-change").classList.remove("down");
+    }
+    if (typeof renderMoney === "function") renderMoney();
+    var subEl = document.getElementById("balSub");
+    if (subEl && typeof formatMoney === "function") subEl.textContent = "+" + formatMoney(0) + " (24h)";
+    var list = document.getElementById("assetList");
+    if (list) {
+      list.innerHTML = Array.from({ length: 3 }).map(function(){
+        return '<div class="asset asset-skeleton"><div class="coin"></div><div class="name"><div class="sym"></div><div class="full"></div></div><div class="spark"></div><div class="vals"><div class="amt"></div><div class="usd"></div></div></div>';
+      }).join("");
+    }
+  `;
+  runInPrototypeScope(source, "Failed to reset prototype portfolio");
 }
 
 /**
@@ -191,6 +254,177 @@ function wireRealReceiveLinks(host: HTMLDivElement) {
         window.location.href = `/receive${window.location.search}`;
       };
     });
+}
+
+/**
+ * Replaces prototype Earn demo balances with a zero-starting position flow.
+ */
+function enhancePrototypeEarn() {
+  const source = `
+    (function(){
+      var storeKey = "lumina_earn_positions_v1";
+      var activeEarnIndex = 0;
+      var earnTimer = null;
+
+      function readStore(){
+        try { return JSON.parse(localStorage.getItem(storeKey) || "{}"); } catch(e) { return {}; }
+      }
+      function writeStore(value){
+        try { localStorage.setItem(storeKey, JSON.stringify(value)); } catch(e) {}
+      }
+      function apyNum(product){
+        return (parseFloat(String(product.apy).replace("%", "")) || 0) / 100;
+      }
+      function tokenFromMin(product){
+        var parts = String(product.min || "").trim().split(/\\s+/);
+        return parts[1] || "TOKEN";
+      }
+      function minAmount(product){
+        return parseFloat(String(product.min || "0").replace(/,/g, "")) || 0;
+      }
+      function earnedFor(product, position){
+        if (!position || !position.amount || !position.startedAt) return 0;
+        var elapsed = Math.max(0, Date.now() - position.startedAt) / 1000;
+        return position.amount * apyNum(product) * (elapsed / (365 * 24 * 60 * 60));
+      }
+      function fmtEarn(value){
+        var n = Number(value) || 0;
+        if (n === 0) return "0";
+        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 });
+      }
+      function totalEarned(){
+        var store = readStore();
+        return products.reduce(function(sum, p){
+          return sum + earnedFor(p, store[p.id]);
+        }, 0);
+      }
+      function updateEarnHero(){
+        var total = totalEarned();
+        var totalEl = document.getElementById("earnTotal");
+        if (totalEl) totalEl.textContent = fmtEarn(total);
+        var sub = document.querySelector(".earn-hero .sub");
+        if (sub) sub.textContent = total > 0 ? "Earning live from active positions" : "No active positions yet";
+        var claim = document.querySelector(".earn-hero .claim");
+        if (claim) claim.disabled = total <= 0;
+      }
+      function positionMeta(product){
+        var store = readStore();
+        var pos = store[product.id] || { amount: 0 };
+        var token = tokenFromMin(product);
+        var earned = earnedFor(product, pos);
+        return { pos: pos, token: token, earned: earned };
+      }
+
+      products.forEach(function(product){ product.mine = "0 " + tokenFromMin(product); });
+
+      renderProducts = function(){
+        var box = document.getElementById("prodList");
+        if (!box) return;
+        box.innerHTML = products.map(function(p, i){
+          var border = p.icBorder ? ("border:" + p.icBorder + ";") : "";
+          var meta = positionMeta(p);
+          return '<div class="prod" onclick="openEarn(' + i + ')">' +
+            '<div class="top">' +
+              '<div class="ic" style="background:' + p.icBg + ';color:' + p.icColor + ';' + border + '">' + p.ic + '</div>' +
+              '<div class="nm"><div class="t">' + t(p.tKey) + '</div><div class="d">' + t(p.dKey) + '</div></div>' +
+              '<div class="apy"><div class="v">' + p.apy + '</div><div class="l">APY</div></div>' +
+            '</div>' +
+            '<div class="meta">' +
+              '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span></div></div>' +
+              '<div class="m"><div class="k">Deposit</div><div class="val">' + fmtEarn(meta.pos.amount || 0) + ' ' + meta.token + '</div></div>' +
+              '<div class="m"><div class="k">Earned</div><div class="val">' + fmtEarn(meta.earned) + ' ' + meta.token + '</div></div>' +
+            '</div></div>';
+        }).join('');
+        updateEarnHero();
+      };
+
+      function renderEarnDetail(product){
+        var meta = positionMeta(product);
+        var token = meta.token;
+        var amount = fmtEarn(meta.pos.amount || 0);
+        document.getElementById("edMine").textContent = amount + " " + token + " · Earned " + fmtEarn(meta.earned) + " " + token;
+        var card = document.getElementById("earnActionCard");
+        if (!card) {
+          card = document.createElement("div");
+          card.id = "earnActionCard";
+          card.className = "earn-action-card";
+          var desc = document.getElementById("edDesc");
+          desc.insertAdjacentElement("afterend", card);
+        }
+        var min = minAmount(product);
+        card.innerHTML =
+          '<label>Amount</label>' +
+          '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" value="' + min + '" /><span>' + token + '</span></div>' +
+          '<div class="earn-action-row">' +
+            '<button class="btn-primary" onclick="luminaEarnAction(\\'deposit\\')">Deposit</button>' +
+            '<button class="btn-ghost" onclick="luminaEarnAction(\\'withdraw\\')">Withdraw</button>' +
+          '</div>';
+      }
+
+      openEarn = function(i){
+        activeEarnIndex = i;
+        var p = products[i];
+        document.getElementById("edTitle").textContent = t(p.tKey);
+        var ic = document.getElementById("edIc");
+        ic.textContent = p.ic;
+        ic.style.background = p.icBg; ic.style.color = p.icColor;
+        ic.style.border = p.icBorder || "none";
+        document.getElementById("edApy").textContent = p.apy;
+        document.getElementById("edRisk").innerHTML = '<span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span>';
+        document.getElementById("edLock").textContent = t(p.lockKey);
+        document.getElementById("edTvl").textContent = formatMoneyCompact(p.tvlNum);
+        document.getElementById("edMin").textContent = p.min;
+        document.getElementById("edDesc").textContent = t(p.descKey);
+        renderEarnDetail(p);
+        go("earn-detail"); setTabByName("Earn");
+      };
+
+      window.luminaEarnAction = async function(action){
+        var product = products[activeEarnIndex];
+        var input = document.getElementById("earnAmountInput");
+        var amount = Math.max(0, parseFloat(String(input && input.value || "0").replace(/,/g, "")) || 0);
+        if (!amount) { toast("Enter amount"); return; }
+        var token = tokenFromMin(product);
+        var ok = true;
+        if (window.__luminaConfirmEarnAction) {
+          ok = await window.__luminaConfirmEarnAction({ action: action, amount: amount + " " + token, product: t(product.tKey) });
+        }
+        if (!ok) { toast("Cancelled"); return; }
+        var store = readStore();
+        var pos = store[product.id] || { amount: 0, startedAt: 0 };
+        if (action === "deposit") {
+          pos.amount = (Number(pos.amount) || 0) + amount;
+          pos.startedAt = Date.now();
+          store[product.id] = pos;
+          toast("Deposit confirmed");
+        } else {
+          pos.amount = Math.max(0, (Number(pos.amount) || 0) - amount);
+          pos.startedAt = pos.amount > 0 ? Date.now() : 0;
+          if (pos.amount > 0) store[product.id] = pos;
+          else delete store[product.id];
+          toast("Withdraw confirmed");
+        }
+        writeStore(store);
+        renderProducts();
+        go("earn"); setTabByName("Earn");
+      };
+
+      openClaimModal = function(){
+        if (totalEarned() <= 0) { toast("No yield yet"); return; }
+        toast("Claim comes after Earn contracts are live");
+      };
+
+      if (earnTimer) clearInterval(earnTimer);
+      earnTimer = setInterval(function(){
+        updateEarnHero();
+        if (document.getElementById("view-earn").classList.contains("active")) renderProducts();
+        if (document.getElementById("view-earn-detail").classList.contains("active")) renderEarnDetail(products[activeEarnIndex]);
+      }, 5000);
+      renderProducts();
+      updateEarnHero();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance Earn prototype");
 }
 
 /**
@@ -302,4 +536,11 @@ function enhancePrototypeDetail() {
   `;
   document.body.appendChild(scriptEl);
   scriptEl.remove();
+}
+
+function runInPrototypeScope(source: string, errorLabel: string) {
+  const script = document.createElement("script");
+  script.text = `try { ${source} } catch (error) { console.error(${JSON.stringify(errorLabel)}, error); }`;
+  document.body.appendChild(script);
+  script.remove();
 }
