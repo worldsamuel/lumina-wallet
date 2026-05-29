@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lumina · 运营后台</title>
+<style>
+  :root {
+    --bg:#080908; --panel:#0e0f0e; --panel-2:#141614; --panel-3:#1a1d1a;
+    --line:#222522; --line-2:#2c302c;
+    --text:#fff; --dim:#8a8f8a; --mute:#5c615c;
+    --green:#4ade80; --green-bright:#22e06b; --blue:#2775ca; --amber:#f5c451; --red:#f87171;
+    --r:14px; --r-lg:18px; --sidebar:236px;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  button { font-family:inherit; cursor:pointer; }
+  input,select { font-family:inherit; }
+  ::-webkit-scrollbar { width:10px; height:10px; } ::-webkit-scrollbar-thumb { background:#222; border-radius:6px; } ::-webkit-scrollbar-track { background:transparent; }
+  .layout { display:flex; min-height:100vh; }
+  .sidebar { width:var(--sidebar); flex-shrink:0; background:var(--panel); border-right:1px solid var(--line); padding:22px 14px; position:fixed; height:100vh; overflow-y:auto; }
+  .brand { display:flex; align-items:center; gap:11px; padding:0 8px 22px; }
+  .brand .logo { width:34px; height:34px; border-radius:50%; border:1.5px solid #333; display:grid; place-items:center; font-weight:800; }
+  .brand .nm { font-size:15px; font-weight:700; line-height:1.2; }
+  .brand .nm small { display:block; color:var(--mute); font-size:11px; font-weight:500; }
+  .nav-group { color:var(--mute); font-size:11px; text-transform:uppercase; letter-spacing:.08em; padding:16px 10px 6px; }
+  .nav-item { display:flex; align-items:center; gap:11px; padding:10px; border-radius:10px; color:var(--dim); font-size:14px; transition:all .15s; }
+  .nav-item:hover { background:var(--panel-2); color:var(--text); }
+  .nav-item.active { background:rgba(74,222,128,0.1); color:var(--green); }
+  .nav-item .ic { display:inline-flex; }
+  .nav-item .badge { margin-left:auto; background:var(--red); color:#fff; font-size:10px; font-weight:700; padding:1px 7px; border-radius:999px; }
+  .main { margin-left:var(--sidebar); flex:1; min-width:0; }
+  .topbar { display:flex; align-items:center; gap:16px; padding:16px 28px; border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(8,9,8,0.9); backdrop-filter:blur(12px); z-index:10; }
+  .topbar h1 { font-size:19px; font-weight:700; }
+  .topbar .env { font-size:11px; padding:3px 10px; border-radius:999px; background:rgba(245,196,81,0.12); color:var(--amber); font-weight:600; }
+  .topbar .spacer { flex:1; }
+  .search { background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:9px 14px; color:var(--text); font-size:13px; width:240px; outline:none; }
+  .search:focus { border-color:rgba(74,222,128,0.4); }
+  .admin-chip { display:flex; align-items:center; gap:9px; background:var(--panel-2); border:1px solid var(--line); border-radius:999px; padding:5px 12px 5px 5px; font-size:13px; }
+  .admin-chip .av { width:28px; height:28px; border-radius:50%; background:conic-gradient(from 90deg,#1b6,#2cf,#93f,#1b6); filter:saturate(.6); }
+  .content { padding:26px 28px 60px; }
+  .page { display:none; } .page.active { display:block; animation:fade .25s ease; }
+  @keyframes fade { from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:none;} }
+  .kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+  .kpi { background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:18px 20px; position:relative; overflow:hidden; }
+  .kpi::after { content:""; position:absolute; right:-30px; top:-30px; width:90px; height:90px; border-radius:50%; background:radial-gradient(circle,rgba(74,222,128,0.08),transparent 70%); }
+  .kpi .k { color:var(--dim); font-size:13px; } .kpi .v { font-size:28px; font-weight:800; margin:8px 0 4px; letter-spacing:-.5px; }
+  .kpi .d { font-size:12px; font-weight:600; } .kpi .d.up { color:var(--green); } .kpi .d.down { color:var(--red); }
+  .grid-2 { display:grid; grid-template-columns:1.6fr 1fr; gap:16px; margin-bottom:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:var(--r-lg); padding:20px; }
+  .card-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .card-head h3 { font-size:15px; font-weight:700; } .card-head .link { color:var(--green); font-size:13px; cursor:pointer; }
+  .chart { height:200px; } .chart svg { width:100%; height:100%; }
+  .legend { display:flex; flex-direction:column; gap:10px; margin-top:12px; }
+  .legend .row { display:flex; align-items:center; gap:9px; font-size:13px; } .legend .dot { width:10px; height:10px; border-radius:3px; } .legend .pct { margin-left:auto; color:var(--dim); }
+  table { width:100%; border-collapse:collapse; }
+  thead th { text-align:left; color:var(--mute); font-size:12px; font-weight:600; padding:10px 14px; border-bottom:1px solid var(--line); text-transform:uppercase; letter-spacing:.04em; }
+  tbody td { padding:13px 14px; border-bottom:1px solid var(--line); font-size:14px; }
+  tbody tr:hover { background:var(--panel-2); } tbody tr:last-child td { border-bottom:none; }
+  .empty { text-align:center; color:var(--mute); padding:40px; font-size:14px; }
+  .tk-cell { display:flex; align-items:center; gap:10px; }
+  .tk-ic { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:12px; flex-shrink:0; }
+  .pill { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+  .pill.green { background:rgba(74,222,128,0.12); color:var(--green); } .pill.amber { background:rgba(245,196,81,0.12); color:var(--amber); }
+  .pill.red { background:rgba(248,113,113,0.12); color:var(--red); } .pill.gray { background:var(--panel-3); color:var(--dim); }
+  .pill.blue { background:rgba(39,117,202,0.15); color:#6db1f5; }
+  .mono { font-family:ui-monospace,Menlo,monospace; font-size:13px; color:var(--dim); }
+  .up { color:var(--green); } .down { color:var(--red); }
+  .btn { background:var(--panel-2); border:1px solid var(--line); color:var(--text); border-radius:9px; padding:8px 14px; font-size:13px; font-weight:600; transition:all .15s; }
+  .btn:hover { border-color:var(--line-2); }
+  .btn.primary { background:var(--green); color:#042; border-color:var(--green); } .btn.primary:hover { opacity:.9; }
+  .btn.danger { color:var(--red); border-color:rgba(248,113,113,0.3); } .btn.danger:hover { background:rgba(248,113,113,0.08); }
+  .btn.sm { padding:5px 11px; font-size:12px; }
+  .toolbar { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  .toolbar .spacer { flex:1; }
+  .filter-tabs { display:flex; gap:6px; }
+  .ftab { padding:7px 14px; border-radius:999px; font-size:13px; color:var(--dim); border:1px solid var(--line); cursor:pointer; }
+  .ftab.active { color:var(--green); border-color:var(--green); background:rgba(74,222,128,0.08); }
+  .toggle { width:42px; height:24px; border-radius:999px; background:var(--panel-3); position:relative; transition:.2s; flex-shrink:0; display:inline-block; vertical-align:middle; cursor:pointer; }
+  .toggle.on { background:var(--green); }
+  .toggle::after { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.2s; }
+  .toggle.on::after { transform:translateX(18px); }
+  .risk-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:7px; }
+  .alert-row { display:flex; align-items:flex-start; gap:12px; padding:13px 0; border-bottom:1px solid var(--line); }
+  .alert-row:last-child { border-bottom:none; }
+  .alert-ic { width:34px; height:34px; border-radius:9px; display:grid; place-items:center; flex-shrink:0; }
+  .alert-ic.red { background:rgba(248,113,113,0.12); color:var(--red); } .alert-ic.amber { background:rgba(245,196,81,0.12); color:var(--amber); } .alert-ic.green { background:rgba(74,222,128,0.12); color:var(--green); }
+  .alert-row .t { font-size:13px; font-weight:600; } .alert-row .s { color:var(--mute); font-size:12px; margin-top:3px; } .alert-row .time { margin-left:auto; color:var(--mute); font-size:11px; white-space:nowrap; }
+  /* modal */
+  .mask { position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:80; }
+  .mask.open { display:flex; animation:fade .2s ease; }
+  .modal { width:440px; max-width:92vw; background:#0c0d0c; border:1px solid var(--line); border-radius:18px; padding:24px; max-height:88vh; overflow-y:auto; }
+  .modal h2 { font-size:18px; margin-bottom:18px; }
+  .modal label { display:block; color:var(--dim); font-size:13px; margin:14px 0 6px; }
+  .modal input, .modal select { width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:12px 14px; color:var(--text); font-size:14px; outline:none; }
+  .modal input:focus, .modal select:focus { border-color:rgba(74,222,128,0.5); }
+  .modal-actions { display:flex; gap:10px; margin-top:22px; }
+  .modal-actions .btn { flex:1; justify-content:center; text-align:center; }
+  .confirm-text { color:var(--dim); font-size:14px; line-height:1.6; margin-bottom:4px; }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--panel-3); border:1px solid var(--line); color:#fff; padding:12px 18px; border-radius:10px; font-size:13px; opacity:0; transform:translateY(10px); transition:.25s; pointer-events:none; z-index:99; }
+  .toast.show { opacity:1; transform:none; }
+</style>
+</head>
+<body>
+<style>
+  /* 登录页样式 */
+  #adminLogin { position: fixed; inset: 0; background: var(--bg); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #adminLogin .login-card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 40px 36px; width: 100%; max-width: 380px; }
+  #adminLogin .login-brand { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 30px; }
+  #adminLogin .login-brand .logo { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--green); display: grid; place-items: center; font-weight: 800; font-size: 18px; color: var(--green); }
+  #adminLogin .login-brand .nm { font-size: 22px; font-weight: 800; }
+  #adminLogin .login-brand .sub { color: var(--mute); font-size: 12px; margin-top: 3px; }
+  #adminLogin h2 { font-size: 18px; font-weight: 700; margin-bottom: 6px; text-align: center; }
+  #adminLogin .login-intro { color: var(--dim); font-size: 13px; text-align: center; margin-bottom: 26px; }
+  #adminLogin label { display: block; color: var(--dim); font-size: 13px; margin: 14px 0 7px; }
+  #adminLogin input { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; color: #fff; font-size: 14px; outline: none; font-family: inherit; }
+  #adminLogin input:focus { border-color: rgba(74,222,128,0.5); }
+  #adminLogin .login-btn { margin-top: 22px; width: 100%; background: var(--green); color: #042; border: none; border-radius: 12px; padding: 14px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  #adminLogin .login-btn:hover { opacity: 0.92; }
+  #adminLogin .login-err { color: var(--red); font-size: 12px; margin-top: 12px; text-align: center; min-height: 14px; }
+  #adminLogin .login-hint { color: var(--mute); font-size: 11px; text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--line); }
+  /* 主布局默认隐藏,登录后再显示 */
+  .layout.locked { display: none; }
+</style>
+<div id="adminLogin">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="logo">L</div>
+      <div><div class="nm">Lumina</div><div class="sub">运营后台</div></div>
+    </div>
+    <h2>登录</h2>
+    <div class="login-intro">请使用管理员账号登录后台</div>
+    <label>账号</label>
+    <input id="loginUser" type="text" placeholder="admin" autocomplete="off" />
+    <label>密码</label>
+    <input id="loginPass" type="password" placeholder="••••••" />
+    <button class="login-btn" onclick="doAdminLogin()">登录</button>
+    <div class="login-err" id="loginErr"></div>
+    <div class="login-hint">演示账号:admin / admin<br>真实项目须改为后端鉴权 + 二次验证</div>
+  </div>
+</div>
+<div class="layout locked">
+  <aside class="sidebar">
+    <div class="brand"><div class="logo">L</div><div class="nm">Lumina<small>运营后台</small></div></div>
+    <div class="nav-group">概览</div>
+    <a class="nav-item active" data-page="dashboard" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span> 数据看板</a>
+    <div class="nav-group">业务管理</div>
+    <a class="nav-item" data-page="earn" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20c0-6 4-9 9-9-1 6-4 9-9 9z"/><path d="M11 20c0-5-3-7-7-7 1 4 3 7 7 7z"/></svg></span> 理财产品</a>
+    <a class="nav-item" data-page="tokens" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span> 代币白名单</a>
+    <a class="nav-item" data-page="top" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7.4-6.3-4.6L5.7 21.4 8 14 2 9.4h7.6z"/></svg></span> Top 代币排行</a>
+    <a class="nav-item" data-page="risk" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/></svg></span> 风控审核 <span class="badge" id="riskBadge">3</span></a>
+    <div class="nav-group">数据</div>
+    <a class="nav-item" data-page="users" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span> 用户管理</a>
+    <a class="nav-item" data-page="txns" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span> 交易记录</a>
+    <div class="nav-group">系统</div>
+    <a class="nav-item" data-page="fees" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span> 手续费设置</a>
+    <a class="nav-item" data-page="announce" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></span> 公告管理</a>
+    <a class="nav-item" data-page="content" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg></span> 内容页管理</a>
+    <a class="nav-item" data-page="currency" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span> 货币与汇率</a>
+    <a class="nav-item" data-page="settings" onclick="nav(this)"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span> 系统设置</a>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="pageTitle">数据看板</h1>
+      <span class="env">测试网 Testnet</span>
+      <div class="spacer"></div>
+      <div class="admin-chip" onclick="doAdminLogout()" style="cursor:pointer;" title="点击退出登录"><span class="av"></span> admin <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.6"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div>
+    </div>
+    <div class="content">
+
+      <div class="page active" id="page-dashboard">
+        <div class="kpis" id="kpiRow"></div>
+        <div class="grid-2">
+          <div class="card"><div class="card-head"><h3>近 30 日交易量 (USD)</h3><span class="link" onclick="toast('查看明细')">查看明细</span></div><div class="chart" id="volChart"></div></div>
+          <div class="card"><div class="card-head"><h3>资产分布 (TVL)</h3></div><div style="display:flex;align-items:center;gap:20px;"><div id="donut"></div><div class="legend" id="donutLegend"></div></div></div>
+        </div>
+        <div class="grid-2">
+          <div class="card"><div class="card-head"><h3>风控告警</h3><span class="link" onclick="gotoPage('risk')">全部</span></div><div id="alerts"></div></div>
+          <div class="card"><div class="card-head"><h3>理财产品 TVL 排行</h3></div><div id="prodRank"></div></div>
+        </div>
+      </div>
+
+      <div class="page" id="page-earn">
+        <div class="toolbar">
+          <div class="filter-tabs" id="earnTabs"></div><div class="spacer"></div>
+          <button class="btn primary" onclick="openEarnForm(null)">+ 新建产品</button>
+        </div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>产品</th><th>APY</th><th>风险</th><th>TVL</th><th>参与人数</th><th>锁仓</th><th>状态</th><th>操作</th></tr></thead><tbody id="earnTable"></tbody></table></div>
+      </div>
+
+      <div class="page" id="page-tokens">
+        <div class="toolbar">
+          <div class="filter-tabs" id="tokenTabs"></div><div class="spacer"></div>
+          <button class="btn" onclick="toast('已从可信 token list 同步')">同步 Token List</button>
+          <button class="btn primary" onclick="openTokenForm()">+ 添加代币</button>
+        </div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>代币</th><th>合约地址</th><th>安全扫描</th><th>24h 交易量</th><th>状态</th><th>涨幅榜</th><th>操作</th></tr></thead><tbody id="tokenTable"></tbody></table></div>
+      </div>
+
+      <div class="page" id="page-risk">
+        <div class="toolbar"><div class="filter-tabs" id="riskTabs"></div></div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>类型</th><th>对象</th><th>详情</th><th>风险等级</th><th>时间</th><th>操作</th></tr></thead><tbody id="riskTable"></tbody></table></div>
+      </div>
+
+      <div class="page" id="page-users">
+        <div class="toolbar"><div class="filter-tabs" id="userTabs"></div><div class="spacer"></div><input class="search" id="userSearch" placeholder="搜索用户名 / 地址" oninput="renderUsers()" /></div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>用户</th><th>地址</th><th>World ID</th><th>资产 (USD)</th><th>注册时间</th><th>状态</th><th>操作</th></tr></thead><tbody id="userTable"></tbody></table></div>
+      </div>
+
+      <div class="page" id="page-txns">
+        <div class="toolbar"><div class="filter-tabs" id="txnTabs"></div><div class="spacer"></div><button class="btn" onclick="toast('已导出 CSV')">导出 CSV</button></div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>类型</th><th>用户</th><th>金额</th><th>交易哈希</th><th>时间</th><th>状态</th></tr></thead><tbody id="txnTable"></tbody></table></div>
+      </div>
+
+      <div class="page" id="page-settings">
+        <div class="card" style="max-width:680px;"><div class="card-head"><h3>全局开关</h3></div><div id="settingsList"></div></div>
+      </div>
+
+      <!-- ===== TOP RANKING ===== -->
+      <div class="page" id="page-top">
+        <div class="toolbar">
+          <div class="filter-tabs" id="topTabs"></div>
+          <div class="spacer"></div>
+          <button class="btn" onclick="toast('已按 24h 涨幅自动刷新排名')">刷新排名</button>
+          <button class="btn primary" onclick="openAddTop()">+ 手动加入</button>
+        </div>
+        <p class="confirm-text" style="margin:-4px 0 16px;font-size:12px;">Top 代币排行展示在用户端 Swap 页。下架后该代币立即从用户端榜单移除。可拖动调整排序(此处用上移/下移)。</p>
+        <div class="card" style="padding:0;"><table><thead><tr><th>排名</th><th>代币</th><th>24h 涨幅</th><th>价格</th><th>交易量</th><th>验证</th><th>排序</th><th>操作</th></tr></thead><tbody id="topTable"></tbody></table></div>
+      </div>
+
+      <!-- ===== FEES ===== -->
+      <div class="page" id="page-fees">
+        <div class="grid-2" style="grid-template-columns:1fr 1fr;">
+          <div class="card">
+            <div class="card-head"><h3>各业务费率</h3></div>
+            <p class="confirm-text" style="font-size:12px;margin-bottom:16px;">费率为平台向用户收取的百分比。按 World 规则,所有费用必须在用户端透明披露。费率最终由链上合约执行,此处为配置值。</p>
+            <div id="feeList"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>手续费收款地址</h3></div>
+            <p class="confirm-text" style="font-size:12px;margin-bottom:16px;">所有手续费将归集到以下 World Chain 地址。务必核对,错误地址会导致手续费永久丢失。</p>
+            <label style="display:block;color:var(--dim);font-size:13px;margin-bottom:8px;">收款地址 (Fee Recipient)</label>
+            <div style="display:flex;gap:8px;">
+              <input class="search" id="feeAddr" style="flex:1;width:auto;font-family:ui-monospace,monospace;" value="0x7Fee...C011ec7" />
+              <button class="btn primary" onclick="saveFeeAddr()">保存</button>
+            </div>
+            <div id="feeAddrStatus" style="margin-top:12px;"></div>
+            <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--line);">
+              <div style="color:var(--dim);font-size:13px;margin-bottom:10px;">本月累计手续费收入</div>
+              <div style="font-size:28px;font-weight:800;">$48,210.55</div>
+              <div style="color:var(--green);font-size:13px;font-weight:600;margin-top:4px;">▲ +12.4% 环比上月</div>
+              <button class="btn" style="margin-top:16px;" onclick="toast('已发起提现到收款地址')">提现归集</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ANNOUNCEMENTS ===== -->
+      <div class="page" id="page-announce">
+        <div class="toolbar">
+          <div class="spacer"></div>
+          <button class="btn primary" onclick="openAnnForm(null)">+ 发布公告</button>
+        </div>
+        <p class="confirm-text" style="margin:-4px 0 16px;font-size:12px;">在此发布的公告会显示在用户端顶部的铃铛里。本原型通过浏览器 localStorage 联动:同一浏览器里打开用户端原型,发布后即可在铃铛看到(真实项目改为写数据库+用户端拉取)。</p>
+        <div class="card" style="padding:0;"><table><thead><tr><th>类型</th><th>标题</th><th>内容</th><th>发布时间</th><th>操作</th></tr></thead><tbody id="annTable"></tbody></table></div>
+      </div>
+
+      <!-- ===== CONTENT PAGES (Help / About) ===== -->
+      <div class="page" id="page-content">
+        <div class="toolbar">
+          <div class="filter-tabs">
+            <span class="ftab active" id="contentTab-help" onclick="switchContent('help')">帮助中心</span>
+            <span class="ftab" id="contentTab-about" onclick="switchContent('about')">关于</span>
+          </div>
+        </div>
+        <p class="confirm-text" style="margin:-4px 0 16px;font-size:12px;">编辑用户端"帮助中心"和"关于"页的内容。段落之间用空行分隔。保存后用户端立即显示新内容。</p>
+        <div class="card">
+          <div class="card-head"><h3 id="contentTitle">帮助中心内容</h3><span class="link" id="contentSavedAt" style="color:var(--mute)"></span></div>
+          <textarea id="contentEditor" rows="14" style="width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:12px; padding:14px; color:#fff; font-size:14px; font-family:inherit; line-height:1.7; outline:none; resize:vertical; min-height:300px;" placeholder="输入正文,段落之间留一个空行。例如:&#10;&#10;## 常见问题&#10;&#10;Q1: 如何转账?&#10;打开 Send 页,输入收款地址和金额..."></textarea>
+          <div style="display:flex; gap:10px; margin-top:14px;">
+            <button class="btn" onclick="resetContent()">清空</button>
+            <div class="spacer" style="flex:1;"></div>
+            <button class="btn primary" onclick="saveContent()">保存并发布</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== CURRENCY & RATES ===== -->
+      <div class="page" id="page-currency">
+        <div class="toolbar">
+          <div class="spacer"></div>
+          <button class="btn" onclick="syncRates()">从行情同步</button>
+          <button class="btn primary" onclick="saveRates()">保存汇率</button>
+        </div>
+        <p class="confirm-text" style="margin:-4px 0 16px;font-size:12px;">汇率为各货币兑 1 USD 的换算比例。保存后用户端立即按新汇率显示。真实环境应从行情 API 自动同步,后台只做覆盖。</p>
+        <div class="card" style="padding:0;">
+          <table><thead><tr><th>货币</th><th>名称</th><th>符号</th><th>汇率 (1 USD =)</th><th>$1,000 = </th><th>状态</th></tr></thead>
+          <tbody id="currencyTable"></tbody></table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="mask" id="modalMask" onclick="if(event.target===this)closeModal()"><div class="modal" id="modalBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+  function toast(m){ var t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(function(){t.classList.remove("show");},1800); }
+
+  /* ============ 登录 / 登出 ============ */
+  // 简单的演示账号(真实项目里这里必须改为调后端鉴权 API + 二次验证)
+  var DEMO_USER = "admin", DEMO_PASS = "admin";
+  // 用 sessionStorage 记住登录状态(关闭浏览器后失效,比 localStorage 安全)
+  try {
+    if (sessionStorage.getItem("ww_admin_loggedin") === "1") {
+      document.getElementById("adminLogin").style.display = "none";
+      document.querySelector(".layout").classList.remove("locked");
+    }
+  } catch(e){}
+  function doAdminLogin(){
+    var u = document.getElementById("loginUser").value.trim();
+    var p = document.getElementById("loginPass").value;
+    var err = document.getElementById("loginErr");
+    if(u === DEMO_USER && p === DEMO_PASS){
+      err.textContent = "";
+      try { sessionStorage.setItem("ww_admin_loggedin","1"); } catch(e){}
+      document.getElementById("adminLogin").style.display = "none";
+      document.querySelector(".layout").classList.remove("locked");
+    } else {
+      err.textContent = "账号或密码错误";
+    }
+  }
+  function doAdminLogout(){
+    if(!confirm("确认退出登录?")) return;
+    try { sessionStorage.removeItem("ww_admin_loggedin"); } catch(e){}
+    document.getElementById("adminLogin").style.display = "flex";
+    document.querySelector(".layout").classList.add("locked");
+    document.getElementById("loginPass").value = "";
+  }
+  // 回车键也能提交登录
+  document.addEventListener("keydown", function(e){
+    if(e.key === "Enter" && document.getElementById("adminLogin").style.display !== "none"){
+      doAdminLogin();
+    }
+  });
+  function esc(s){ return String(s).replace(/'/g,"\\'"); }
+
+  var titles = { dashboard:"数据看板", earn:"理财产品管理", tokens:"代币白名单", top:"Top 代币排行", risk:"风控审核", users:"用户管理", txns:"交易记录", fees:"手续费设置", announce:"公告管理", content:"内容页管理", currency:"货币与汇率", settings:"系统设置" };
+  function nav(el){
+    document.querySelectorAll(".nav-item").forEach(function(n){n.classList.remove("active");});
+    el.classList.add("active");
+    showPage(el.dataset.page);
+  }
+  function gotoPage(p){ document.querySelectorAll(".nav-item").forEach(function(n){ n.classList.toggle("active", n.dataset.page===p); }); showPage(p); }
+  function showPage(p){
+    document.querySelectorAll(".page").forEach(function(pg){pg.classList.remove("active");});
+    document.getElementById("page-"+p).classList.add("active");
+    document.getElementById("pageTitle").textContent = titles[p];
+    window.scrollTo(0,0);
+  }
+
+  // modal helpers
+  function openModal(html){ document.getElementById("modalBox").innerHTML=html; document.getElementById("modalMask").classList.add("open"); }
+  function closeModal(){ document.getElementById("modalMask").classList.remove("open"); }
+
+  /* ===================== DASHBOARD ===================== */
+  var kpis = [
+    { k:"总用户数", v:"48,210", d:"+5.2% 本周", up:true },
+    { k:"总锁仓量 TVL", v:"$12.04M", d:"+1.8% 本周", up:true },
+    { k:"24h 交易量", v:"$2.31M", d:"+12.4% 今日", up:true },
+    { k:"24h 手续费收入", v:"$4,820", d:"-3.1% 今日", up:false }
+  ];
+  document.getElementById("kpiRow").innerHTML = kpis.map(function(x){
+    return '<div class="kpi"><div class="k">'+x.k+'</div><div class="v">'+x.v+'</div><div class="d '+(x.up?'up':'down')+'">'+(x.up?'▲ ':'▼ ')+x.d+'</div></div>';
+  }).join('');
+  (function(){
+    var pts=[], y=120;
+    for(var i=0;i<=30;i++){ y += Math.sin(i*0.5)*14 + (Math.random()*30-13); y=Math.max(30,Math.min(180,y)); pts.push((i*(620/30)).toFixed(1)+","+y.toFixed(1)); }
+    document.getElementById("volChart").innerHTML='<svg viewBox="0 0 620 200" preserveAspectRatio="none"><defs><linearGradient id="vg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(74,222,128,0.28)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient></defs><polygon points="0,200 '+pts.join(" ")+' 620,200" fill="url(#vg)"/><polyline points="'+pts.join(" ")+'" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  })();
+  (function(){
+    var data=[{n:"USDC",v:42,c:"#2775ca"},{n:"WLD",v:28,c:"#fff"},{n:"ETH",v:19,c:"#8aa3d8"},{n:"其他",v:11,c:"#4ade80"}];
+    var circ=2*Math.PI*52, off=0, segs="";
+    data.forEach(function(d){ var len=circ*d.v/100; segs+='<circle cx="70" cy="70" r="52" fill="none" stroke="'+d.c+'" stroke-width="20" stroke-dasharray="'+len+' '+(circ-len)+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 70 70)"/>'; off+=len; });
+    document.getElementById("donut").innerHTML='<svg width="140" height="140" viewBox="0 0 140 140">'+segs+'<text x="70" y="66" text-anchor="middle" fill="#fff" font-size="20" font-weight="800">$12M</text><text x="70" y="84" text-anchor="middle" fill="#5c615c" font-size="11">TVL</text></svg>';
+    document.getElementById("donutLegend").innerHTML=data.map(function(d){return '<div class="row"><span class="dot" style="background:'+d.c+'"></span>'+d.n+'<span class="pct">'+d.v+'%</span></div>';}).join('');
+  })();
+  var alerts=[
+    { lv:"red", t:"疑似蜜罐代币被导入", s:"代币 0x9a3...f21 · 12 名用户持有", time:"5 分钟前" },
+    { lv:"amber", t:"大额异常转账", s:"用户 bob.world 单笔转出 $48,000", time:"23 分钟前" },
+    { lv:"amber", t:"新代币待审核", s:"MOON 申请加入涨幅榜", time:"1 小时前" },
+    { lv:"green", t:"合约审计通过", s:"USDC 储蓄金库 v2 已通过审计", time:"3 小时前" }
+  ];
+  document.getElementById("alerts").innerHTML=alerts.map(function(a){
+    return '<div class="alert-row"><div class="alert-ic '+a.lv+'"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div><div class="t">'+a.t+'</div><div class="s">'+a.s+'</div></div><div class="time">'+a.time+'</div></div>';
+  }).join('');
+  function renderProdRank(){
+    var rank = earnP.slice().sort(function(a,b){ return tvlNum(b.tvl)-tvlNum(a.tvl); });
+    var max = tvlNum(rank[0].tvl);
+    document.getElementById("prodRank").innerHTML=rank.map(function(r){
+      var p = Math.round(tvlNum(r.tvl)/max*100);
+      return '<div style="margin-bottom:14px;"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px;"><span>'+r.n+'</span><span style="color:var(--dim)">'+r.tvl+'</span></div><div style="height:7px;background:var(--panel-3);border-radius:4px;overflow:hidden;"><div style="height:100%;width:'+p+'%;background:var(--green);"></div></div></div>';
+    }).join('');
+  }
+  function tvlNum(s){ var n=parseFloat(s.replace(/[$,]/g,'')); if(s.indexOf("M")>=0) n*=1e6; if(s.indexOf("K")>=0) n*=1e3; return n; }
+
+  /* ===================== EARN PRODUCTS (CRUD) ===================== */
+  var earnP=[
+    { id:1, ic:"◉",bg:"#fff",col:"#000",n:"WLD 质押",apy:"8.5%",risk:"low",tvl:"$2.4M",users:"3,201",lock:"随时",on:true },
+    { id:2, ic:"$",bg:"#2775ca",col:"#fff",n:"USDC 储蓄金库",apy:"5.2%",risk:"low",tvl:"$8.1M",users:"8,940",lock:"随时",on:true },
+    { id:3, ic:"◆",bg:"#1c2536",col:"#8aa3d8",n:"ETH-USDC 流动性",apy:"14.8%",risk:"mid",tvl:"$1.2M",users:"1,120",lock:"随时",on:true },
+    { id:4, ic:"◉",bg:"#0d150d",col:"#4ade80",n:"WLD 高收益农场",apy:"32.0%",risk:"high",tvl:"$340K",users:"410",lock:"7天",on:false }
+  ];
+  var earnFilter="全部";
+  var riskName={low:"低",mid:"中",high:"高"}, riskColor={low:"green",mid:"amber",high:"red"};
+  function renderEarnTabs(){
+    var tabs=["全部","上线中","已下线"];
+    document.getElementById("earnTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t===earnFilter?"active":"")+'" onclick="earnFilter=\''+t+'\';renderEarnTabs();renderEarn()">'+t+'</span>'; }).join('');
+  }
+  function renderEarn(){
+    var rows=earnP.filter(function(p){ return earnFilter==="全部" || (earnFilter==="上线中"&&p.on) || (earnFilter==="已下线"&&!p.on); });
+    var tb=document.getElementById("earnTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty">暂无产品</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(p){
+      return '<tr><td><div class="tk-cell"><span class="tk-ic" style="background:'+p.bg+';color:'+p.col+'">'+p.ic+'</span>'+p.n+'</div></td>'+
+        '<td class="up" style="font-weight:700">'+p.apy+'</td>'+
+        '<td><span class="risk-dot" style="background:var(--'+riskColor[p.risk]+')"></span>'+riskName[p.risk]+'风险</td>'+
+        '<td>'+p.tvl+'</td><td>'+p.users+'</td><td>'+p.lock+'</td>'+
+        '<td><span class="toggle '+(p.on?"on":"")+'" onclick="toggleEarn('+p.id+')"></span></td>'+
+        '<td><button class="btn sm" onclick="openEarnForm('+p.id+')">编辑</button> <button class="btn sm danger" onclick="deleteEarn('+p.id+')">删除</button></td></tr>';
+    }).join('');
+    renderProdRank();
+  }
+  function toggleEarn(id){ var p=earnP.find(function(x){return x.id===id;}); p.on=!p.on; renderEarn(); toast(p.n+(p.on?" 已上线":" 已下线")); }
+  function deleteEarn(id){
+    var p=earnP.find(function(x){return x.id===id;});
+    openModal('<h2>删除产品</h2><p class="confirm-text">确定要删除「'+p.n+'」吗?该操作会让用户端不再显示此产品。</p><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" onclick="confirmDeleteEarn('+id+')">确认删除</button></div>');
+  }
+  function confirmDeleteEarn(id){ earnP=earnP.filter(function(x){return x.id!==id;}); renderEarn(); closeModal(); toast("产品已删除"); }
+  function openEarnForm(id){
+    var p = id ? earnP.find(function(x){return x.id===id;}) : { n:"",apy:"",risk:"low",tvl:"$0",users:"0",lock:"随时",on:true,ic:"●",bg:"#1c2536",col:"#fff" };
+    var isNew = !id;
+    openModal('<h2>'+(isNew?"新建产品":"编辑产品")+'</h2>'+
+      '<label>产品名称</label><input id="f_n" value="'+esc(p.n)+'" placeholder="如:USDC 储蓄金库"/>'+
+      '<label>APY</label><input id="f_apy" value="'+esc(p.apy)+'" placeholder="如:5.2%"/>'+
+      '<label>风险等级</label><select id="f_risk"><option value="low"'+(p.risk==="low"?" selected":"")+'>低风险</option><option value="mid"'+(p.risk==="mid"?" selected":"")+'>中风险</option><option value="high"'+(p.risk==="high"?" selected":"")+'>高风险</option></select>'+
+      '<label>锁仓</label><input id="f_lock" value="'+esc(p.lock)+'" placeholder="如:随时 / 7天"/>'+
+      '<label>TVL</label><input id="f_tvl" value="'+esc(p.tvl)+'" placeholder="如:$1.2M"/>'+
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveEarn('+(id||"null")+')">保存</button></div>');
+  }
+  function saveEarn(id){
+    var n=document.getElementById("f_n").value.trim();
+    if(!n){ toast("请填写产品名称"); return; }
+    var data={ n:n, apy:document.getElementById("f_apy").value||"0%", risk:document.getElementById("f_risk").value, lock:document.getElementById("f_lock").value||"随时", tvl:document.getElementById("f_tvl").value||"$0" };
+    if(id){ Object.assign(earnP.find(function(x){return x.id===id;}), data); toast("已保存修改"); }
+    else { var nid=Math.max.apply(null,earnP.map(function(x){return x.id;}).concat(0))+1; earnP.push(Object.assign({id:nid,users:"0",on:true,ic:"●",bg:"#1c2536",col:"#fff"},data)); toast("已新建产品"); }
+    renderEarn(); closeModal();
+  }
+
+  /* ===================== TOKEN WHITELIST (CRUD) ===================== */
+  var tokens=[
+    { id:1, ic:"◉",bg:"#fff",col:"#000",sym:"WLD",addr:"0x163f...4e2a",scan:"green",scanT:"通过",vol:"$88M",st:"verified",top:true },
+    { id:2, ic:"$",bg:"#2775ca",col:"#fff",sym:"USDC",addr:"0x79A0...24d1",scan:"green",scanT:"通过",vol:"$150M",st:"verified",top:false },
+    { id:3, ic:"◆",bg:"#1c2536",col:"#8aa3d8",sym:"ETH",addr:"0x4200...0006",scan:"green",scanT:"通过",vol:"$210M",st:"verified",top:true },
+    { id:4, ic:"🌙",bg:"#1a1530",col:"#fff",sym:"MOON",addr:"0x9a3b...8f21",scan:"red",scanT:"疑似蜜罐",vol:"$1.2M",st:"pending",top:false },
+    { id:5, ic:"D",bg:"#2a1a30",col:"#fff",sym:"DEGEN",addr:"0x44c1...02ad",scan:"amber",scanT:"高税12%",vol:"$3.4M",st:"pending",top:false }
+  ];
+  var tokenFilter="全部";
+  var stName={verified:"已验证",pending:"待审核"}, stColor={verified:"green",pending:"amber"};
+  function renderTokenTabs(){
+    var tabs=["全部","已验证","待审核"];
+    document.getElementById("tokenTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t===tokenFilter?"active":"")+'" onclick="tokenFilter=\''+t+'\';renderTokenTabs();renderTokens()">'+t+'</span>'; }).join('');
+  }
+  function renderTokens(){
+    var rows=tokens.filter(function(t){ return tokenFilter==="全部" || (tokenFilter==="已验证"&&t.st==="verified") || (tokenFilter==="待审核"&&t.st==="pending"); });
+    var tb=document.getElementById("tokenTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty">暂无代币</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(t){
+      return '<tr><td><div class="tk-cell"><span class="tk-ic" style="background:'+t.bg+';color:'+t.col+'">'+t.ic+'</span>'+t.sym+'</div></td>'+
+        '<td class="mono">'+t.addr+'</td>'+
+        '<td><span class="pill '+t.scan+'">'+t.scanT+'</span></td>'+
+        '<td>'+t.vol+'</td>'+
+        '<td><span class="pill '+stColor[t.st]+'">'+stName[t.st]+'</span></td>'+
+        '<td><span class="toggle '+(t.top?"on":"")+'" onclick="toggleTop('+t.id+')"></span></td>'+
+        '<td>'+(t.st==="pending"?'<button class="btn sm primary" onclick="approveToken('+t.id+')">通过</button> <button class="btn sm danger" onclick="rejectToken('+t.id+')">拒绝</button>':'<button class="btn sm danger" onclick="rejectToken('+t.id+')">移除</button>')+'</td></tr>';
+    }).join('');
+  }
+  function toggleTop(id){ var t=tokens.find(function(x){return x.id===id;}); if(t.st!=="verified"&&!t.top){ toast("未验证代币不建议上涨幅榜,请先审核"); } t.top=!t.top; renderTokens(); toast(t.sym+(t.top?" 已加入涨幅榜":" 已移出涨幅榜")); }
+  function approveToken(id){ var t=tokens.find(function(x){return x.id===id;}); t.st="verified"; renderTokens(); toast(t.sym+" 审核通过,已加入白名单"); }
+  function rejectToken(id){ var t=tokens.find(function(x){return x.id===id;}); tokens=tokens.filter(function(x){return x.id!==id;}); renderTokens(); toast(t.sym+" 已移除"); }
+  function openTokenForm(){
+    openModal('<h2>添加代币</h2>'+
+      '<label>合约地址</label><input id="t_addr" placeholder="0x..."/>'+
+      '<label>符号 (Symbol)</label><input id="t_sym" placeholder="如:USDC"/>'+
+      '<p class="confirm-text" style="margin-top:14px;font-size:12px;">提交后将自动调用安全扫描 (蜜罐/税/仿冒检测),结果为"待审核"需人工确认。</p>'+
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveToken()">提交扫描</button></div>');
+  }
+  function saveToken(){
+    var sym=document.getElementById("t_sym").value.trim().toUpperCase();
+    var addr=document.getElementById("t_addr").value.trim();
+    if(!sym||!addr){ toast("请填写地址和符号"); return; }
+    var short = addr.length>12 ? addr.slice(0,6)+"..."+addr.slice(-4) : addr;
+    var nid=Math.max.apply(null,tokens.map(function(x){return x.id;}).concat(0))+1;
+    // 模拟扫描结果
+    var scans=[["green","通过"],["amber","高税"],["red","疑似蜜罐"]]; var s=scans[Math.floor(Math.random()*3)];
+    tokens.push({ id:nid, ic:sym[0], bg:"#1c2536", col:"#fff", sym:sym, addr:short, scan:s[0], scanT:s[1], vol:"$0", st:"pending", top:false });
+    renderTokens(); closeModal(); toast(sym+" 已提交,扫描结果:"+s[1]);
+  }
+
+  /* ===================== RISK REVIEW ===================== */
+  var risks=[
+    { id:1, type:"代币审核",obj:"MOON 0x9a3b...8f21",detail:"安全扫描:疑似蜜罐,无法卖出",lv:"red",lvT:"高危",time:"5 分钟前",done:false },
+    { id:2, type:"大额转账",obj:"bob.world",detail:"单笔转出 $48,000,超日常 20 倍",lv:"amber",lvT:"可疑",time:"23 分钟前",done:false },
+    { id:3, type:"涨幅榜申请",obj:"DEGEN 0x44c1...02ad",detail:"买卖税 12%,申请加入涨幅榜",lv:"amber",lvT:"可疑",time:"1 小时前",done:false }
+  ];
+  var riskFilter="待处理";
+  function renderRiskTabs(){
+    var pending=risks.filter(function(r){return !r.done;}).length;
+    var tabs=[["待处理","待处理 "+pending],["已处理","已处理"]];
+    document.getElementById("riskTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t[0]===riskFilter?"active":"")+'" onclick="riskFilter=\''+t[0]+'\';renderRiskTabs();renderRisk()">'+t[1]+'</span>'; }).join('');
+    document.getElementById("riskBadge").textContent=pending;
+    document.getElementById("riskBadge").style.display = pending? "inline-block":"none";
+  }
+  function renderRisk(){
+    var rows=risks.filter(function(r){ return riskFilter==="待处理"? !r.done : r.done; });
+    var tb=document.getElementById("riskTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty">没有'+riskFilter+'的事项</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(r){
+      var act = r.done ? '<span class="pill '+(r.result==="approved"?"green":"red")+'">'+(r.result==="approved"?"已批准":"已拒绝")+'</span>'
+        : '<button class="btn sm primary" onclick="resolveRisk('+r.id+',\'approved\')">批准</button> <button class="btn sm danger" onclick="resolveRisk('+r.id+',\'rejected\')">拒绝</button>';
+      return '<tr><td>'+r.type+'</td><td class="mono">'+r.obj+'</td><td style="color:var(--dim)">'+r.detail+'</td><td><span class="pill '+r.lv+'">'+r.lvT+'</span></td><td style="color:var(--mute)">'+r.time+'</td><td>'+act+'</td></tr>';
+    }).join('');
+  }
+  function resolveRisk(id,result){ var r=risks.find(function(x){return x.id===id;}); r.done=true; r.result=result; renderRiskTabs(); renderRisk(); toast(result==="approved"?"已批准":"已拒绝并记录"); }
+
+  /* ===================== USERS ===================== */
+  var users=[
+    { n:"alice.world",addr:"0x4a3f...6F2d",id:"green",idT:"Orb",bal:"$1,245",reg:"2026-03-12",st:"green",stT:"正常",frozen:false },
+    { n:"bob.world",addr:"0x7c1a...8e4b",id:"green",idT:"Orb",bal:"$52,300",reg:"2026-01-08",st:"amber",stT:"监控中",frozen:false },
+    { n:"carol.world",addr:"0x2b9d...1f0c",id:"amber",idT:"Device",bal:"$89",reg:"2026-05-01",st:"green",stT:"正常",frozen:false },
+    { n:"dave.world",addr:"0x55ef...77aa",id:"gray",idT:"未验证",bal:"$12",reg:"2026-05-20",st:"green",stT:"正常",frozen:false },
+    { n:"eve.world",addr:"0x9f01...3c2e",id:"green",idT:"Orb",bal:"$3,410",reg:"2026-02-19",st:"red",stT:"已冻结",frozen:true }
+  ];
+  var userFilter="全部";
+  function renderUserTabs(){
+    var tabs=["全部","Orb 已验证","未验证"];
+    document.getElementById("userTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t===userFilter?"active":"")+'" onclick="userFilter=\''+t+'\';renderUserTabs();renderUsers()">'+t+'</span>'; }).join('');
+  }
+  function renderUsers(){
+    var q=(document.getElementById("userSearch").value||"").toLowerCase();
+    var rows=users.filter(function(u){
+      var f = userFilter==="全部" || (userFilter==="Orb 已验证"&&u.idT==="Orb") || (userFilter==="未验证"&&u.idT==="未验证");
+      var s = !q || u.n.toLowerCase().indexOf(q)>=0 || u.addr.toLowerCase().indexOf(q)>=0;
+      return f && s;
+    });
+    var tb=document.getElementById("userTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty">没有匹配的用户</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(u){
+      return '<tr><td>'+u.n+'</td><td class="mono">'+u.addr+'</td><td><span class="pill '+u.id+'">'+u.idT+'</span></td><td style="font-weight:600">'+u.bal+'</td><td style="color:var(--mute)">'+u.reg+'</td><td><span class="pill '+u.st+'">'+u.stT+'</span></td>'+
+        '<td><button class="btn sm '+(u.frozen?"":"danger")+'" onclick="toggleFreeze(\''+esc(u.n)+'\')">'+(u.frozen?"解冻":"冻结")+'</button></td></tr>';
+    }).join('');
+  }
+  function toggleFreeze(name){
+    var u=users.find(function(x){return x.n===name;});
+    if(u.frozen){ u.frozen=false; u.st="green"; u.stT="正常"; renderUsers(); toast(name+" 已解冻"); return; }
+    openModal('<h2>冻结账户</h2><p class="confirm-text">确定冻结「'+name+'」吗?冻结后该用户将无法转账和交易,此操作会被记入审计日志。</p><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" onclick="confirmFreeze(\''+esc(name)+'\')">确认冻结</button></div>');
+  }
+  function confirmFreeze(name){ var u=users.find(function(x){return x.n===name;}); u.frozen=true; u.st="red"; u.stT="已冻结"; renderUsers(); closeModal(); toast(name+" 已冻结"); }
+
+  /* ===================== TXNS ===================== */
+  var txns=[
+    { cat:"收款",type:"green",typeT:"收款",u:"alice.world",amt:"+120 USDC",hash:"0xab12...9f3c",time:"10:32",st:"green",stT:"成功" },
+    { cat:"转账",type:"gray",typeT:"发送",u:"bob.world",amt:"-48,000 USDC",hash:"0xcd34...1a2b",time:"10:09",st:"green",stT:"成功" },
+    { cat:"兑换",type:"blue",typeT:"兑换",u:"alice.world",amt:"100 WLD→1.9K USDC",hash:"0xef56...7c8d",time:"09:51",st:"green",stT:"成功" },
+    { cat:"理财",type:"amber",typeT:"理财",u:"carol.world",amt:"存入 200 USDC",hash:"0x1234...5e6f",time:"09:30",st:"amber",stT:"处理中" },
+    { cat:"转账",type:"gray",typeT:"发送",u:"eve.world",amt:"-0.05 ETH",hash:"0x7890...ab12",time:"08:47",st:"red",stT:"失败" }
+  ];
+  var txnFilter="全部";
+  function renderTxnTabs(){
+    var tabs=["全部","转账","兑换","理财"];
+    document.getElementById("txnTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t===txnFilter?"active":"")+'" onclick="txnFilter=\''+t+'\';renderTxnTabs();renderTxns()">'+t+'</span>'; }).join('');
+  }
+  function renderTxns(){
+    var rows=txns.filter(function(t){ return txnFilter==="全部" || (txnFilter==="转账"&&t.cat==="转账"||txnFilter==="转账"&&t.cat==="收款") || t.cat===txnFilter; });
+    if(txnFilter==="转账") rows=txns.filter(function(t){return t.cat==="转账"||t.cat==="收款";});
+    var tb=document.getElementById("txnTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="6"><div class="empty">暂无记录</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(t){
+      return '<tr><td><span class="pill '+t.type+'">'+t.typeT+'</span></td><td>'+t.u+'</td><td style="font-weight:600">'+t.amt+'</td><td class="mono">'+t.hash+'</td><td style="color:var(--mute)">'+t.time+'</td><td><span class="pill '+t.st+'">'+t.stT+'</span></td></tr>';
+    }).join('');
+  }
+
+  /* ===================== SETTINGS ===================== */
+  var settings=[
+    { t:"维护模式",d:"开启后用户端显示维护公告,暂停交易",on:false },
+    { t:"允许导入自定义代币",d:"关闭后用户无法通过合约地址导入未知代币",on:true },
+    { t:"涨幅榜功能",d:"在 Swap 页展示 24h 涨幅榜",on:true },
+    { t:"新代币强制安全扫描",d:"导入前必须通过 GoPlus / Honeypot 检测",on:true },
+    { t:"大额交易人工审核",d:"超过阈值的转账需运营审核放行",on:false }
+  ];
+  function renderSettings(){
+    document.getElementById("settingsList").innerHTML=settings.map(function(s,i){
+      return '<div style="display:flex;align-items:center;gap:16px;padding:16px 0;border-bottom:1px solid var(--line);"><div style="flex:1"><div style="font-size:14px;font-weight:600">'+s.t+'</div><div style="color:var(--mute);font-size:12px;margin-top:4px">'+s.d+'</div></div><span class="toggle '+(s.on?"on":"")+'" onclick="toggleSetting('+i+')"></span></div>';
+    }).join('');
+  }
+  function toggleSetting(i){ settings[i].on=!settings[i].on; renderSettings(); toast(settings[i].t+(settings[i].on?" 已开启":" 已关闭")); }
+
+  /* ===================== TOP RANKING ===================== */
+  var topList=[
+    { id:1, sym:"MOON", ic:"🌙", bg:"#1a1530", col:"#fff", chg:"+312%", price:"$0.0042", vol:"$1.2M", verified:false },
+    { id:2, sym:"DEGEN", ic:"D", bg:"#2a1a30", col:"#fff", chg:"+148%", price:"$0.018", vol:"$3.4M", verified:false },
+    { id:3, sym:"WLD", ic:"◉", bg:"#fff", col:"#000", chg:"+42%", price:"$19.04", vol:"$88M", verified:true },
+    { id:4, sym:"GROK", ic:"G", bg:"#16281f", col:"#fff", chg:"+38%", price:"$0.93", vol:"$5.1M", verified:false },
+    { id:5, sym:"ORB", ic:"O", bg:"#152028", col:"#fff", chg:"+19%", price:"$2.41", vol:"$2.2M", verified:true },
+    { id:6, sym:"ETH", ic:"◆", bg:"#1c2536", col:"#8aa3d8", chg:"+11%", price:"$1,426", vol:"$210M", verified:true }
+  ];
+  var topFilter="全部";
+  function renderTopTabs(){
+    var tabs=["全部","已验证","未验证"];
+    document.getElementById("topTabs").innerHTML=tabs.map(function(t){ return '<span class="ftab '+(t===topFilter?"active":"")+'" onclick="topFilter=\''+t+'\';renderTopTabs();renderTop()">'+t+'</span>'; }).join('');
+  }
+  function renderTop(){
+    var rows=topList.filter(function(t){ return topFilter==="全部" || (topFilter==="已验证"&&t.verified) || (topFilter==="未验证"&&!t.verified); });
+    var tb=document.getElementById("topTable");
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty">榜单为空</div></td></tr>'; return; }
+    tb.innerHTML=rows.map(function(t,i){
+      var realIdx=topList.indexOf(t);
+      var vbadge=t.verified?'<span class="pill green">已验证</span>':'<span class="pill red">未验证</span>';
+      var up = realIdx>0 ? '<button class="btn sm" onclick="moveTop('+t.id+',-1)">↑</button>' : '<button class="btn sm" disabled style="opacity:.3">↑</button>';
+      var down = realIdx<topList.length-1 ? '<button class="btn sm" onclick="moveTop('+t.id+',1)">↓</button>' : '<button class="btn sm" disabled style="opacity:.3">↓</button>';
+      return '<tr><td style="font-weight:800;color:'+(realIdx<3?"#f5854a":"var(--dim)")+'">'+(realIdx+1)+'</td>'+
+        '<td><div class="tk-cell"><span class="tk-ic" style="background:'+t.bg+';color:'+t.col+'">'+t.ic+'</span>'+t.sym+'</div></td>'+
+        '<td class="up" style="font-weight:700">'+t.chg+'</td><td>'+t.price+'</td><td>'+t.vol+'</td>'+
+        '<td>'+vbadge+'</td><td style="white-space:nowrap">'+up+' '+down+'</td>'+
+        '<td><button class="btn sm danger" onclick="removeTop('+t.id+')">下架</button></td></tr>';
+    }).join('');
+  }
+  function moveTop(id,dir){
+    var i=topList.findIndex(function(x){return x.id===id;});
+    var j=i+dir; if(j<0||j>=topList.length) return;
+    var tmp=topList[i]; topList[i]=topList[j]; topList[j]=tmp;
+    renderTop(); toast("已调整排序");
+  }
+  function removeTop(id){
+    var t=topList.find(function(x){return x.id===id;});
+    openModal('<h2>下架 Top 代币</h2><p class="confirm-text">确定将「'+t.sym+'」从 Top 排行下架吗?下架后用户端 Swap 页的涨幅榜将不再显示该代币。</p><div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn danger" onclick="confirmRemoveTop('+id+')">确认下架</button></div>');
+  }
+  function confirmRemoveTop(id){ var t=topList.find(function(x){return x.id===id;}); topList=topList.filter(function(x){return x.id!==id;}); renderTop(); closeModal(); toast(t.sym+" 已下架"); }
+  function openAddTop(){
+    openModal('<h2>手动加入 Top 排行</h2>'+
+      '<label>代币符号</label><input id="top_sym" placeholder="如:PEPE"/>'+
+      '<label>合约地址</label><input id="top_addr" placeholder="0x..."/>'+
+      '<p class="confirm-text" style="margin-top:14px;font-size:12px;">手动加入会跳过涨幅排序,建议仅用于官方推广代币,且必须为已验证代币。</p>'+
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveAddTop()">加入</button></div>');
+  }
+  function saveAddTop(){
+    var sym=document.getElementById("top_sym").value.trim().toUpperCase();
+    if(!sym){ toast("请填写代币符号"); return; }
+    var nid=Math.max.apply(null,topList.map(function(x){return x.id;}).concat(0))+1;
+    topList.push({ id:nid, sym:sym, ic:sym[0], bg:"#1c2536", col:"#fff", chg:"—", price:"—", vol:"—", verified:false });
+    renderTop(); closeModal(); toast(sym+" 已加入榜单");
+  }
+
+  /* ===================== FEES ===================== */
+  var fees=[
+    { id:"swap", name:"兑换手续费 (Swap)", desc:"每笔代币兑换收取", pct:0.30, max:1.0 },
+    { id:"send", name:"转账手续费 (Send)", desc:"对外转账收取(不含 gas)", pct:0.00, max:0.5 },
+    { id:"earn", name:"理财提现费 (Earn)", desc:"理财赎回时从收益中收取", pct:0.50, max:2.0 }
+  ];
+  function renderFees(){
+    document.getElementById("feeList").innerHTML=fees.map(function(f){
+      return '<div style="padding:14px 0;border-bottom:1px solid var(--line);">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;">'+
+          '<div><div style="font-size:14px;font-weight:600">'+f.name+'</div><div style="color:var(--mute);font-size:12px;margin-top:3px">'+f.desc+'</div></div>'+
+          '<div style="display:flex;align-items:center;gap:8px;">'+
+            '<input id="fee_'+f.id+'" type="number" step="0.01" min="0" max="'+f.max+'" value="'+f.pct.toFixed(2)+'" style="width:80px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:#fff;text-align:right;outline:none;"/>'+
+            '<span style="color:var(--dim);font-weight:700;">%</span>'+
+          '</div>'+
+        '</div>'+
+        '<div style="color:var(--mute);font-size:11px;margin-top:8px;">上限 '+f.max+'% · 示例:兑换 $1,000 收取 <b style="color:var(--green)">$'+(1000*f.pct/100).toFixed(2)+'</b></div>'+
+      '</div>';
+    }).join('') + '<button class="btn primary" style="margin-top:18px;" onclick="saveFees()">保存费率</button>';
+  }
+  function saveFees(){
+    var bad=null;
+    fees.forEach(function(f){
+      var v=parseFloat(document.getElementById("fee_"+f.id).value);
+      if(isNaN(v)||v<0){ bad=f.name+" 费率无效"; return; }
+      if(v>f.max){ bad=f.name+" 超过上限 "+f.max+"%"; return; }
+      f.pct=v;
+    });
+    if(bad){ toast("⚠ "+bad); renderFees(); return; }
+    renderFees(); toast("费率已保存(真实环境需链上合约确认)");
+  }
+  function saveFeeAddr(){
+    var a=document.getElementById("feeAddr").value.trim();
+    var ok=/^0x[a-fA-F0-9]{40}$/.test(a) || /^0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4,}$/.test(a);
+    var box=document.getElementById("feeAddrStatus");
+    if(!/^0x/.test(a)){ box.innerHTML='<span class="pill red">地址格式无效,必须以 0x 开头</span>'; return; }
+    box.innerHTML='<span class="pill green">✓ 已保存收款地址</span>';
+    toast("收款地址已更新");
+  }
+
+  /* ===================== INIT ===================== */
+  renderEarnTabs(); renderEarn();
+  renderTokenTabs(); renderTokens();
+  renderRiskTabs(); renderRisk();
+  renderUserTabs(); renderUsers();
+  renderTxnTabs(); renderTxns();
+  renderSettings();
+  renderTopTabs(); renderTop();
+  renderFees();
+
+  /* ===================== ANNOUNCEMENTS ===================== */
+  var ANN_KEY = "ww_announcements";
+  var annTagName = { notice:"通知", warning:"提醒", urgent:"重要" };
+  var annTagColor = { notice:"green", warning:"amber", urgent:"red" };
+  function loadAnn(){ try { return JSON.parse(localStorage.getItem(ANN_KEY) || "[]"); } catch(e){ return []; } }
+  function saveAnn(list){ try { localStorage.setItem(ANN_KEY, JSON.stringify(list)); } catch(e){} }
+  function nowStr(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); }
+  function renderAnn(){
+    var list = loadAnn().slice().reverse();
+    var tb = document.getElementById("annTable");
+    if(!list.length){ tb.innerHTML='<tr><td colspan="5"><div class="empty">暂无公告,点右上角发布</div></td></tr>'; return; }
+    tb.innerHTML = list.map(function(a){
+      return '<tr><td><span class="pill '+(annTagColor[a.tag]||"green")+'">'+(annTagName[a.tag]||"通知")+'</span></td><td style="font-weight:600">'+a.title+'</td><td style="color:var(--dim);max-width:280px;">'+a.body+'</td><td style="color:var(--mute);white-space:nowrap">'+(a.time||"")+'</td><td><button class="btn sm danger" onclick="deleteAnn('+a.id+')">删除</button></td></tr>';
+    }).join('');
+  }
+  function openAnnForm(){
+    openModal('<h2>发布公告</h2>'+
+      '<label>类型</label><select id="a_tag"><option value="notice">通知 (绿色)</option><option value="warning">提醒 (黄色)</option><option value="urgent">重要 (红色)</option></select>'+
+      '<label>标题</label><input id="a_title" placeholder="如:系统维护通知"/>'+
+      '<label>内容</label><input id="a_body" placeholder="公告正文"/>'+
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveAnnForm()">发布</button></div>');
+  }
+  function saveAnnForm(){
+    var title=document.getElementById("a_title").value.trim();
+    var body=document.getElementById("a_body").value.trim();
+    if(!title){ toast("请填写标题"); return; }
+    var list=loadAnn();
+    var nid=list.reduce(function(m,a){ return Math.max(m,a.id||0); },0)+1;
+    list.push({ id:nid, tag:document.getElementById("a_tag").value, title:title, body:body, time:nowStr() });
+    saveAnn(list); renderAnn(); closeModal(); toast("公告已发布,用户端铃铛将显示");
+  }
+  function deleteAnn(id){ var list=loadAnn().filter(function(a){ return a.id!==id; }); saveAnn(list); renderAnn(); toast("公告已删除"); }
+  renderAnn();
+
+  /* ===================== CONTENT PAGES (Help / About) ===================== */
+  // 通过 localStorage 与用户端共享 ww_help_content / ww_about_content
+  var CONTENT_KEYS = { help: "ww_help_content", about: "ww_about_content" };
+  var CONTENT_TITLES = { help: "帮助中心内容", about: "关于页内容" };
+  var currentContent = "help";
+  function switchContent(which){
+    currentContent = which;
+    document.getElementById("contentTab-help").classList.toggle("active", which==="help");
+    document.getElementById("contentTab-about").classList.toggle("active", which==="about");
+    document.getElementById("contentTitle").textContent = CONTENT_TITLES[which];
+    document.getElementById("contentEditor").value = localStorage.getItem(CONTENT_KEYS[which]) || "";
+  }
+  function saveContent(){
+    var text = document.getElementById("contentEditor").value;
+    try { localStorage.setItem(CONTENT_KEYS[currentContent], text); } catch(e){}
+    var stamp = new Date().toLocaleTimeString();
+    document.getElementById("contentSavedAt").textContent = "已保存 " + stamp;
+    toast("已发布,用户端" + CONTENT_TITLES[currentContent].replace("内容","") + "立即显示");
+  }
+  function resetContent(){
+    if(!confirm("清空当前内容?")) return;
+    document.getElementById("contentEditor").value = "";
+  }
+  // 默认先放一段帮助内容,方便看到效果
+  if(!localStorage.getItem(CONTENT_KEYS.help)){
+    localStorage.setItem(CONTENT_KEYS.help,
+      "## 常见问题\n\n" +
+      "Q: 如何转账?\nA: 在主页点 Send,输入收款地址和金额,确认即可。\n\n" +
+      "Q: 转账卡在处理中?\nA: World Chain 出块通常几秒内确认,若超过 30 秒请刷新交易记录页。\n\n" +
+      "Q: 如何导入新代币?\nA: 在 Swap 页点代币选择框,粘贴合约地址即可自动检测并导入。\n\n" +
+      "## 联系我们\n\n如需进一步帮助,请发送邮件至 support@example.com"
+    );
+  }
+  if(!localStorage.getItem(CONTENT_KEYS.about)){
+    localStorage.setItem(CONTENT_KEYS.about,
+      "Lumina 是基于 World Chain 的钱包 Mini App,内置于 World App。\n\n" +
+      "我们的使命是为每一个真人提供安全、易用的数字资产管理工具。所有功能均围绕 World ID 的真人验证基础设施构建,确保只有真实用户能访问。\n\n" +
+      "## 版本信息\n\n当前版本: v1.0.0\n更新日期: 2026 年 5 月\n\n## 法律\n\n使用本应用即表示同意我们的服务条款和隐私政策。"
+    );
+  }
+  switchContent("help");
+
+  /* ===================== CURRENCY & RATES ===================== */
+  // 默认汇率(以 USD=1 为基准),与用户端的 defaultCurrencies 保持一致
+  var CURRENCY_RATES_KEY = "ww_currency_rates";
+  var ratesCurrencies = [
+    { code:"USD", name:"US Dollar", symbol:"$",   rate:1.00 },
+    { code:"EUR", name:"Euro", symbol:"€",        rate:0.92 },
+    { code:"GBP", name:"British Pound", symbol:"£", rate:0.79 },
+    { code:"JPY", name:"Japanese Yen", symbol:"¥", rate:155.0 },
+    { code:"CNY", name:"Chinese Yuan", symbol:"¥", rate:7.20 },
+    { code:"HKD", name:"Hong Kong Dollar", symbol:"HK$", rate:7.82 },
+    { code:"TWD", name:"New Taiwan Dollar", symbol:"NT$", rate:32.5 },
+    { code:"KRW", name:"Korean Won", symbol:"₩", rate:1350 },
+    { code:"NGN", name:"Nigerian Naira", symbol:"₦", rate:1580 },
+    { code:"ZAR", name:"South African Rand", symbol:"R", rate:18.6 },
+    { code:"KES", name:"Kenyan Shilling", symbol:"KSh", rate:129 },
+    { code:"EGP", name:"Egyptian Pound", symbol:"E£", rate:48.7 }
+  ];
+  // 从 localStorage 读取已保存的覆盖值
+  try {
+    var saved = JSON.parse(localStorage.getItem(CURRENCY_RATES_KEY) || "null");
+    if(saved){
+      ratesCurrencies.forEach(function(c){ if(saved[c.code]) c.rate = saved[c.code]; });
+    }
+  } catch(e){}
+
+  function renderCurrencyTable(){
+    document.getElementById("currencyTable").innerHTML = ratesCurrencies.map(function(c, i){
+      var isUSD = c.code === "USD";
+      var sample = (1000 * c.rate);
+      var sampleTxt = (c.code==="JPY"||c.code==="KRW"||c.code==="NGN"||c.code==="TWD")
+        ? c.symbol + Math.round(sample).toLocaleString()
+        : c.symbol + sample.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+      var input = isUSD
+        ? '<span style="color:var(--mute)">1.0000 (基准)</span>'
+        : '<input type="number" step="0.0001" min="0" value="'+c.rate+'" onchange="updateRate('+i+', this.value)" style="width:120px;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;color:#fff;font-size:13px;outline:none;"/>';
+      return '<tr><td style="font-weight:700">'+c.code+'</td><td style="color:var(--dim)">'+c.name+'</td><td style="font-size:16px">'+c.symbol+'</td><td>'+input+'</td><td style="color:var(--dim)">'+sampleTxt+'</td><td><span class="pill green">启用</span></td></tr>';
+    }).join('');
+  }
+  function updateRate(idx, val){
+    var v = parseFloat(val);
+    if(isNaN(v) || v<=0){ toast("汇率必须大于 0"); renderCurrencyTable(); return; }
+    ratesCurrencies[idx].rate = v;
+  }
+  function saveRates(){
+    var obj = {};
+    ratesCurrencies.forEach(function(c){ obj[c.code] = c.rate; });
+    try { localStorage.setItem(CURRENCY_RATES_KEY, JSON.stringify(obj)); } catch(e){}
+    renderCurrencyTable();
+    toast("汇率已保存,用户端将自动按新汇率显示");
+  }
+  function syncRates(){
+    // 模拟从行情拉取:小幅随机波动当前汇率
+    ratesCurrencies.forEach(function(c){
+      if(c.code === "USD") return;
+      c.rate = c.rate * (1 + (Math.random()-0.5)*0.02); // ±1%
+    });
+    renderCurrencyTable();
+    toast("已从行情同步(模拟),记得保存");
+  }
+  renderCurrencyTable();
+</script>
+</body>
+</html>

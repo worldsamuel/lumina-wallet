@@ -25,7 +25,7 @@ const authOptions: NextAuthOptions = {
     },
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn() {
       return true;
     },
   },

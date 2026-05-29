@@ -1,0 +1,38 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model UserProfile {
+  id             String   @id @default(cuid())
+  worldUserId    String?  @unique
+  walletAddress  String?
+  displayName    String?
+  locale         String   @default("en")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  activityEvents WalletActivity[]
+}
+
+model WalletActivity {
+  id            String      @id @default(cuid())
+  userProfileId String?
+  userProfile   UserProfile? @relation(fields: [userProfileId], references: [id])
+  type          String
+  assetSymbol   String
+  amount        Decimal
+  status        String
+  txHash        String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+}
+
+model AdminSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  updatedAt DateTime @updatedAt
+}

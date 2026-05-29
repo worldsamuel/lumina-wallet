@@ -1,0 +1,1756 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Lumina</title>
+<style>
+  :root {
+    --bg: #000000; --surface: #0e0f0e; --surface-2: #161816; --surface-3: #1c1f1c;
+    --line: #232623; --text: #ffffff; --text-dim: #8a8f8a; --text-mute: #5c615c;
+    --green: #4ade80; --green-bright: #22e06b; --blue: #2775ca; --red: #f87171;
+    --radius-card: 22px; --radius-md: 18px; --radius-pill: 999px;
+    --pad-screen: 20px; --gap: 12px; --phone-max: 430px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  button { font-family: inherit; }
+  .phone { max-width: var(--phone-max); margin: 0 auto; min-height: 100vh; background: var(--bg); position: relative; overflow: hidden; }
+  .view { display: none; padding-bottom: 100px; }
+  .view.active { display: block; animation: fade .25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .statusbar { display: flex; justify-content: space-between; align-items: center; padding: 14px 24px 6px; font-size: 15px; font-weight: 600; }
+  .statusbar .right { display: flex; gap: 7px; align-items: center; }
+  .header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 14px var(--pad-screen) 10px; }
+  .header .header-spacer { /* 占位,让中间品牌真正居中 */ }
+  .header .brand { justify-self: center; }
+  .header .header-actions { justify-self: end; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo { width: 38px; height: 38px; border-radius: 50%; border: 1.5px solid #333; display: grid; place-items: center; font-weight: 800; font-size: 17px; }
+  .brand .title { font-size: 22px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+  .verified-badge { color: var(--green); display: inline-flex; }
+  .header-actions { display: flex; gap: 18px; align-items: center; }
+  .icon-btn { background: none; border: none; color: var(--text); cursor: pointer; display: grid; place-items: center; }
+  .icon-btn.dot { position: relative; }
+  .icon-btn.dot::after { content: ""; position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); }
+  #bellBtn { position: relative; }
+  .bell-dot { position: absolute; top: -1px; right: -1px; width: 8px; height: 8px; border-radius: 50%; background: var(--green-bright); }
+  .ann-item { padding: 16px var(--pad-screen); border-bottom: 1px solid var(--line); cursor: default; }
+  .ann-item:last-child { border-bottom: none; }
+  .ann-item .ann-top { display: flex; align-items: center; gap: 8px; }
+  .ann-item .ann-tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  .ann-item .ann-tag.notice { background: rgba(74,222,128,0.12); color: var(--green); }
+  .ann-item .ann-tag.warning { background: rgba(245,196,81,0.12); color: #f5c451; }
+  .ann-item .ann-tag.urgent { background: rgba(248,113,113,0.12); color: var(--red); }
+  .ann-item .ann-time { margin-left: auto; color: var(--text-mute); font-size: 11px; }
+  .ann-item .ann-title { font-weight: 700; font-size: 15px; margin-top: 8px; }
+  .ann-item .ann-body { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin-top: 6px; }
+  .ann-empty { padding: 40px var(--pad-screen); text-align: center; color: var(--text-mute); font-size: 14px; }
+  /* Help / About 文章样式 */
+  .article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; }
+  .article h2 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
+  .article p { color: var(--text-dim); font-size: 14px; line-height: 1.7; margin-bottom: 14px; }
+  .article p:last-child { margin-bottom: 0; }
+  .article-empty { padding: 60px var(--pad-screen); text-align: center; color: var(--text-mute); font-size: 14px; line-height: 1.6; }
+  /* Connected apps */
+  .app-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); border-bottom: 1px solid var(--line); }
+  .app-row:last-child { border-bottom: none; }
+  .app-row .ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; }
+  .app-row .mid { flex: 1; min-width: 0; }
+  .app-row .mid .n { font-weight: 700; font-size: 14px; }
+  .app-row .mid .d { color: var(--text-mute); font-size: 12px; margin-top: 3px; }
+  .app-row .revoke-btn { background: var(--surface-2); border: 1px solid rgba(248,113,113,0.25); color: var(--red); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .app-row .revoke-btn:active { background: rgba(248,113,113,0.08); }
+  /* Backup phrase grid */
+  .phrase-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+  .phrase-grid .w { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 8px; font-size: 13px; }
+  .phrase-grid .w .i { color: var(--text-mute); font-size: 10px; margin-right: 6px; }
+  .addr-chip { margin: 4px var(--pad-screen) 18px; display: inline-flex; align-items: center; gap: 10px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 8px 14px; font-size: 15px; font-weight: 500; cursor: pointer; width: fit-content; }
+  .addr-chip .avatar { width: 22px; height: 22px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.6); }
+  .addr-chip .copy { color: var(--text-dim); display: inline-flex; }
+  .balance-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 140% at 100% 30%, rgba(34,224,107,0.10), transparent 55%), linear-gradient(160deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px 22px 20px; position: relative; overflow: hidden; }
+  .balance-card .globe { position: absolute; right: -40px; top: -10px; width: 220px; height: 220px; border-radius: 50%; background: repeating-radial-gradient(circle at 50% 50%, transparent 0 14px, rgba(34,224,107,0.06) 14px 15px), repeating-conic-gradient(from 0deg, transparent 0 11deg, rgba(34,224,107,0.05) 11deg 12deg); -webkit-mask: radial-gradient(circle at 60% 40%, #000 50%, transparent 72%); mask: radial-gradient(circle at 60% 40%, #000 50%, transparent 72%); }
+  .balance-top { display: flex; justify-content: space-between; align-items: center; }
+  .balance-label { display: flex; align-items: center; gap: 8px; color: var(--text-dim); font-size: 15px; }
+  .eye { cursor: pointer; display: inline-flex; }
+  .chain-tag { display: inline-flex; align-items: center; gap: 7px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 6px 12px; font-size: 13px; color: #cfd; z-index: 2; }
+  .chain-tag .led { width: 7px; height: 7px; border-radius: 50%; background: var(--green-bright); }
+  .balance-amount { font-size: 44px; font-weight: 800; letter-spacing: -1px; margin: 10px 0 6px; }
+  .balance-change { color: var(--green); font-size: 15px; font-weight: 600; }
+  .balance-change .sub { color: #2faf5e; font-weight: 500; }
+  .human-pill { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-size: 14px; }
+  .human-pill .seal { color: var(--green); display: inline-flex; }
+  .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--gap); padding: 22px var(--pad-screen) 6px; }
+  .action { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 16px 4px 12px; text-align: center; cursor: pointer; transition: transform .12s ease, background .2s; }
+  .action:active { transform: scale(0.95); background: var(--surface-2); }
+  .action .ring { width: 46px; height: 46px; border-radius: 50%; border: 1.5px solid rgba(74,222,128,0.4); display: grid; place-items: center; margin: 0 auto 8px; color: var(--green); }
+  .action .lbl { font-size: 13px; color: var(--text-dim); }
+  .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
+  .section-head h2 { font-size: 19px; font-weight: 700; }
+  .section-head .link { color: var(--green); font-size: 15px; cursor: pointer; }
+  .assets { margin: 0 var(--pad-screen); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+  .asset { display: grid; grid-template-columns: 44px 1fr 80px auto; gap: 14px; align-items: center; padding: 16px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .asset:active { background: var(--surface-2); }
+  .asset .coin { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
+  .coin.wld { background: #fff; color: #000; } .coin.usdc { background: var(--blue); color: #fff; }
+  .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
+  .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+  .asset .spark { width: 80px; height: 34px; }
+  .asset .vals { text-align: right; white-space: nowrap; } .asset .vals .amt { font-weight: 700; font-size: 15px; } .asset .vals .usd { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
+  .add-token { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 17px; color: var(--green); font-weight: 600; font-size: 15px; cursor: pointer; }
+  .backup { margin: 16px var(--pad-screen) 0; display: flex; align-items: center; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px; cursor: pointer; }
+  .backup .shield { width: 48px; height: 48px; border-radius: 14px; background: radial-gradient(circle at 40% 30%, rgba(74,222,128,0.35), rgba(74,222,128,0.08)); display: grid; place-items: center; color: var(--green); flex-shrink: 0; }
+  .backup .txt .t { font-weight: 700; font-size: 15px; } .backup .txt .d { color: var(--text-mute); font-size: 13px; margin-top: 3px; }
+  .backup .chev { margin-left: auto; color: var(--text-mute); display: inline-flex; }
+  .subhead { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 14px; padding: 8px var(--pad-screen) 18px; }
+  .subhead > h1 { text-align: center; grid-column: 2; }
+  .subhead > .back-btn { grid-column: 1; }
+  .back-btn { background: var(--surface-2); border: none; color: var(--text); width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+  .subhead h1 { font-size: 20px; font-weight: 700; }
+  .qr-wrap { margin: 10px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 28px; text-align: center; }
+  .qr { width: 200px; height: 200px; margin: 0 auto 22px; background: #fff; border-radius: 16px; padding: 14px; }
+  .qr svg { width: 100%; height: 100%; }
+  .recv-addr { background: var(--surface-2); border-radius: 14px; padding: 14px 16px; font-size: 13px; color: var(--text-dim); word-break: break-all; line-height: 1.5; }
+  .recv-note { color: var(--text-mute); font-size: 13px; margin: 16px var(--pad-screen) 0; text-align: center; line-height: 1.5; }
+  .copy-btn { margin: 18px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--green); color: #042; border: none; border-radius: var(--radius-md); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .copy-btn:active { opacity: 0.85; }
+  .form-card { margin: 0 var(--pad-screen); }
+  .field-label { color: var(--text-dim); font-size: 13px; margin: 18px 0 8px 4px; }
+  .field { width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px; color: var(--text); font-size: 16px; outline: none; }
+  .field:focus { border-color: rgba(74,222,128,0.5); }
+  .token-select { display: flex; gap: 10px; }
+  .token-opt { flex: 1; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px; text-align: center; cursor: pointer; font-weight: 600; transition: all .15s; }
+  .token-opt.sel { border-color: var(--green); background: rgba(74,222,128,0.08); color: var(--green); }
+  /* Send 页代币选择器(点击打开代币搜索弹窗) */
+  .send-token-picker { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; cursor: pointer; transition: all .15s; }
+  .send-token-picker:hover { border-color: var(--line-2, #2c302c); }
+  .send-token-picker .coin { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; }
+  .send-token-picker .send-tok-info { flex: 1; min-width: 0; }
+  .send-token-picker .send-tok-info .s { font-weight: 700; font-size: 15px; }
+  .send-token-picker .send-tok-info .f { color: var(--text-mute); font-size: 12px; margin-top: 2px; }
+  .send-token-picker .chev { color: var(--text-mute); display: inline-flex; }
+  .amount-row { position: relative; }
+  .amount-row .max { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--green); font-weight: 600; font-size: 13px; cursor: pointer; }
+  .avail { color: var(--text-mute); font-size: 12px; margin: 6px 0 0 4px; }
+  .send-submit { margin: 26px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--green); color: #042; border: none; border-radius: var(--radius-md); padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; }
+  .send-submit:active { opacity: 0.85; }
+  /* Swap */
+  .swap-box { margin: 0 var(--pad-screen); position: relative; }
+  .swap-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px; }
+  .swap-panel .row { display: flex; justify-content: space-between; align-items: center; }
+  .swap-panel .cap { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+  .swap-panel .amt-in { background: none; border: none; color: var(--text); font-size: 30px; font-weight: 700; width: 60%; outline: none; }
+  .swap-panel .tk { display: flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-weight: 700; cursor: pointer; }
+  .swap-panel .tk .dot2 { width: 22px; height: 22px; border-radius: 50%; }
+  .swap-panel .bal { color: var(--text-mute); font-size: 12px; margin-top: 8px; }
+  .swap-switch { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 42px; height: 42px; border-radius: 12px; background: var(--surface-2); border: 3px solid var(--bg); display: grid; place-items: center; color: var(--green); cursor: pointer; z-index: 3; }
+  .swap-gap { height: 8px; }
+  .swap-rate { margin: 14px var(--pad-screen) 0; display: flex; justify-content: space-between; color: var(--text-dim); font-size: 13px; }
+  /* Activity */
+  .act-filter { display: flex; gap: 8px; padding: 0 var(--pad-screen) 6px; }
+  .chip { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-pill); padding: 8px 16px; font-size: 13px; color: var(--text-dim); cursor: pointer; }
+  .chip.sel { border-color: var(--green); color: var(--green); background: rgba(74,222,128,0.08); }
+  .act-day { color: var(--text-mute); font-size: 13px; padding: 16px var(--pad-screen) 8px; }
+  .act-group-head { color: var(--text-mute); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: 18px var(--pad-screen) 8px; display:flex; align-items:center; gap:8px; }
+  .act-group-head .act-count { background: var(--surface-2); color: var(--text-dim); font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+  .act-item { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); cursor: pointer; }
+  .act-item:active { background: var(--surface-2); }
+  .act-ic { width: 42px; height: 42px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; flex-shrink: 0; }
+  .act-ic.in { color: var(--green); } .act-ic.out { color: var(--text); } .act-ic.swap { color: #8aa3d8; }
+  .act-mid { flex: 1; } .act-mid .t { font-weight: 600; font-size: 15px; } .act-mid .s { color: var(--text-mute); font-size: 12px; margin-top: 3px; }
+  .act-amt { text-align: right; white-space: nowrap; } .act-amt .v { font-weight: 700; font-size: 15px; } .act-amt .v.plus { color: var(--green); } .act-amt .st { font-size: 11px; color: var(--text-mute); margin-top: 3px; }
+  /* Detail */
+  .detail-top { text-align: center; padding: 6px var(--pad-screen) 0; }
+  .detail-coin { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px; display: grid; place-items: center; font-weight: 700; font-size: 20px; }
+  .detail-amt { font-size: 32px; font-weight: 800; } .detail-usd { color: var(--text-dim); font-size: 15px; margin-top: 4px; }
+  .detail-chart { margin: 22px var(--pad-screen) 0; height: 140px; }
+  .detail-chart svg { width: 100%; height: 100%; }
+  .range-row { display: flex; justify-content: center; gap: 8px; margin-top: 14px; }
+  .range { padding: 6px 14px; border-radius: var(--radius-pill); font-size: 13px; color: var(--text-dim); cursor: pointer; }
+  .range.sel { background: var(--surface-2); color: var(--green); }
+  .detail-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 24px var(--pad-screen) 0; }
+  .detail-actions button { padding: 15px; border-radius: var(--radius-md); border: none; font-size: 15px; font-weight: 700; cursor: pointer; }
+  .btn-primary { background: var(--green); color: #042; } .btn-ghost { background: var(--surface-2); color: var(--text); }
+  /* Swap 增强:汇率详情/价格影响 */
+  .swap-detail { margin: 14px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .swap-detail .ln { display: flex; justify-content: space-between; font-size: 13px; padding: 5px 0; }
+  .swap-detail .ln .k { color: var(--text-dim); }
+  .swap-detail .ln .impact-low { color: var(--green); } .swap-detail .ln .impact-mid { color: #f5c451; } .swap-detail .ln .impact-high { color: var(--red); }
+  .gear { margin-left: auto; cursor: pointer; color: var(--text-dim); display: inline-flex; }
+  .swap-head { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 14px; padding: 8px var(--pad-screen) 18px; }
+  .swap-head > h1 { text-align: center; grid-column: 2; }
+  .swap-head > .back-btn { grid-column: 1; }
+  .swap-head > .gear { grid-column: 3; justify-self: end; }
+  /* 滑点设置面板 */
+  .slip-panel { margin: 0 var(--pad-screen) 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: none; }
+  .slip-panel.open { display: block; animation: fade .2s ease; }
+  .slip-panel .lbl { color: var(--text-dim); font-size: 12px; margin-bottom: 8px; }
+  .slip-opts { display: flex; gap: 6px; }
+  .slip-opt { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; text-align: center; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .slip-opt.sel { border-color: var(--green); color: var(--green); background: rgba(74,222,128,0.08); }
+  .slip-custom { width: 72px; flex: 1; padding: 7px 10px !important; font-size: 13px !important; border-radius: 8px !important; }
+  /* 代币选择弹窗 */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: flex-end; justify-content: center; z-index: 80; }
+  .modal-mask.open { display: flex; animation: fade .2s ease; }
+  .modal { width: 100%; max-width: var(--phone-max); background: #0c0d0c; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid var(--line); padding: 8px 0 24px; max-height: 70vh; overflow-y: auto; }
+  .modal-grip { width: 40px; height: 4px; border-radius: 4px; background: #444; margin: 8px auto 14px; }
+  .modal h3 { font-size: 17px; padding: 0 var(--pad-screen) 12px; }
+  .modal .tk-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); cursor: pointer; }
+  .modal .tk-row:active { background: var(--surface-2); }
+  .modal .tk-row .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
+  .modal .tk-row .mid { flex: 1; } .modal .tk-row .mid .s { font-weight: 700; } .modal .tk-row .mid .f { color: var(--text-mute); font-size: 12px; margin-top: 2px; }
+  .modal .tk-row .bal { text-align: right; font-size: 13px; color: var(--text-dim); }
+  .tk-search { padding: 0 var(--pad-screen) 8px; }
+  .tk-search input { width: 100%; background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; color: var(--text); font-size: 14px; outline: none; }
+  .tk-search input:focus { border-color: rgba(74,222,128,0.5); }
+  .import-card { margin: 4px var(--pad-screen) 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .import-card .hd { display: flex; align-items: center; gap: 12px; }
+  .import-card .ic { width: 40px; height: 40px; border-radius: 50%; background: #2a2d2a; display: grid; place-items: center; font-weight: 700; color: var(--text-dim); }
+  .import-card .mid { flex: 1; } .import-card .mid .s { font-weight: 700; } .import-card .mid .f { color: var(--text-mute); font-size: 12px; margin-top: 2px; }
+  .import-card .addr { font-size: 11px; color: var(--text-mute); margin-top: 10px; word-break: break-all; }
+  .import-card .warn { display: flex; gap: 8px; margin-top: 12px; padding: 10px; background: rgba(245,196,81,0.08); border-radius: 10px; font-size: 12px; color: #f5c451; line-height: 1.5; }
+  .import-card .btn { margin-top: 12px; width: 100%; background: var(--green); color: #042; border: none; border-radius: 12px; padding: 12px; font-weight: 700; cursor: pointer; }
+  .import-card .btn:active { opacity: 0.85; }
+  .import-err { margin: 4px var(--pad-screen) 8px; padding: 14px; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.2); border-radius: 12px; color: var(--red); font-size: 13px; }
+  .import-load { margin: 4px var(--pad-screen); padding: 16px; text-align: center; color: var(--text-dim); font-size: 13px; }
+  .custom-badge { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: rgba(245,196,81,0.15); color: #f5c451; font-size: 10px; font-weight: 600; vertical-align: middle; }
+  /* 代币安全扫描 */
+  .scan-rows { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .scan-row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
+  .scan-row .dot3 { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .scan-row.pass .dot3 { background: var(--green); } .scan-row.pass { color: var(--text-dim); }
+  .scan-row.warn .dot3 { background: #f5c451; } .scan-row.warn { color: #f5c451; }
+  .scan-row.danger .dot3 { background: var(--red); } .scan-row.danger { color: var(--red); }
+  .scan-row .k { flex: 1; } .scan-row .v { font-weight: 600; }
+  .risk-score { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 12px; border-radius: 10px; }
+  .risk-score.low { background: rgba(74,222,128,0.1); } .risk-score.mid { background: rgba(245,196,81,0.1); } .risk-score.high { background: rgba(248,113,113,0.12); }
+  .risk-score .big { font-size: 22px; font-weight: 800; }
+  .risk-score.low .big { color: var(--green); } .risk-score.mid .big { color: #f5c451; } .risk-score.high .big { color: var(--red); }
+  .risk-score .txt { font-size: 12px; line-height: 1.4; }
+  .risk-score.low .txt { color: var(--green); } .risk-score.mid .txt { color: #f5c451; } .risk-score.high .txt { color: var(--red); }
+  .ack { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; cursor: pointer; font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .ack .box { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--text-mute); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
+  .ack.checked .box { background: var(--green); border-color: var(--green); }
+  .ack.checked .box svg { display: block; } .ack .box svg { display: none; }
+  .import-card .btn:disabled { background: var(--surface-3); color: var(--text-mute); cursor: not-allowed; }
+  /* Swap 未验证代币警告条 */
+  .unv-warn { margin: 14px var(--pad-screen) 0; background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25); border-radius: 14px; padding: 14px; display: none; }
+  .unv-warn.show { display: block; animation: fade .2s ease; }
+  .unv-warn .hd { display: flex; align-items: center; gap: 8px; color: var(--red); font-weight: 700; font-size: 14px; }
+  .unv-warn .bd { color: #d99; font-size: 12px; line-height: 1.5; margin-top: 8px; }
+  .unv-warn .ack2 { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; cursor: pointer; font-size: 12px; color: #e9b; line-height: 1.5; }
+  .unv-warn .ack2 .box { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid var(--red); flex-shrink: 0; display: grid; place-items: center; margin-top: 1px; }
+  .unv-warn .ack2.checked .box { background: var(--red); }
+  .unv-warn .ack2.checked .box svg { display: block; } .unv-warn .ack2 .box svg { display: none; }
+  .send-submit:disabled { background: var(--surface-3); color: var(--text-mute); cursor: not-allowed; }
+  /* 涨幅榜 */
+  .gainers-head { display: flex; align-items: center; justify-content: space-between; padding: 26px var(--pad-screen) 4px; }
+  .gainers-head .l { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }
+  .gainers-head .fire { color: #f5854a; display: inline-flex; }
+  .gainers-head .r { color: var(--text-mute); font-size: 12px; }
+  .gainers-note { margin: 8px var(--pad-screen) 0; display: flex; gap: 8px; padding: 10px 12px; background: rgba(245,196,81,0.07); border-radius: 10px; font-size: 11px; color: #c9a24a; line-height: 1.5; }
+  .gainers { margin: 12px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+  .gainer { display: grid; grid-template-columns: 22px 36px 1fr auto; gap: 11px; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .gainer:last-child { border-bottom: none; }
+  .gainer:active { background: var(--surface-2); }
+  .gainer .rank { color: var(--text-mute); font-size: 13px; font-weight: 700; text-align: center; }
+  .gainer .rank.top { color: #f5854a; }
+  .gainer .ic { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+  .gainer .mid .s { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .gainer .mid .p { color: var(--text-mute); font-size: 12px; margin-top: 2px; }
+  .gainer .chg { text-align: right; } .gainer .chg .pct { font-weight: 800; font-size: 15px; color: var(--green); } .gainer .chg .vol { color: var(--text-mute); font-size: 11px; margin-top: 2px; }
+  .vbadge { display: inline-flex; color: var(--green); } .rbadge { font-size: 10px; padding: 1px 6px; border-radius: 6px; font-weight: 600; }
+  .rbadge.unverified { background: rgba(248,113,113,0.12); color: var(--red); }
+  /* Earn */
+  .earn-hero { margin: 0 var(--pad-screen); background: radial-gradient(130% 130% at 0% 0%, rgba(34,224,107,0.16), transparent 50%), linear-gradient(150deg, #11160f, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; position: relative; overflow: hidden; }
+  .earn-hero .leaf { position: absolute; right: 16px; top: 14px; color: rgba(74,222,128,0.25); }
+  .earn-hero .cap { color: var(--text-dim); font-size: 14px; }
+  .earn-hero .total { font-size: 34px; font-weight: 800; margin: 8px 0 4px; }
+  .earn-hero .sub { color: var(--green); font-size: 14px; font-weight: 600; }
+  .earn-hero .claim { margin-top: 16px; background: var(--green); color: #042; border: none; border-radius: var(--radius-pill); padding: 11px 22px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .earn-hero .claim:active { opacity: 0.85; }
+  .prod { margin: 12px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px; cursor: pointer; transition: border-color .15s; }
+  .prod:active { border-color: rgba(74,222,128,0.4); }
+  .prod .top { display: flex; align-items: center; gap: 12px; }
+  .prod .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; flex-shrink: 0; }
+  .prod .nm { flex: 1; } .prod .nm .t { font-weight: 700; font-size: 16px; } .prod .nm .d { color: var(--text-mute); font-size: 12px; margin-top: 3px; }
+  .prod .apy { text-align: right; } .prod .apy .v { color: var(--green); font-weight: 800; font-size: 20px; } .prod .apy .l { color: var(--text-mute); font-size: 11px; }
+  .prod .meta { display: flex; gap: 18px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+  .prod .meta .m { font-size: 12px; } .prod .meta .m .k { color: var(--text-mute); } .prod .meta .m .val { font-weight: 600; margin-top: 3px; }
+  .risk { display: inline-block; padding: 2px 8px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 600; }
+  .risk.low { background: rgba(74,222,128,0.12); color: var(--green); }
+  .risk.mid { background: rgba(245,196,81,0.12); color: #f5c451; }
+  .risk.high { background: rgba(248,113,113,0.12); color: var(--red); }
+  .ed-hero { text-align: center; padding: 6px var(--pad-screen) 0; }
+  .ed-ic { width: 56px; height: 56px; border-radius: 50%; margin: 0 auto 12px; display: grid; place-items: center; font-weight: 700; font-size: 22px; }
+  .ed-apy { font-size: 38px; font-weight: 800; color: var(--green); } .ed-apy-l { color: var(--text-dim); font-size: 14px; }
+  .ed-stats { margin: 22px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px; }
+  .ed-stats .ln { display: flex; justify-content: space-between; font-size: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .ed-stats .ln:last-child { border-bottom: none; }
+  .ed-stats .ln .k { color: var(--text-dim); }
+  .ed-desc { margin: 16px var(--pad-screen) 0; color: var(--text-dim); font-size: 13px; line-height: 1.6; }
+  /* Me */
+  .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; display: flex; align-items: center; gap: 16px; }
+  .me-avatar { width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.7); flex-shrink: 0; }
+  .me-info { flex: 1; min-width: 0; }
+  .me-name { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+  .me-name .v { color: var(--green); display: inline-flex; }
+  .me-addr { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
+  .me-orb { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: rgba(74,222,128,0.12); color: var(--green); border-radius: var(--radius-pill); padding: 5px 12px; font-size: 12px; font-weight: 600; }
+  .me-group-label { color: var(--text-mute); font-size: 13px; margin: 24px 0 8px; padding: 0 var(--pad-screen); }
+  .me-group { margin: 0 var(--pad-screen); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
+  .me-row { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .me-row:last-child { border-bottom: none; }
+  .me-row:active { background: var(--surface-2); }
+  .me-row .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; color: var(--green); flex-shrink: 0; }
+  .me-row .lbl { flex: 1; font-size: 15px; font-weight: 500; }
+  .me-row .val { color: var(--text-mute); font-size: 14px; }
+  .me-row .chev { color: var(--text-mute); display: inline-flex; }
+  /* 开关 */
+  .toggle { width: 46px; height: 27px; border-radius: 999px; background: var(--surface-3); position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+  .toggle.on { background: var(--green); }
+  .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; transition: transform .2s; }
+  .toggle.on::after { transform: translateX(19px); }
+  .me-logout { margin: 24px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--surface); border: 1px solid var(--line); color: var(--red); border-radius: var(--radius-md); padding: 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .me-logout:active { background: var(--surface-2); }
+  .me-version { text-align: center; color: var(--text-mute); font-size: 12px; margin-top: 18px; }
+  .tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--phone-max); display: grid; grid-template-columns: repeat(5, 1fr); background: rgba(8,9,8,0.92); backdrop-filter: blur(20px); border-top: 1px solid var(--line); padding: 10px 0 22px; z-index: 50; }
+  .tab { display: grid; place-items: center; gap: 5px; color: var(--text-mute); font-size: 11px; cursor: pointer; }
+  .tab.active { color: var(--green); }
+  .home-indicator { position: fixed; bottom: 8px; left: 50%; transform: translateX(-50%); width: 130px; height: 4px; border-radius: 4px; background: #fff; z-index: 51; }
+  .toast { position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface-3); color: #fff; padding: 10px 18px; border-radius: var(--radius-pill); font-size: 13px; opacity: 0; transition: all .25s; pointer-events: none; z-index: 99; border: 1px solid var(--line); }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- HOME -->
+  <div class="view active" id="view-home">
+    <div class="header">
+      <div class="header-spacer" aria-hidden="true"></div>
+      <div class="brand"><div class="logo">L</div><div class="title">Lumina <span class="verified-badge"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div></div>
+      <div class="header-actions">
+        <button class="icon-btn" onclick="toast(t('tScan'))"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7V5a2 2 0 012-2h2M17 3h2a2 2 0 012 2v2M21 17v2a2 2 0 01-2 2h-2M7 21H5a2 2 0 01-2-2v-2"/><rect x="7" y="7" width="4" height="4" rx="0.5"/><rect x="13" y="7" width="4" height="4" rx="0.5"/><rect x="7" y="13" width="4" height="4" rx="0.5"/><line x1="13" y1="13" x2="13" y2="13.01"/><line x1="17" y1="13" x2="17" y2="17"/><line x1="13" y1="17" x2="15" y2="17"/></svg></button>
+        <button class="icon-btn" id="bellBtn" onclick="openAnnouncements()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg><span class="bell-dot" id="bellDot" style="display:none"></span></button>
+      </div>
+    </div>
+    <div class="addr-chip" onclick="toast(t('tAddrCopied'))"><span class="avatar"></span><span>0x4a3...6F2d</span><span class="copy"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 012-2h10"/></svg></span></div>
+    <div class="balance-card">
+      <div class="globe"></div>
+      <div class="balance-top"><div class="balance-label"><span data-i18n="totalBalance">Total Balance</span> <span class="eye" id="eyeBtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/><line x1="3" y1="3" x2="21" y2="21"/></svg></span></div><div class="chain-tag"><span class="led"></span> World Chain</div></div>
+      <div class="balance-amount" id="balAmt">$1,245.32</div>
+      <div class="balance-change">+3.24% <span class="sub" id="balSub">+$38.87 (24h)</span></div>
+      <div class="human-pill"><span class="seal"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span> <span data-i18n="verifiedHuman">Verified Human</span></div>
+    </div>
+    <div class="actions">
+      <div class="action" onclick="go('receive')"><div class="ring"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div><div class="lbl" data-i18n="receive">Receive</div></div>
+      <div class="action" onclick="go('send')"><div class="ring"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></div><div class="lbl" data-i18n="send">Send</div></div>
+      <div class="action" onclick="go('swap'); setTabByName('Swap')"><div class="ring"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg></div><div class="lbl" data-i18n="swap">Swap</div></div>
+      <div class="action" onclick="go('earn'); setTabByName('Earn')"><div class="ring"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20c0-6 4-9 9-9-1 6-4 9-9 9z"/><path d="M11 20c0-5-3-7-7-7 1 4 3 7 7 7z"/><line x1="11" y1="20" x2="11" y2="14"/></svg></div><div class="lbl" data-i18n="earn">Earn</div></div>
+    </div>
+    <div class="section-head"><h2 data-i18n="assets">Assets</h2><span class="link" data-i18n="viewAll" onclick="toast(t('tComingSoon'))">View All</span></div>
+    <div class="assets" id="assetList"></div>
+  </div>
+
+  <!-- RECEIVE -->
+  <div class="view" id="view-receive">
+    <div class="subhead"><button class="back-btn" onclick="go('home'); setTabByName('Home')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="receive">Receive</h1></div>
+    <div class="qr-wrap"><div class="qr" id="qrBox"></div><div class="recv-addr">0x4a3f8c2e1d9b7a6f5e4d3c2b1a0f9e8d7c6b5a46F2d</div></div>
+    <p class="recv-note">仅向此地址发送 World Chain 上的资产。<br>发送其他网络的代币可能导致永久丢失。</p>
+    <button class="copy-btn" onclick="toast(t('tCopied'))">复制地址</button>
+  </div>
+
+  <!-- SEND -->
+  <div class="view" id="view-send">
+    <div class="subhead"><button class="back-btn" onclick="go('home'); setTabByName('Home')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="send">Send</h1></div>
+    <div class="form-card">
+      <div class="field-label" data-i18n="selectToken">选择代币</div>
+      <div class="send-token-picker" onclick="openTokenModal('send')">
+        <div class="coin wld" id="sendTokIc">◉</div>
+        <div class="send-tok-info"><div class="s" id="sendTokSym">WLD</div><div class="f" id="sendTokFull">Worldcoin</div></div>
+        <span class="chev"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>
+      </div>
+      <div class="field-label" data-i18n="recipient">收款地址</div><input class="field" data-i18n-ph="phRecipient" placeholder="0x... 或 World 用户名" />
+      <div class="field-label" data-i18n="amount">金额</div>
+      <div class="amount-row"><input class="field" type="text" inputmode="decimal" placeholder="0.00" /><span class="max" onclick="toast(t('tMaxFilled'))">MAX</span></div>
+      <div class="avail" id="availTxt"></div>
+      <button class="send-submit" onclick="toast(t('tComingSoon'))"><span data-i18n="confirmSend">确认发送</span></button>
+    </div>
+  </div>
+
+  <!-- SWAP -->
+  <div class="view" id="view-swap">
+    <div class="swap-head">
+      <button class="back-btn" onclick="go('home'); setTabByName('Home')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h1 data-i18n="swap">Swap</h1>
+      <span class="gear" onclick="toggleSlip()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>
+    </div>
+
+    <div class="slip-panel" id="slipPanel">
+      <div class="lbl" data-i18n="slippageTitle">滑点容忍度 (Slippage)</div>
+      <div class="slip-opts">
+        <div class="slip-opt" onclick="selSlip(this,'0.1%')">0.1%</div>
+        <div class="slip-opt sel" onclick="selSlip(this,'0.5%')">0.5%</div>
+        <div class="slip-opt" onclick="selSlip(this,'1.0%')">1.0%</div>
+        <input class="field slip-custom" data-i18n-ph="custom" placeholder="自定义" inputmode="decimal" />
+      </div>
+    </div>
+
+    <div class="swap-box">
+      <div class="swap-panel">
+        <div class="cap" data-i18n="youPay">卖出</div>
+        <div class="row"><input class="amt-in" id="sellAmt" value="100" inputmode="decimal" oninput="recalc()" /><div class="tk" onclick="openTokenModal('sell')"><span class="dot2" id="sellDot" style="background:#fff"></span> <span id="sellSym">WLD</span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div></div>
+        <div class="bal" id="sellBal">余额 12.3456 · ≈ $234.56</div>
+      </div>
+      <div class="swap-gap"></div>
+      <div class="swap-switch" onclick="flipSwap()"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+      <div class="swap-panel">
+        <div class="cap" data-i18n="youReceive">买入</div>
+        <div class="row"><input class="amt-in" id="buyAmt" value="543.20" readonly /><div class="tk" onclick="openTokenModal('buy')"><span class="dot2" id="buyDot" style="background:var(--blue)"></span> <span id="buySym">USDC</span> <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg></div></div>
+        <div class="bal" id="buyBal">余额 543.21 · ≈ $543.21</div>
+      </div>
+    </div>
+
+    <div class="swap-detail">
+      <div class="ln"><span class="k" data-i18n="rate">汇率</span><span id="rateTxt">1 WLD ≈ 5.43 USDC</span></div>
+      <div class="ln"><span class="k" data-i18n="priceImpact">价格影响</span><span class="impact-low" id="impactTxt">&lt;0.1%</span></div>
+      <div class="ln"><span class="k" data-i18n="slippageTol">滑点容忍</span><span id="slipTxt">0.5%</span></div>
+      <div class="ln"><span class="k" data-i18n="networkFee">网络费</span><span>≈ $0.01</span></div>
+    </div>
+
+    <div class="unv-warn" id="unvWarn">
+      <div class="hd"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> 未验证代币</div>
+      <div class="bd" id="unvBody">你正在兑换一个自行导入、未经验证的代币。它可能无法卖出(蜜罐)、收取高额买卖税,或仿冒知名项目。请务必核实合约地址。</div>
+      <div class="ack2" id="unvAck" onclick="toggleUnvAck()"><span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已了解风险,自愿继续此笔兑换。</span></div>
+    </div>
+
+    <button class="send-submit" id="swapBtn" onclick="confirmSwap()"><span data-i18n="confirmSwap">确认兑换</span></button>
+
+    <div class="gainers-head">
+      <div class="l" data-i18n="topGainers"><span class="fire"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 5-2 6-1.5 1.5-3 3-3 6a5 5 0 0010 0c0-2-1-3.5-2-5 0 1.5-1 2-1.5 2 .5-3-1-6-1.5-9z"/></svg></span> 今日涨幅榜</div>
+      <div class="r" data-i18n="gainersTime">24h · 链上数据</div>
+    </div>
+    <div class="gainers-note"><span>⚠</span><span data-i18n="gainersNote">以下为链上 24h 涨幅排行,仅为市场行情,非投资建议。高涨幅代币通常伴随高波动与高风险,部分为未经验证的新代币。</span></div>
+    <div class="gainers" id="gainersList"></div>
+  </div>
+
+  <!-- ACTIVITY -->
+  <div class="view" id="view-activity">
+    <div class="subhead" style="padding-bottom:12px"><h1 data-i18n="activity">Activity</h1></div>
+    <div class="act-filter">
+      <div class="chip sel" data-i18n="actAll" onclick="selChipFilter(this,'all')">全部</div>
+      <div class="chip" data-i18n="actIn" onclick="selChipFilter(this,'in')">收款</div>
+      <div class="chip" data-i18n="actOut" onclick="selChipFilter(this,'out')">发送</div>
+      <div class="chip" data-i18n="actSwap" onclick="selChipFilter(this,'swap')">兑换</div>
+    </div>
+    <div id="actList"></div>
+  </div>
+
+  <!-- DETAIL -->
+  <div class="view" id="view-detail">
+    <div class="subhead"><button class="back-btn" onclick="go('home'); setTabByName('Home')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 id="detTitle">WLD</h1></div>
+    <div class="detail-top">
+      <div class="detail-coin" id="detCoin">◉</div>
+      <div class="detail-amt" id="detAmt">12.3456 WLD</div>
+      <div class="detail-usd" id="detUsd">$234.56 · +3.2% (24h)</div>
+    </div>
+    <div class="detail-chart" id="detChart"></div>
+    <div class="range-row"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1M</div><div class="range">1Y</div></div>
+    <div class="detail-actions">
+      <button class="btn-ghost" onclick="go('receive')">Receive</button>
+      <button class="btn-primary" onclick="goSend(assets[currentDetailIdx].sym)">Send</button>
+    </div>
+  </div>
+
+  <!-- EARN -->
+  <div class="view" id="view-earn">
+    <div class="subhead" style="padding-bottom:14px"><h1 data-i18n="earn">Earn</h1></div>
+    <div class="earn-hero">
+      <span class="leaf"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 20c0-6 4-9 9-9-1 6-4 9-9 9z"/><path d="M11 20c0-5-3-7-7-7 1 4 3 7 7 7z"/><line x1="11" y1="20" x2="11" y2="14"/></svg></span>
+      <div class="cap" data-i18n="totalEarned">已赚取收益</div>
+      <div class="total" id="earnTotal">$48.21</div>
+      <div class="sub" data-i18n="earnedSub">+$0.83 今日 · 跨 2 个仓位</div>
+      <button class="claim" onclick="openClaimModal()"><span data-i18n="claim">领取收益</span></button>
+    </div>
+    <div class="section-head"><h2 data-i18n="products">理财产品</h2><span class="link" data-i18n="myPositions" onclick="toast('')">我的仓位</span></div>
+    <div id="prodList"></div>
+  </div>
+
+  <!-- EARN DETAIL -->
+  <div class="view" id="view-earn-detail">
+    <div class="subhead"><button class="back-btn" onclick="go('earn'); setTabByName('Earn')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 id="edTitle">质押 WLD</h1></div>
+    <div class="ed-hero">
+      <div class="ed-ic" id="edIc">◉</div>
+      <div class="ed-apy" id="edApy">8.5%</div>
+      <div class="ed-apy-l">年化收益率 (APY)</div>
+    </div>
+    <div class="ed-stats">
+      <div class="ln"><span class="k" data-i18n="riskLevel">风险等级</span><span id="edRisk"></span></div>
+      <div class="ln"><span class="k" data-i18n="lockup">锁仓期</span><span id="edLock">随时可取</span></div>
+      <div class="ln"><span class="k" data-i18n="tvlFull">总锁仓量 (TVL)</span><span id="edTvl">$2.4M</span></div>
+      <div class="ln"><span class="k" data-i18n="minDeposit">最低存入</span><span id="edMin">0.1 WLD</span></div>
+      <div class="ln"><span class="k" data-i18n="myDeposit">我的存入</span><span id="edMine">0</span></div>
+    </div>
+    <p class="ed-desc" id="edDesc"></p>
+    <button class="send-submit" onclick="toast(t('tComingSoon'))"><span data-i18n="deposit">存入</span></button>
+  </div>
+
+  <!-- ME -->
+  <div class="view" id="view-me">
+    <div class="subhead" style="padding-bottom:14px"><h1 data-i18n="me">Me</h1></div>
+    <div class="me-card">
+      <div class="me-avatar"></div>
+      <div class="me-info">
+        <div class="me-name">alice.world <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div>
+        <div class="me-addr">0x4a3...6F2d</div>
+        <span class="me-orb"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="#0a0b0a"/></svg> Orb 已验证</span>
+      </div>
+    </div>
+
+    <div class="me-group-label" data-i18n="grpSecurity">账户与安全</div>
+    <div class="me-group">
+      <div class="me-row" onclick="go('backup')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/></svg></span><span class="lbl" data-i18n="backupRecovery">备份与恢复</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row" onclick="go('pin')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span><span class="lbl" data-i18n="pinBio">PIN 与生物识别</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="lbl" data-i18n="txConfirm">交易二次确认</span><span class="toggle on" onclick="this.classList.toggle('on')"></span></div>
+    </div>
+
+    <div class="me-group-label">World ID</div>
+    <div class="me-group">
+      <div class="me-row" onclick="go('level')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg></span><span class="lbl" data-i18n="verifyLevel">验证等级</span><span class="val">Orb</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row" onclick="go('apps')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span><span class="lbl" data-i18n="connectedApps">已连接的应用</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+    </div>
+
+    <div class="me-group-label" data-i18n="grpPrefs">偏好设置</div>
+    <div class="me-group">
+      <div class="me-row" onclick="openLangModal()"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 010 20 15 15 0 010-20z"/></svg></span><span class="lbl" data-i18n="lang">语言</span><span class="val" id="langVal">English</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row" onclick="openCurrencyModal()"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span><span class="lbl" data-i18n="currency">显示货币</span><span class="val" id="currencyVal">USD</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></span><span class="lbl" data-i18n="notifications">推送通知</span><span class="toggle on" onclick="this.classList.toggle('on')"></span></div>
+    </div>
+
+    <div class="me-group-label" data-i18n="grpSupport">支持</div>
+    <div class="me-group">
+      <div class="me-row" onclick="go('help')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 015.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span><span class="lbl" data-i18n="help">帮助中心</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row" onclick="go('about')"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></span><span class="lbl" data-i18n="about">关于</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+    </div>
+
+    <button class="me-logout" onclick="openLogoutConfirm()"><span data-i18n="logout">退出登录</span></button>
+    <div class="me-version">Lumina v1.0.0</div>
+  </div>
+
+  <!-- ============ Backup & Recovery ============ -->
+  <div class="view" id="view-backup">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="backupTitleP">备份与恢复</h1></div>
+    <div style="margin: 0 var(--pad-screen);">
+      <div style="background:rgba(245,196,81,0.08); border:1px solid rgba(245,196,81,0.2); border-radius:14px; padding:16px; display:flex; gap:10px; align-items:flex-start;">
+        <span style="color:#f5c451;flex-shrink:0">⚠</span>
+        <span style="color:#d9b863; font-size:13px; line-height:1.6;" data-i18n="backupIntro">恢复短语是恢复你钱包的唯一方式。请离线妥善保管,任何人取得都能转走你的资产。</span>
+      </div>
+      <div id="phraseBox" style="margin-top:18px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:24px; min-height:140px; display:grid; place-items:center;">
+        <button class="btn-reveal" onclick="revealPhrase()" data-i18n="showPhrase" style="background:var(--surface-2); border:1px solid var(--line); color:var(--text); border-radius:12px; padding:12px 22px; font-size:14px; font-weight:600; cursor:pointer;">显示恢复短语</button>
+      </div>
+      <button class="send-submit" style="margin: 22px 0 0;" onclick="toast(t('tCopied'))" data-i18n="confirmBackup">我已安全备份</button>
+    </div>
+  </div>
+
+  <!-- ============ PIN & Biometrics ============ -->
+  <div class="view" id="view-pin">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="pinTitle">PIN 与生物识别</h1></div>
+    <div class="me-group" style="margin-top:6px;">
+      <div class="me-row" onclick="openPinModal()"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/></svg></span><span class="lbl" data-i18n="changePin">修改 PIN</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>
+      <div class="me-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 11c0-3-1.5-5-4-5s-4 2-4 5"/><circle cx="12" cy="14" r="1"/></svg></span><span class="lbl" data-i18n="faceUnlock">Face ID 解锁</span><span class="toggle on" onclick="this.classList.toggle('on')"></span></div>
+      <div class="me-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 11c-1.5 0-3 1.3-3 4M15 15c0 2-1 4-3 4"/><circle cx="12" cy="11" r="6"/></svg></span><span class="lbl" data-i18n="fingerprint">指纹解锁</span><span class="toggle" onclick="this.classList.toggle('on')"></span></div>
+      <div class="me-row"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span><span class="lbl" data-i18n="pinForTx">交易时需输入 PIN</span><span class="toggle on" onclick="this.classList.toggle('on')"></span></div>
+    </div>
+  </div>
+
+  <!-- ============ Verification Level ============ -->
+  <div class="view" id="view-level">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="selectLevel">World ID 验证等级</h1></div>
+    <div style="margin: 0 var(--pad-screen);" id="levelCards"></div>
+    <div style="margin: 0 var(--pad-screen);">
+      <button class="send-submit" style="margin-top:22px;" onclick="toast(t('tComingSoon'))" data-i18n="findOrb">查找附近的 Orb</button>
+    </div>
+  </div>
+
+  <!-- ============ Connected Apps ============ -->
+  <div class="view" id="view-apps">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="connectedAppsP">已连接的应用</h1></div>
+    <p style="color:var(--text-dim); font-size:13px; line-height:1.6; margin: 0 var(--pad-screen) 16px;" data-i18n="connectedIntro">以下应用已获得你的 World ID 授权。</p>
+    <div id="appsList"></div>
+  </div>
+
+  <!-- ============ Help Center ============ -->
+  <div class="view" id="view-help">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="helpTitle">帮助中心</h1></div>
+    <div id="helpContent" style="margin: 0 var(--pad-screen);"></div>
+  </div>
+
+  <!-- ============ About ============ -->
+  <div class="view" id="view-about">
+    <div class="subhead"><button class="back-btn" onclick="go('me'); setTabByName('Me')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1 data-i18n="aboutTitle">关于</h1></div>
+    <div id="aboutContent" style="margin: 0 var(--pad-screen);"></div>
+  </div>
+</div>
+
+<div class="tabbar" id="tabbar">
+  <div class="tab active" data-n="Home" onclick="go('home'); setTab(this)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span data-i18n="navHome">Home</span></div>
+  <div class="tab" data-n="Earn" onclick="go('earn'); setTab(this)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><span data-i18n="navEarn">Earn</span></div>
+  <div class="tab" data-n="Swap" onclick="go('swap'); setTab(this)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg><span data-i18n="navSwap">Swap</span></div>
+  <div class="tab" data-n="Activity" onclick="go('activity'); setTab(this)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg><span data-i18n="navActivity">Activity</span></div>
+  <div class="tab" data-n="Me" onclick="go('me'); setTab(this)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span data-i18n="navMe">Me</span></div>
+</div>
+<div class="modal-mask" id="tokenModal" onclick="if(event.target===this)closeTokenModal()">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <h3>选择代币</h3>
+    <div class="tk-search">
+      <input id="tkSearch" data-i18n-ph="phTokenSearch" placeholder="搜索名称或粘贴合约地址 (0x...)" oninput="onTokenSearch(this.value)" />
+    </div>
+    <div id="importPreview"></div>
+    <div id="tokenModalList"></div>
+  </div>
+</div>
+<div class="modal-mask" id="langModal" onclick="if(event.target===this)closeLangModal()">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <h3 data-i18n="selectLang">选择语言</h3>
+    <div id="langList"></div>
+  </div>
+</div>
+<div class="modal-mask" id="annModal" onclick="if(event.target===this)closeAnnouncements()">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <h3 data-i18n="announcements">公告</h3>
+    <div id="annList"></div>
+  </div>
+</div>
+<div class="modal-mask" id="currencyModal" onclick="if(event.target===this)closeCurrencyModal()">
+  <div class="modal">
+    <div class="modal-grip"></div>
+    <h3 data-i18n="selectCurrency">选择货币</h3>
+    <div id="currencyList"></div>
+  </div>
+</div>
+<div class="modal-mask" id="riskModal" style="align-items:center;" onclick="if(event.target===this)closeRiskModal()">
+  <div class="modal" style="max-width:360px;border-radius:20px;padding:24px;">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(248,113,113,0.12);display:grid;place-items:center;margin:0 auto 14px;color:var(--red);">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <h3 id="riskModalTitle" style="text-align:center;font-size:17px;" data-i18n="riskTitle">未验证代币</h3>
+    <p id="riskModalBody" style="color:var(--text-dim);font-size:13px;line-height:1.6;text-align:center;margin:12px 0 0;" data-i18n="riskBody"></p>
+    <div style="display:flex;gap:10px;margin-top:20px;">
+      <button onclick="closeRiskModal()" style="flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;" data-i18n="riskCancel">取消</button>
+      <button onclick="proceedRisk()" style="flex:1;background:var(--red);border:none;color:#fff;border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;" data-i18n="riskProceed">我已了解,继续</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="pinModal" style="align-items:center;" onclick="if(event.target===this)closePinModal()">
+  <div class="modal" style="max-width:360px;border-radius:20px;padding:24px;">
+    <h3 style="font-size:17px;" data-i18n="changePin">修改 PIN</h3>
+    <label style="display:block;color:var(--text-dim);font-size:13px;margin:16px 0 7px;" data-i18n="pinCurrent">当前 PIN</label>
+    <input id="pinCur" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:#fff;font-size:18px;letter-spacing:6px;outline:none;text-align:center;" />
+    <label style="display:block;color:var(--text-dim);font-size:13px;margin:14px 0 7px;" data-i18n="pinNew">新 PIN (6 位)</label>
+    <input id="pinNew" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:#fff;font-size:18px;letter-spacing:6px;outline:none;text-align:center;" />
+    <label style="display:block;color:var(--text-dim);font-size:13px;margin:14px 0 7px;" data-i18n="pinConfirm">确认新 PIN</label>
+    <input id="pinConf" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" style="width:100%;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;color:#fff;font-size:18px;letter-spacing:6px;outline:none;text-align:center;" />
+    <div style="display:flex;gap:10px;margin-top:22px;">
+      <button onclick="closePinModal()" style="flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;" data-i18n="pinCancel">取消</button>
+      <button onclick="savePin()" style="flex:1;background:var(--green);border:none;color:#042;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="pinSave">保存</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="claimModal" style="align-items:center;" onclick="if(event.target===this)closeClaimModal()">
+  <div class="modal" style="max-width:360px;border-radius:20px;padding:24px;text-align:center;">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(74,222,128,0.12);display:grid;place-items:center;margin:0 auto 14px;color:var(--green);">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    </div>
+    <h3 style="font-size:17px;" data-i18n="claimTitle">领取收益</h3>
+    <div id="claimAmt" style="font-size:30px;font-weight:800;margin:14px 0 4px;color:var(--green);">+$48.21</div>
+    <p style="color:var(--text-dim);font-size:13px;line-height:1.6;margin-top:8px;" data-i18n="claimBody"></p>
+    <div style="display:flex;gap:10px;margin-top:22px;">
+      <button onclick="closeClaimModal()" style="flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;" data-i18n="cancel">取消</button>
+      <button onclick="confirmClaim()" style="flex:1;background:var(--green);border:none;color:#042;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="claimConfirm">确认领取</button>
+    </div>
+  </div>
+</div>
+<div class="modal-mask" id="logoutModal" style="align-items:center;" onclick="if(event.target===this)closeLogoutConfirm()">
+  <div class="modal" style="max-width:360px;border-radius:20px;padding:24px;text-align:center;">
+    <div style="width:48px;height:48px;border-radius:50%;background:rgba(248,113,113,0.12);display:grid;place-items:center;margin:0 auto 14px;color:var(--red);">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </div>
+    <h3 style="font-size:17px;" data-i18n="logoutConfirmTitle">确认退出登录?</h3>
+    <p style="color:var(--text-dim);font-size:13px;line-height:1.6;margin-top:10px;" data-i18n="logoutConfirmBody"></p>
+    <div style="display:flex;gap:10px;margin-top:22px;">
+      <button onclick="closeLogoutConfirm()" style="flex:1;background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;" data-i18n="cancel">取消</button>
+      <button onclick="doLogout()" style="flex:1;background:var(--red);border:none;color:#fff;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;" data-i18n="confirmLogout">确认退出</button>
+    </div>
+  </div>
+</div>
+<div id="loginScreen" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;">
+  <div style="width:80px;height:80px;border-radius:50%;border:2px solid var(--green);display:grid;place-items:center;font-size:36px;font-weight:800;margin-bottom:24px;">L</div>
+  <h2 style="font-size:28px;font-weight:800;margin-bottom:10px;">Lumina</h2>
+  <p style="color:var(--text-dim);font-size:14px;line-height:1.6;max-width:280px;margin-bottom:32px;" data-i18n="loginIntro">使用 World App 登录以访问你的钱包</p>
+  <button onclick="loginBack()" style="background:var(--green);color:#042;border:none;border-radius:14px;padding:15px 36px;font-size:15px;font-weight:700;cursor:pointer;" data-i18n="loginAgain">重新登录</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var assets = [
+    { sym: "WLD", full: "Worldcoin", amt: "12.3456 WLD", usdNum: 234.56, cls: "wld", logo: "◉" },
+    { sym: "USDC", full: "USD Coin", amt: "543.21 USDC", usdNum: 543.21, cls: "usdc", logo: "$" },
+    { sym: "ETH", full: "Ethereum", amt: "0.2345 ETH", usdNum: 334.58, cls: "eth", logo: "◆" },
+    { sym: "PiJ", full: "PiJ Token", amt: "12,000 PiJ", usdNum: 132.97, cls: "pij", logo: "PiJ" }
+  ];
+  // 总余额(USD 基准)和 24h 变化金额(USD 基准),用于切货币时换算
+  var totalUsdNum = 1245.32;
+  var change24hUsdNum = 38.87;
+  function sparkline(seed) {
+    var pts = [], y = 22;
+    for (var i = 0; i <= 10; i++) { y += (Math.sin(seed + i) * 5) + (Math.random() * 6 - 2.5); y = Math.max(6, Math.min(28, y)); pts.push(i*8 + "," + y.toFixed(1)); }
+    return '<svg class="spark" viewBox="0 0 80 34" preserveAspectRatio="none"><polyline points="' + pts.join(' ') + '" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="filter: drop-shadow(0 0 3px rgba(74,222,128,0.5))"/></svg>';
+  }
+  function renderAssets(){
+    document.getElementById("assetList").innerHTML = assets.map(function(a, i) {
+      return '<div class="asset" onclick="openDetail(' + i + ')"><div class="coin ' + a.cls + '">' + a.logo + '</div><div class="name"><div class="sym">' + a.sym + '</div><div class="full">' + a.full + '</div></div>' + sparkline(i*1.7) + '<div class="vals"><div class="amt">' + a.amt + '</div><div class="usd">' + formatMoney(a.usdNum) + '</div></div></div>';
+    }).join('') + '<div class="add-token" onclick="openTokenModal(\'buy\')">+ Add Token</div>';
+  }
+  // 不在这里直接调 renderAssets(),因为 currencies 还没初始化
+  // 由末尾 init 里的 renderMoney() 统一触发
+
+  // Activity 假数据 (hash 为演示哈希,真实项目用每笔交易的真实 tx hash)
+  var acts = [
+    { type:"in",   verb:"received", asset:"USDC", peerKey:"from",  peer:"0x9f2...3a1", v:"+120.00 USDC",   dayKey:"today", hash:"0xab12c4e9f0a7b3d5e8c1f2a6b9d4e7c0a3f5b8d1e4c7a0f3b6d9e2c5a8f1b4d7e0" },
+    { type:"out",  verb:"sent",     asset:"WLD",  peerKey:"toAddr",peer:"alice.world", v:"-5.00 WLD",      dayKey:"today", hash:"0xcd34a1b8e5f2c9d6a3b0e7f4c1d8a5b2e9f6c3a0d7b4e1f8c5a2b9e6f3c0d7a4b1" },
+    { type:"swap", verb:"swapped",  asset:"WLD → USDC", peerKey:"", peer:"100 WLD",    v:"+543.20 USDC",   dayKey:"yesterday", hash:"0xef56b2c9a6f3d0e7b4a1f8c5d2e9b6a3f0c7d4e1b8a5f2c9d6e3b0a7f4c1d8e5b2" },
+    { type:"out",  verb:"sent",     asset:"ETH",  peerKey:"toAddr",peer:"0x7c1...8e4", v:"-0.05 ETH",      dayKey:"yesterday", hash:"0x7890d3e0a7c4b1f8e5d2a9c6f3b0e7d4a1f8c5b2e9d6a3f0c7b4e1a8f5d2c9b6e3" },
+    { type:"in",   verb:"received", asset:"PiJ",  peerKey:"from",  peerIsKey:"airdrop",v:"+12,000 PiJ",    day:"2026-05-20", hash:"0x1234a5b2e9f6c3d0a7b4e1f8c5d2a9b6e3f0c7d4a1b8e5f2c9d6a3b0e7f4c1d8a5" }
+  ];
+  // 在 World Chain 区块浏览器(worldscan.org)打开交易
+  function openExplorer(hash){
+    window.open("https://worldscan.org/tx/" + hash, "_blank");
+  }
+  function actIcon(type){
+    if(type==="in") return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+    if(type==="out") return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>';
+    return '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>';
+  }
+  var actFilter = "all"; // all | in | out | swap
+  function selChipFilter(el, kind){
+    el.parentNode.querySelectorAll(".chip").forEach(function(c){c.classList.remove("sel");});
+    el.classList.add("sel");
+    actFilter = kind;
+    renderActivity();
+  }
+  function renderActivity(){
+    var box = document.getElementById("actList");
+    if(!box) return;
+    // 按类型分组
+    var groups = {
+      in:   { titleKey:"actIn",   items:[] },
+      out:  { titleKey:"actOut",  items:[] },
+      swap: { titleKey:"actSwap", items:[] }
+    };
+    acts.forEach(function(a){
+      if(groups[a.type]) groups[a.type].items.push(a);
+    });
+    function itemHtml(a){
+      var plus = a.type === "in" || a.type === "swap" ? " plus" : "";
+      var title = a.verb === "swapped" ? (t("swapped") + " " + a.asset) : (t(a.verb) + " " + a.asset);
+      var peerText = a.peerIsKey ? t(a.peerIsKey) : a.peer;
+      var sub = a.peerKey ? (t(a.peerKey) + " " + peerText) : peerText;
+      var dayLabel = a.dayKey ? t(a.dayKey) : a.day;
+      var dayBadge = '<span style="color:var(--text-mute);font-size:11px;margin-left:8px;">· ' + dayLabel + '</span>';
+      return '<div class="act-item" onclick="openExplorer(\'' + a.hash + '\')" style="cursor:pointer;"><div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div><div class="act-mid"><div class="t">' + title + ' <span style="color:var(--text-mute);font-size:11px;">↗</span></div><div class="s">' + sub + dayBadge + '</div></div><div class="act-amt"><div class="v' + plus + '">' + a.v + '</div><div class="st">' + t("completed") + '</div></div></div>';
+    }
+    function groupHtml(g){
+      if(!g.items.length) return "";
+      return '<div class="act-group-head">' + t(g.titleKey) + ' <span class="act-count">' + g.items.length + '</span></div>' + g.items.map(itemHtml).join('');
+    }
+    var html = "";
+    if(actFilter === "all"){
+      html += groupHtml(groups.in);
+      html += groupHtml(groups.out);
+      html += groupHtml(groups.swap);
+    } else {
+      html += groups[actFilter].items.map(itemHtml).join('');
+      if(!groups[actFilter].items.length){
+        html = '<div style="text-align:center;color:var(--text-mute);padding:40px var(--pad-screen);font-size:14px;">—</div>';
+      }
+    }
+    box.innerHTML = html;
+  }
+
+  // 详情大走势图
+  function bigChart(seed){
+    var pts = [], y = 70;
+    for (var i = 0; i <= 40; i++) { y += (Math.sin(seed + i*0.4) * 8) + (Math.random()*10 - 5); y = Math.max(20, Math.min(120, y)); pts.push((i*10) + "," + y.toFixed(1)); }
+    var area = "0,140 " + pts.join(" ") + " 400,140";
+    return '<svg viewBox="0 0 400 140" preserveAspectRatio="none"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="rgba(74,222,128,0.3)"/><stop offset="100%" stop-color="rgba(74,222,128,0)"/></linearGradient></defs><polygon points="' + area + '" fill="url(#g)"/><polyline points="' + pts.join(" ") + '" fill="none" stroke="#4ade80" stroke-width="2.5" stroke-linejoin="round"/></svg>';
+  }
+
+  var currentDetailIdx = -1;
+  function openDetail(i){
+    currentDetailIdx = i;
+    var a = assets[i];
+    document.getElementById("detTitle").textContent = a.sym;
+    var coin = document.getElementById("detCoin");
+    coin.textContent = a.logo; coin.className = "detail-coin coin " + a.cls;
+    document.getElementById("detAmt").textContent = a.amt;
+    document.getElementById("detUsd").textContent = formatMoney(a.usdNum) + " · +3.2% (24h)";
+    document.getElementById("detChart").innerHTML = bigChart(i*2.3);
+    go("detail"); setTabByName("Home");
+  }
+
+  function fakeQR() {
+    var cells = "";
+    for (var r = 0; r < 21; r++) for (var c = 0; c < 21; c++) {
+      var corner = (r<7&&c<7)||(r<7&&c>13)||(r>13&&c<7);
+      if (corner || Math.random() > 0.55) cells += '<rect x="' + (c*9) + '" y="' + (r*9) + '" width="9" height="9" fill="#000"/>';
+    }
+    document.getElementById("qrBox").innerHTML = '<svg viewBox="0 0 189 189">' + cells + '</svg>';
+  }
+  fakeQR();
+
+  function go(name) { document.querySelectorAll(".view").forEach(function(v){v.classList.remove("active");}); document.getElementById("view-"+name).classList.add("active"); window.scrollTo(0,0); }
+  function setTab(el) { document.querySelectorAll(".tab").forEach(function(t){t.classList.remove("active");}); el.classList.add("active"); }
+  function setTabByName(n){ document.querySelectorAll(".tab").forEach(function(t){ t.classList.toggle("active", t.dataset.n === n); }); }
+  function selChip(el){ el.parentNode.querySelectorAll(".chip").forEach(function(c){c.classList.remove("sel");}); el.classList.add("sel"); }
+  function toast(msg) { var t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._timer); t._timer = setTimeout(function(){t.classList.remove("show");}, 1600); }
+
+  var hidden = false;
+  document.getElementById("eyeBtn").onclick = function() { hidden = !hidden; document.getElementById("balAmt").textContent = hidden ? "••••••" : formatMoney(totalUsdNum); };
+  var availMap = { WLD: "12.3456 WLD", USDC: "543.21 USDC", ETH: "0.2345 ETH", PiJ: "12,000 PiJ" };
+  // Send 页当前选中的代币
+  var sendCurrentToken = "WLD";
+
+  // 选中 Send 页的某个代币:更新图标/符号/全名/可用余额(全部跟随语言)
+  function selectSendToken(sym){
+    sendCurrentToken = sym;
+    var ic = document.getElementById("sendTokIc");
+    var symEl = document.getElementById("sendTokSym");
+    var fullEl = document.getElementById("sendTokFull");
+    if(!ic) return;
+    // 图标:优先用 tokenLogo + dotColor(Swap 模块定义),fallback 到首字母
+    var logo = (typeof tokenLogo !== "undefined" && tokenLogo[sym]) ? tokenLogo[sym] : sym.charAt(0);
+    var bg = (typeof dotColor !== "undefined" && dotColor[sym]) ? dotColor[sym] : "var(--surface-2)";
+    ic.textContent = logo;
+    ic.style.background = bg;
+    ic.style.color = (bg === "#fff" || bg.indexOf("var(--blue)") < 0 && bg === "#fff") ? "#000" : "#fff";
+    symEl.textContent = sym;
+    var full = (typeof tokenFull !== "undefined" && tokenFull[sym]) ? tokenFull[sym] : sym;
+    fullEl.textContent = full;
+    // 可用余额(语言跟随)
+    var avail = availMap[sym];
+    if(!avail){
+      // 从 swap 的 balances 中查(支持涨幅榜导入的币)
+      var b = (typeof balances !== "undefined" && balances[sym]) ? balances[sym] : "0";
+      avail = b + " " + sym;
+    }
+    var at = document.getElementById("availTxt");
+    if(at) at.textContent = t("available") + ": " + avail;
+  }
+  // 打开 Send 页并预选某个代币(从首页资产/详情页点"发送"时用)
+  function goSend(sym){
+    selectSendToken(sym);
+    go("send"); setTabByName("Home");
+  }
+  document.querySelectorAll(".range").forEach(function(r){ r.onclick = function(){ document.querySelectorAll(".range").forEach(function(x){x.classList.remove("sel");}); r.classList.add("sel"); }; });
+
+  /* ============ Swap 逻辑 ============ */
+  // 各代币对 USD 的模拟价格 (真实接入换成行情 API)
+  var prices = { WLD: 19.0, USDC: 1.0, ETH: 1426.0, PiJ: 0.011 };
+  var dotColor = { WLD: "#fff", USDC: "var(--blue)", ETH: "#1c2536", PiJ: "var(--green)" };
+  var balances = { WLD: "12.3456", USDC: "543.21", ETH: "0.2345", PiJ: "12,000" };
+  var swapState = { sell: "WLD", buy: "USDC", target: "sell" };
+
+  function fmt(n){ return n.toLocaleString(undefined, { maximumFractionDigits: 4 }); }
+
+  // 卖出数量变化时,按价格比自动算买入数量 + 价格影响
+  function recalc(){
+    var amt = parseFloat(document.getElementById("sellAmt").value) || 0;
+    var pSell = prices[swapState.sell], pBuy = prices[swapState.buy];
+    // 导入的自定义代币没有行情价格,无法估算
+    if (!pSell || !pBuy) {
+      document.getElementById("buyAmt").value = "—";
+      document.getElementById("rateTxt").textContent = "无行情数据,需链上池子报价";
+      var ela = document.getElementById("impactTxt"); ela.textContent = "未知"; ela.className = "impact-mid";
+      return;
+    }
+    var rate = pSell / pBuy;
+    var out = amt * rate;
+    document.getElementById("buyAmt").value = out ? fmt(out) : "0";
+    document.getElementById("rateTxt").textContent = "1 " + swapState.sell + " ≈ " + fmt(rate) + " " + swapState.buy;
+
+    // 模拟价格影响:金额越大影响越大 (真实由 DEX 池子深度决定)
+    var usd = amt * pSell;
+    var impact = Math.min(usd / 50000 * 100, 12); // 假设池子约 5万刀深度
+    var el = document.getElementById("impactTxt");
+    if (impact < 0.1) { el.textContent = "<0.1%"; el.className = "impact-low"; }
+    else if (impact < 1) { el.textContent = impact.toFixed(2) + "%"; el.className = "impact-low"; }
+    else if (impact < 3) { el.textContent = impact.toFixed(2) + "%"; el.className = "impact-mid"; }
+    else { el.textContent = impact.toFixed(2) + "% ⚠"; el.className = "impact-high"; }
+  }
+
+  function refreshSwapLabels(){
+    document.getElementById("sellSym").textContent = swapState.sell;
+    document.getElementById("buySym").textContent = swapState.buy;
+    document.getElementById("sellDot").style.background = dotColor[swapState.sell];
+    document.getElementById("buyDot").style.background = dotColor[swapState.buy];
+    document.getElementById("sellBal").textContent = t("balance") + " " + balances[swapState.sell] + " · ≈ " + formatMoney(parseFloat(balances[swapState.sell].replace(/,/g,'')) * prices[swapState.sell]);
+    document.getElementById("buyBal").textContent = t("balance") + " " + balances[swapState.buy] + " · ≈ " + formatMoney(parseFloat(balances[swapState.buy].replace(/,/g,'')) * prices[swapState.buy]);
+    recalc();
+    updateUnverifiedWarning();
+  }
+
+  // 选中的任一方是未验证导入代币 → 显示红色警告条,并要求勾选确认
+  function updateUnverifiedWarning(){
+    var warn = document.getElementById("unvWarn");
+    var ack = document.getElementById("unvAck");
+    var btn = document.getElementById("swapBtn");
+    var bad = [swapState.sell, swapState.buy].filter(function(s){ return customTokens[s]; });
+    if (bad.length) {
+      document.getElementById("unvBody").textContent =
+        "你正在兑换未经验证的导入代币(" + bad.join("、") + ")。它可能无法卖出(蜜罐)、收取高额买卖税,或仿冒知名项目。请务必核实合约地址。";
+      warn.classList.add("show");
+      ack.classList.remove("checked");
+      btn.disabled = true; // 必须勾选后才能兑换
+    } else {
+      warn.classList.remove("show");
+      btn.disabled = false;
+    }
+  }
+
+  function toggleUnvAck(){
+    var ack = document.getElementById("unvAck");
+    ack.classList.toggle("checked");
+    document.getElementById("swapBtn").disabled = !ack.classList.contains("checked");
+  }
+
+  function confirmSwap(){
+    if (document.getElementById("swapBtn").disabled) return;
+    toast(t('tComingSoon'));
+  }
+
+  function flipSwap(){
+    var t = swapState.sell; swapState.sell = swapState.buy; swapState.buy = t;
+    refreshSwapLabels();
+    toast(t('tFlipped'));
+  }
+
+  // 滑点
+  function toggleSlip(){ document.getElementById("slipPanel").classList.toggle("open"); }
+  function selSlip(el, val){
+    el.parentNode.querySelectorAll(".slip-opt").forEach(function(o){o.classList.remove("sel");});
+    el.classList.add("sel");
+    document.getElementById("slipTxt").textContent = val;
+  }
+
+  // 代币元数据 (导入的自定义代币会动态加进这几个对象)
+  var tokenFull = { WLD:"Worldcoin", USDC:"USD Coin", ETH:"Ethereum", PiJ:"PiJ Token" };
+  var tokenLogo = { WLD:"◉", USDC:"$", ETH:"◆", PiJ:"PiJ" };
+  var customTokens = {}; // sym -> { address } 标记哪些是导入的
+
+  // 渲染弹窗内的代币列表 (可按关键词过滤)
+  function renderTokenList(filter){
+    filter = (filter || "").toLowerCase();
+    var rows = Object.keys(prices).filter(function(sym){
+      if (!filter) return true;
+      return sym.toLowerCase().indexOf(filter) >= 0 || (tokenFull[sym]||"").toLowerCase().indexOf(filter) >= 0;
+    }).map(function(sym){
+      var badge = customTokens[sym] ? '<span class="custom-badge">已导入</span>' : '';
+      var color = sym === "WLD" ? "#000" : "#fff";
+      return '<div class="tk-row" onclick="pickToken(\'' + sym + '\')"><div class="ic" style="background:' + dotColor[sym] + ';color:' + color + '">' + tokenLogo[sym] + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + tokenFull[sym] + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
+    }).join('');
+    document.getElementById("tokenModalList").innerHTML = rows || '<div class="import-load">没有匹配的代币</div>';
+  }
+
+  // 代币选择弹窗
+  function openTokenModal(target){
+    swapState.target = target;
+    document.getElementById("tkSearch").value = "";
+    document.getElementById("importPreview").innerHTML = "";
+    renderTokenList("");
+    document.getElementById("tokenModal").classList.add("open");
+  }
+  function closeTokenModal(){ document.getElementById("tokenModal").classList.remove("open"); }
+
+  // 搜索框输入:是合约地址就走"导入预览",否则当关键词过滤
+  function onTokenSearch(val){
+    val = val.trim();
+    var preview = document.getElementById("importPreview");
+    var isAddr = /^0x[a-fA-F0-9]{40}$/.test(val);
+    if (isAddr) {
+      preview.innerHTML = '<div class="import-load">正在查询合约 …</div>';
+      document.getElementById("tokenModalList").innerHTML = "";
+      // 真实接入时:这里用 viem readContract 读 ERC-20 的 symbol/name/decimals/balanceOf
+      setTimeout(function(){ showImportPreview(val); }, 700);
+    } else {
+      preview.innerHTML = "";
+      renderTokenList(val);
+    }
+  }
+
+  // 模拟"链上读取 + 安全扫描" + 导入卡片
+  function showImportPreview(addr){
+    var fake = ["MOON","DEGEN","SHIB2","GROK","WBTC"][parseInt(addr.slice(-1),16) % 5];
+    // 真实接入:这里调安全 API (GoPlus / Honeypot.is) + 读池子流动性,返回真实风险项
+    var scan = simulateScan(addr);
+
+    var rowsHtml = scan.checks.map(function(c){
+      var icon = c.level === "pass"
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+        : (c.level === "danger" ? '✕' : '!');
+      return '<div class="scan-row ' + c.level + '"><span class="dot3"></span><span class="k">' + c.k + '</span><span class="v">' + c.v + '</span></div>';
+    }).join('');
+
+    var scoreTxt = scan.score === "high"
+      ? '高风险 — 强烈不建议导入'
+      : (scan.score === "mid" ? '中等风险 — 请谨慎' : '低风险 — 但仍非官方背书');
+    var scoreNum = scan.score === "high" ? "高危" : (scan.score === "mid" ? "中" : "低");
+
+    // 高/中风险需勾选确认才能导入
+    var needAck = scan.score !== "low";
+    var btnAttr = needAck ? ' disabled id="impBtn"' : ' id="impBtn"';
+    var ackHtml = needAck
+      ? '<div class="ack" id="impAck" onclick="toggleImpAck()"><span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#042" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>我已了解此代币未经验证、可能存在上述风险,自行承担因导入和兑换造成的全部损失。</span></div>'
+      : '';
+
+    document.getElementById("importPreview").innerHTML =
+      '<div class="import-card">' +
+        '<div class="hd">' +
+          '<div class="ic">?</div>' +
+          '<div class="mid"><div class="s">' + fake + '</div><div class="f">未知代币 · 链上余额 0</div></div>' +
+        '</div>' +
+        '<div class="addr">' + addr + '</div>' +
+        '<div class="scan-rows">' + rowsHtml + '</div>' +
+        '<div class="risk-score ' + scan.score + '"><span class="big">' + scoreNum + '</span><span class="txt">安全扫描结果:' + scoreTxt + '<br>扫描由第三方提供,不构成安全保证。</span></div>' +
+        ackHtml +
+        '<button class="btn"' + btnAttr + ' onclick="doImport(\'' + fake + '\',\'' + addr + '\',\'' + scan.score + '\')">导入 ' + fake + '</button>' +
+      '</div>';
+  }
+
+  // 模拟安全扫描:真实接入时替换为 GoPlus/Honeypot 等 API 的返回
+  function simulateScan(addr){
+    var seed = parseInt(addr.slice(-2), 16);
+    var honeypot = seed % 7 === 0;            // 蜜罐:能买不能卖
+    var highTax = seed % 3 === 0;             // 高买卖税
+    var lowLiq = seed % 2 === 0;              // 流动性过低
+    var impersonate = seed % 5 === 0;         // 疑似仿冒知名代币
+    var checks = [
+      honeypot
+        ? { k:"蜜罐检测 (能否卖出)", v:"无法卖出!", level:"danger" }
+        : { k:"蜜罐检测 (能否卖出)", v:"可正常卖出", level:"pass" },
+      highTax
+        ? { k:"买卖税", v:"买12% / 卖15%", level:"warn" }
+        : { k:"买卖税", v:"0% / 0%", level:"pass" },
+      lowLiq
+        ? { k:"流动性", v:"极低 (<$5K)", level:"warn" }
+        : { k:"流动性", v:"充足", level:"pass" },
+      impersonate
+        ? { k:"仿冒检测", v:"疑似仿冒知名代币", level:"danger" }
+        : { k:"仿冒检测", v:"未发现仿冒", level:"pass" },
+      { k:"合约开源", v: seed % 4 === 0 ? "未开源" : "已验证开源", level: seed % 4 === 0 ? "warn" : "pass" }
+    ];
+    var danger = checks.some(function(c){ return c.level === "danger"; });
+    var warn = checks.some(function(c){ return c.level === "warn"; });
+    return { checks: checks, score: danger ? "high" : (warn ? "mid" : "low") };
+  }
+
+  function toggleImpAck(){
+    var ack = document.getElementById("impAck");
+    ack.classList.toggle("checked");
+    document.getElementById("impBtn").disabled = !ack.classList.contains("checked");
+  }
+
+  function doImport(sym, addr, score){
+    var key = prices[sym] ? (sym + "_" + addr.slice(-4)) : sym;
+    prices[key] = 0;
+    tokenFull[key] = "导入的代币";
+    tokenLogo[key] = "?";
+    dotColor[key] = "#2a2d2a";
+    balances[key] = "0";
+    customTokens[key] = { address: addr, verified: false, risk: score || "mid" };
+    document.getElementById("tkSearch").value = "";
+    document.getElementById("importPreview").innerHTML = "";
+    toast(t('tImported'));
+    // 自动选中刚导入的代币(根据当前 target 路由到 Swap 或 Send)
+    pickToken(key);
+  }
+
+  function pickToken(sym){
+    // 如果是从 Send 页打开的代币选择
+    if (swapState.target === "send") {
+      selectSendToken(sym);
+      closeTokenModal();
+      return;
+    }
+    var other = swapState.target === "sell" ? "buy" : "sell";
+    if (swapState[other] === sym) { swapState[other] = swapState[swapState.target]; }
+    swapState[swapState.target] = sym;
+    refreshSwapLabels();
+    closeTokenModal();
+  }
+
+  /* ============ 今日涨幅榜 ============ */
+  // 模拟链上 24h 涨幅数据 (真实接入换成 DEX/行情 API 的链上数据)
+  // verified: 是否在官方/可信代币列表里; 涨幅高的新币往往未验证
+  var gainers = [
+    { sym:"MOON",  full:"MoonShot",    price:"$0.0042",  chg:"+312%", vol:"$1.2M",  ic:"🌙", bg:"#1a1530", verified:false },
+    { sym:"DEGEN", full:"Degen",       price:"$0.018",   chg:"+148%", vol:"$3.4M",  ic:"D",  bg:"#2a1a30", verified:false },
+    { sym:"WLD",   full:"Worldcoin",   price:"$19.04",   chg:"+42%",  vol:"$88M",   ic:"◉", bg:"#fff",     verified:true  },
+    { sym:"GROK",  full:"Grok Token",  price:"$0.93",    chg:"+38%",  vol:"$5.1M",  ic:"G",  bg:"#16281f", verified:false },
+    { sym:"PiJ",   full:"PiJ Token",   price:"$0.011",   chg:"+27%",  vol:"$420K",  ic:"P",  bg:"#0d150d", verified:false },
+    { sym:"ORB",   full:"Orb",         price:"$2.41",    chg:"+19%",  vol:"$2.2M",  ic:"O",  bg:"#152028", verified:true  },
+    { sym:"ETH",   full:"Ethereum",    price:"$1,426",   chg:"+11%",  vol:"$210M",  ic:"◆", bg:"#1c2536",  verified:true  },
+    { sym:"PEPE2", full:"Pepe 2.0",    price:"$0.00009",  chg:"+9.4%", vol:"$890K",  ic:"🐸", bg:"#1a2615", verified:false },
+    { sym:"USDT",  full:"Tether",      price:"$1.00",    chg:"+0.3%", vol:"$150M",  ic:"₮",  bg:"#0a3d2e", verified:true  },
+    { sym:"WBTC",  full:"Wrapped BTC", price:"$67,200",  chg:"+0.1%", vol:"$45M",   ic:"₿",  bg:"#3a2410", verified:true  }
+  ];
+
+  function renderGainers(){
+    document.getElementById("gainersList").innerHTML = gainers.map(function(g, i){
+      var rankCls = i < 3 ? "rank top" : "rank";
+      var color = (g.bg === "#fff") ? "#000" : "#fff";
+      var tag = g.verified
+        ? '<span class="vbadge" title="' + t("verified") + '"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#0a0b0a"/></svg></span>'
+        : '<span class="rbadge unverified">' + t("unverified") + '</span>';
+      return '<div class="gainer" onclick="gainerTap(' + i + ')">' +
+        '<div class="' + rankCls + '">' + (i+1) + '</div>' +
+        '<div class="ic" style="background:' + g.bg + ';color:' + color + '">' + g.ic + '</div>' +
+        '<div class="mid"><div class="s">' + g.sym + ' ' + tag + '</div><div class="p">' + g.price + '</div></div>' +
+        '<div class="chg"><div class="pct">' + g.chg + '</div><div class="vol">' + t("vol") + ' ' + g.vol + '</div></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // 点榜单某个币:设为 Swap 的"买入"目标,跳到 Swap。未验证的先弹风险框。
+  var pendingGainer = null;
+  // 把涨幅榜代币的价格(从 "$0.0042" 解析)注册进 swap 用的各个映射
+  function registerGainerToken(g){
+    var key = g.sym;
+    if (prices[key] === undefined) {
+      var pnum = parseFloat(g.price.replace(/[$,]/g,'')) || 0;
+      prices[key] = pnum;
+      dotColor[key] = g.bg;
+      tokenFull[key] = g.full;
+      tokenLogo[key] = g.ic;
+      if (balances[key] === undefined) balances[key] = "0";
+      if (!g.verified) customTokens[key] = { address: "0x...", verified:false };
+    }
+    return key;
+  }
+  function applyGainerToSwap(g){
+    var key = registerGainerToken(g);
+    // 买入设为该币;若卖出和它相同,卖出切回 WLD
+    if (swapState.sell === key) swapState.sell = (key === "WLD") ? "USDC" : "WLD";
+    swapState.buy = key;
+    refreshSwapLabels();
+    go("swap"); setTabByName("Swap");
+  }
+  function gainerTap(i){
+    var g = gainers[i];
+    if (!g.verified) {
+      // 未验证 → 弹风险框(文字跟随当前语言)
+      pendingGainer = g;
+      document.getElementById("riskModalBody").textContent = t("riskBody");
+      document.getElementById("riskModalTitle").textContent = t("riskTitle") + " · " + g.sym;
+      document.getElementById("riskModal").classList.add("open");
+    } else {
+      applyGainerToSwap(g);
+    }
+  }
+  function closeRiskModal(){ document.getElementById("riskModal").classList.remove("open"); pendingGainer = null; }
+  function proceedRisk(){
+    if (pendingGainer) { applyGainerToSwap(pendingGainer); }
+    document.getElementById("riskModal").classList.remove("open");
+    pendingGainer = null;
+  }
+
+  var products = [
+    { id:"wld-stake", ic:"◉", icBg:"#fff", icColor:"#000", tKey:"p_wldStake_t", dKey:"p_wldStake_d", descKey:"p_wldStake_desc", apy:"8.5%", risk:"low", lockKey:"anytime", tvlNum:2400000, min:"0.1 WLD", mine:"5.0 WLD" },
+    { id:"usdc-vault", ic:"$", icBg:"var(--blue)", icColor:"#fff", tKey:"p_usdc_t", dKey:"p_usdc_d", descKey:"p_usdc_desc", apy:"5.2%", risk:"low", lockKey:"anytime", tvlNum:8100000, min:"1 USDC", mine:"200 USDC" },
+    { id:"eth-lp", ic:"◆", icBg:"#1c2536", icColor:"#8aa3d8", tKey:"p_eth_t", dKey:"p_eth_d", descKey:"p_eth_desc", apy:"14.8%", risk:"mid", lockKey:"anytime", tvlNum:1200000, min:"0.01 ETH", mine:"0" },
+    { id:"wld-farm", ic:"◉", icBg:"#0d150d", icColor:"var(--green)", icBorder:"1.5px solid var(--green)", tKey:"p_farm_t", dKey:"p_farm_d", descKey:"p_farm_desc", apy:"32.0%", risk:"high", lockKey:"lock7d", tvlNum:340000, min:"1 WLD", mine:"0" }
+  ];
+  // 风险等级 → 翻译 key
+  var riskKey = { low:"riskLow", mid:"riskMid", high:"riskHigh" };
+
+  function renderProducts(){
+    document.getElementById("prodList").innerHTML = products.map(function(p, i){
+      var border = p.icBorder ? ("border:" + p.icBorder + ";") : "";
+      return '<div class="prod" onclick="openEarn(' + i + ')">' +
+        '<div class="top">' +
+          '<div class="ic" style="background:' + p.icBg + ';color:' + p.icColor + ';' + border + '">' + p.ic + '</div>' +
+          '<div class="nm"><div class="t">' + t(p.tKey) + '</div><div class="d">' + t(p.dKey) + '</div></div>' +
+          '<div class="apy"><div class="v">' + p.apy + '</div><div class="l">APY</div></div>' +
+        '</div>' +
+        '<div class="meta">' +
+          '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span></div></div>' +
+          '<div class="m"><div class="k">' + t("lockup") + '</div><div class="val">' + t(p.lockKey) + '</div></div>' +
+          '<div class="m"><div class="k">TVL</div><div class="val">' + formatMoneyCompact(p.tvlNum) + '</div></div>' +
+        '</div></div>';
+    }).join('');
+  }
+
+  function openEarn(i){
+    var p = products[i];
+    document.getElementById("edTitle").textContent = t(p.tKey);
+    var ic = document.getElementById("edIc");
+    ic.textContent = p.ic;
+    ic.style.background = p.icBg; ic.style.color = p.icColor;
+    ic.style.border = p.icBorder || "none";
+    document.getElementById("edApy").textContent = p.apy;
+    document.getElementById("edRisk").innerHTML = '<span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span>';
+    document.getElementById("edLock").textContent = t(p.lockKey);
+    document.getElementById("edTvl").textContent = formatMoneyCompact(p.tvlNum);
+    document.getElementById("edMin").textContent = p.min;
+    document.getElementById("edMine").textContent = p.mine;
+    document.getElementById("edDesc").textContent = t(p.descKey);
+    go("earn-detail"); setTabByName("Earn");
+  }
+
+  /* ============ 多语言 i18n ============ */
+  // 支持的语言 (真实项目里建议用 react-i18next 或 next-intl 管理)
+  var languages = [
+    { code:"en",    name:"English",  flag:"🇬🇧" },
+    { code:"fr",    name:"Français", flag:"🇫🇷" },
+    { code:"de",    name:"Deutsch",  flag:"🇩🇪" },
+    { code:"es",    name:"Español",  flag:"🇪🇸" },
+    { code:"ja",    name:"日本語",    flag:"🇯🇵" },
+    { code:"zh-CN", name:"简体中文", flag:"🇨🇳" },
+    { code:"zh-TW", name:"繁體中文", flag:"🇭🇰" }
+  ];
+
+  // 翻译词条:key -> { 各语言 }
+  var i18n = {
+    totalBalance:{ "zh-CN":"总余额","zh-TW":"總餘額","en":"Total Balance","fr":"Solde total","de":"Gesamtsaldo","es":"Saldo total","ja":"残高合計" },
+    verifiedHuman:{ "zh-CN":"已验证真人","zh-TW":"已驗證真人","en":"Verified Human","fr":"Humain vérifié","de":"Verifizierter Mensch","es":"Humano verificado","ja":"本人確認済み" },
+    receive:{ "zh-CN":"接收","zh-TW":"接收","en":"Receive","fr":"Recevoir","de":"Empfangen","es":"Recibir","ja":"受取" },
+    send:{ "zh-CN":"发送","zh-TW":"發送","en":"Send","fr":"Envoyer","de":"Senden","es":"Enviar","ja":"送金" },
+    swap:{ "zh-CN":"兑换","zh-TW":"兌換","en":"Swap","fr":"Échanger","de":"Tauschen","es":"Intercambiar","ja":"交換" },
+    earn:{ "zh-CN":"赚取","zh-TW":"賺取","en":"Earn","fr":"Gagner","de":"Verdienen","es":"Ganar","ja":"運用" },
+    assets:{ "zh-CN":"资产","zh-TW":"資產","en":"Assets","fr":"Actifs","de":"Vermögen","es":"Activos","ja":"資産" },
+    viewAll:{ "zh-CN":"查看全部","zh-TW":"查看全部","en":"View All","fr":"Tout voir","de":"Alle ansehen","es":"Ver todo","ja":"すべて表示" },
+    backupTitle:{ "zh-CN":"备份你的钱包","zh-TW":"備份你的錢包","en":"Back up your wallet","fr":"Sauvegardez votre portefeuille","de":"Sichern Sie Ihr Wallet","es":"Respalda tu billetera","ja":"ウォレットをバックアップ" },
+    backupDesc:{ "zh-CN":"保护资产并支持恢复钱包","zh-TW":"保護資產並支援恢復錢包","en":"Secure your assets and recover your wallet","fr":"Sécurisez vos actifs et récupérez votre portefeuille","de":"Sichern Sie Ihr Vermögen und stellen Sie Ihr Wallet wieder her","es":"Protege tus activos y recupera tu billetera","ja":"資産を保護し、ウォレットを復元できます" },
+    navHome:{ "zh-CN":"主页","zh-TW":"主頁","en":"Home","fr":"Accueil","de":"Start","es":"Inicio","ja":"ホーム" },
+    navEarn:{ "zh-CN":"赚取","zh-TW":"賺取","en":"Earn","fr":"Gagner","de":"Verdienen","es":"Ganar","ja":"運用" },
+    navSwap:{ "zh-CN":"兑换","zh-TW":"兌換","en":"Swap","fr":"Échanger","de":"Tauschen","es":"Cambiar","ja":"交換" },
+    navActivity:{ "zh-CN":"动态","zh-TW":"動態","en":"Activity","fr":"Activité","de":"Aktivität","es":"Actividad","ja":"履歴" },
+    navMe:{ "zh-CN":"我的","zh-TW":"我的","en":"Me","fr":"Moi","de":"Ich","es":"Yo","ja":"マイ" },
+    activity:{ "zh-CN":"动态","zh-TW":"動態","en":"Activity","fr":"Activité","de":"Aktivität","es":"Actividad","ja":"履歴" },
+    me:{ "zh-CN":"我的","zh-TW":"我的","en":"Me","fr":"Moi","de":"Ich","es":"Yo","ja":"マイページ" },
+    selectToken:{ "zh-CN":"选择代币","zh-TW":"選擇代幣","en":"Select token","fr":"Choisir un jeton","de":"Token wählen","es":"Seleccionar token","ja":"トークンを選択" },
+    recipient:{ "zh-CN":"收款地址","zh-TW":"收款地址","en":"Recipient address","fr":"Adresse du destinataire","de":"Empfängeradresse","es":"Dirección del destinatario","ja":"送金先アドレス" },
+    amount:{ "zh-CN":"金额","zh-TW":"金額","en":"Amount","fr":"Montant","de":"Betrag","es":"Cantidad","ja":"金額" },
+    confirmSend:{ "zh-CN":"确认发送","zh-TW":"確認發送","en":"Confirm send","fr":"Confirmer l'envoi","de":"Senden bestätigen","es":"Confirmar envío","ja":"送金を確認" },
+    youPay:{ "zh-CN":"卖出","zh-TW":"賣出","en":"You pay","fr":"Vous payez","de":"Sie zahlen","es":"Pagas","ja":"支払い" },
+    youReceive:{ "zh-CN":"买入","zh-TW":"買入","en":"You receive","fr":"Vous recevez","de":"Sie erhalten","es":"Recibes","ja":"受取り" },
+    confirmSwap:{ "zh-CN":"确认兑换","zh-TW":"確認兌換","en":"Confirm swap","fr":"Confirmer l'échange","de":"Tausch bestätigen","es":"Confirmar cambio","ja":"交換を確認" },
+    topGainers:{ "zh-CN":"今日涨幅榜","zh-TW":"今日漲幅榜","en":"Top Gainers Today","fr":"Plus fortes hausses","de":"Top-Gewinner heute","es":"Mayores subidas hoy","ja":"本日の上昇率ランキング" },
+    totalEarned:{ "zh-CN":"已赚取收益","zh-TW":"已賺取收益","en":"Total Earned","fr":"Total gagné","de":"Insgesamt verdient","es":"Total ganado","ja":"獲得した収益" },
+    claim:{ "zh-CN":"领取收益","zh-TW":"領取收益","en":"Claim rewards","fr":"Réclamer","de":"Belohnungen abholen","es":"Reclamar","ja":"報酬を受取る" },
+    claimTitle:{ "zh-CN":"领取收益","zh-TW":"領取收益","en":"Claim rewards","fr":"Réclamer les gains","de":"Belohnungen abholen","es":"Reclamar recompensas","ja":"報酬を受取る" },
+    claimBody:{ "zh-CN":"将把累计收益发送到你的钱包。链上交易需支付少量网络费,确认后到账。","zh-TW":"將把累計收益發送到你的錢包。鏈上交易需支付少量網絡費,確認後到帳。","en":"Your accumulated rewards will be sent to your wallet. A small network fee applies; funds arrive after on-chain confirmation.","fr":"Vos gains cumulés seront envoyés vers votre portefeuille. Des frais réseau s'appliquent ; réception après confirmation.","de":"Ihre angesammelten Belohnungen werden an Ihr Wallet gesendet. Eine kleine Netzwerkgebühr fällt an; Erhalt nach Bestätigung.","es":"Tus recompensas acumuladas se enviarán a tu billetera. Se aplica una pequeña comisión de red; llegan tras la confirmación.","ja":"累積した報酬がウォレットに送られます。少額のネットワーク手数料がかかり、オンチェーン確認後に着金します。" },
+    claimConfirm:{ "zh-CN":"确认领取","zh-TW":"確認領取","en":"Confirm claim","fr":"Confirmer","de":"Bestätigen","es":"Confirmar","ja":"受取を確認" },
+    claimDone:{ "zh-CN":"领取成功,收益已到账","zh-TW":"領取成功,收益已到帳","en":"Claimed! Rewards sent to your wallet","fr":"Réclamé ! Gains envoyés","de":"Abgeholt! Belohnungen gesendet","es":"¡Reclamado! Recompensas enviadas","ja":"受取完了!報酬が着金しました"},
+    cancel:{ "zh-CN":"取消","zh-TW":"取消","en":"Cancel","fr":"Annuler","de":"Abbrechen","es":"Cancelar","ja":"キャンセル" },
+    products:{ "zh-CN":"理财产品","zh-TW":"理財產品","en":"Products","fr":"Produits","de":"Produkte","es":"Productos","ja":"商品" },
+    deposit:{ "zh-CN":"存入","zh-TW":"存入","en":"Deposit","fr":"Déposer","de":"Einzahlen","es":"Depositar","ja":"預入" },
+    grpSecurity:{ "zh-CN":"账户与安全","zh-TW":"帳戶與安全","en":"Account & Security","fr":"Compte et sécurité","de":"Konto & Sicherheit","es":"Cuenta y seguridad","ja":"アカウントとセキュリティ" },
+    grpPrefs:{ "zh-CN":"偏好设置","zh-TW":"偏好設定","en":"Preferences","fr":"Préférences","de":"Einstellungen","es":"Preferencias","ja":"設定" },
+    grpSupport:{ "zh-CN":"支持","zh-TW":"支援","en":"Support","fr":"Assistance","de":"Support","es":"Soporte","ja":"サポート" },
+    lang:{ "zh-CN":"语言","zh-TW":"語言","en":"Language","fr":"Langue","de":"Sprache","es":"Idioma","ja":"言語" },
+    currency:{ "zh-CN":"显示货币","zh-TW":"顯示貨幣","en":"Display currency","fr":"Devise d'affichage","de":"Anzeigewährung","es":"Moneda","ja":"表示通貨" },
+    notifications:{ "zh-CN":"推送通知","zh-TW":"推送通知","en":"Notifications","fr":"Notifications","de":"Benachrichtigungen","es":"Notificaciones","ja":"通知" },
+    backupRecovery:{ "zh-CN":"备份与恢复","zh-TW":"備份與恢復","en":"Backup & Recovery","fr":"Sauvegarde et récupération","de":"Backup & Wiederherstellung","es":"Copia y recuperación","ja":"バックアップと復元" },
+    help:{ "zh-CN":"帮助中心","zh-TW":"幫助中心","en":"Help Center","fr":"Centre d'aide","de":"Hilfe-Center","es":"Centro de ayuda","ja":"ヘルプセンター" },
+    logout:{ "zh-CN":"退出登录","zh-TW":"登出","en":"Log out","fr":"Se déconnecter","de":"Abmelden","es":"Cerrar sesión","ja":"ログアウト" },
+    selectLang:{ "zh-CN":"选择语言","zh-TW":"選擇語言","en":"Select language","fr":"Choisir la langue","de":"Sprache wählen","es":"Seleccionar idioma","ja":"言語を選択" },
+    announcements:{ "zh-CN":"公告","zh-TW":"公告","en":"Announcements","fr":"Annonces","de":"Ankündigungen","es":"Anuncios","ja":"お知らせ" },
+    about:{ "zh-CN":"关于","zh-TW":"關於","en":"About","fr":"À propos","de":"Über","es":"Acerca de","ja":"アプリについて" },
+    custom:{ "zh-CN":"自定义","zh-TW":"自訂","en":"Custom","fr":"Perso.","de":"Eigene","es":"Personal.","ja":"カスタム" },
+    phRecipient:{ "zh-CN":"0x... 或 World 用户名","zh-TW":"0x... 或 World 使用者名稱","en":"0x... or World username","fr":"0x... ou nom World","de":"0x... oder World-Name","es":"0x... o usuario World","ja":"0x... または World ユーザー名" },
+    phTokenSearch:{ "zh-CN":"搜索名称或粘贴合约地址 (0x...)","zh-TW":"搜尋名稱或貼上合約地址 (0x...)","en":"Search name or paste contract (0x...)","fr":"Nom ou adresse de contrat (0x...)","de":"Name suchen oder Vertrag (0x...)","es":"Buscar nombre o pegar contrato (0x...)","ja":"名前を検索またはコントラクト貼付 (0x...)" },
+    tAddrCopied:{ "zh-CN":"地址已复制到剪贴板","zh-TW":"地址已複製到剪貼簿","en":"Address copied to clipboard","fr":"Adresse copiée","de":"Adresse kopiert","es":"Dirección copiada","ja":"アドレスをコピーしました" },
+    tCopied:{ "zh-CN":"已复制","zh-TW":"已複製","en":"Copied","fr":"Copié","de":"Kopiert","es":"Copiado","ja":"コピーしました" },
+    tMaxFilled:{ "zh-CN":"已填入最大可用余额","zh-TW":"已填入最大可用餘額","en":"Max amount filled","fr":"Montant max rempli","de":"Maximalbetrag eingesetzt","es":"Importe máximo","ja":"最大額を入力しました" },
+    tComingSoon:{ "zh-CN":"功能开发中","zh-TW":"功能開發中","en":"Coming soon","fr":"Bientôt disponible","de":"Demnächst","es":"Próximamente","ja":"近日公開" },
+    tScan:{ "zh-CN":"打开扫一扫","zh-TW":"開啟掃一掃","en":"Open QR scanner","fr":"Ouvrir le scanner QR","de":"QR-Scanner öffnen","es":"Abrir escáner QR","ja":"QR スキャナーを開く" },
+    tFlipped:{ "zh-CN":"已对调买卖方向","zh-TW":"已對調買賣方向","en":"Swapped direction","fr":"Sens inversé","de":"Richtung getauscht","es":"Dirección invertida","ja":"方向を入れ替えました" },
+    tImported:{ "zh-CN":"已导入未验证代币","zh-TW":"已匯入未驗證代幣","en":"Imported (unverified token)","fr":"Importé (non vérifié)","de":"Importiert (ungeprüft)","es":"Importado (sin verificar)","ja":"インポート済み(未検証)" },
+    tLogout:{ "zh-CN":"退出登录","zh-TW":"登出","en":"Logging out","fr":"Déconnexion","de":"Abmelden","es":"Cerrando sesión","ja":"ログアウト" },
+    logoutConfirmTitle:{ "zh-CN":"确认退出登录?","zh-TW":"確認登出?","en":"Log out?","fr":"Se déconnecter ?","de":"Abmelden?","es":"¿Cerrar sesión?","ja":"ログアウトしますか?" },
+    logoutConfirmBody:{ "zh-CN":"退出后需重新通过 World ID 登录。你的钱包资产不会丢失,仍存于链上。","zh-TW":"登出後需重新透過 World ID 登入。你的錢包資產不會遺失,仍存於鏈上。","en":"You'll need to log in again with World ID. Your assets remain safe on-chain.","fr":"Vous devrez vous reconnecter avec World ID. Vos actifs restent en sécurité on-chain.","de":"Sie müssen sich erneut mit World ID anmelden. Ihre Assets bleiben sicher on-chain.","es":"Tendrás que iniciar sesión de nuevo con World ID. Tus activos están seguros en la cadena.","ja":"再度 World ID でログインする必要があります。資産はオンチェーン上で安全です。" },
+    confirmLogout:{ "zh-CN":"确认退出","zh-TW":"確認登出","en":"Log out","fr":"Se déconnecter","de":"Abmelden","es":"Cerrar sesión","ja":"ログアウト" },
+    loggedOutTitle:{ "zh-CN":"已退出登录","zh-TW":"已登出","en":"Logged out","fr":"Déconnecté","de":"Abgemeldet","es":"Sesión cerrada","ja":"ログアウト済み" },
+    loginAgain:{ "zh-CN":"重新登录","zh-TW":"重新登入","en":"Log in again","fr":"Se reconnecter","de":"Erneut anmelden","es":"Iniciar sesión","ja":"再度ログイン" },
+    loginIntro:{ "zh-CN":"使用 World App 登录以访问你的钱包","zh-TW":"使用 World App 登入以存取你的錢包","en":"Sign in with World App to access your wallet","fr":"Connectez-vous avec World App pour accéder à votre portefeuille","de":"Mit World App anmelden, um auf Ihr Wallet zuzugreifen","es":"Inicia sesión con World App para acceder a tu billetera","ja":"World App でサインインしてウォレットにアクセス" },
+    available:{ "zh-CN":"可用","zh-TW":"可用","en":"Available","fr":"Disponible","de":"Verfügbar","es":"Disponible","ja":"利用可能" },
+    riskTitle:{ "zh-CN":"未验证代币","zh-TW":"未驗證代幣","en":"Unverified token","fr":"Jeton non vérifié","de":"Ungeprüfter Token","es":"Token sin verificar","ja":"未検証トークン" },
+    riskBody:{ "zh-CN":"该代币未经验证,可能存在风险(无法卖出、高额买卖税、仿冒知名项目等)。请务必核实合约地址后再交易。","zh-TW":"該代幣未經驗證,可能存在風險(無法賣出、高額買賣稅、仿冒知名項目等)。請務必核實合約地址後再交易。","en":"This token is unverified and may carry risks (cannot sell, high trading tax, impersonating known projects). Verify the contract address before trading.","fr":"Ce jeton n'est pas vérifié et peut présenter des risques (vente impossible, taxe élevée, usurpation de projets connus). Vérifiez l'adresse du contrat avant de trader.","de":"Dieser Token ist ungeprüft und kann Risiken bergen (nicht verkaufbar, hohe Handelssteuer, Nachahmung bekannter Projekte). Prüfen Sie die Vertragsadresse vor dem Handel.","es":"Este token no está verificado y puede conllevar riesgos (no se puede vender, alto impuesto, suplantación de proyectos conocidos). Verifica la dirección del contrato antes de operar.","ja":"このトークンは未検証で、リスク(売却不可・高い取引税・著名プロジェクトの偽装など)がある可能性があります。取引前に必ずコントラクトアドレスを確認してください。" },
+    riskCancel:{ "zh-CN":"取消","zh-TW":"取消","en":"Cancel","fr":"Annuler","de":"Abbrechen","es":"Cancelar","ja":"キャンセル" },
+    riskProceed:{ "zh-CN":"我已了解,继续","zh-TW":"我已了解,繼續","en":"I understand, continue","fr":"J'ai compris, continuer","de":"Verstanden, fortfahren","es":"Entiendo, continuar","ja":"理解しました、続行" },
+    selectCurrency:{ "zh-CN":"选择货币","zh-TW":"選擇貨幣","en":"Select currency","fr":"Choisir la devise","de":"Währung wählen","es":"Seleccionar moneda","ja":"通貨を選択" },
+    selectLevel:{ "zh-CN":"World ID 验证等级","zh-TW":"World ID 驗證等級","en":"World ID Verification","fr":"Vérification World ID","de":"World-ID-Verifizierung","es":"Verificación World ID","ja":"World ID 認証" },
+    backupTitleP:{ "zh-CN":"备份与恢复","zh-TW":"備份與恢復","en":"Backup & Recovery","fr":"Sauvegarde et récupération","de":"Backup & Wiederherstellung","es":"Copia y recuperación","ja":"バックアップと復元" },
+    backupIntro:{ "zh-CN":"恢复短语是恢复你钱包的唯一方式。请离线妥善保管,任何人取得都能转走你的资产。","zh-TW":"復原短語是恢復你錢包的唯一方式。請離線妥善保管,任何人取得都能轉走你的資產。","en":"Your recovery phrase is the only way to restore your wallet. Keep it offline and secure — anyone with access can drain your funds.","fr":"La phrase de récupération est le seul moyen de restaurer votre portefeuille. Conservez-la hors ligne — quiconque y a accès peut tout dépenser.","de":"Die Wiederherstellungsphrase ist der einzige Weg, Ihr Wallet wiederherzustellen. Bewahren Sie sie offline auf — wer Zugriff hat, kann alles abheben.","es":"La frase de recuperación es la única forma de restaurar tu billetera. Guárdala sin conexión — cualquiera con acceso puede vaciar tus fondos.","ja":"リカバリーフレーズはウォレットを復元する唯一の手段です。オフラインで安全に保管してください。第三者に渡ると資金を奪われます。" },
+    showPhrase:{ "zh-CN":"显示恢复短语","zh-TW":"顯示恢復短語","en":"Reveal recovery phrase","fr":"Afficher la phrase","de":"Phrase anzeigen","es":"Mostrar frase","ja":"フレーズを表示" },
+    confirmBackup:{ "zh-CN":"我已安全备份","zh-TW":"我已安全備份","en":"I've backed it up","fr":"C'est sauvegardé","de":"Gesichert","es":"Está respaldada","ja":"バックアップ完了" },
+    pinTitle:{ "zh-CN":"PIN 与生物识别","zh-TW":"PIN 與生物辨識","en":"PIN & Biometrics","fr":"PIN et biométrie","de":"PIN & Biometrie","es":"PIN y biometría","ja":"PIN と生体認証" },
+    changePin:{ "zh-CN":"修改 PIN","zh-TW":"修改 PIN","en":"Change PIN","fr":"Modifier le PIN","de":"PIN ändern","es":"Cambiar PIN","ja":"PIN を変更" },
+    pinCurrent:{ "zh-CN":"当前 PIN","zh-TW":"目前 PIN","en":"Current PIN","fr":"PIN actuel","de":"Aktuelle PIN","es":"PIN actual","ja":"現在の PIN" },
+    pinNew:{ "zh-CN":"新 PIN (6 位)","zh-TW":"新 PIN (6 位)","en":"New PIN (6 digits)","fr":"Nouveau PIN (6 chiffres)","de":"Neue PIN (6 Ziffern)","es":"Nuevo PIN (6 dígitos)","ja":"新しい PIN (6桁)" },
+    pinConfirm:{ "zh-CN":"确认新 PIN","zh-TW":"確認新 PIN","en":"Confirm new PIN","fr":"Confirmer le PIN","de":"PIN bestätigen","es":"Confirmar PIN","ja":"新しい PIN を確認" },
+    pinSave:{ "zh-CN":"保存","zh-TW":"儲存","en":"Save","fr":"Enregistrer","de":"Speichern","es":"Guardar","ja":"保存" },
+    pinCancel:{ "zh-CN":"取消","zh-TW":"取消","en":"Cancel","fr":"Annuler","de":"Abbrechen","es":"Cancelar","ja":"キャンセル" },
+    pinMismatch:{ "zh-CN":"两次输入的 PIN 不一致","zh-TW":"兩次輸入的 PIN 不一致","en":"PINs don't match","fr":"Les PIN ne correspondent pas","de":"PINs stimmen nicht überein","es":"Los PIN no coinciden","ja":"PIN が一致しません" },
+    pinLen:{ "zh-CN":"PIN 必须是 6 位数字","zh-TW":"PIN 必須是 6 位數字","en":"PIN must be 6 digits","fr":"Le PIN doit comporter 6 chiffres","de":"PIN muss 6 Ziffern haben","es":"El PIN debe tener 6 dígitos","ja":"PIN は6桁の数字です" },
+    pinChanged:{ "zh-CN":"PIN 已修改","zh-TW":"PIN 已修改","en":"PIN changed","fr":"PIN modifié","de":"PIN geändert","es":"PIN cambiado","ja":"PIN を変更しました" },
+    current:{ "zh-CN":"当前","zh-TW":"目前","en":"CURRENT","fr":"ACTUEL","de":"AKTUELL","es":"ACTUAL","ja":"現在" },
+    levelSwitched:{ "zh-CN":"已切换验证等级","zh-TW":"已切換驗證等級","en":"Verification level switched","fr":"Niveau changé","de":"Stufe gewechselt","es":"Nivel cambiado","ja":"認証レベルを変更しました" },
+    faceUnlock:{ "zh-CN":"Face ID 解锁","zh-TW":"Face ID 解鎖","en":"Face ID unlock","fr":"Déverrouillage Face ID","de":"Face-ID-Entsperrung","es":"Desbloqueo Face ID","ja":"Face ID で解錠" },
+    fingerprint:{ "zh-CN":"指纹解锁","zh-TW":"指紋解鎖","en":"Fingerprint","fr":"Empreinte","de":"Fingerabdruck","es":"Huella","ja":"指紋認証" },
+    pinForTx:{ "zh-CN":"交易时需输入 PIN","zh-TW":"交易時需輸入 PIN","en":"Require PIN for transactions","fr":"PIN requis pour les transactions","de":"PIN bei Transaktionen","es":"PIN para transacciones","ja":"取引時に PIN を要求" },
+    levelOrb:{ "zh-CN":"Orb 验证","zh-TW":"Orb 驗證","en":"Orb verified","fr":"Vérifié Orb","de":"Orb verifiziert","es":"Verificado Orb","ja":"Orb 認証済み" },
+    levelOrbDesc:{ "zh-CN":"通过 Orb 设备生物特征验证,确认为唯一真人。等级最高,可解锁全部功能。","zh-TW":"透過 Orb 設備生物特徵驗證,確認為唯一真人。等級最高,可解鎖全部功能。","en":"Verified by Orb biometrics as a unique human. Highest tier, unlocks all features.","fr":"Vérifié comme humain unique via biométrie Orb. Niveau le plus élevé, débloque toutes les fonctions.","de":"Per Orb-Biometrie als einzigartiger Mensch verifiziert. Höchste Stufe, schaltet alle Funktionen frei.","es":"Verificado como humano único mediante biometría Orb. Nivel más alto, desbloquea todas las funciones.","ja":"Orb 生体認証で唯一の人間として認証済み。最上位レベルで全機能を解放。" },
+    levelDevice:{ "zh-CN":"设备验证","zh-TW":"裝置驗證","en":"Device verified","fr":"Vérifié appareil","de":"Geräteverifiziert","es":"Verificado dispositivo","ja":"デバイス認証" },
+    levelDeviceDesc:{ "zh-CN":"通过设备唯一性认证,部分功能可用。建议升级到 Orb 验证。","zh-TW":"通過裝置唯一性認證,部分功能可用。建議升級到 Orb 驗證。","en":"Verified by device uniqueness. Some features available. Upgrade to Orb recommended.","fr":"Vérifié par unicité de l'appareil. Certaines fonctions disponibles. Passage à Orb recommandé.","de":"Per Geräteeinzigartigkeit verifiziert. Einige Funktionen verfügbar. Upgrade auf Orb empfohlen.","es":"Verificado por unicidad del dispositivo. Algunas funciones disponibles. Se recomienda Orb.","ja":"デバイスの唯一性で認証。一部の機能が利用可能。Orb へのアップグレード推奨。" },
+    upgradeToOrb:{ "zh-CN":"升级到 Orb 验证","zh-TW":"升級到 Orb 驗證","en":"Upgrade to Orb","fr":"Passer à Orb","de":"Auf Orb upgraden","es":"Actualizar a Orb","ja":"Orb にアップグレード" },
+    findOrb:{ "zh-CN":"查找附近的 Orb","zh-TW":"尋找附近的 Orb","en":"Find a nearby Orb","fr":"Trouver un Orb à proximité","de":"Orb in der Nähe finden","es":"Buscar Orb cercano","ja":"近くの Orb を探す" },
+    connectedAppsP:{ "zh-CN":"已连接的应用","zh-TW":"已連接的應用","en":"Connected Apps","fr":"Applications connectées","de":"Verbundene Apps","es":"Apps conectadas","ja":"連携アプリ" },
+    connectedIntro:{ "zh-CN":"以下应用已获得你的 World ID 授权。撤销后,该应用将无法再读取你的验证信息。","zh-TW":"以下應用已取得你的 World ID 授權。撤銷後,該應用將無法再讀取你的驗證資訊。","en":"These apps have access to your World ID. Revoking removes their ability to read your verification.","fr":"Ces applications ont accès à votre World ID. Révoquer supprime leur accès à votre vérification.","de":"Diese Apps haben Zugriff auf Ihre World ID. Widerruf entzieht ihnen den Zugriff.","es":"Estas apps tienen acceso a tu World ID. Revocar elimina su acceso a tu verificación.","ja":"これらのアプリはあなたの World ID にアクセスできます。取り消すと認証情報の読取りができなくなります。" },
+    revoke:{ "zh-CN":"撤销","zh-TW":"撤銷","en":"Revoke","fr":"Révoquer","de":"Widerrufen","es":"Revocar","ja":"取消" },
+    grantedOn:{ "zh-CN":"授权于","zh-TW":"授權於","en":"Granted","fr":"Accordé","de":"Erteilt","es":"Concedido","ja":"許可日" },
+    helpTitle:{ "zh-CN":"帮助中心","zh-TW":"幫助中心","en":"Help Center","fr":"Centre d'aide","de":"Hilfe-Center","es":"Centro de ayuda","ja":"ヘルプセンター" },
+    aboutTitle:{ "zh-CN":"关于","zh-TW":"關於","en":"About","fr":"À propos","de":"Über","es":"Acerca de","ja":"このアプリについて" },
+    contentEmpty:{ "zh-CN":"暂无内容,运营后台发布后将显示在此","zh-TW":"暫無內容,運營後台發布後將顯示在此","en":"No content yet. Publish from admin and it will show here.","fr":"Aucun contenu. Publiez depuis l'admin pour l'afficher ici.","de":"Noch kein Inhalt. Vom Admin veröffentlichen, dann erscheint er hier.","es":"Sin contenido. Publica desde el admin para verlo aquí.","ja":"コンテンツがまだありません。管理画面から公開すると表示されます。" },
+    noAnnouncements:{ "zh-CN":"暂无公告","zh-TW":"暫無公告","en":"No announcements","fr":"Aucune annonce","de":"Keine Ankündigungen","es":"Sin anuncios","ja":"お知らせはありません" },
+    risk:{ "zh-CN":"风险","zh-TW":"風險","en":"Risk","fr":"Risque","de":"Risiko","es":"Riesgo","ja":"リスク" },
+    lockup:{ "zh-CN":"锁仓","zh-TW":"鎖倉","en":"Lock-up","fr":"Blocage","de":"Sperrfrist","es":"Bloqueo","ja":"ロック" },
+    riskLow:{ "zh-CN":"低风险","zh-TW":"低風險","en":"Low risk","fr":"Risque faible","de":"Geringes Risiko","es":"Riesgo bajo","ja":"低リスク" },
+    riskMid:{ "zh-CN":"中风险","zh-TW":"中風險","en":"Medium risk","fr":"Risque moyen","de":"Mittleres Risiko","es":"Riesgo medio","ja":"中リスク" },
+    riskHigh:{ "zh-CN":"高风险","zh-TW":"高風險","en":"High risk","fr":"Risque élevé","de":"Hohes Risiko","es":"Riesgo alto","ja":"高リスク" },
+    anytime:{ "zh-CN":"随时可取","zh-TW":"隨時可取","en":"Withdraw anytime","fr":"Retrait à tout moment","de":"Jederzeit abhebbar","es":"Retiro en cualquier momento","ja":"いつでも引出可" },
+    lock7d:{ "zh-CN":"7 天锁仓","zh-TW":"7 天鎖倉","en":"7-day lock","fr":"Blocage 7 jours","de":"7 Tage Sperre","es":"Bloqueo 7 días","ja":"7日間ロック" },
+    riskLevel:{ "zh-CN":"风险等级","zh-TW":"風險等級","en":"Risk level","fr":"Niveau de risque","de":"Risikostufe","es":"Nivel de riesgo","ja":"リスクレベル" },
+    tvlFull:{ "zh-CN":"总锁仓量 (TVL)","zh-TW":"總鎖倉量 (TVL)","en":"Total Value Locked","fr":"Valeur totale bloquée","de":"Gesperrter Gesamtwert","es":"Valor total bloqueado","ja":"預かり資産総額" },
+    minDeposit:{ "zh-CN":"最低存入","zh-TW":"最低存入","en":"Min. deposit","fr":"Dépôt min.","de":"Mindesteinlage","es":"Depósito mín.","ja":"最低預入額" },
+    myDeposit:{ "zh-CN":"我的存入","zh-TW":"我的存入","en":"My deposit","fr":"Mon dépôt","de":"Meine Einlage","es":"Mi depósito","ja":"預入額" },
+    myPositions:{ "zh-CN":"我的仓位","zh-TW":"我的倉位","en":"My positions","fr":"Mes positions","de":"Meine Positionen","es":"Mis posiciones","ja":"ポジション" },
+    earnedSub:{ "zh-CN":"+$0.83 今日 · 跨 2 个仓位","zh-TW":"+$0.83 今日 · 跨 2 個倉位","en":"+$0.83 today · 2 positions","fr":"+0,83 $ aujourd'hui · 2 positions","de":"+0,83 $ heute · 2 Positionen","es":"+$0.83 hoy · 2 posiciones","ja":"本日 +$0.83 · 2ポジション" },
+    gainersTime:{ "zh-CN":"24h · 链上数据","zh-TW":"24h · 鏈上數據","en":"24h · on-chain","fr":"24h · on-chain","de":"24h · On-Chain","es":"24h · on-chain","ja":"24h · オンチェーン" },
+    gainersNote:{ "zh-CN":"以下为链上 24h 涨幅排行,仅为市场行情,非投资建议。高涨幅代币通常伴随高波动与高风险,部分为未经验证的新代币。","zh-TW":"以下為鏈上 24h 漲幅排行,僅為市場行情,非投資建議。高漲幅代幣通常伴隨高波動與高風險,部分為未經驗證的新代幣。","en":"On-chain 24h gainers. Market data only, not investment advice. High gainers carry high volatility and risk; some are unverified new tokens.","fr":"Hausses on-chain 24h. Données de marché uniquement, pas un conseil. Les fortes hausses impliquent volatilité et risque ; certains jetons ne sont pas vérifiés.","de":"On-Chain-Gewinner 24h. Nur Marktdaten, keine Anlageberatung. Hohe Gewinner bergen hohe Volatilität und Risiko; einige sind ungeprüfte neue Token.","es":"Mayores subidas on-chain 24h. Solo datos de mercado, no asesoramiento. Las grandes subidas conllevan volatilidad y riesgo; algunos son tokens nuevos sin verificar.","ja":"オンチェーン24h上昇率。市場データのみで投資助言ではありません。高騰銘柄は高ボラティリティ・高リスクを伴い、一部は未検証の新規トークンです。" },
+    verified:{ "zh-CN":"已验证","zh-TW":"已驗證","en":"Verified","fr":"Vérifié","de":"Verifiziert","es":"Verificado","ja":"検証済み" },
+    unverified:{ "zh-CN":"未验证","zh-TW":"未驗證","en":"Unverified","fr":"Non vérifié","de":"Ungeprüft","es":"Sin verificar","ja":"未検証" },
+    vol:{ "zh-CN":"量","zh-TW":"量","en":"Vol","fr":"Vol","de":"Vol","es":"Vol","ja":"出来高" },
+    actAll:{ "zh-CN":"全部","zh-TW":"全部","en":"All","fr":"Tout","de":"Alle","es":"Todo","ja":"すべて" },
+    actIn:{ "zh-CN":"收款","zh-TW":"收款","en":"Received","fr":"Reçu","de":"Erhalten","es":"Recibido","ja":"受取" },
+    actOut:{ "zh-CN":"发送","zh-TW":"發送","en":"Sent","fr":"Envoyé","de":"Gesendet","es":"Enviado","ja":"送金" },
+    actSwap:{ "zh-CN":"兑换","zh-TW":"兌換","en":"Swap","fr":"Échange","de":"Tausch","es":"Cambio","ja":"交換" },
+    p_wldStake_t:{ "zh-CN":"质押 WLD","zh-TW":"質押 WLD","en":"Stake WLD","fr":"Staker WLD","de":"WLD staken","es":"Hacer staking de WLD","ja":"WLD をステーク" },
+    p_wldStake_d:{ "zh-CN":"World Chain 原生质押","zh-TW":"World Chain 原生質押","en":"Native World Chain staking","fr":"Staking natif World Chain","de":"Natives World-Chain-Staking","es":"Staking nativo de World Chain","ja":"World Chain ネイティブステーキング" },
+    p_wldStake_desc:{ "zh-CN":"将 WLD 质押到 World Chain 验证节点,帮助网络安全运行并获得质押奖励。随时可解押,无锁仓期。收益每日结算。","zh-TW":"將 WLD 質押到 World Chain 驗證節點,協助網絡安全運行並獲得質押獎勵。隨時可解押,無鎖倉期。收益每日結算。","en":"Stake WLD to World Chain validators to help secure the network and earn staking rewards. Unstake anytime, no lock-up. Rewards settled daily.","fr":"Stakez WLD auprès des validateurs World Chain pour sécuriser le réseau et gagner des récompenses. Retrait à tout moment, sans blocage. Récompenses réglées chaque jour.","de":"Staken Sie WLD bei World-Chain-Validatoren, um das Netzwerk zu sichern und Belohnungen zu verdienen. Jederzeit kündbar, keine Sperrfrist. Tägliche Abrechnung.","es":"Haz staking de WLD en validadores de World Chain para asegurar la red y ganar recompensas. Retira cuando quieras, sin bloqueo. Recompensas diarias.","ja":"WLD を World Chain のバリデータにステークし、ネットワークの安全に貢献して報酬を獲得します。いつでも解除可能、ロックなし。報酬は毎日精算。" },
+    p_usdc_t:{ "zh-CN":"USDC 储蓄金库","zh-TW":"USDC 儲蓄金庫","en":"USDC Savings Vault","fr":"Coffre d'épargne USDC","de":"USDC-Sparvault","es":"Bóveda de ahorro USDC","ja":"USDC 貯蓄ボールト" },
+    p_usdc_d:{ "zh-CN":"稳定币低风险理财","zh-TW":"穩定幣低風險理財","en":"Low-risk stablecoin yield","fr":"Rendement stablecoin à faible risque","de":"Stablecoin-Rendite, geringes Risiko","es":"Rendimiento de stablecoin de bajo riesgo","ja":"低リスクのステーブルコイン運用" },
+    p_usdc_desc:{ "zh-CN":"USDC 存入借贷协议金库,赚取借款人支付的利息。稳定币本位,价格波动极小,适合稳健理财。","zh-TW":"USDC 存入借貸協議金庫,賺取借款人支付的利息。穩定幣本位,價格波動極小,適合穩健理財。","en":"Deposit USDC into a lending vault to earn interest paid by borrowers. Stablecoin-denominated with minimal price volatility — suited for steady yield.","fr":"Déposez des USDC dans un coffre de prêt pour gagner les intérêts payés par les emprunteurs. Libellé en stablecoin, volatilité minimale — idéal pour un rendement stable.","de":"Zahlen Sie USDC in einen Lending-Vault ein und verdienen Sie Zinsen der Kreditnehmer. Stablecoin-basiert mit minimaler Volatilität — für stetige Rendite.","es":"Deposita USDC en una bóveda de préstamos para ganar intereses pagados por prestatarios. Denominado en stablecoin con mínima volatilidad — ideal para rendimiento estable.","ja":"USDC を貸付ボールトに預け、借り手が支払う利息を獲得します。ステーブルコイン建てで価格変動が小さく、安定運用向け。" },
+    p_eth_t:{ "zh-CN":"ETH-USDC 流动性","zh-TW":"ETH-USDC 流動性","en":"ETH-USDC Liquidity","fr":"Liquidité ETH-USDC","de":"ETH-USDC-Liquidität","es":"Liquidez ETH-USDC","ja":"ETH-USDC 流動性" },
+    p_eth_d:{ "zh-CN":"提供 DEX 流动性挖矿","zh-TW":"提供 DEX 流動性挖礦","en":"Provide DEX liquidity","fr":"Fournir de la liquidité DEX","de":"DEX-Liquidität bereitstellen","es":"Proveer liquidez DEX","ja":"DEX に流動性を提供" },
+    p_eth_desc:{ "zh-CN":"向 ETH-USDC 交易池提供流动性,赚取交易手续费分成 + 流动性挖矿奖励。注意:存在无常损失风险,两种代币价格偏离越大,潜在损失越高。","zh-TW":"向 ETH-USDC 交易池提供流動性,賺取交易手續費分成 + 流動性挖礦獎勵。注意:存在無常損失風險,兩種代幣價格偏離越大,潛在損失越高。","en":"Provide liquidity to the ETH-USDC pool to earn a share of trading fees plus mining rewards. Note: impermanent loss risk — the more the two prices diverge, the higher the potential loss.","fr":"Fournissez de la liquidité au pool ETH-USDC pour gagner une part des frais de transaction et des récompenses. Attention : risque de perte impermanente — plus les deux prix divergent, plus la perte potentielle est élevée.","de":"Stellen Sie dem ETH-USDC-Pool Liquidität bereit und verdienen Sie einen Anteil der Handelsgebühren plus Mining-Belohnungen. Hinweis: Risiko des unbeständigen Verlusts — je stärker die Preise divergieren, desto höher der mögliche Verlust.","es":"Provee liquidez al pool ETH-USDC para ganar una parte de las comisiones más recompensas de minería. Nota: riesgo de pérdida impermanente — cuanto más divergen los precios, mayor la pérdida potencial.","ja":"ETH-USDC プールに流動性を提供し、取引手数料の分配とマイニング報酬を獲得します。注意:インパーマネントロスのリスクがあり、2つの価格が乖離するほど損失が大きくなります。" },
+    p_farm_t:{ "zh-CN":"WLD 高收益农场","zh-TW":"WLD 高收益農場","en":"WLD High-Yield Farm","fr":"Ferme à haut rendement WLD","de":"WLD-Hochzinsfarm","es":"Granja de alto rendimiento WLD","ja":"WLD 高利回りファーム" },
+    p_farm_d:{ "zh-CN":"新协议激励池","zh-TW":"新協議激勵池","en":"New protocol incentive pool","fr":"Pool d'incitation nouveau protocole","de":"Anreizpool für neues Protokoll","es":"Pool de incentivos de nuevo protocolo","ja":"新プロトコルのインセンティブプール" },
+    p_farm_desc:{ "zh-CN":"新上线协议的激励农场,APY 很高但来自代币增发激励,可能随时下降。新协议合约风险较高,请只投入可承受损失的资金。","zh-TW":"新上線協議的激勵農場,APY 很高但來自代幣增發激勵,可能隨時下降。新協議合約風險較高,請只投入可承受損失的資金。","en":"An incentive farm from a newly launched protocol. The high APY comes from token emissions and may drop at any time. New-protocol contract risk is elevated — only invest what you can afford to lose.","fr":"Ferme d'incitation d'un protocole récent. L'APY élevé provient d'émissions de jetons et peut chuter à tout moment. Risque de contrat élevé — n'investissez que ce que vous pouvez perdre.","de":"Eine Anreizfarm eines neu gestarteten Protokolls. Der hohe APY stammt aus Token-Emissionen und kann jederzeit fallen. Erhöhtes Vertragsrisiko — investieren Sie nur, was Sie verlieren können.","es":"Una granja de incentivos de un protocolo recién lanzado. El alto APY proviene de emisiones de tokens y puede caer en cualquier momento. Riesgo de contrato elevado — invierte solo lo que puedas permitirte perder.","ja":"新規プロトコルのインセンティブファーム。高い APY はトークン発行由来でいつでも下落し得ます。新規契約リスクが高いため、失っても困らない資金のみ投入してください。" },
+    importedToken:{ "zh-CN":"导入的代币","zh-TW":"導入的代幣","en":"Imported token","fr":"Jeton importé","de":"Importierter Token","es":"Token importado","ja":"インポートしたトークン" },
+    today:{ "zh-CN":"今天","zh-TW":"今天","en":"Today","fr":"Aujourd'hui","de":"Heute","es":"Hoy","ja":"今日" },
+    yesterday:{ "zh-CN":"昨天","zh-TW":"昨天","en":"Yesterday","fr":"Hier","de":"Gestern","es":"Ayer","ja":"昨日" },
+    completed:{ "zh-CN":"已完成","zh-TW":"已完成","en":"Completed","fr":"Terminé","de":"Abgeschlossen","es":"Completado","ja":"完了" },
+    received:{ "zh-CN":"收到","zh-TW":"收到","en":"Received","fr":"Reçu","de":"Erhalten","es":"Recibido","ja":"受取" },
+    sent:{ "zh-CN":"发送","zh-TW":"發送","en":"Sent","fr":"Envoyé","de":"Gesendet","es":"Enviado","ja":"送金" },
+    swapped:{ "zh-CN":"兑换","zh-TW":"兌換","en":"Swapped","fr":"Échangé","de":"Getauscht","es":"Cambiado","ja":"交換" },
+    from:{ "zh-CN":"来自","zh-TW":"來自","en":"From","fr":"De","de":"Von","es":"De","ja":"差出" },
+    toAddr:{ "zh-CN":"至","zh-TW":"至","en":"To","fr":"À","de":"An","es":"A","ja":"宛先" },
+    airdrop:{ "zh-CN":"空投","zh-TW":"空投","en":"Airdrop","fr":"Airdrop","de":"Airdrop","es":"Airdrop","ja":"エアドロップ" },
+    pinBio:{ "zh-CN":"PIN 与生物识别","zh-TW":"PIN 與生物辨識","en":"PIN & Biometrics","fr":"PIN et biométrie","de":"PIN & Biometrie","es":"PIN y biometría","ja":"PIN と生体認証" },
+    txConfirm:{ "zh-CN":"交易二次确认","zh-TW":"交易二次確認","en":"Transaction confirmation","fr":"Confirmation de transaction","de":"Transaktionsbestätigung","es":"Confirmación de transacción","ja":"取引の再確認" },
+    verifyLevel:{ "zh-CN":"验证等级","zh-TW":"驗證等級","en":"Verification level","fr":"Niveau de vérification","de":"Verifizierungsstufe","es":"Nivel de verificación","ja":"認証レベル" },
+    connectedApps:{ "zh-CN":"已连接的应用","zh-TW":"已連接的應用","en":"Connected apps","fr":"Applications connectées","de":"Verbundene Apps","es":"Apps conectadas","ja":"連携アプリ" },
+    balance:{ "zh-CN":"余额","zh-TW":"餘額","en":"Balance","fr":"Solde","de":"Guthaben","es":"Saldo","ja":"残高" },
+    rate:{ "zh-CN":"汇率","zh-TW":"匯率","en":"Rate","fr":"Taux","de":"Kurs","es":"Tasa","ja":"レート" },
+    priceImpact:{ "zh-CN":"价格影响","zh-TW":"價格影響","en":"Price impact","fr":"Impact prix","de":"Preiseinfluss","es":"Impacto de precio","ja":"価格影響" },
+    slippageTol:{ "zh-CN":"滑点容忍","zh-TW":"滑點容忍","en":"Slippage","fr":"Glissement","de":"Slippage","es":"Deslizamiento","ja":"スリッページ" },
+    networkFee:{ "zh-CN":"网络费","zh-TW":"網絡費","en":"Network fee","fr":"Frais réseau","de":"Netzwerkgebühr","es":"Comisión de red","ja":"ネットワーク手数料" },
+    slippageTitle:{ "zh-CN":"滑点容忍度 (Slippage)","zh-TW":"滑點容忍度 (Slippage)","en":"Slippage tolerance","fr":"Tolérance au glissement","de":"Slippage-Toleranz","es":"Tolerancia de deslizamiento","ja":"スリッページ許容度" }
+  };
+
+  var currentLang = "en";
+
+  // 取当前语言的翻译;没有词条就原样返回
+  function t(key){
+    return (i18n[key] && i18n[key][currentLang]) ? i18n[key][currentLang] : key;
+  }
+
+  // 把页面上所有带 data-i18n 的元素替换成当前语言文字
+  function applyLang(code){
+    currentLang = code;
+    document.documentElement.lang = code;
+    document.querySelectorAll("[data-i18n]").forEach(function(el){
+      var key = el.getAttribute("data-i18n");
+      if (i18n[key] && i18n[key][code]) el.textContent = i18n[key][code];
+    });
+    // 翻译 input 的 placeholder (placeholder 不是 textContent,要单独处理)
+    document.querySelectorAll("[data-i18n-ph]").forEach(function(el){
+      var key = el.getAttribute("data-i18n-ph");
+      if (i18n[key] && i18n[key][code]) el.setAttribute("placeholder", i18n[key][code]);
+    });
+    // 更新 Me 页"语言"那一行右侧显示的当前语言名
+    var lobj = languages.filter(function(l){ return l.code === code; })[0];
+    if (lobj) document.getElementById("langVal").textContent = lobj.name;
+    // 重新渲染 JS 动态生成的内容 (Earn 产品 / 涨幅榜 / 交易记录)
+    if (typeof renderProducts === "function") renderProducts();
+    if (typeof renderGainers === "function") renderGainers();
+    if (typeof renderActivity === "function") renderActivity();
+    if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+    if (typeof renderApps === "function") renderApps();
+    if (typeof renderHelp === "function") renderHelp();
+    if (typeof renderAbout === "function") renderAbout();
+    if (typeof renderLevels === "function") renderLevels();
+    if (typeof selectSendToken === "function" && typeof sendCurrentToken !== "undefined") selectSendToken(sendCurrentToken);
+  }
+
+  function openLangModal(){
+    document.getElementById("langList").innerHTML = languages.map(function(l){
+      var check = l.code === currentLang
+        ? '<span class="vbadge"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>'
+        : '';
+      return '<div class="tk-row" onclick="chooseLang(\'' + l.code + '\')"><div class="ic" style="background:var(--surface-2)">' + l.flag + '</div><div class="mid"><div class="s">' + l.name + '</div></div><div class="bal">' + check + '</div></div>';
+    }).join('');
+    document.getElementById("langModal").classList.add("open");
+  }
+  function closeLangModal(){ document.getElementById("langModal").classList.remove("open"); }
+  function chooseLang(code){
+    applyLang(code);
+    closeLangModal();
+    var lobj = languages.filter(function(l){ return l.code === code; })[0];
+    toast((lobj ? lobj.name : code));
+  }
+
+  // 初始化:默认简体中文
+  applyLang("en");
+
+  /* ============ 货币切换 + 全局换算 ============ */
+  // 各币种汇率(以 USD=1 为基准)。"后台-货币与汇率"页修改后会通过 localStorage 共享到这里。
+  // 真实项目里要接行情 API 拉实时汇率,后台只做覆盖/开关。
+  var CURRENCY_RATES_KEY = "ww_currency_rates";
+  var CURRENCY_PREF_KEY = "ww_currency_pref";
+  var defaultCurrencies = [
+    { code:"USD", name:"US Dollar", symbol:"$",   rate:1.00 },
+    { code:"EUR", name:"Euro", symbol:"€",        rate:0.92 },
+    { code:"GBP", name:"British Pound", symbol:"£", rate:0.79 },
+    { code:"JPY", name:"Japanese Yen", symbol:"¥", rate:155.0 },
+    { code:"CNY", name:"Chinese Yuan", symbol:"¥", rate:7.20 },
+    { code:"HKD", name:"Hong Kong Dollar", symbol:"HK$", rate:7.82 },
+    { code:"TWD", name:"New Taiwan Dollar", symbol:"NT$", rate:32.5 },
+    { code:"KRW", name:"Korean Won", symbol:"₩", rate:1350 },
+    { code:"NGN", name:"Nigerian Naira", symbol:"₦", rate:1580 },
+    { code:"ZAR", name:"South African Rand", symbol:"R", rate:18.6 },
+    { code:"KES", name:"Kenyan Shilling", symbol:"KSh", rate:129 },
+    { code:"EGP", name:"Egyptian Pound", symbol:"E£", rate:48.7 }
+  ];
+  var currencies = defaultCurrencies.slice();
+
+  // 从后台共享的汇率覆盖默认值
+  function loadRatesFromAdmin(){
+    try {
+      var saved = JSON.parse(localStorage.getItem(CURRENCY_RATES_KEY) || "null");
+      if(saved && typeof saved === "object"){
+        currencies = defaultCurrencies.map(function(c){
+          return Object.assign({}, c, saved[c.code] ? { rate: saved[c.code] } : {});
+        });
+      }
+    } catch(e){}
+  }
+  loadRatesFromAdmin();
+
+  // 读取用户上次选择的货币(localStorage)
+  var currentCurrency = "USD";
+  try { var pref = localStorage.getItem(CURRENCY_PREF_KEY); if(pref) currentCurrency = pref; } catch(e){}
+
+  function curObj(){
+    if(typeof currencies === "undefined" || !currencies) return { code:"USD", symbol:"$", rate:1 };
+    return currencies.find(function(c){return c.code===currentCurrency;}) || currencies[0];
+  }
+  // 全局金额格式化:输入 USD 数值,按当前货币换算并加符号
+  function formatMoney(usd){
+    if(usd == null || isNaN(usd)) return "—";
+    var c = curObj();
+    var v = usd * c.rate;
+    // 大额货币(JPY/KRW/NGN/IDR 等)不显示小数
+    var noDec = (c.code === "JPY" || c.code === "KRW" || c.code === "NGN" || c.code === "TWD");
+    var formatted = noDec
+      ? Math.round(v).toLocaleString()
+      : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return c.symbol + formatted;
+  }
+
+  // 紧凑格式(用于 TVL 这种大数字: $2.4M / ¥372M 等)
+  function formatMoneyCompact(usd){
+    if(usd == null || isNaN(usd)) return "—";
+    var c = curObj();
+    var v = usd * c.rate;
+    var suffix = "", div = 1;
+    if(v >= 1e9){ suffix="B"; div=1e9; }
+    else if(v >= 1e6){ suffix="M"; div=1e6; }
+    else if(v >= 1e3){ suffix="K"; div=1e3; }
+    var num = (v/div);
+    var numTxt = suffix ? num.toFixed(num >= 100 ? 0 : 1) : Math.round(num).toLocaleString();
+    return c.symbol + numTxt + suffix;
+  }
+
+  function openCurrencyModal(){
+    document.getElementById("currencyList").innerHTML = currencies.map(function(c){
+      var sel = c.code===currentCurrency
+        ? '<span style="color:var(--green);display:inline-flex;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>'
+        : '';
+      return '<div class="tk-row" onclick="pickCurrency(\''+c.code+'\')"><div class="ic" style="background:var(--surface-2);font-size:15px;">'+c.symbol+'</div><div class="mid"><div class="s">'+c.code+'</div><div class="f">'+c.name+'</div></div><div class="bal">'+sel+'</div></div>';
+    }).join('');
+    document.getElementById("currencyModal").classList.add("open");
+  }
+  function closeCurrencyModal(){ document.getElementById("currencyModal").classList.remove("open"); }
+  function pickCurrency(code){
+    // 切换前先重新读一次后台汇率(后台可能刚改过)
+    loadRatesFromAdmin();
+    currentCurrency = code;
+    try { localStorage.setItem(CURRENCY_PREF_KEY, code); } catch(e){}
+    document.getElementById("currencyVal").textContent = code;
+    closeCurrencyModal();
+    // 全局重新渲染所有显示金额的地方
+    renderMoney();
+    toast(code + " · " + curObj().symbol);
+  }
+
+  // 集中渲染所有需要按货币换算的金额
+  function renderMoney(){
+    // 主页总余额
+    var balEl = document.getElementById("balAmt");
+    if(balEl && balEl.textContent !== "••••••") balEl.textContent = formatMoney(totalUsdNum);
+    // 24h 变化金额 (绿色 +xx)
+    var subEl = document.getElementById("balSub");
+    if(subEl) subEl.textContent = "+" + formatMoney(change24hUsdNum) + " (24h)";
+    // 资产列表
+    if(typeof renderAssets === "function") renderAssets();
+    // Earn: 已赚取收益 + 产品 TVL
+    var earnEl = document.getElementById("earnTotal");
+    if(earnEl) earnEl.textContent = formatMoney(48.21);
+    if(typeof renderProducts === "function") renderProducts();
+    // Swap 余额行
+    if(typeof refreshSwapLabels === "function") refreshSwapLabels();
+    // 资产详情页的美元值(若已展开过)
+    if(typeof currentDetailIdx !== "undefined" && currentDetailIdx >= 0 && assets[currentDetailIdx]){
+      var u = assets[currentDetailIdx].usdNum;
+      var de = document.getElementById("detUsd"); if(de) de.textContent = formatMoney(u) + " · +3.2% (24h)";
+    }
+  }
+
+  /* ============ Backup 显示恢复短语 ============ */
+  var demoPhrase = ["abandon","absent","absorb","abstract","absurd","abuse","access","accident","account","accuse","achieve","acid"];
+  function revealPhrase(){
+    var box = document.getElementById("phraseBox");
+    box.style.display = "block";
+    box.style.padding = "16px";
+    box.innerHTML = '<div class="phrase-grid">' + demoPhrase.map(function(w,i){ return '<div class="w"><span class="i">'+(i+1)+'</span>'+w+'</div>'; }).join('') + '</div><div style="color:var(--text-mute); font-size:11px; margin-top:14px; text-align:center;">⚠ 仅为演示词组,真实钱包请使用实际生成的助记词</div>';
+  }
+
+  /* ============ 修改 PIN ============ */
+  function openPinModal(){
+    document.getElementById("pinCur").value = "";
+    document.getElementById("pinNew").value = "";
+    document.getElementById("pinConf").value = "";
+    document.getElementById("pinModal").classList.add("open");
+  }
+  function closePinModal(){ document.getElementById("pinModal").classList.remove("open"); }
+  function savePin(){
+    var cur = document.getElementById("pinCur").value;
+    var nw = document.getElementById("pinNew").value;
+    var cf = document.getElementById("pinConf").value;
+    if(!/^\d{6}$/.test(nw)){ toast(t("pinLen")); return; }
+    if(nw !== cf){ toast(t("pinMismatch")); return; }
+    // 真实项目里这里会校验当前 PIN、调后端/安全模块更新
+    closePinModal();
+    toast(t("pinChanged"));
+  }
+
+  /* ============ 领取收益 ============ */
+  function openClaimModal(){
+    // 显示当前货币下的收益金额
+    var amtEl = document.getElementById("claimAmt");
+    if(amtEl && typeof formatMoney === "function") amtEl.textContent = "+" + formatMoney(48.21);
+    var bodyEl = document.getElementById("claimModal").querySelector("[data-i18n='claimBody']");
+    if(bodyEl) bodyEl.textContent = t("claimBody");
+    document.getElementById("claimModal").classList.add("open");
+  }
+  function closeClaimModal(){ document.getElementById("claimModal").classList.remove("open"); }
+  function confirmClaim(){
+    // 真实项目里这里会调 MiniKit.sendTransaction() 调理财合约的 claim() 方法
+    closeClaimModal();
+    toast(t("claimDone"));
+  }
+
+  /* ============ 退出登录 ============ */
+  function openLogoutConfirm(){ document.getElementById("logoutModal").classList.add("open"); }
+  function closeLogoutConfirm(){ document.getElementById("logoutModal").classList.remove("open"); }
+  function doLogout(){
+    closeLogoutConfirm();
+    // 真实项目:清除会话 token、撤销 World ID session、回到登录页
+    document.getElementById("loginScreen").style.display = "flex";
+  }
+  function loginBack(){
+    // 真实项目:发起 MiniKit.walletAuth(...) 流程,通过后再隐藏登录页
+    document.getElementById("loginScreen").style.display = "none";
+    toast(t("tComingSoon"));
+  }
+
+  /* ============ 验证等级选择 ============ */
+  var verifyLevels = [
+    { id:"orb", nameKey:"levelOrb", descKey:"levelOrbDesc", accent:true,
+      icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="#0a0b0a"/></svg>' },
+    { id:"device", nameKey:"levelDevice", descKey:"levelDeviceDesc", accent:false,
+      icon:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>' }
+  ];
+  var currentLevel = "orb";
+  function renderLevels(){
+    var box = document.getElementById("levelCards");
+    if(!box || typeof verifyLevels === "undefined") return;
+    box.innerHTML = verifyLevels.map(function(l){
+      var isCur = l.id === currentLevel;
+      var bg = isCur
+        ? "background:linear-gradient(140deg, rgba(74,222,128,0.18), rgba(74,222,128,0.04)); border:1px solid rgba(74,222,128,0.4);"
+        : "background:var(--surface); border:1px solid var(--line);";
+      var iconColor = isCur ? "var(--green)" : "var(--text-dim)";
+      var badge = isCur
+        ? '<span style="margin-left:auto; background:var(--green); color:#042; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:700;">'+t("current")+'</span>'
+        : '<span style="margin-left:auto; color:var(--text-mute);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>';
+      return '<div onclick="pickLevel(\''+l.id+'\')" style="'+bg+' border-radius:18px; padding:22px; margin-bottom:14px; cursor:pointer;">'+
+        '<div style="display:flex;align-items:center;gap:10px;">'+
+          '<span style="color:'+iconColor+'; display:inline-flex;">'+l.icon+'</span>'+
+          '<div style="font-size:'+(l.accent?"18px":"16px")+'; font-weight:'+(l.accent?"800":"700")+';">'+t(l.nameKey)+'</div>'+
+          badge+
+        '</div>'+
+        '<p style="color:var(--text-dim); font-size:13px; line-height:1.6; margin-top:12px;">'+t(l.descKey)+'</p>'+
+      '</div>';
+    }).join('');
+  }
+  function pickLevel(id){
+    if(id === currentLevel) return;
+    currentLevel = id;
+    renderLevels();
+    // 同步 Me 页"验证等级"那一栏的右侧显示 + 顶部资料卡徽章
+    var lv = verifyLevels.find(function(x){return x.id===id;});
+    toast(t("levelSwitched") + ": " + t(lv.nameKey));
+  }
+
+  /* ============ Connected Apps ============ */
+  var connectedApps = [
+    { id:1, n:"World ID Showcase", d:"获得验证信息读取权限", bg:"#1c2536", ic:"W", color:"#8aa3d8" },
+    { id:2, n:"Anonymous Voting", d:"读取唯一真人证明", bg:"#0d150d", ic:"V", color:"var(--green)" },
+    { id:3, n:"Worldcoin Grants", d:"领取空投资格验证", bg:"#2a1a30", ic:"G", color:"#fff" }
+  ];
+  function renderApps(){
+    var box = document.getElementById("appsList");
+    if(!box) return;
+    if(typeof connectedApps === "undefined" || !connectedApps.length){ box.innerHTML = '<div class="article-empty">' + t("contentEmpty") + '</div>'; return; }
+    box.innerHTML = connectedApps.map(function(a){
+      return '<div class="app-row"><div class="ic" style="background:'+a.bg+';color:'+a.color+'">'+a.ic+'</div><div class="mid"><div class="n">'+a.n+'</div><div class="d">'+a.d+'</div></div><button class="revoke-btn" onclick="revokeApp('+a.id+')">'+t("revoke")+'</button></div>';
+    }).join('');
+  }
+  function revokeApp(id){
+    var a = connectedApps.find(function(x){return x.id===id;});
+    connectedApps = connectedApps.filter(function(x){return x.id!==id;});
+    renderApps(); toast(t("revoke") + ": " + a.n);
+  }
+
+  /* ============ Help Center / About (后台发布 → 用户端展示) ============ */
+  // 这两个内容由运营后台编辑,通过 localStorage 共享给用户端(原型阶段)
+  // 真实项目里改为后端 API:管理员存数据库,用户端调 GET 拉
+  var HELP_KEY = "ww_help_content";
+  var ABOUT_KEY = "ww_about_content";
+
+  function loadContent(key){
+    try { return localStorage.getItem(key) || ""; } catch(e){ return ""; }
+  }
+  function renderHelp(){
+    var c = loadContent(HELP_KEY);
+    document.getElementById("helpContent").innerHTML = c
+      ? '<div class="article">' + escapeHtml(c).split(/\n\n+/).map(function(p){ return '<p>'+p.replace(/\n/g,'<br>')+'</p>'; }).join('') + '</div>'
+      : '<div class="article-empty">' + t("contentEmpty") + '</div>';
+  }
+  function renderAbout(){
+    var c = loadContent(ABOUT_KEY);
+    document.getElementById("aboutContent").innerHTML = c
+      ? '<div class="article">' + escapeHtml(c).split(/\n\n+/).map(function(p){ return '<p>'+p.replace(/\n/g,'<br>')+'</p>'; }).join('') + '</div>'
+      : '<div class="article-empty">' + t("contentEmpty") + '</div>';
+  }
+  // 简单的 HTML 转义,防 XSS
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+
+  /* ============ 公告 (后台发布 → 铃铛展示) ============ */
+  var ANN_KEY = "ww_announcements";
+  var ANN_READ_KEY = "ww_ann_last_read";
+
+  function loadAnnouncements(){
+    try { return JSON.parse(localStorage.getItem(ANN_KEY) || "[]"); }
+    catch(e){ return []; }
+  }
+  function seedIfEmpty(){
+    var list = loadAnnouncements();
+    if(!list.length){
+      list = [{ id:1, tag:"notice", title:"欢迎使用 Lumina", body:"这是一条示例公告。在运营后台发布的公告会实时显示在这里。", time:"刚刚" }];
+      try { localStorage.setItem(ANN_KEY, JSON.stringify(list)); } catch(e){}
+    }
+    return list;
+  }
+  function updateBellDot(){
+    var list = loadAnnouncements();
+    var lastRead = 0;
+    try { lastRead = parseInt(localStorage.getItem(ANN_READ_KEY) || "0"); } catch(e){}
+    var maxId = list.reduce(function(m,a){ return Math.max(m, a.id||0); }, 0);
+    document.getElementById("bellDot").style.display = (maxId > lastRead && list.length) ? "block" : "none";
+  }
+  var tagName = { notice:{ "zh-CN":"通知","en":"Notice" }, warning:{ "zh-CN":"提醒","en":"Warning" }, urgent:{ "zh-CN":"重要","en":"Urgent" } };
+  function tName(tag){ var m=tagName[tag]||tagName.notice; return m[currentLang]||m["en"]||tag; }
+  function openAnnouncements(){
+    var list = loadAnnouncements().slice().reverse();
+    var box = document.getElementById("annList");
+    if(!list.length){
+      box.innerHTML = '<div class="ann-empty">' + t("noAnnouncements") + '</div>';
+    } else {
+      box.innerHTML = list.map(function(a){
+        return '<div class="ann-item"><div class="ann-top"><span class="ann-tag '+(a.tag||"notice")+'">'+tName(a.tag||"notice")+'</span><span class="ann-time">'+(a.time||"")+'</span></div><div class="ann-title">'+a.title+'</div><div class="ann-body">'+a.body+'</div></div>';
+      }).join('');
+    }
+    document.getElementById("annModal").classList.add("open");
+    var maxId = loadAnnouncements().reduce(function(m,a){ return Math.max(m, a.id||0); }, 0);
+    try { localStorage.setItem(ANN_READ_KEY, String(maxId)); } catch(e){}
+    updateBellDot();
+  }
+  function closeAnnouncements(){ document.getElementById("annModal").classList.remove("open"); }
+  seedIfEmpty();
+  updateBellDot();
+  setInterval(updateBellDot, 10 * 1000);
+  renderLevels();
+  selectSendToken("WLD"); // 初始化 Send 页代币选择器(图标 + "可用"文字)
+  // 应用用户上次选的货币(从 localStorage 读到的),并同步 Me 页那一栏的显示
+  (function applySavedCurrency(){
+    var cv = document.getElementById("currencyVal");
+    if(cv) cv.textContent = currentCurrency;
+    renderMoney();
+  })();
+  // 每 5 秒检查后台是否更新了汇率(原型用 localStorage 模拟,真实项目是 API 轮询/推送)
+  setInterval(function(){
+    var before = JSON.stringify(currencies.map(function(c){return c.rate;}));
+    loadRatesFromAdmin();
+    var after = JSON.stringify(currencies.map(function(c){return c.rate;}));
+    if(before !== after) renderMoney();
+  }, 5 * 1000);
+</script>
+</body>
+</html>
