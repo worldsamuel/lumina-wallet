@@ -8,7 +8,7 @@ export type TokenConfig = {
   className: string;
   contractAddress?: Address;
   native?: boolean;
-  // TODO: Replace static placeholders with a price feed in the next pricing step.
+  coingeckoId: string;
   priceUsd: number;
 };
 
@@ -23,7 +23,8 @@ export const TOKENS: readonly TokenConfig[] = [
     logo: "◉",
     className: "wld",
     contractAddress: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address,
-    priceUsd: 0,
+    coingeckoId: "worldcoin-wld",
+    priceUsd: 1.85,
   },
   {
     symbol: "USDC",
@@ -32,7 +33,8 @@ export const TOKENS: readonly TokenConfig[] = [
     logo: "$",
     className: "usdc",
     contractAddress: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as Address,
-    priceUsd: 0,
+    coingeckoId: "usd-coin",
+    priceUsd: 1,
   },
   {
     symbol: "ETH",
@@ -41,7 +43,8 @@ export const TOKENS: readonly TokenConfig[] = [
     logo: "◆",
     className: "eth",
     native: true,
-    priceUsd: 0,
+    coingeckoId: "ethereum",
+    priceUsd: 3400,
   },
 ];
 

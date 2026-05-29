@@ -22,6 +22,17 @@ type BalancesResponse = {
   cached: boolean;
 };
 
+export type PricesResponse = Record<string, number | string | PriceMeta> & {
+  updated_at: string;
+  meta: PriceMeta;
+};
+
+type PriceMeta = {
+  source: "coingecko" | "cache" | "fallback";
+  changes_24h: Record<string, number>;
+  last_updated_at: Record<string, number>;
+};
+
 type PrototypeAsset = {
   sym: string;
   full: string;
@@ -31,51 +42,63 @@ type PrototypeAsset = {
   logo: string;
 };
 
-const fetcher = async (url: string) => {
+const fetcher = async <T,>(url: string) => {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? "Unable to read on-chain data.");
   }
-  return (await response.json()) as BalancesResponse;
+  return (await response.json()) as T;
 };
 
 /**
  * Polls World Chain balances and syncs them into the mounted v22 prototype runtime.
  */
 export function useChainBalanceSync(enabled: boolean, userAddress: string | null) {
-  const { data, error, isLoading } = useSWR(
+  const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
     { refreshInterval: 30_000 },
   );
+  const prices = useSWR<PricesResponse>(enabled ? "/api/prices" : null, fetcher, {
+    refreshInterval: 30_000,
+  });
 
   useEffect(() => {
     if (!enabled) return;
 
-    if (isLoading) {
+    if (balances.isLoading || prices.isLoading) {
       renderBalanceSkeleton();
       return;
     }
 
-    if (error) {
+    if (balances.error) {
       renderBalanceError();
       return;
     }
 
-    if (!data?.balances) return;
-    syncBalancesToPrototype(data.balances);
-  }, [data, enabled, error, isLoading]);
+    if (!balances.data?.balances) return;
+    syncBalancesToPrototype(balances.data.balances, prices.data);
+  }, [
+    balances.data,
+    balances.error,
+    balances.isLoading,
+    enabled,
+    prices.data,
+    prices.isLoading,
+  ]);
 }
 
-function syncBalancesToPrototype(items: BalanceApiItem[]) {
+function syncBalancesToPrototype(items: BalanceApiItem[], pricesData?: PricesResponse) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
+    const priceUsd = pickPrice(item.symbol, pricesData, item.priceUsd);
+    const usdValue = (Number.parseFloat(item.formatted || "0") || 0) * priceUsd;
     return {
       sym: item.symbol,
       full: item.name,
       amt: `${formatted} ${item.symbol}`,
-      usdNum: Number.parseFloat(item.usdValue || "0") || 0,
+      usdNum: usdValue,
       cls: item.className,
       logo: item.logo,
     };
@@ -86,8 +109,17 @@ function syncBalancesToPrototype(items: BalanceApiItem[]) {
   const availableMap = Object.fromEntries(
     items.map((item) => [item.symbol, `${formatTokenAmount(item.formatted)} ${item.symbol}`]),
   );
-  const priceMap = Object.fromEntries(items.map((item) => [item.symbol, item.priceUsd]));
+  const priceMap = Object.fromEntries(
+    items.map((item) => [item.symbol, pickPrice(item.symbol, pricesData, item.priceUsd)]),
+  );
+  const changeMap = pricesData?.meta?.changes_24h ?? {};
   const totalUsd = assets.reduce((sum, item) => sum + item.usdNum, 0);
+  const changeUsd = items.reduce((sum, item) => {
+    const currentValue = (Number.parseFloat(item.formatted || "0") || 0) * pickPrice(item.symbol, pricesData, item.priceUsd);
+    const changePct = changeMap[item.symbol] ?? 0;
+    return sum + currentValue * (changePct / 100);
+  }, 0);
+  const weightedChangePct = totalUsd > 0 ? (changeUsd / totalUsd) * 100 : 0;
 
   runInPrototypeScope(`
     assets = ${JSON.stringify(assets)};
@@ -95,10 +127,25 @@ function syncBalancesToPrototype(items: BalanceApiItem[]) {
     availMap = ${JSON.stringify(availableMap)};
     prices = ${JSON.stringify(priceMap)};
     totalUsdNum = ${JSON.stringify(totalUsd)};
-    change24hUsdNum = 0;
+    change24hUsdNum = ${JSON.stringify(changeUsd)};
+    tokenChanges24h = ${JSON.stringify(changeMap)};
+    if (document.querySelector(".balance-change")) {
+      document.querySelector(".balance-change").childNodes[0].textContent = ${JSON.stringify(formatChangePct(weightedChangePct))} + " ";
+      document.querySelector(".balance-change").classList.toggle("down", ${JSON.stringify(weightedChangePct < 0)});
+    }
     if (typeof renderMoney === "function") renderMoney();
     if (typeof refreshSwapLabels === "function") refreshSwapLabels();
   `);
+}
+
+function pickPrice(symbol: string, pricesData: PricesResponse | undefined, fallback: number) {
+  const value = pricesData?.[symbol];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function formatChangePct(value: number) {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
 }
 
 function renderBalanceSkeleton() {

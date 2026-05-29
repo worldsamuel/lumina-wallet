@@ -3,7 +3,7 @@
 import Link from "next/link";
 import useSWR from "swr";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
-import type { BalanceApiItem } from "@/lib/chain/use-chain-balance-sync";
+import type { BalanceApiItem, PricesResponse } from "@/lib/chain/use-chain-balance-sync";
 import { getTokenBySymbol } from "@/lib/tokens";
 
 type AssetPageProps = {
@@ -14,10 +14,10 @@ type BalancesResponse = {
   balances: BalanceApiItem[];
 };
 
-const fetcher = async (url: string) => {
+const fetcher = async <T,>(url: string) => {
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("Unable to read on-chain data.");
-  return (await response.json()) as BalancesResponse;
+  return (await response.json()) as T;
 };
 
 /**
@@ -27,13 +27,20 @@ export function AssetPage({ symbol }: AssetPageProps) {
   const upperSymbol = symbol.toUpperCase();
   const token = getTokenBySymbol(upperSymbol);
   const { address, status, login } = useWalletAuth();
-  const { data, error, isLoading } = useSWR(
+  const balances = useSWR<BalancesResponse>(
     status === "authenticated" && address ? `/api/balances?address=${address}` : null,
     fetcher,
     { refreshInterval: 30_000 },
   );
+  const prices = useSWR<PricesResponse>(status === "authenticated" ? "/api/prices" : null, fetcher, {
+    refreshInterval: 30_000,
+  });
 
-  const balance = data?.balances.find((item) => item.symbol.toUpperCase() === upperSymbol);
+  const balance = balances.data?.balances.find((item) => item.symbol.toUpperCase() === upperSymbol);
+  const priceUsd =
+    typeof prices.data?.[upperSymbol] === "number" ? (prices.data[upperSymbol] as number) : token?.priceUsd ?? 0;
+  const usdValue = balance ? (Number.parseFloat(balance.formatted || "0") || 0) * priceUsd : 0;
+  const change24h = prices.data?.meta?.changes_24h?.[upperSymbol] ?? 0;
 
   if (status === "not-installed") {
     return (
@@ -74,16 +81,18 @@ export function AssetPage({ symbol }: AssetPageProps) {
         <h1>{token?.symbol ?? upperSymbol}</h1>
         <p>{token?.name ?? "Unsupported token"}</p>
 
-        {isLoading ? (
+        {balances.isLoading || prices.isLoading ? (
           <div className="asset-detail-loading">读取链上余额中...</div>
-        ) : error ? (
+        ) : balances.error ? (
           <div className="asset-detail-error">无法读取链上数据,请稍后重试</div>
         ) : balance ? (
           <>
             <div className="asset-detail-balance">
               {formatTokenAmount(balance.formatted)} {balance.symbol}
             </div>
-            <div className="asset-detail-usd">${Number(balance.usdValue).toFixed(2)}</div>
+            <div className="asset-detail-usd">
+              ${usdValue.toFixed(2)} · <span className={change24h >= 0 ? "asset-up" : "asset-down"}>{formatChange(change24h)}</span> (24h)
+            </div>
           </>
         ) : (
           <div className="asset-detail-error">暂不支持这个资产。</div>
@@ -96,6 +105,11 @@ export function AssetPage({ symbol }: AssetPageProps) {
       </section>
     </main>
   );
+}
+
+function formatChange(value: number) {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(2)}%`;
 }
 
 function formatTokenAmount(value: string) {

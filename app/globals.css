@@ -128,6 +128,7 @@
   .balance-amount { font-size: 44px; font-weight: 800; letter-spacing: -1px; margin: 10px 0 6px; }
   .balance-change { color: var(--green); font-size: 15px; font-weight: 600; }
   .balance-change .sub { color: #2faf5e; font-weight: 500; }
+  .balance-change.down, .balance-change.down .sub { color: var(--red); }
   .human-pill { margin-top: 16px; display: inline-flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-size: 14px; }
   .human-pill .seal { color: var(--green); display: inline-flex; }
   .actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; padding: 22px var(--pad-screen) 6px; }
@@ -555,6 +556,14 @@ button, input, select {
   color: var(--text-mute);
   margin-top: 8px;
   font-size: 15px;
+}
+
+.asset-up {
+  color: var(--green);
+}
+
+.asset-down {
+  color: var(--red);
 }
 
 .asset-detail-loading,
