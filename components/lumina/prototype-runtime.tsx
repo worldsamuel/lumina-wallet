@@ -89,6 +89,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeDetail();
       enhancePrototypeEarn();
       enhancePrototypeTokens();
+      enhancePrototypeHome();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -555,6 +556,11 @@ function enhancePrototypeTokens() {
         document.getElementById("importPreview").innerHTML = "";
         toast("Imported " + token.symbol);
         pickToken(key);
+        if (typeof closeTokenModal === "function") closeTokenModal();
+        if (typeof renderAssets === "function") renderAssets();
+        if (typeof renderAllAssets === "function") renderAllAssets();
+        go("home");
+        setTabByName("Home");
       };
 
       doImport = function(sym, addr, score){
@@ -622,6 +628,105 @@ function enhancePrototypeTokens() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance token import");
+}
+
+/**
+ * Restyles the Home view to match the latest wallet UI while preserving live balance data.
+ */
+function enhancePrototypeHome() {
+  const source = `
+    (function(){
+      function homeIcon(name) {
+        if (name === "world") return '<svg width="31" height="31" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="16" cy="16" r="11"/><path d="M7 16h18"/><path d="M16 5a17 17 0 010 22M16 5a17 17 0 000 22"/></svg>';
+        if (name === "verified") return '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.4 15.4l-2.5-2.5 1.4-1.4 1.1 1.1 4.2-4.2 1.4 1.4z" fill="#052512"/></svg>';
+        if (name === "bell") return '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+        if (name === "search") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
+        return "";
+      }
+      function ensureHomeShell() {
+        var home = document.getElementById("view-home");
+        if (!home || home.dataset.luminaHomeV2 === "1") return;
+        home.dataset.luminaHomeV2 = "1";
+        var balanceCard = home.querySelector(".balance-card");
+        var chainTag = balanceCard && balanceCard.querySelector(".chain-tag");
+        var balanceChange = balanceCard && balanceCard.querySelector(".balance-change");
+        if (chainTag && balanceChange) balanceChange.insertAdjacentElement("afterend", chainTag);
+
+        var top = document.createElement("div");
+        top.className = "home-v2-top";
+        top.innerHTML =
+          '<button class="home-chain-pill" type="button"><span>' + homeIcon("world") + '</span><strong>World Chain</strong><i>⌄</i></button>' +
+          '<div class="home-top-actions"><button type="button" class="home-round verified">' + homeIcon("verified") + '</button><button type="button" class="home-round bell" onclick="openAnnouncements()">' + homeIcon("bell") + '<em></em></button></div>';
+        home.insertBefore(top, home.firstChild);
+
+        var section = home.querySelector(".section-head");
+        if (section && !section.querySelector(".home-add-circle")) {
+          var link = section.querySelector(".link");
+          if (link) {
+            link.classList.add("home-view-all");
+            link.textContent = "View All";
+          }
+          var controls = document.createElement("div");
+          controls.className = "home-section-actions";
+          var plus = document.createElement("button");
+          plus.className = "home-add-circle";
+          plus.type = "button";
+          plus.innerHTML = '<span>+</span>';
+          plus.onclick = function(){ openTokenModal("buy"); };
+          if (link) controls.appendChild(link);
+          controls.appendChild(plus);
+          section.appendChild(controls);
+          var search = document.createElement("div");
+          search.className = "home-token-search";
+          search.innerHTML = '<span>' + homeIcon("search") + '</span><input id="homeTokenSearch" placeholder="Search token" oninput="renderAssets()" />';
+          section.insertAdjacentElement("afterend", search);
+        }
+      }
+      function tokenInitialHome(symbol){
+        return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 3).toUpperCase() || "?";
+      }
+      function importedHomeRows(filter){
+        var rows = [];
+        try {
+          Object.keys(customTokens || {}).forEach(function(sym){
+            var meta = customTokens[sym] || {};
+            if (meta.risk === "high") return;
+            var full = tokenFull[sym] || meta.name || sym;
+            if (filter && (sym + " " + full).toLowerCase().indexOf(filter) < 0) return;
+            rows.push({ sym: sym, full: full, amt: (balances[sym] || "0") + " " + sym, usdNum: 0, cls: "custom", logo: tokenLogo[sym] || tokenInitialHome(sym), custom: true });
+          });
+        } catch(e) {}
+        return rows;
+      }
+      function rowHtml(asset, index, imported){
+        var open = imported ? 'openImportedRisk(\\'' + ((customTokens[asset.sym] || {}).address || "") + '\\')' : 'openDetail(' + index + ')';
+        return '<div class="asset home-v2-asset" onclick="' + open + '">' +
+          '<div class="coin ' + (asset.cls || "custom") + '">' + (asset.logo || tokenInitialHome(asset.sym)) + '</div>' +
+          '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
+          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (typeof formatMoney === "function" ? formatMoney(asset.usdNum || 0) : "$0.00") + '</div></div>' +
+          '<span class="home-asset-chev">›</span>' +
+        '</div>';
+      }
+      renderAssets = function(){
+        ensureHomeShell();
+        var list = document.getElementById("assetList");
+        if (!list) return;
+        var filter = "";
+        var search = document.getElementById("homeTokenSearch");
+        if (search) filter = String(search.value || "").toLowerCase().trim();
+        var verified = (assets || []).filter(function(a){
+          return !filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0;
+        });
+        var html = verified.map(function(a, i){ return rowHtml(a, i, false); }).join("");
+        html += importedHomeRows(filter).map(function(a){ return rowHtml(a, 0, true); }).join("");
+        html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
+        list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
+      };
+      ensureHomeShell();
+      renderAssets();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance home prototype");
 }
 
 /**
