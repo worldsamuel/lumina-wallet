@@ -119,11 +119,32 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
           },
         ];
 
+  console.log("=== SEND TX DEBUG ===");
+  console.log("token:", {
+    symbol: params.tokenSymbol,
+    address: params.tokenAddress,
+    decimals: params.tokenDecimals,
+    isNative: params.tokenAddress === null,
+  });
+  console.log("recipient:", params.recipient);
+  console.log("amountHuman:", params.amountHuman);
+  console.log("amountWei:", amountWei.toString());
+  console.log("transaction payload:");
+  console.log(
+    JSON.stringify(
+      transaction,
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2,
+    ),
+  );
+
   try {
     const result = (await MiniKit.sendTransaction({
       chainId: 480,
       transactions: transaction,
     })) as MiniKitSendResult;
+    console.log("=== MiniKit success ===");
+    console.log(JSON.stringify(result, null, 2));
     const payload = extractPayload(result);
 
     if (payload.status && payload.status !== "success") {
@@ -142,6 +163,16 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
       txHash: extractTxHash(payload),
     };
   } catch (error) {
+    const err = error as {
+      name?: unknown;
+      message?: unknown;
+      code?: unknown;
+    };
+    console.log("=== MiniKit error ===");
+    console.log("name:", err?.name);
+    console.log("message:", err?.message);
+    console.log("code:", err?.code);
+    console.log("full:", JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
     const code = normalizeError(error);
     if (code === "user_rejected") return { status: "user_rejected" };
     return { status: "failed", error: code };
