@@ -36,6 +36,8 @@ declare global {
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
+    eruda?: { init: () => void };
+    __luminaErudaInstalled?: boolean;
   }
 }
 
@@ -116,6 +118,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     const host = hostRef.current;
     if (!host || status !== "authenticated") return;
 
+    installMobileConsole();
     setPrototypeReady(false);
     host.innerHTML = prototypeMarkup;
     const scriptEl = document.createElement("script");
@@ -194,6 +197,28 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   }
 
   return <div ref={hostRef} />;
+}
+
+function installMobileConsole() {
+  if (typeof window === "undefined" || window.__luminaErudaInstalled) return;
+  window.__luminaErudaInstalled = true;
+
+  const existing = document.getElementById("lumina-eruda-script") as HTMLScriptElement | null;
+  if (existing) return;
+
+  const script = document.createElement("script");
+  script.id = "lumina-eruda-script";
+  script.src = "https://cdn.jsdelivr.net/npm/eruda@3/eruda.min.js";
+  script.async = true;
+  script.onload = () => {
+    try {
+      window.eruda?.init();
+      console.log("=== ERUDA READY ===");
+    } catch (error) {
+      console.log("Failed to initialize Eruda", error);
+    }
+  };
+  document.head.appendChild(script);
 }
 
 function exposeEarnWalletConfirm() {
