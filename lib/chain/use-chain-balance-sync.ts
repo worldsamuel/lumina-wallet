@@ -38,13 +38,15 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
-    { refreshInterval: 30_000 },
+    { dedupingInterval: 15_000, refreshInterval: 30_000, revalidateOnFocus: false },
   );
   const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
+    dedupingInterval: 15_000,
     refreshInterval: 30_000,
     revalidateOnFocus: false,
   });
   const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
+    dedupingInterval: 15_000,
     refreshInterval: 30_000,
     revalidateOnFocus: false,
   });
@@ -52,7 +54,7 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   useEffect(() => {
     if (!enabled) return;
 
-    if (balances.isLoading || market.isLoading || onchain.isLoading) {
+    if (balances.isLoading && !balances.data) {
       renderBalanceSkeleton();
       return;
     }
@@ -183,7 +185,7 @@ function formatChangePct(value: number) {
 
 function renderBalanceSkeleton() {
   const list = document.getElementById("assetList");
-  if (!list || list.querySelector(".asset-skeleton")) return;
+  if (!list || list.children.length > 0 || list.querySelector(".asset-skeleton")) return;
   list.innerHTML = Array.from({ length: 3 })
     .map(
       () =>

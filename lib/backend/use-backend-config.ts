@@ -46,7 +46,11 @@ function formatRelativeTime(value: string) {
  * Loads admin-managed backend configuration and adapts it into the v22 prototype runtime.
  */
 export function useBackendConfigSync(enabled: boolean) {
-  const swrOptions = { refreshInterval: 30_000, revalidateOnFocus: true };
+  const swrOptions = {
+    dedupingInterval: 20_000,
+    refreshInterval: 60_000,
+    revalidateOnFocus: false,
+  };
   const announcements = useSWR<BackendAnnouncement[]>(
     enabled ? "/api/announcements" : null,
     fetcher,

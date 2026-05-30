@@ -85,9 +85,10 @@ const tabByView: Record<string, string> = {
 export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [prototypeReady, setPrototypeReady] = useState(false);
+  const [dataSyncReady, setDataSyncReady] = useState(false);
   const { address, error, login, logout, status, username } = useWalletAuth();
-  useBackendConfigSync(status === "authenticated");
-  useChainBalanceSync(status === "authenticated" && prototypeReady, address);
+  useBackendConfigSync(status === "authenticated" && dataSyncReady);
+  useChainBalanceSync(status === "authenticated" && prototypeReady && dataSyncReady, address);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -142,6 +143,15 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       host.innerHTML = "";
     };
   }, [address, initialView, login, logout, status, username]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !prototypeReady) {
+      setDataSyncReady(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setDataSyncReady(true), 450);
+    return () => window.clearTimeout(timer);
+  }, [prototypeReady, status]);
 
   useEffect(() => {
     if (hostRef.current) updatePrototypeAddress(hostRef.current, address);
@@ -223,9 +233,14 @@ function exposeMorphoTransactions() {
  */
 function resetPrototypePortfolio() {
   const source = `
-    assets = [];
+    assets = [
+      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "W" },
+      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "$" },
+      { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$" },
+      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E" }
+    ];
     balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0" };
-    availMap = {};
+    availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH" };
     totalUsdNum = 0;
     change24hUsdNum = 0;
     if (document.querySelector(".balance-change")) {
@@ -235,12 +250,6 @@ function resetPrototypePortfolio() {
     if (typeof renderMoney === "function") renderMoney();
     var subEl = document.getElementById("balSub");
     if (subEl && typeof formatMoney === "function") subEl.textContent = "+" + formatMoney(0) + " (24h)";
-    var list = document.getElementById("assetList");
-    if (list) {
-      list.innerHTML = Array.from({ length: 3 }).map(function(){
-        return '<div class="asset asset-skeleton"><div class="coin"></div><div class="name"><div class="sym"></div><div class="full"></div></div><div class="spark"></div><div class="vals"><div class="amt"></div><div class="usd"></div></div></div>';
-      }).join("");
-    }
   `;
   runInPrototypeScope(source, "Failed to reset prototype portfolio");
 }
@@ -450,6 +459,7 @@ function enhancePrototypeEarn() {
       var morphoPositions = [];
       var morphoLoading = true;
       var morphoError = "";
+      var morphoStarted = false;
 
       function riskClass(level){
         return level === "medium" ? "mid" : (level || "low");
@@ -814,6 +824,7 @@ function enhancePrototypeEarn() {
         morphoPositions = Array.isArray(data.positions) ? data.positions : [];
       }
       async function loadMorphoData(force){
+        morphoStarted = true;
         morphoLoading = true;
         morphoError = "";
         renderProducts();
@@ -848,7 +859,24 @@ function enhancePrototypeEarn() {
         loadMorphoData(true);
       };
 
-      loadMorphoData(false);
+      if (!window.__luminaEarnGoWrapped && typeof go === "function") {
+        window.__luminaEarnGoWrapped = true;
+        var previousEarnGo = go;
+        go = function(name){
+          previousEarnGo(name);
+          if ((name === "earn" || name === "earn-detail") && !morphoStarted) {
+            setTimeout(function(){ loadMorphoData(false); }, 60);
+          }
+        };
+      }
+      var earnView = document.getElementById("view-earn");
+      var earnDetailView = document.getElementById("view-earn-detail");
+      if ((earnView && earnView.classList.contains("active")) || (earnDetailView && earnDetailView.classList.contains("active"))) {
+        loadMorphoData(false);
+      } else {
+        morphoLoading = false;
+        updateEarnHero();
+      }
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance Earn prototype");
@@ -1341,7 +1369,7 @@ function enhancePrototypeMarket() {
             })
             .catch(function(){ renderGainersFromMarkets([]); });
         };
-        renderGainers();
+        setTimeout(renderGainers, 1200);
       }
       var previousRenderAssets = typeof renderAssets === "function" ? renderAssets : null;
       if (previousRenderAssets && !window.__luminaMarketRenderAssets) {
