@@ -61,7 +61,6 @@ type ReportContext = {
   assetsAfterDeposit: Snapshot<bigint>;
   assetsAfterWait: Snapshot<bigint>;
   sharesAfterRedeem: Snapshot<bigint>;
-  approveTx: TxResult;
   depositTx: TxResult;
   redeemTx: TxResult;
   fundingActions: string[];
@@ -143,9 +142,13 @@ async function main() {
     }),
   );
 
-  const [approveTxRequest, depositTxRequest] = buildDepositTx(vault, ONE_USDC, account.address);
-  const approveTx = await sendAndRecord("approve 1 USDC to Re7 USDC vault", approveTxRequest.to, approveTxRequest.data);
-  const depositTx = await sendAndRecord("deposit 1 USDC into Re7 USDC vault", depositTxRequest.to, depositTxRequest.data);
+  const depositBundle = buildDepositTx(vault, ONE_USDC, account.address);
+  const depositTxRequest = depositBundle.transactions[0];
+  const depositTx = await sendAndRecord(
+    "deposit 1 USDC into Re7 USDC vault through Bundler3",
+    depositTxRequest.to,
+    depositTxRequest.data,
+  );
 
   const usdcBalanceAfterDeposit = await snapshot("USDC balance after deposit", () => readUsdcBalance());
   const sharesAfterDeposit = await snapshot("vault shares after deposit", () => readVaultShares());
@@ -190,7 +193,6 @@ async function main() {
     assetsAfterDeposit,
     assetsAfterWait,
     sharesAfterRedeem,
-    approveTx,
     depositTx,
     redeemTx,
     fundingActions,
@@ -324,7 +326,6 @@ function renderReport(context: ReportContext) {
 
 | Step | Tx hash | Status | Gas used | On-chain timestamp | Tenderly link |
 | --- | --- | --- | ---: | --- | --- |
-| Approve | \`${context.approveTx.hash}\` | ${context.approveTx.status} | ${context.approveTx.gasUsed} | ${context.approveTx.timestamp} (${formatUnix(context.approveTx.timestamp)}) | ${txLink(context.approveTx.hash, context.explorerBaseUrl)} |
 | Deposit | \`${context.depositTx.hash}\` | ${context.depositTx.status} | ${context.depositTx.gasUsed} | ${context.depositTx.timestamp} (${formatUnix(context.depositTx.timestamp)}) | ${txLink(context.depositTx.hash, context.explorerBaseUrl)} |
 | Redeem | \`${context.redeemTx.hash}\` | ${context.redeemTx.status} | ${context.redeemTx.gasUsed} | ${context.redeemTx.timestamp} (${formatUnix(context.redeemTx.timestamp)}) | ${txLink(context.redeemTx.hash, context.explorerBaseUrl)} |
 

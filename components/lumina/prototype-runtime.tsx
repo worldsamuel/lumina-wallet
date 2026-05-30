@@ -24,7 +24,10 @@ declare global {
     __luminaUserAddress?: string;
     __luminaUsername?: string;
     __luminaConfirmEarnAction?: (input: EarnConfirmInput) => Promise<boolean>;
-    __luminaSendMorphoTransactions?: (transactions: MiniKitCalldataTransaction[]) => Promise<unknown>;
+    __luminaSendMorphoTransactions?: (
+      transactions: MiniKitCalldataTransaction[],
+      permit2?: MiniKitPermit2[],
+    ) => Promise<unknown>;
   }
 }
 
@@ -38,6 +41,16 @@ type MiniKitCalldataTransaction = {
   to: string;
   data: string;
   value?: string;
+};
+
+type MiniKitPermit2 = {
+  permitted: {
+    token: string;
+    amount: string | unknown;
+  };
+  spender: string;
+  nonce: string | unknown;
+  deadline: string | unknown;
 };
 
 type MiniKitSendTransactionEnvelope = {
@@ -196,7 +209,7 @@ function exposeEarnWalletConfirm() {
 }
 
 function exposeMorphoTransactions() {
-  window.__luminaSendMorphoTransactions = async (transactions) => {
+  window.__luminaSendMorphoTransactions = async (transactions, permit2) => {
     if (new URL(window.location.href).searchParams.get("mockWorld") === "1") {
       return { userOpHash: `0xmock${Date.now().toString(16)}` };
     }
@@ -206,6 +219,7 @@ function exposeMorphoTransactions() {
         chainId?: number;
         transaction?: MiniKitCalldataTransaction[];
         transactions?: MiniKitCalldataTransaction[];
+        permit2?: MiniKitPermit2[];
       }) => Promise<unknown>;
     };
     if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
@@ -217,6 +231,7 @@ function exposeMorphoTransactions() {
         data: transaction.data,
         value: transaction.value ?? "0x0",
       })),
+      permit2,
     })) as MiniKitSendTransactionEnvelope;
 
     const payload = result?.data ?? result;
@@ -764,7 +779,7 @@ function enhancePrototypeEarn() {
           });
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
-          var result = await window.__luminaSendMorphoTransactions(data.transactions);
+          var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2);
           var payload = result && (result.data || result);
           var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
           toast("Transaction submitted: " + String(hash).slice(0, 18));

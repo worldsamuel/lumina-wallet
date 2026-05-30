@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         return jsonResponse({ error: "Deposits are temporarily paused. Withdrawals remain available." }, { status: 423 });
       }
       const amount = parseTokenAmount(body.amount, vault.asset.decimals);
-      return jsonResponse({ transactions: buildDepositTx(vault, amount, body.userAddress as Address), depositsPaused: false });
+      return jsonResponse({ ...buildDepositTx(vault, amount, body.userAddress as Address), depositsPaused: false });
     }
 
     if (body.type === "withdraw") {
