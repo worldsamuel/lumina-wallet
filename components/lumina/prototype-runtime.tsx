@@ -1685,11 +1685,11 @@ function enhancePrototypeSend() {
           modal.className = "modal-mask open";
           modal.id = "sendConfirmModal";
           modal.innerHTML =
-            '<div class="modal send-confirm-sheet">' +
+            '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;min-height:300px;padding:24px 24px 22px;margin:0 auto 10px;border-radius:26px;">' +
               '<div class="modal-grip"></div>' +
               '<h3>确认转账</h3>' +
-              '<p class="send-confirm-body">转 ' + state.amountText + ' ' + state.token.symbol + '<br>到 ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
-              '<div class="earn-action-row"><button class="btn-ghost" id="sendConfirmCancel">取消</button><button class="btn-primary" id="sendConfirmOk">确认</button></div>' +
+              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">转 ' + state.amountText + ' ' + state.token.symbol + '<br>到 ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">取消</button><button class="btn-primary" id="sendConfirmOk">确认</button></div>' +
             '</div>';
           document.body.appendChild(modal);
           function done(value){
