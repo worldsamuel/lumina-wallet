@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import useSWR from "swr";
+import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 
 export type BalanceApiItem = {
   symbol: string;
@@ -13,35 +14,12 @@ export type BalanceApiItem = {
   className: string;
   native: boolean;
   contractAddress?: string;
-  priceUsd: number;
   usdValue: string;
 };
 
 type BalancesResponse = {
   balances: BalanceApiItem[];
   cached: boolean;
-};
-
-export type PricesResponse = Record<string, number | string | PriceMeta> & {
-  updated_at: string;
-  meta: PriceMeta;
-};
-
-type PriceMeta = {
-  source: "worldchain" | "cache" | "fallback";
-  changes_24h: Record<string, number | null>;
-  last_updated_at: Record<string, number>;
-  liquidity_usd?: Record<string, number>;
-  volume_24h_usd?: Record<string, number>;
-};
-
-type PrototypeAsset = {
-  sym: string;
-  full: string;
-  amt: string;
-  usdNum: number;
-  cls: string;
-  logo: string;
 };
 
 const fetcher = async <T,>(url: string) => {
@@ -62,14 +40,19 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     fetcher,
     { refreshInterval: 30_000 },
   );
-  const prices = useSWR<PricesResponse>(enabled ? "/api/prices" : null, fetcher, {
+  const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
     refreshInterval: 30_000,
+    revalidateOnFocus: false,
+  });
+  const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
+    refreshInterval: 30_000,
+    revalidateOnFocus: false,
   });
 
   useEffect(() => {
     if (!enabled) return;
 
-    if (balances.isLoading || prices.isLoading) {
+    if (balances.isLoading || market.isLoading || onchain.isLoading) {
       renderBalanceSkeleton();
       return;
     }
@@ -80,22 +63,29 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     }
 
     if (!balances.data?.balances) return;
-    syncBalancesToPrototype(balances.data.balances, prices.data);
+    syncBalancesToPrototype(balances.data.balances, market.data, onchain.data);
   }, [
     balances.data,
     balances.error,
     balances.isLoading,
     enabled,
-    prices.data,
-    prices.isLoading,
+    market.data,
+    market.isLoading,
+    onchain.data,
+    onchain.isLoading,
   ]);
 }
 
-function syncBalancesToPrototype(items: BalanceApiItem[], pricesData?: PricesResponse) {
+function syncBalancesToPrototype(
+  items: BalanceApiItem[],
+  marketData?: MarketPricesResponse,
+  onchainData?: OnchainPricesResponse,
+) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
-    const priceUsd = pickPrice(item.symbol, pricesData, item.priceUsd);
-    const usdValue = (Number.parseFloat(item.formatted || "0") || 0) * priceUsd;
+    const priceUsd = pickOnchainPrice(item.symbol, onchainData);
+    const amount = Number.parseFloat(item.formatted || "0") || 0;
+    const usdValue = priceUsd === null ? null : amount * priceUsd;
     return {
       sym: item.symbol,
       full: item.name,
@@ -112,12 +102,22 @@ function syncBalancesToPrototype(items: BalanceApiItem[], pricesData?: PricesRes
     items.map((item) => [item.symbol, `${formatTokenAmount(item.formatted)} ${item.symbol}`]),
   );
   const priceMap = Object.fromEntries(
-    items.map((item) => [item.symbol, pickPrice(item.symbol, pricesData, item.priceUsd)]),
+    items.map((item) => [item.symbol, pickOnchainPrice(item.symbol, onchainData)]),
   );
-  const changeMap = pricesData?.meta?.changes_24h ?? {};
-  const totalUsd = assets.reduce((sum, item) => sum + item.usdNum, 0);
+  const marketPriceMap = Object.fromEntries(
+    items.map((item) => [item.symbol, pickMarketPrice(item.symbol, marketData)]),
+  );
+  const changeMap = Object.fromEntries(
+    items.map((item) => [item.symbol, pickMarketChange(item.symbol, marketData)]),
+  );
+  const marketCapMap = Object.fromEntries(
+    items.map((item) => [item.symbol, pickMarketCap(item.symbol, marketData)]),
+  );
+  const totalUsd = assets.reduce((sum, item) => sum + (item.usdNum ?? 0), 0);
   const changeUsd = items.reduce((sum, item) => {
-    const currentValue = (Number.parseFloat(item.formatted || "0") || 0) * pickPrice(item.symbol, pricesData, item.priceUsd);
+    const priceUsd = pickOnchainPrice(item.symbol, onchainData);
+    if (priceUsd === null) return sum;
+    const currentValue = (Number.parseFloat(item.formatted || "0") || 0) * priceUsd;
     const changePct = changeMap[item.symbol] ?? 0;
     return sum + currentValue * (changePct / 100);
   }, 0);
@@ -128,9 +128,13 @@ function syncBalancesToPrototype(items: BalanceApiItem[], pricesData?: PricesRes
     balances = ${JSON.stringify(balanceMap)};
     availMap = ${JSON.stringify(availableMap)};
     prices = ${JSON.stringify(priceMap)};
+    marketPrices = ${JSON.stringify(marketPriceMap)};
     totalUsdNum = ${JSON.stringify(totalUsd)};
     change24hUsdNum = ${JSON.stringify(changeUsd)};
     tokenChanges24h = ${JSON.stringify(changeMap)};
+    tokenMarketCaps = ${JSON.stringify(marketCapMap)};
+    window.__luminaOnchainPrices = ${JSON.stringify(onchainData ?? null)};
+    window.__luminaMarketPrices = ${JSON.stringify(marketData ?? null)};
     if (document.querySelector(".balance-change")) {
       document.querySelector(".balance-change").childNodes[0].textContent = ${JSON.stringify(formatChangePct(weightedChangePct))} + " ";
       document.querySelector(".balance-change").classList.toggle("down", ${JSON.stringify(weightedChangePct < 0)});
@@ -140,9 +144,36 @@ function syncBalancesToPrototype(items: BalanceApiItem[], pricesData?: PricesRes
   `);
 }
 
-function pickPrice(symbol: string, pricesData: PricesResponse | undefined, fallback: number) {
-  const value = pricesData?.[symbol];
-  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+function pickOnchainPrice(symbol: string, pricesData: OnchainPricesResponse | undefined) {
+  const value = pricesData?.[symbol as keyof OnchainPricesResponse];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function pickMarketPrice(symbol: string, marketData: MarketPricesResponse | undefined) {
+  const value = marketData?.[symbol as keyof MarketPricesResponse];
+  return typeof value === "object" && value && "usd" in value && typeof value.usd === "number"
+    ? value.usd
+    : null;
+}
+
+function pickMarketChange(symbol: string, marketData: MarketPricesResponse | undefined) {
+  const value = marketData?.[symbol as keyof MarketPricesResponse];
+  return typeof value === "object" &&
+    value &&
+    "usd_24h_change" in value &&
+    typeof value.usd_24h_change === "number"
+    ? value.usd_24h_change
+    : null;
+}
+
+function pickMarketCap(symbol: string, marketData: MarketPricesResponse | undefined) {
+  const value = marketData?.[symbol as keyof MarketPricesResponse];
+  return typeof value === "object" &&
+    value &&
+    "usd_market_cap" in value &&
+    typeof value.usd_market_cap === "number"
+    ? value.usd_market_cap
+    : null;
 }
 
 function formatChangePct(value: number) {

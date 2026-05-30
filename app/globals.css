@@ -200,13 +200,21 @@
   .asset:active { background: var(--surface-2); }
   .asset .coin { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
   .coin.wld { background: #fff; color: #000; } .coin.usdc { background: var(--blue); color: #fff; } .coin.usdt { background: #26a17b; color: #fff; }
+  .token-logo-frame,
+  .token-logo-fallback { display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
+  .token-logo-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .token-logo-fallback { font-weight: 800; line-height: 1; }
   .coin .wld-mark,
   .home-chain-pill .wld-mark,
   .gainer .ic .wld-mark { width: 72%; height: 72%; display: block; }
   .coin .lumina-token-mark,
+  .coin .lumina-token-img,
   .tk-row .ic .lumina-token-mark,
+  .tk-row .ic .lumina-token-img,
   .send-token-picker .coin .lumina-token-mark,
-  .detail-v2-token-icon .lumina-token-mark { width: 72%; height: 72%; display: block; }
+  .send-token-picker .coin .lumina-token-img,
+  .detail-v2-token-icon .lumina-token-mark,
+  .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; }
   .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
   .coin.custom, .token-initial { background: linear-gradient(135deg,#202820,#324036); color: var(--green); border: 1px solid rgba(74,222,128,0.28); font-size: 12px; letter-spacing: 0; }
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }

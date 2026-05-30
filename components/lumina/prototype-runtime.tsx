@@ -296,6 +296,12 @@ function wireRealReceiveLinks(host: HTMLDivElement) {
 function enhancePrototypeBuiltinTokenLogos() {
   const source = `
     (function(){
+      var trustLogoAddresses = {
+        WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+        USDC: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+        USDT: "0x102d758f688a4c1c5a80b116bd945d4455460282",
+        ETH: "0x4200000000000000000000000000000000000006"
+      };
       function mark(symbol){
         var sym = String(symbol || "").toUpperCase();
         if (sym === "WLD") return '<svg class="lumina-token-mark wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
@@ -307,17 +313,28 @@ function enhancePrototypeBuiltinTokenLogos() {
       function initial(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
+      function trustLogo(symbol){
+        var sym = String(symbol || "").toUpperCase();
+        var address = trustLogoAddresses[sym];
+        if (!address) return "";
+        var world = "https://assets-cdn.trustwallet.com/blockchains/worldchain/assets/" + address + "/logo.png";
+        var eth = "https://assets-cdn.trustwallet.com/blockchains/ethereum/assets/" + address + "/logo.png";
+        var fallback = String(mark(sym) || initial(sym)).replace(/"/g, "&quot;");
+        return '<img class="lumina-token-img" src="' + world + '" alt="' + sym + ' logo" loading="lazy" data-fallback="' + eth + '" data-initial="' + fallback + '" onload="try{var k=\\'worldchain:' + address.toLowerCase() + '\\';var c=JSON.parse(localStorage.getItem(\\'lumina_token_logo_cache_v1\\')||\\'{}\\');c[k]={url:this.currentSrc||this.src,expiresAt:Date.now()+432000000};localStorage.setItem(\\'lumina_token_logo_cache_v1\\',JSON.stringify(c));}catch(e){}" onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=\\'\\';}else{this.outerHTML=this.dataset.initial||\\'';}"/>';
+      }
       window.__luminaTokenLogoHtml = function(symbol, fallback){
+        var trusted = trustLogo(symbol);
+        if (trusted) return trusted;
         if (mark(symbol)) return mark(symbol);
         var fb = String(fallback || "");
         if (fb.indexOf("<svg") >= 0 || fb.indexOf("<img") >= 0) return fb;
         return initial(symbol);
       };
       tokenFull.USDT = tokenFull.USDT || "Tether USD";
-      tokenLogo.WLD = mark("WLD");
-      tokenLogo.USDC = mark("USDC");
-      tokenLogo.USDT = mark("USDT");
-      tokenLogo.ETH = mark("ETH");
+      tokenLogo.WLD = window.__luminaTokenLogoHtml("WLD", mark("WLD"));
+      tokenLogo.USDC = window.__luminaTokenLogoHtml("USDC", mark("USDC"));
+      tokenLogo.USDT = window.__luminaTokenLogoHtml("USDT", mark("USDT"));
+      tokenLogo.ETH = window.__luminaTokenLogoHtml("ETH", mark("ETH"));
       dotColor.WLD = "#fff";
       dotColor.USDC = "var(--blue)";
       dotColor.USDT = "#26a17b";
@@ -792,7 +809,7 @@ function enhancePrototypeHome() {
         return '<div class="asset home-v2-asset" onclick="' + open + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
-          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (typeof formatMoney === "function" ? formatMoney(asset.usdNum || 0) : "$0.00") + '</div></div>' +
+          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (typeof formatMoney === "function" ? formatMoney(asset.usdNum) : "—") + '</div></div>' +
           '<span class="home-asset-chev">›</span>' +
         '</div>';
       }
@@ -917,11 +934,25 @@ function enhancePrototypeMarket() {
           '</div>';
         }).join("");
       }
+      function marketsFromCoinGecko(payload){
+        if (!payload) return [];
+        return ["WLD","USDC","ETH","BTC"].map(function(sym){
+          var row = payload[sym];
+          if (!row || typeof row !== "object") return null;
+          return {
+            symbol: sym,
+            name: tokenFull[sym] || (sym === "BTC" ? "Bitcoin" : sym),
+            priceUsd: row.usd,
+            change24h: row.usd_24h_change,
+            volume24hUsd: 0,
+            liquidityUsd: row.usd_market_cap,
+            marketCapUsd: row.usd_market_cap,
+            logoUrl: null
+          };
+        }).filter(function(item){ return item && item.priceUsd; });
+      }
       function registerMarketsFromPriceMeta(payload){
-        try {
-          var markets = payload && payload.meta && Array.isArray(payload.meta.markets) ? payload.meta.markets : [];
-          markets.forEach(registerMarketToken);
-        } catch(e) {}
+        try { marketsFromCoinGecko(payload).forEach(registerMarketToken); } catch(e) {}
       }
       applyTokenLogos();
       if (typeof renderGainers === "function") {
@@ -930,11 +961,16 @@ function enhancePrototypeMarket() {
           if (box) box.innerHTML = '<div class="import-load">读取 GeckoTerminal 行情...</div>';
           Promise.all([
             fetch("/api/tokens/top", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
-            fetch("/api/prices", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
+            fetch("/api/prices/market", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
           ])
             .then(function(results){
               registerMarketsFromPriceMeta(results[1]);
-              renderGainersFromMarkets(Array.isArray(results[0]) ? results[0] : []);
+              var cg = marketsFromCoinGecko(results[1]);
+              var poolMarkets = Array.isArray(results[0]) ? results[0] : [];
+              var merged = cg.concat(poolMarkets.filter(function(item){
+                return !cg.some(function(existing){ return existing.symbol === item.symbol; });
+              }));
+              renderGainersFromMarkets(merged);
             })
             .catch(function(){ renderGainersFromMarkets([]); });
         };

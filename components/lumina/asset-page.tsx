@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import useSWR from "swr";
+import { TokenLogo } from "@/components/TokenLogo";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
-import type { BalanceApiItem, PricesResponse } from "@/lib/chain/use-chain-balance-sync";
-import { getTokenBySymbol } from "@/lib/tokens";
+import type { BalanceApiItem } from "@/lib/chain/use-chain-balance-sync";
+import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
+import { getTokenBySymbol, getTokenLogoAddress } from "@/lib/tokens";
 
 type AssetPageProps = {
   symbol: string;
@@ -32,15 +34,20 @@ export function AssetPage({ symbol }: AssetPageProps) {
     fetcher,
     { refreshInterval: 30_000 },
   );
-  const prices = useSWR<PricesResponse>(status === "authenticated" ? "/api/prices" : null, fetcher, {
+  const market = useSWR<MarketPricesResponse>(status === "authenticated" ? "/api/prices/market" : null, fetcher, {
     refreshInterval: 30_000,
+    revalidateOnFocus: false,
+  });
+  const onchain = useSWR<OnchainPricesResponse>(status === "authenticated" ? "/api/prices/onchain" : null, fetcher, {
+    refreshInterval: 30_000,
+    revalidateOnFocus: false,
   });
 
   const balance = balances.data?.balances.find((item) => item.symbol.toUpperCase() === upperSymbol);
-  const priceUsd =
-    typeof prices.data?.[upperSymbol] === "number" ? (prices.data[upperSymbol] as number) : token?.priceUsd ?? 0;
-  const usdValue = balance ? (Number.parseFloat(balance.formatted || "0") || 0) * priceUsd : 0;
-  const change24h = prices.data?.meta?.changes_24h?.[upperSymbol] ?? null;
+  const priceUsd = pickOnchainPrice(upperSymbol, onchain.data);
+  const usdValue =
+    balance && priceUsd !== null ? (Number.parseFloat(balance.formatted || "0") || 0) * priceUsd : null;
+  const change24h = pickMarketChange(upperSymbol, market.data);
 
   if (status === "not-installed") {
     return (
@@ -77,11 +84,13 @@ export function AssetPage({ symbol }: AssetPageProps) {
         返回
       </Link>
       <section className="asset-detail-card">
-        <div className={`asset-detail-logo ${token?.className ?? ""}`}>{token?.logo ?? "?"}</div>
+        <div className={`asset-detail-logo ${token?.className ?? ""}`}>
+          <TokenLogo symbol={upperSymbol} address={getTokenLogoAddress(upperSymbol)} size={56} />
+        </div>
         <h1>{token?.symbol ?? upperSymbol}</h1>
         <p>{token?.name ?? "Unsupported token"}</p>
 
-        {balances.isLoading || prices.isLoading ? (
+        {balances.isLoading || market.isLoading || onchain.isLoading ? (
           <div className="asset-detail-loading">读取链上余额中...</div>
         ) : balances.error ? (
           <div className="asset-detail-error">无法读取链上数据,请稍后重试</div>
@@ -91,7 +100,7 @@ export function AssetPage({ symbol }: AssetPageProps) {
               {formatTokenAmount(balance.formatted)} {balance.symbol}
             </div>
             <div className="asset-detail-usd">
-              ${usdValue.toFixed(2)}
+              {usdValue === null ? "—" : `$${usdValue.toFixed(2)}`}
               {change24h === null ? (
                 <span> · 无 24h 行情</span>
               ) : (
@@ -118,6 +127,21 @@ export function AssetPage({ symbol }: AssetPageProps) {
 function formatChange(value: number) {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
+}
+
+function pickOnchainPrice(symbol: string, pricesData: OnchainPricesResponse | undefined) {
+  const value = pricesData?.[symbol as keyof OnchainPricesResponse];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function pickMarketChange(symbol: string, marketData: MarketPricesResponse | undefined) {
+  const value = marketData?.[symbol as keyof MarketPricesResponse];
+  return typeof value === "object" &&
+    value &&
+    "usd_24h_change" in value &&
+    typeof value.usd_24h_change === "number"
+    ? value.usd_24h_change
+    : null;
 }
 
 function formatTokenAmount(value: string) {

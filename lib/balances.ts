@@ -22,14 +22,11 @@ export type ChainBalance = {
   className: string;
   native: boolean;
   contractAddress?: Address;
-  priceUsd: number;
   usdValue: string;
 };
 
 function toBalance(token: TokenConfig, balance: bigint): ChainBalance {
   const formatted = formatUnits(balance, token.decimals);
-  // TODO: Replace placeholder token prices with a live price source.
-  const usdValue = String(Number.parseFloat(formatted || "0") * token.priceUsd);
 
   return {
     symbol: token.symbol,
@@ -41,8 +38,7 @@ function toBalance(token: TokenConfig, balance: bigint): ChainBalance {
     className: token.className,
     native: Boolean(token.native),
     contractAddress: token.contractAddress,
-    priceUsd: token.priceUsd,
-    usdValue,
+    usdValue: "",
   };
 }
 

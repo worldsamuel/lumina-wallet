@@ -3,6 +3,8 @@ import { formatUnits, isAddress, parseUnits, zeroAddress, type Address } from "v
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
+import { readOraclePrices } from "@/lib/oracle";
+import { isFinitePrice } from "@/lib/prices";
 import { TOKENS } from "@/lib/tokens";
 
 const UNISWAP_V3_FACTORY = "0x7a5028BDa40e7B173C278C5342087826455ea25a" as Address;
@@ -129,7 +131,12 @@ export async function POST(req: NextRequest) {
       return null;
     });
     if (bungee) return jsonResponse(bungee);
-    return jsonResponse({ error: "No Uniswap v3 or Bungee quote found for this pair on World Chain." }, { status: 404 });
+    const fallback = await quoteFromOnchainPrices(from, to, amountText).catch((error) => {
+      console.error("Chainlink quote fallback failed", error);
+      return null;
+    });
+    if (fallback) return jsonResponse(fallback);
+    return jsonResponse({ error: "No Uniswap v3, Bungee, or Chainlink quote found for this pair." }, { status: 404 });
   }
 
   const slippageBps = slippageBpsFromBody(body?.slippageBps);
@@ -150,6 +157,34 @@ export async function POST(req: NextRequest) {
     fee: best.fee,
     note: "Read-only quote. No swap transaction, approve flow, or MiniKit.sendTransaction is executed.",
   });
+}
+
+async function quoteFromOnchainPrices(
+  from: { symbol: string; decimals: number; address: Address },
+  to: { symbol: string; decimals: number; address: Address },
+  amountText: string,
+) {
+  const prices = await readOraclePrices();
+  const fromUsd = prices[from.symbol as keyof typeof prices];
+  const toUsd = prices[to.symbol as keyof typeof prices];
+  if (!isFinitePrice(fromUsd) || !isFinitePrice(toUsd)) return null;
+  const amountIn = Number(amountText);
+  if (!Number.isFinite(amountIn) || amountIn <= 0) return null;
+  const amountOut = (amountIn * fromUsd) / toUsd;
+
+  return {
+    dex: "Chainlink fallback",
+    fromToken: from.symbol,
+    toToken: to.symbol,
+    fromAmount: amountText,
+    toAmount: amountOut.toString(),
+    minToAmount: null,
+    priceImpact: null,
+    route: [`${from.symbol}/USD`, `${to.symbol}/USD`],
+    gas: "0",
+    gasLabel: "—",
+    note: "Oracle fallback quote only. Uses Chainlink USD feeds for display and does not execute a swap.",
+  };
 }
 
 function slippageBpsFromBody(value: unknown) {

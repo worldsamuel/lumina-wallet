@@ -1,6 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "assets-cdn.trustwallet.com",
+      },
+    ],
+  },
   webpack(config) {
     config.ignoreWarnings = [
       ...(config.ignoreWarnings ?? []),
