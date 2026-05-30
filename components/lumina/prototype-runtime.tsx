@@ -1502,6 +1502,54 @@ function enhancePrototypeActivity() {
 function enhancePrototypeMe() {
   const source = `
     (function(){
+      function meCopy(){
+        var zh = (window.currentLang || "en") === "zh-CN";
+        return zh ? {
+          support: "支持",
+          feedback: "在线反馈",
+          preferences: "偏好设置",
+          language: "语言",
+          currency: "显示货币",
+          notifications: "通知",
+          legal: "法律",
+          privacy: "隐私政策",
+          terms: "服务条款",
+          version: "版本",
+          connected: "World App 已连接",
+          notConnected: "未连接",
+          feedbackTitle: "在线反馈",
+          feedbackHint: "告诉我们哪里出错了，或你希望改进什么。反馈会保存给 Lumina 团队。",
+          feedbackPlaceholder: "请输入你的反馈...",
+          contactPlaceholder: "联系方式 / Telegram / email（可选）",
+          send: "发送反馈",
+          sending: "发送中...",
+          tooShort: "请输入至少 3 个字的反馈内容",
+          sent: "反馈已发送",
+          failed: "发送失败，请稍后重试"
+        } : {
+          support: "Support",
+          feedback: "Feedback",
+          preferences: "Preferences",
+          language: "Language",
+          currency: "Display currency",
+          notifications: "Notifications",
+          legal: "Legal",
+          privacy: "Privacy Policy",
+          terms: "Terms of Service",
+          version: "Version",
+          connected: "World App connected",
+          notConnected: "Not connected",
+          feedbackTitle: "Feedback",
+          feedbackHint: "Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.",
+          feedbackPlaceholder: "Tell us what happened...",
+          contactPlaceholder: "Telegram / email (optional)",
+          send: "Send feedback",
+          sending: "Sending...",
+          tooShort: "Please enter at least 3 characters.",
+          sent: "Feedback sent",
+          failed: "Unable to send feedback. Please try again."
+        };
+      }
       function meIcon(name) {
         if (name === "feedback") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg>';
         if (name === "privacy") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9.5 12l1.7 1.7 3.8-4"/></svg>';
@@ -1518,22 +1566,39 @@ function enhancePrototypeMe() {
       function toggleHtml(){
         return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
       }
+      function updateFeedbackCopy(){
+        var modal = document.getElementById("feedbackModal");
+        if (!modal) return;
+        var c = meCopy();
+        var title = modal.querySelector("h3");
+        var hint = modal.querySelector(".feedback-hint");
+        var text = document.getElementById("feedbackText");
+        var contact = document.getElementById("feedbackContact");
+        var btn = document.getElementById("feedbackSendBtn");
+        if (title) title.textContent = c.feedbackTitle;
+        if (hint) hint.textContent = c.feedbackHint;
+        if (text) text.setAttribute("placeholder", c.feedbackPlaceholder);
+        if (contact) contact.setAttribute("placeholder", c.contactPlaceholder);
+        if (btn && !btn.disabled) btn.textContent = c.send;
+      }
       function ensureFeedbackModal(){
-        if (document.getElementById("feedbackModal")) return;
+        if (document.getElementById("feedbackModal")) { updateFeedbackCopy(); return; }
         var modal = document.createElement("div");
         modal.className = "modal-mask";
         modal.id = "feedbackModal";
         modal.onclick = function(event){ if(event.target === modal) closeFeedback(); };
         modal.innerHTML =
-          '<div class="modal feedback-sheet"><div class="modal-grip"></div><h3>在线反馈</h3>' +
-          '<p class="feedback-hint">Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.</p>' +
-          '<textarea id="feedbackText" maxlength="1200" placeholder="请输入你的反馈..."></textarea>' +
-          '<input id="feedbackContact" maxlength="120" placeholder="联系方式 / Telegram / email (optional)" />' +
-          '<button id="feedbackSendBtn" onclick="sendFeedback()">发送反馈</button></div>';
+          '<div class="modal feedback-sheet"><div class="modal-grip"></div><h3></h3>' +
+          '<p class="feedback-hint"></p>' +
+          '<textarea id="feedbackText" maxlength="1200"></textarea>' +
+          '<input id="feedbackContact" maxlength="120" />' +
+          '<button id="feedbackSendBtn" onclick="sendFeedback()"></button></div>';
         document.body.appendChild(modal);
+        updateFeedbackCopy();
       }
       window.openFeedback = function(){
         ensureFeedbackModal();
+        updateFeedbackCopy();
         document.getElementById("feedbackText").value = "";
         document.getElementById("feedbackContact").value = "";
         document.getElementById("feedbackModal").classList.add("open");
@@ -1543,12 +1608,13 @@ function enhancePrototypeMe() {
         if (modal) modal.classList.remove("open");
       };
       window.sendFeedback = async function(){
+        var c = meCopy();
         var text = (document.getElementById("feedbackText").value || "").trim();
         var contact = (document.getElementById("feedbackContact").value || "").trim();
-        if (text.length < 3) { toast("请输入反馈内容"); return; }
+        if (text.length < 3) { toast(c.tooShort); return; }
         var btn = document.getElementById("feedbackSendBtn");
         btn.disabled = true;
-        btn.textContent = "发送中...";
+        btn.textContent = c.sending;
         try {
           var res = await fetch("/api/feedback", {
             method: "POST",
@@ -1560,41 +1626,53 @@ function enhancePrototypeMe() {
               username: window.__luminaUsername || ""
             })
           });
-          if (!res.ok) throw new Error("failed");
+          var data = await res.json().catch(function(){ return null; });
+          if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || c.failed);
           closeFeedback();
-          toast("反馈已发送");
+          toast(c.sent);
         } catch(e) {
-          toast("发送失败,请稍后重试");
+          toast(e && e.message ? e.message : c.failed);
         } finally {
           btn.disabled = false;
-          btn.textContent = "发送反馈";
+          btn.textContent = meCopy().send;
         }
       };
       function renderMe(){
+        var c = meCopy();
         var view = document.getElementById("view-me");
         if (!view) return;
         var address = window.__luminaUserAddress || "";
-        var short = address ? address.slice(0, 6) + "..." + address.slice(-4) : "Not connected";
+        var short = address ? address.slice(0, 6) + "..." + address.slice(-4) : c.notConnected;
         var name = window.__luminaUsername || short;
         view.innerHTML =
           '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
-          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr">' + short + '</div><span class="me-orb">World App connected</span></div></div>' +
-          '<div class="me-group-label">Support</div><div class="me-group">' +
-            row("feedback", "在线反馈", "", "openFeedback()") +
+          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr">' + short + '</div><span class="me-orb">' + c.connected + '</span></div></div>' +
+          '<div class="me-group-label">' + c.support + '</div><div class="me-group">' +
+            row("feedback", c.feedback, "", "openFeedback()") +
           '</div>' +
-          '<div class="me-group-label">Preferences</div><div class="me-group">' +
-            row("language", "Language", (document.getElementById("langVal") && document.getElementById("langVal").textContent) || "English", "openLangModal()") +
-            row("currency", "Display currency", (document.getElementById("currencyVal") && document.getElementById("currencyVal").textContent) || "USD", "openCurrencyModal()") +
-            row("bell", "Notifications", "", "", toggleHtml()) +
+          '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
+            row("language", c.language, (document.getElementById("langVal") && document.getElementById("langVal").textContent) || "English", "openLangModal()") +
+            row("currency", c.currency, (document.getElementById("currencyVal") && document.getElementById("currencyVal").textContent) || "USD", "openCurrencyModal()") +
+            row("bell", c.notifications, "", "", toggleHtml()) +
           '</div>' +
-          '<div class="me-group-label">Legal</div><div class="me-group">' +
-            row("privacy", "Privacy Policy", "", "window.location.href=\\'/privacy\\'") +
-            row("terms", "Terms of Service", "", "window.location.href=\\'/terms\\'") +
-            row("version", "Version", "Lumina v1.0.0", "", "") +
+          '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
+            row("privacy", c.privacy, "", "window.location.href=\\'/privacy\\'") +
+            row("terms", c.terms, "", "window.location.href=\\'/terms\\'") +
+            row("version", c.version, "Lumina v1.0.0", "", "") +
           '</div>';
         ensureFeedbackModal();
       }
       window.__luminaRenderMe = renderMe;
+      if (!window.__luminaMeLangPatch && typeof applyLang === "function") {
+        window.__luminaMeLangPatch = true;
+        var previousApplyLang = applyLang;
+        applyLang = function(code){
+          previousApplyLang(code);
+          try { localStorage.setItem("ww_lang", code); } catch(e) {}
+          if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
+          updateFeedbackCopy();
+        };
+      }
       renderMe();
     })();
   `;

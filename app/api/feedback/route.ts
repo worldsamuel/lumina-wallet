@@ -29,15 +29,20 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ error: "Feedback message is too short." }, { status: 400 });
   }
 
-  const rawAddress = clean(body?.address, 64);
-  const feedback = await db.feedback.create({
-    data: {
-      address: isAddress(rawAddress) ? rawAddress : null,
-      username: clean(body?.username, 80) || null,
-      contact: clean(body?.contact, 120) || null,
-      message,
-    },
-  });
+  try {
+    const rawAddress = clean(body?.address, 64);
+    const feedback = await db.feedback.create({
+      data: {
+        address: isAddress(rawAddress) ? rawAddress : null,
+        username: clean(body?.username, 80) || null,
+        contact: clean(body?.contact, 120) || null,
+        message,
+      },
+    });
 
-  return jsonResponse({ ok: true, id: feedback.id });
+    return jsonResponse({ ok: true, id: feedback.id });
+  } catch (error) {
+    console.error("Failed to save feedback", error);
+    return jsonResponse({ error: "Feedback service is temporarily unavailable." }, { status: 503 });
+  }
 }
