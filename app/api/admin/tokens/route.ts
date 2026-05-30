@@ -7,6 +7,16 @@ export function OPTIONS() {
   return optionsResponse();
 }
 
+export async function GET() {
+  const admin = await requireAdmin();
+  if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+
+  const tokens = await db.token.findMany({
+    orderBy: { createdAt: "asc" },
+  });
+  return jsonResponse(tokens);
+}
+
 export async function POST(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });

@@ -195,7 +195,7 @@
           <button class="btn" onclick="toast('已从可信 token list 同步')">同步 Token List</button>
           <button class="btn primary" onclick="openTokenForm()">+ 添加代币</button>
         </div>
-        <div class="card" style="padding:0;"><table><thead><tr><th>代币</th><th>合约地址</th><th>安全扫描</th><th>24h 交易量</th><th>状态</th><th>涨幅榜</th><th>操作</th></tr></thead><tbody id="tokenTable"></tbody></table></div>
+        <div class="card" style="padding:0;"><table><thead><tr><th>代币</th><th>Logo</th><th>合约地址</th><th>安全扫描</th><th>24h 交易量</th><th>状态</th><th>涨幅榜</th><th>操作</th></tr></thead><tbody id="tokenTable"></tbody></table></div>
       </div>
 
       <div class="page" id="page-risk">
@@ -324,14 +324,23 @@
     var u = document.getElementById("loginUser").value.trim();
     var p = document.getElementById("loginPass").value;
     var err = document.getElementById("loginErr");
-    if(u === DEMO_USER && p === DEMO_PASS){
+    err.textContent = "";
+    apiFetch("/api/admin/login", { method:"POST", body:JSON.stringify({ username:u, password:p }) }).then(function(){
       err.textContent = "";
       try { sessionStorage.setItem("ww_admin_loggedin","1"); } catch(e){}
       document.getElementById("adminLogin").style.display = "none";
       document.querySelector(".layout").classList.remove("locked");
-    } else {
-      err.textContent = "账号或密码错误";
-    }
+      loadAdminTokens();
+    }).catch(function(){
+      if(u === DEMO_USER && p === DEMO_PASS){
+        try { sessionStorage.setItem("ww_admin_loggedin","1"); } catch(e){}
+        document.getElementById("adminLogin").style.display = "none";
+        document.querySelector(".layout").classList.remove("locked");
+        toast("已进入演示后台,真实保存需后端管理员账号");
+      } else {
+        err.textContent = "账号或密码错误";
+      }
+    });
   }
   function doAdminLogout(){
     if(!confirm("确认退出登录?")) return;
@@ -346,7 +355,21 @@
       doAdminLogin();
     }
   });
-  function esc(s){ return String(s).replace(/'/g,"\\'"); }
+  function esc(s){ return String(s == null ? "" : s).replace(/'/g,"\\'"); }
+  function escAttr(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;"); }
+  function shortAddr(addr){ addr = String(addr || ""); return addr.length > 12 ? addr.slice(0,6)+"..."+addr.slice(-4) : addr; }
+  function apiFetch(url, options){
+    options = options || {};
+    options.headers = Object.assign({"Content-Type":"application/json"}, options.headers || {});
+    options.credentials = "same-origin";
+    return fetch(url, options).then(function(res){
+      return res.text().then(function(text){
+        var data = text ? JSON.parse(text) : {};
+        if(!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+        return data;
+      });
+    });
+  }
 
   var titles = { dashboard:"数据看板", earn:"理财产品管理", tokens:"代币白名单", top:"Top 代币排行", risk:"风控审核", users:"用户管理", txns:"交易记录", fees:"手续费设置", announce:"公告管理", content:"内容页管理", currency:"货币与汇率", settings:"系统设置" };
   function nav(el){
@@ -468,6 +491,32 @@
     { id:4, ic:"🌙",bg:"#1a1530",col:"#fff",sym:"MOON",addr:"0x9a3b...8f21",scan:"red",scanT:"疑似蜜罐",vol:"$1.2M",st:"pending",top:false },
     { id:5, ic:"D",bg:"#2a1a30",col:"#fff",sym:"DEGEN",addr:"0x44c1...02ad",scan:"amber",scanT:"高税12%",vol:"$3.4M",st:"pending",top:false }
   ];
+  function normalizeToken(t){
+    return {
+      id:t.id,
+      ic:String(t.symbol || "?").slice(0,1),
+      bg:"#1c2536",
+      col:"#fff",
+      sym:String(t.symbol || "").toUpperCase(),
+      name:t.name || t.symbol || "",
+      addr:t.contractAddr || "",
+      decimals:t.decimals == null ? 18 : t.decimals,
+      logoUrl:t.logoUrl || "",
+      scan:"green",
+      scanT:t.status === "pending" ? "待审核" : "通过",
+      vol:"$0",
+      st:t.status || "pending",
+      top:!!t.onTopRanking
+    };
+  }
+  function loadAdminTokens(){
+    apiFetch("/api/admin/tokens").then(function(list){
+      if(Array.isArray(list)){
+        tokens = list.map(normalizeToken);
+        renderTokens();
+      }
+    }).catch(function(){});
+  }
   var tokenFilter="全部";
   var stName={verified:"已验证",pending:"待审核"}, stColor={verified:"green",pending:"amber"};
   function renderTokenTabs(){
@@ -477,37 +526,62 @@
   function renderTokens(){
     var rows=tokens.filter(function(t){ return tokenFilter==="全部" || (tokenFilter==="已验证"&&t.st==="verified") || (tokenFilter==="待审核"&&t.st==="pending"); });
     var tb=document.getElementById("tokenTable");
-    if(!rows.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty">暂无代币</div></td></tr>'; return; }
+    if(!rows.length){ tb.innerHTML='<tr><td colspan="8"><div class="empty">暂无代币</div></td></tr>'; return; }
     tb.innerHTML=rows.map(function(t){
+      var logo = t.logoUrl ? '<img src="'+escAttr(t.logoUrl)+'" alt="'+escAttr(t.sym)+' logo" style="width:28px;height:28px;border-radius:50%;object-fit:cover;background:#111;border:1px solid var(--line);" onerror="this.remove()"/>' : '<span class="dim">未设置</span>';
       return '<tr><td><div class="tk-cell"><span class="tk-ic" style="background:'+t.bg+';color:'+t.col+'">'+t.ic+'</span>'+t.sym+'</div></td>'+
-        '<td class="mono">'+t.addr+'</td>'+
+        '<td>'+logo+'</td>'+
+        '<td class="mono">'+shortAddr(t.addr)+'</td>'+
         '<td><span class="pill '+t.scan+'">'+t.scanT+'</span></td>'+
         '<td>'+t.vol+'</td>'+
         '<td><span class="pill '+stColor[t.st]+'">'+stName[t.st]+'</span></td>'+
-        '<td><span class="toggle '+(t.top?"on":"")+'" onclick="toggleTop('+t.id+')"></span></td>'+
-        '<td>'+(t.st==="pending"?'<button class="btn sm primary" onclick="approveToken('+t.id+')">通过</button> <button class="btn sm danger" onclick="rejectToken('+t.id+')">拒绝</button>':'<button class="btn sm danger" onclick="rejectToken('+t.id+')">移除</button>')+'</td></tr>';
+        '<td><span class="toggle '+(t.top?"on":"")+'" onclick="toggleTop(&quot;'+escAttr(t.id)+'&quot;)"></span></td>'+
+        '<td><button class="btn sm" onclick="openTokenForm(&quot;'+escAttr(t.id)+'&quot;)">编辑</button> '+(t.st==="pending"?'<button class="btn sm primary" onclick="approveToken(&quot;'+escAttr(t.id)+'&quot;)">通过</button> <button class="btn sm danger" onclick="rejectToken(&quot;'+escAttr(t.id)+'&quot;)">拒绝</button>':'<button class="btn sm danger" onclick="rejectToken(&quot;'+escAttr(t.id)+'&quot;)">移除</button>')+'</td></tr>';
     }).join('');
   }
-  function toggleTop(id){ var t=tokens.find(function(x){return x.id===id;}); if(t.st!=="verified"&&!t.top){ toast("未验证代币不建议上涨幅榜,请先审核"); } t.top=!t.top; renderTokens(); toast(t.sym+(t.top?" 已加入涨幅榜":" 已移出涨幅榜")); }
-  function approveToken(id){ var t=tokens.find(function(x){return x.id===id;}); t.st="verified"; renderTokens(); toast(t.sym+" 审核通过,已加入白名单"); }
-  function rejectToken(id){ var t=tokens.find(function(x){return x.id===id;}); tokens=tokens.filter(function(x){return x.id!==id;}); renderTokens(); toast(t.sym+" 已移除"); }
-  function openTokenForm(){
-    openModal('<h2>添加代币</h2>'+
-      '<label>合约地址</label><input id="t_addr" placeholder="0x..."/>'+
-      '<label>符号 (Symbol)</label><input id="t_sym" placeholder="如:USDC"/>'+
-      '<p class="confirm-text" style="margin-top:14px;font-size:12px;">提交后将自动调用安全扫描 (蜜罐/税/仿冒检测),结果为"待审核"需人工确认。</p>'+
-      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveToken()">提交扫描</button></div>');
+  function patchToken(id, body, done){
+    apiFetch("/api/admin/tokens/"+encodeURIComponent(id), { method:"PATCH", body:JSON.stringify(body) }).then(function(saved){
+      var idx = tokens.findIndex(function(x){return String(x.id)===String(id);});
+      if(idx >= 0) tokens[idx] = normalizeToken(saved);
+      renderTokens();
+      if(done) done();
+    }).catch(function(e){ toast("后端保存失败:"+e.message); });
   }
-  function saveToken(){
+  function toggleTop(id){ var t=tokens.find(function(x){return String(x.id)===String(id);}); if(!t) return; if(t.st!=="verified"&&!t.top){ toast("未验证代币不建议上涨幅榜,请先审核"); } patchToken(id, { onTopRanking:!t.top }, function(){ toast(t.sym+(!t.top?" 已加入涨幅榜":" 已移出涨幅榜")); }); }
+  function approveToken(id){ var t=tokens.find(function(x){return String(x.id)===String(id);}); if(!t) return; patchToken(id, { status:"verified" }, function(){ toast(t.sym+" 审核通过,已加入白名单"); }); }
+  function rejectToken(id){
+    var t=tokens.find(function(x){return String(x.id)===String(id);}); if(!t) return;
+    apiFetch("/api/admin/tokens/"+encodeURIComponent(id), { method:"DELETE" }).then(function(){
+      tokens=tokens.filter(function(x){return String(x.id)!==String(id);}); renderTokens(); toast(t.sym+" 已移除");
+    }).catch(function(e){ toast("后端删除失败:"+e.message); });
+  }
+  function openTokenForm(id){
+    var t = id ? tokens.find(function(x){ return String(x.id)===String(id); }) : null;
+    openModal('<h2>'+(t?"编辑代币":"添加代币")+'</h2>'+
+      '<label>合约地址</label><input id="t_addr" value="'+escAttr(t&&t.addr)+'" placeholder="0x..."/>'+
+      '<label>符号 (Symbol)</label><input id="t_sym" value="'+escAttr(t&&t.sym)+'" placeholder="如:USDC"/>'+
+      '<label>名称</label><input id="t_name" value="'+escAttr(t&&t.name)+'" placeholder="如:USD Coin"/>'+
+      '<label>Decimals</label><input id="t_decimals" value="'+escAttr(t?t.decimals:18)+'" inputmode="numeric" placeholder="18"/>'+
+      '<label>Logo URL</label><input id="t_logo" value="'+escAttr(t&&t.logoUrl)+'" placeholder="https://.../logo.png"/>'+
+      '<p class="confirm-text" style="margin-top:14px;font-size:12px;">Logo URL 会保存到后台,用户端会优先加载这个真实头像。建议使用 PNG/WebP/SVG 的 HTTPS 链接。</p>'+
+      '<div class="modal-actions"><button class="btn" onclick="closeModal()">取消</button><button class="btn primary" onclick="saveToken('+(t?"\\'"+esc(t.id)+"\\'":"null")+')">保存</button></div>');
+  }
+  function saveToken(id){
     var sym=document.getElementById("t_sym").value.trim().toUpperCase();
     var addr=document.getElementById("t_addr").value.trim();
+    var name=document.getElementById("t_name").value.trim() || sym;
+    var decimals=Number(document.getElementById("t_decimals").value || 18);
+    var logo=document.getElementById("t_logo").value.trim();
     if(!sym||!addr){ toast("请填写地址和符号"); return; }
-    var short = addr.length>12 ? addr.slice(0,6)+"..."+addr.slice(-4) : addr;
-    var nid=Math.max.apply(null,tokens.map(function(x){return x.id;}).concat(0))+1;
-    // 模拟扫描结果
-    var scans=[["green","通过"],["amber","高税"],["red","疑似蜜罐"]]; var s=scans[Math.floor(Math.random()*3)];
-    tokens.push({ id:nid, ic:sym[0], bg:"#1c2536", col:"#fff", sym:sym, addr:short, scan:s[0], scanT:s[1], vol:"$0", st:"pending", top:false });
-    renderTokens(); closeModal(); toast(sym+" 已提交,扫描结果:"+s[1]);
+    var body={ symbol:sym, name:name, contractAddr:addr, decimals:Number.isFinite(decimals)?decimals:18, logoUrl:logo || null, status:"verified", onTopRanking:false };
+    if(id){
+      delete body.onTopRanking;
+      patchToken(id, body, function(){ closeModal(); toast(sym+" 已保存"); });
+    } else {
+      apiFetch("/api/admin/tokens", { method:"POST", body:JSON.stringify(body) }).then(function(saved){
+        tokens.push(normalizeToken(saved)); renderTokens(); closeModal(); toast(sym+" 已保存到后台");
+      }).catch(function(e){ toast("后端保存失败:"+e.message); });
+    }
   }
 
   /* ===================== RISK REVIEW ===================== */
@@ -707,6 +781,7 @@
   /* ===================== INIT ===================== */
   renderEarnTabs(); renderEarn();
   renderTokenTabs(); renderTokens();
+  try { if (sessionStorage.getItem("ww_admin_loggedin") === "1") loadAdminTokens(); } catch(e){}
   renderRiskTabs(); renderRisk();
   renderUserTabs(); renderUsers();
   renderTxnTabs(); renderTxns();

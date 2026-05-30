@@ -359,7 +359,7 @@ function wireRealReceiveLinks(host: HTMLDivElement) {
 }
 
 /**
- * Provides stable built-in token marks independent of GeckoTerminal image availability.
+ * Loads token logos from backend config first, then trusted remote token-list assets.
  */
 function enhancePrototypeBuiltinTokenLogos() {
   const source = `
@@ -370,39 +370,75 @@ function enhancePrototypeBuiltinTokenLogos() {
         USDT: "0x102d758f688a4c1c5a80b116bd945d4455460282",
         ETH: "0x4200000000000000000000000000000000000006"
       };
-      function mark(symbol){
-        var sym = String(symbol || "").toUpperCase();
-        if (sym === "WLD") return '<svg class="lumina-token-mark wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-        if (sym === "USDC") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 7v18M20.2 10.8c-1-.9-2.4-1.5-4.2-1.5-2.7 0-4.7 1.4-4.7 3.6 0 2.4 2.3 3.1 4.8 3.7 2.4.6 3.9 1 3.9 2.9 0 2-1.8 3.3-4.3 3.3-1.9 0-3.6-.7-5-2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
-        if (sym === "USDT") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M8 9h16v4H8zM14 13h4v9h-4z" fill="#fff"/><ellipse cx="16" cy="14" rx="8" ry="2.5" fill="none" stroke="#fff" stroke-width="1.8"/></svg>';
-        if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3l8 13-8 4.6L8 16 16 3z" fill="#8aa3d8"/><path d="M16 22.4L8 17.7 16 29l8-11.3-8 4.7z" fill="#b8c8ff"/><path d="M16 20.6V3l8 13-8 4.6z" fill="#dfe6ff" opacity=".38"/></svg>';
-        return "";
+      var logoUrlsBySymbol = {};
+      function htmlEscape(value){
+        return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
       }
       function initial(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
-      function trustLogo(symbol){
+      function isLogoUrl(url){
+        return /^https?:\\/\\//i.test(String(url || ""));
+      }
+      function readLogoConfig(){
+        logoUrlsBySymbol = {};
+        function ingest(list){
+          if (!Array.isArray(list)) return;
+          list.forEach(function(token){
+            var sym = String(token && token.symbol || "").toUpperCase();
+            var url = token && token.logoUrl;
+            if (sym && isLogoUrl(url)) logoUrlsBySymbol[sym] = String(url);
+          });
+        }
+        try { ingest(JSON.parse(localStorage.getItem("ww_top_tokens") || "[]")); } catch(e) {}
+        try { ingest(JSON.parse(localStorage.getItem("ww_tokens") || "[]")); } catch(e) {}
+      }
+      function logoImg(symbol, url, fallbackUrl){
+        var sym = String(symbol || "").toUpperCase();
+        var fallback = isLogoUrl(fallbackUrl) ? String(fallbackUrl) : "";
+        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"lazy\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" data-initial=\\"" + htmlEscape(initial(sym)) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
+      }
+      function trustedLogoUrl(symbol){
         var sym = String(symbol || "").toUpperCase();
         var address = trustLogoAddresses[sym];
         if (!address) return "";
-        var world = "https://assets-cdn.trustwallet.com/blockchains/worldchain/assets/" + address + "/logo.png";
-        var eth = "https://assets-cdn.trustwallet.com/blockchains/ethereum/assets/" + address + "/logo.png";
-        var fallback = String(mark(sym) || initial(sym)).replace(/"/g, "&quot;");
-        return "<img class=\\"lumina-token-img\\" src=\\"" + world + "\\" alt=\\"" + sym + " logo\\" loading=\\"lazy\\" data-cache-key=\\"worldchain:" + address.toLowerCase() + "\\" data-fallback=\\"" + eth + "\\" data-initial=\\"" + fallback + "\\" onload=\\"try{var k=this.dataset.cacheKey;var c=JSON.parse(localStorage.getItem('lumina_token_logo_cache_v1')||'{}');c[k]={url:this.currentSrc||this.src,expiresAt:Date.now()+432000000};localStorage.setItem('lumina_token_logo_cache_v1',JSON.stringify(c));}catch(e){}\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
+        return "https://assets-cdn.trustwallet.com/blockchains/worldchain/assets/" + address + "/logo.png";
       }
+      function ethTrustLogoUrl(symbol){
+        var sym = String(symbol || "").toUpperCase();
+        var address = trustLogoAddresses[sym];
+        if (!address) return "";
+        return "https://assets-cdn.trustwallet.com/blockchains/ethereum/assets/" + address + "/logo.png";
+      }
+      readLogoConfig();
+      window.__luminaSetTokenLogoUrl = function(symbol, url){
+        var sym = String(symbol || "").toUpperCase();
+        if (sym && isLogoUrl(url)) logoUrlsBySymbol[sym] = String(url);
+      };
       window.__luminaTokenLogoHtml = function(symbol, fallback){
-        if (mark(symbol)) return mark(symbol);
-        var trusted = trustLogo(symbol);
-        if (trusted) return trusted;
+        var sym = String(symbol || "").toUpperCase();
+        var configured = logoUrlsBySymbol[sym];
+        if (configured) return logoImg(sym, configured, ethTrustLogoUrl(sym));
+        var trusted = trustedLogoUrl(sym);
+        if (trusted) return logoImg(sym, trusted, ethTrustLogoUrl(sym));
         var fb = String(fallback || "");
-        if (fb.indexOf("<svg") >= 0 || fb.indexOf("<img") >= 0) return fb;
-        return initial(symbol);
+        if (fb.indexOf("<img") >= 0) return fb;
+        return initial(sym);
+      };
+      window.__luminaRefreshTokenLogos = function(){
+        readLogoConfig();
+        tokenLogo.WLD = window.__luminaTokenLogoHtml("WLD", "");
+        tokenLogo.USDC = window.__luminaTokenLogoHtml("USDC", "");
+        tokenLogo.USDT = window.__luminaTokenLogoHtml("USDT", "");
+        tokenLogo.ETH = window.__luminaTokenLogoHtml("ETH", "");
+        if (typeof renderAssets === "function") renderAssets();
+        if (typeof renderTokenList === "function") {
+          var search = document.getElementById("tkSearch");
+          if (search) renderTokenList(search.value || "");
+        }
       };
       tokenFull.USDT = tokenFull.USDT || "Tether USD";
-      tokenLogo.WLD = window.__luminaTokenLogoHtml("WLD", mark("WLD"));
-      tokenLogo.USDC = window.__luminaTokenLogoHtml("USDC", mark("USDC"));
-      tokenLogo.USDT = window.__luminaTokenLogoHtml("USDT", mark("USDT"));
-      tokenLogo.ETH = window.__luminaTokenLogoHtml("ETH", mark("ETH"));
+      window.__luminaRefreshTokenLogos();
       dotColor.WLD = "#fff";
       dotColor.USDC = "var(--blue)";
       dotColor.USDT = "#26a17b";
@@ -1277,6 +1313,7 @@ function enhancePrototypeMarket() {
       }
       function registerMarketToken(market){
         var sym = market.symbol;
+        if (market.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(sym, market.logoUrl);
         prices[sym] = market.priceUsd || 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
         tokenFull[sym] = market.name || sym;

@@ -15,7 +15,9 @@ declare global {
     renderAbout?: () => void;
     renderHelp?: () => void;
     renderMoney?: () => void;
+    renderAssets?: () => void;
     updateBellDot?: () => void;
+    __luminaRefreshTokenLogos?: () => void;
   }
 }
 
@@ -111,8 +113,16 @@ export function useBackendConfigSync(enabled: boolean) {
       window.renderAbout?.();
     }
 
-    if (tokens.data) window.localStorage.setItem("ww_tokens", JSON.stringify(tokens.data));
-    if (topTokens.data) window.localStorage.setItem("ww_top_tokens", JSON.stringify(topTokens.data));
+    if (tokens.data) {
+      window.localStorage.setItem("ww_tokens", JSON.stringify(tokens.data));
+      window.__luminaRefreshTokenLogos?.();
+      window.renderAssets?.();
+    }
+    if (topTokens.data) {
+      window.localStorage.setItem("ww_top_tokens", JSON.stringify(topTokens.data));
+      window.__luminaRefreshTokenLogos?.();
+      window.renderAssets?.();
+    }
     if (fees.data) window.localStorage.setItem("ww_fee_configs", JSON.stringify(fees.data));
   }, [
     about.data,
