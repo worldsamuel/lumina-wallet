@@ -204,11 +204,13 @@ function AuthLoading() {
   return (
     <main className="mini-auth-screen mini-auth-loading">
       <div className="mini-auth-grid" aria-hidden="true" />
-      <div className="mini-auth-orb" aria-hidden="true">
-        <span />
-        <i />
+      <div className="mini-auth-logo-stage">
+        <div className="mini-auth-orb" aria-hidden="true">
+          <span />
+          <i />
+        </div>
+        <div className="mini-auth-logo mini-auth-logo-live">L</div>
       </div>
-      <div className="mini-auth-logo mini-auth-logo-live">L</div>
       <h1>Connecting Lumina</h1>
       <p>Confirm wallet authentication in World App.</p>
       <div className="mini-auth-progress" aria-hidden="true">

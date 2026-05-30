@@ -46,6 +46,9 @@
   .view > .swap-head .back-btn { position: absolute; top: 10px; left: var(--pad-screen); width: 34px; height: 34px; background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   #view-swap .swap-head .back-btn { display: none; }
   .view > .swap-head .gear { position: absolute; top: 15px; right: var(--pad-screen); margin: 0; color: var(--text); background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  #view-swap > .swap-head { pointer-events: none; }
+  #view-swap .swap-head .gear { pointer-events: auto; top: 22px; right: calc(var(--pad-screen) + 16px); width: 40px; height: 40px; color: #e9eee9; background: #101210; border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
+  #view-swap .swap-head .gear svg { width: 23px; height: 23px; }
   #view-home .balance-card,
   #view-earn .earn-hero,
   #view-me .me-card { margin-top: 10px; }
@@ -601,12 +604,22 @@ button, input, select {
   animation: authScan 2.4s ease-in-out infinite;
 }
 
+.mini-auth-logo-stage {
+  position: relative;
+  z-index: 1;
+  width: 230px;
+  height: 230px;
+  display: grid;
+  place-items: center;
+  margin-bottom: -54px;
+}
+
 .mini-auth-orb {
   position: absolute;
+  inset: 0;
   width: 230px;
   height: 230px;
   border-radius: 50%;
-  top: calc(50% - 154px);
   border: 1px solid rgba(74, 222, 128, .14);
   box-shadow: 0 0 80px rgba(74, 222, 128, .1), inset 0 0 46px rgba(74, 222, 128, .08);
   animation: authPulse 2.8s ease-in-out infinite;
