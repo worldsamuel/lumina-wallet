@@ -414,6 +414,7 @@
   /* 代币选择弹窗 */
   .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.42); display: none; align-items: flex-end; justify-content: center; z-index: 80; }
   .modal-mask.open { display: flex; animation: fade .2s ease; }
+  .modal-mask.show { display: flex; animation: fade .2s ease; }
   .modal { width: 100%; max-width: var(--phone-max); background: #111311; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid #303330; padding: 8px 0 24px; max-height: 76vh; overflow-y: auto; box-shadow: 0 -18px 55px rgba(0,0,0,0.45); }
   .modal-grip { width: 44px; height: 5px; border-radius: 5px; background: #666a66; margin: 8px auto 18px; }
   .modal h3 { font-size: 18px; color: var(--text); font-weight: 800; padding: 0 var(--pad-screen) 14px; }
@@ -551,6 +552,10 @@
   .morpho-compliance p:last-child { margin-bottom: 0; }
   .morpho-withdraw-modal .modal { padding-bottom: 20px; }
   .morpho-withdraw-modal .hint { color: var(--text-dim); font-size: 13px; margin: 0 0 12px; }
+  .morpho-confirm-modal { align-items: center; }
+  .morpho-confirm-modal .modal { max-width: 360px; border-radius: 20px; padding: 18px; }
+  .morpho-confirm-modal .modal h3 { padding: 0 0 10px; }
+  .morpho-confirm-body { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 0; }
   /* Me */
   .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; display: flex; align-items: center; gap: 16px; }
   .me-avatar { width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.7); flex-shrink: 0; }

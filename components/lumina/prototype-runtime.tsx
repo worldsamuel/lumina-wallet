@@ -523,6 +523,37 @@ function enhancePrototypeEarn() {
         toast("APY 含 Morpho 协议奖励,每日变动");
       };
 
+      function setMorphoBusy(isBusy){
+        ["morphoDepositBtn", "morphoBottomDepositBtn"].forEach(function(id){
+          var btn = document.getElementById(id);
+          if (!btn) return;
+          btn.disabled = !!isBusy;
+          btn.textContent = isBusy ? "Submitting..." : "Deposit";
+        });
+      }
+
+      function confirmMorphoDeposit(message){
+        return new Promise(function(resolve){
+          var old = document.getElementById("morphoConfirmMask");
+          if (old) old.remove();
+          var mask = document.createElement("div");
+          mask.className = "modal-mask open morpho-confirm-modal";
+          mask.id = "morphoConfirmMask";
+          mask.innerHTML =
+            '<div class="modal"><div class="modal-grip"></div><h3>确认存款</h3>' +
+            '<p class="morpho-confirm-body">' + message + '</p>' +
+            '<div class="earn-action-row"><button class="btn-ghost" id="morphoConfirmCancel">取消</button><button class="btn-primary" id="morphoConfirmOk">确认存入</button></div></div>';
+          document.body.appendChild(mask);
+          function done(value){
+            mask.remove();
+            resolve(value);
+          }
+          mask.onclick = function(event){ if (event.target === mask) done(false); };
+          document.getElementById("morphoConfirmCancel").onclick = function(){ done(false); };
+          document.getElementById("morphoConfirmOk").onclick = function(){ done(true); };
+        });
+      }
+
       function renderEarnDetail(vault){
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
@@ -563,6 +594,13 @@ function enhancePrototypeEarn() {
             '<strong>ⓘ About this product</strong>' +
             '<p>Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Your funds are deposited into a Morpho Vault smart contract earning yield from lending markets. Smart contracts have been audited by Spearbit and OpenZeppelin, but all DeFi protocols carry technical risk (smart contract bugs, oracle failures, etc). APY varies in real-time and is not guaranteed. You can withdraw anytime, subject to vault liquidity.</p>' +
           '</div>';
+        var bottomBtn = document.querySelector("#view-earn-detail > .send-submit");
+        if (bottomBtn) {
+          bottomBtn.id = "morphoBottomDepositBtn";
+          bottomBtn.disabled = paused;
+          bottomBtn.textContent = paused ? "Deposits paused" : "Deposit";
+          bottomBtn.onclick = function(){ window.depositMorpho(); };
+        }
         var input = document.getElementById("earnAmountInput");
         var annualEl = document.getElementById("morphoAnnual");
         var dailyEl = document.getElementById("morphoDaily");
@@ -610,8 +648,10 @@ function enhancePrototypeEarn() {
         if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
         if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("先获取 " + vault.asset.symbol);
         var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
-        if (!window.confirm("您将存入 " + amount + " " + vault.asset.symbol + " 到 " + vault.displayName + " Vault,当前 APY " + apy)) return;
+        var confirmed = await confirmMorphoDeposit("您将存入 " + amount + " " + vault.asset.symbol + " 到 " + vault.displayName + " Vault,当前 APY " + apy);
+        if (!confirmed) return;
         try {
+          setMorphoBusy(true);
           var res = await fetch("/api/morpho/tx", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -625,6 +665,8 @@ function enhancePrototypeEarn() {
           pollMorphoPositions();
         } catch(e) {
           toast(e && e.message ? e.message : "Deposit failed");
+        } finally {
+          setMorphoBusy(false);
         }
       };
 
@@ -639,7 +681,7 @@ function enhancePrototypeEarn() {
         if (!vault || !pos || Number(pos.shares || 0) <= 0) return;
         closeModal();
         var mask = document.createElement("div");
-        mask.className = "modal-mask show morpho-withdraw-modal";
+        mask.className = "modal-mask open morpho-withdraw-modal";
         mask.id = "morphoWithdrawMask";
         mask.innerHTML =
           '<div class="modal"><div class="grab"></div><h3>Withdraw ' + vault.displayName + '</h3>' +
