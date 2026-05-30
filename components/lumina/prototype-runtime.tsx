@@ -1677,6 +1677,31 @@ function enhancePrototypeSend() {
           localStorage.setItem(key, JSON.stringify(rows.slice(0, 20)));
         } catch(e) {}
       }
+      function confirmSendAction(state){
+        return new Promise(function(resolve){
+          var old = document.getElementById("sendConfirmModal");
+          if (old) old.remove();
+          var modal = document.createElement("div");
+          modal.className = "modal-mask open";
+          modal.id = "sendConfirmModal";
+          modal.innerHTML =
+            '<div class="modal send-confirm-sheet">' +
+              '<div class="modal-grip"></div>' +
+              '<h3>确认转账</h3>' +
+              '<p class="send-confirm-body">转 ' + state.amountText + ' ' + state.token.symbol + '<br>到 ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<div class="earn-action-row"><button class="btn-ghost" id="sendConfirmCancel">取消</button><button class="btn-primary" id="sendConfirmOk">确认</button></div>' +
+            '</div>';
+          document.body.appendChild(modal);
+          function done(value){
+            modal.classList.remove("open");
+            setTimeout(function(){ modal.remove(); }, 180);
+            resolve(value);
+          }
+          modal.onclick = function(event){ if (event.target === modal) done(false); };
+          document.getElementById("sendConfirmCancel").onclick = function(){ done(false); };
+          document.getElementById("sendConfirmOk").onclick = function(){ done(true); };
+        });
+      }
       async function handleSendClick(){
         var state = validation();
         if (sending) return;
@@ -1684,7 +1709,8 @@ function enhancePrototypeSend() {
           toast(state.error || "请先填写有效地址和金额");
           return;
         }
-        if (!window.confirm("确认转 " + state.amountText + " " + state.token.symbol + " 到 " + state.recipient + "?")) {
+        var confirmed = await confirmSendAction(state);
+        if (!confirmed) {
           toast("已取消");
           return;
         }

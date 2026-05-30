@@ -311,6 +311,9 @@
   .send-spinner { width: 17px; height: 17px; border-radius: 50%; border: 2px solid rgba(0,68,34,0.28); border-top-color: #042; animation: sendSpin .75s linear infinite; }
   @keyframes sendSpin { to { transform: rotate(360deg); } }
   .send-submit:active { opacity: 0.85; }
+  .send-confirm-sheet { max-width: 360px; border-radius: 20px; padding: 18px; }
+  .send-confirm-sheet h3 { padding: 0 0 10px; }
+  .send-confirm-body { color: var(--text-dim); font-size: 14px; line-height: 1.65; margin: 0 0 16px; overflow-wrap: anywhere; }
   /* Swap */
   .swap-box { margin: 0 var(--pad-screen); position: relative; }
   .swap-panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); padding: 18px; }
