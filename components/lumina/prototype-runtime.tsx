@@ -1764,7 +1764,8 @@ function enhancePrototypeSend() {
             tokenAddress: state.token.address,
             tokenDecimals: state.token.decimals,
             recipient: state.recipient,
-            amountHuman: state.amountText
+            amountHuman: state.amountText,
+            userAddress: window.__luminaUserAddress || ""
           });
           if (result.status === "success") {
             var hash = result.txHash || "";
@@ -1785,6 +1786,7 @@ function enhancePrototypeSend() {
           var friendly = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(code) : code;
           toast("转账失败: " + friendly);
         } finally {
+          console.log("[A7] finally — setSending false");
           sending = false;
           setButtonLoading(false);
           validation();

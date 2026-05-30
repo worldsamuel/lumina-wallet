@@ -1,5 +1,8 @@
 import { MiniKit } from "@worldcoin/minikit-js";
 import { isAddress, parseUnits, type Address } from "viem";
+import { publicClient } from "../chain";
+
+const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address;
 
 const transferAbi = [
   {
@@ -14,12 +17,23 @@ const transferAbi = [
   },
 ] as const;
 
+const erc20MinABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
 export interface SendParams {
   tokenSymbol: "WLD" | "USDC" | "ETH" | string;
   tokenAddress: `0x${string}` | null;
   tokenDecimals: number;
   recipient: string;
   amountHuman: string;
+  userAddress?: string;
 }
 
 export interface SendResult {
@@ -94,6 +108,15 @@ function normalizeError(error: unknown) {
   return String(error || "generic_error");
 }
 
+function safeTypeOf(getValue: () => unknown) {
+  try {
+    return typeof getValue();
+  } catch (error) {
+    const err = error as { message?: unknown };
+    return `throws: ${String(err?.message ?? error)}`;
+  }
+}
+
 export async function sendToken(params: SendParams): Promise<SendResult> {
   if (!isAddress(params.recipient)) {
     return { status: "failed", error: "invalid_address" };
@@ -149,6 +172,29 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     ),
   );
 
+  if (params.userAddress && isAddress(params.userAddress)) {
+    try {
+      const [ethBalance, wldBalance] = await Promise.all([
+        publicClient.getBalance({ address: params.userAddress as Address }),
+        publicClient.readContract({
+          address: WLD_ADDRESS,
+          abi: erc20MinABI,
+          functionName: "balanceOf",
+          args: [params.userAddress as Address],
+        }),
+      ]);
+      console.log("[C1] ETH balance (for gas):", ethBalance.toString());
+      console.log("[C2] WLD balance:", wldBalance.toString());
+      console.log("[C3] Sending WLD amount:", amountWei.toString());
+      console.log("[C4] Is sending more than balance?", amountWei > wldBalance);
+      console.log("[C5] Has ETH for gas?", ethBalance > 100000000000000n);
+    } catch (error) {
+      console.log("[C ERROR] balance/gas diagnostics failed:", error);
+    }
+  } else {
+    console.log("[C SKIP] userAddress missing or invalid:", params.userAddress);
+  }
+
   const miniKitStatus = MiniKit as unknown as { isInstalled?: () => boolean };
   console.log("[STEP 1] About to call MiniKit.sendTransaction");
   console.log("[STEP 1] MiniKit.isInstalled?", miniKitStatus.isInstalled?.());
@@ -163,17 +209,39 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
 
   const startTime = Date.now();
 
+  console.log("[A1] Before await");
+  console.log("[A2] typeof MiniKit:", typeof MiniKit);
+  console.log(
+    "[A3] typeof MiniKit.commandsAsync:",
+    safeTypeOf(() => (MiniKit as unknown as { commandsAsync?: unknown }).commandsAsync),
+  );
+  console.log(
+    "[A4] typeof sendTransaction:",
+    safeTypeOf(
+      () =>
+        (MiniKit as unknown as { commandsAsync?: { sendTransaction?: unknown } }).commandsAsync
+          ?.sendTransaction,
+    ),
+  );
+
   try {
-    const result = (await MiniKit.sendTransaction({
+    const txPromise = MiniKit.sendTransaction({
       chainId: 480,
       transactions: transaction as never,
-    })) as MiniKitSendResult & {
+    });
+    const timeoutPromise = new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT_15S")), 15000),
+    );
+    console.log("[A5] Promise created, racing with 15s timeout");
+
+    const result = (await Promise.race([txPromise, timeoutPromise])) as MiniKitSendResult & {
       commandPayload?: unknown;
       finalPayload?: {
         status?: string;
         transaction_id?: string;
       };
     };
+    console.log("[A6] SUCCESS, result:", JSON.stringify(result, null, 2));
     console.log("[STEP 2] sendTransaction returned after", Date.now() - startTime, "ms");
     console.log("[STEP 2] result:", JSON.stringify(result, null, 2));
     console.log("[STEP 2] result.commandPayload:", result?.commandPayload);
@@ -209,6 +277,8 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     console.log("[STEP 2 ERROR] name:", err?.name);
     console.log("[STEP 2 ERROR] message:", err?.message);
     console.log("[STEP 2 ERROR] code:", err?.code);
+    console.log("[A6] FAIL:", err?.message);
+    console.log("[A6] full error:", JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
     console.log("=== MiniKit error ===");
     console.log("name:", err?.name);
     console.log("message:", err?.message);
