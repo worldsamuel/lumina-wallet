@@ -72,3 +72,13 @@ model AuditLog {
   payload   Json?
   createdAt DateTime @default(now())
 }
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  address   String?
+  username  String?
+  contact   String?
+  message   String
+  status    String   @default("new")
+  createdAt DateTime @default(now())
+}

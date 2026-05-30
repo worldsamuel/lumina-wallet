@@ -22,6 +22,7 @@ declare global {
     openLangModal?: () => void;
     setTabByName?: (name: string) => void;
     __luminaUserAddress?: string;
+    __luminaUsername?: string;
     __luminaConfirmEarnAction?: (input: EarnConfirmInput) => Promise<boolean>;
   }
 }
@@ -57,7 +58,7 @@ const tabByView: Record<string, string> = {
 export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [prototypeReady, setPrototypeReady] = useState(false);
-  const { address, error, login, logout, status } = useWalletAuth();
+  const { address, error, login, logout, status, username } = useWalletAuth();
   useBackendConfigSync(status === "authenticated");
   useChainBalanceSync(status === "authenticated" && prototypeReady, address);
 
@@ -74,7 +75,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     exposeEarnWalletConfirm();
 
     requestAnimationFrame(() => {
-      updatePrototypeAddress(host, address);
+      updatePrototypeAddress(host, address, username);
       if (initialView === "detail") {
         (window as unknown as { openDetail?: (index: number) => void }).openDetail?.(0);
       } else if (initialView === "earn-detail") {
@@ -94,6 +95,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeMarket();
       enhancePrototypeSwapQuote();
       enhancePrototypeActivity();
+      enhancePrototypeMe();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -111,7 +113,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       setPrototypeReady(false);
       host.innerHTML = "";
     };
-  }, [address, initialView, login, logout, status]);
+  }, [address, initialView, login, logout, status, username]);
 
   useEffect(() => {
     if (hostRef.current) updatePrototypeAddress(hostRef.current, address);
@@ -239,11 +241,19 @@ function AuthError({ message, onRetry }: { message: string; onRetry: () => void 
   );
 }
 
-function updatePrototypeAddress(host: HTMLDivElement, address: string | null) {
+function updatePrototypeAddress(host: HTMLDivElement, address: string | null, username?: string | null) {
   window.__luminaUserAddress = address ?? "";
+  window.__luminaUsername = username ?? "";
   const label = shortenAddress(address);
+  const displayName = username || label;
   const chipLabel = host.querySelector(".addr-chip span:nth-child(2)");
   if (chipLabel) chipLabel.textContent = label;
+  const meName = host.querySelector(".me-name");
+  if (meName) {
+    meName.innerHTML =
+      displayName +
+      ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span>';
+  }
   const meAddr = host.querySelector(".me-addr");
   if (meAddr) meAddr.textContent = label;
 }
@@ -1115,6 +1125,111 @@ function enhancePrototypeActivity() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance real activity");
+}
+
+/**
+ * Rebuilds the Me page around feedback, legal links, preferences, and real user identity.
+ */
+function enhancePrototypeMe() {
+  const source = `
+    (function(){
+      function meIcon(name) {
+        if (name === "feedback") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg>';
+        if (name === "privacy") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9.5 12l1.7 1.7 3.8-4"/></svg>';
+        if (name === "terms") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>';
+        if (name === "version") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+        if (name === "language") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>';
+        if (name === "currency") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
+        if (name === "bell") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+        return "";
+      }
+      function row(icon, label, value, action, extra) {
+        return '<div class="me-row" ' + (action ? 'onclick="' + action + '"' : '') + '><span class="ic">' + meIcon(icon) + '</span><span class="lbl">' + label + '</span>' + (value ? '<span class="val">' + value + '</span>' : '') + (extra || '<span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>') + '</div>';
+      }
+      function toggleHtml(){
+        return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
+      }
+      function ensureFeedbackModal(){
+        if (document.getElementById("feedbackModal")) return;
+        var modal = document.createElement("div");
+        modal.className = "modal-mask";
+        modal.id = "feedbackModal";
+        modal.onclick = function(event){ if(event.target === modal) closeFeedback(); };
+        modal.innerHTML =
+          '<div class="modal feedback-sheet"><div class="modal-grip"></div><h3>在线反馈</h3>' +
+          '<p class="feedback-hint">Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.</p>' +
+          '<textarea id="feedbackText" maxlength="1200" placeholder="请输入你的反馈..."></textarea>' +
+          '<input id="feedbackContact" maxlength="120" placeholder="联系方式 / Telegram / email (optional)" />' +
+          '<button id="feedbackSendBtn" onclick="sendFeedback()">发送反馈</button></div>';
+        document.body.appendChild(modal);
+      }
+      window.openFeedback = function(){
+        ensureFeedbackModal();
+        document.getElementById("feedbackText").value = "";
+        document.getElementById("feedbackContact").value = "";
+        document.getElementById("feedbackModal").classList.add("open");
+      };
+      window.closeFeedback = function(){
+        var modal = document.getElementById("feedbackModal");
+        if (modal) modal.classList.remove("open");
+      };
+      window.sendFeedback = async function(){
+        var text = (document.getElementById("feedbackText").value || "").trim();
+        var contact = (document.getElementById("feedbackContact").value || "").trim();
+        if (text.length < 3) { toast("请输入反馈内容"); return; }
+        var btn = document.getElementById("feedbackSendBtn");
+        btn.disabled = true;
+        btn.textContent = "发送中...";
+        try {
+          var res = await fetch("/api/feedback", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: text,
+              contact: contact,
+              address: window.__luminaUserAddress || "",
+              username: window.__luminaUsername || ""
+            })
+          });
+          if (!res.ok) throw new Error("failed");
+          closeFeedback();
+          toast("反馈已发送");
+        } catch(e) {
+          toast("发送失败,请稍后重试");
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "发送反馈";
+        }
+      };
+      function renderMe(){
+        var view = document.getElementById("view-me");
+        if (!view) return;
+        var address = window.__luminaUserAddress || "";
+        var short = address ? address.slice(0, 6) + "..." + address.slice(-4) : "Not connected";
+        var name = window.__luminaUsername || short;
+        view.innerHTML =
+          '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
+          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr">' + short + '</div><span class="me-orb">World App connected</span></div></div>' +
+          '<div class="me-group-label">Support</div><div class="me-group">' +
+            row("feedback", "在线反馈", "", "openFeedback()") +
+          '</div>' +
+          '<div class="me-group-label">Preferences</div><div class="me-group">' +
+            row("language", "Language", (document.getElementById("langVal") && document.getElementById("langVal").textContent) || "English", "openLangModal()") +
+            row("currency", "Display currency", (document.getElementById("currencyVal") && document.getElementById("currencyVal").textContent) || "USD", "openCurrencyModal()") +
+            row("bell", "Notifications", "", "", toggleHtml()) +
+          '</div>' +
+          '<div class="me-group-label">Legal</div><div class="me-group">' +
+            row("privacy", "Privacy Policy", "", "window.location.href=\\'/privacy\\'") +
+            row("terms", "Terms of Service", "", "window.location.href=\\'/terms\\'") +
+            row("version", "Version", "Lumina v1.0.0", "", "") +
+          '</div>';
+        ensureFeedbackModal();
+      }
+      window.__luminaRenderMe = renderMe;
+      renderMe();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance Me page");
 }
 
 /**

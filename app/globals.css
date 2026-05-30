@@ -541,6 +541,15 @@
   .me-logout { margin: 24px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--surface); border: 1px solid var(--line); color: var(--red); border-radius: var(--radius-md); padding: 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .me-logout:active { background: var(--surface-2); }
   .me-version { text-align: center; color: var(--text-mute); font-size: 12px; margin-top: 18px; }
+  .feedback-sheet { padding: 20px; }
+  .feedback-sheet h3 { font-size: 19px; margin: 8px 0 8px; }
+  .feedback-hint { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin-bottom: 14px; }
+  .feedback-sheet textarea,
+  .feedback-sheet input { width: 100%; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); color: var(--text); outline: none; padding: 13px 14px; font-size: 14px; }
+  .feedback-sheet textarea { min-height: 132px; resize: none; line-height: 1.5; }
+  .feedback-sheet input { margin-top: 10px; }
+  .feedback-sheet button { width: 100%; min-height: 52px; margin-top: 14px; border: none; border-radius: 15px; background: var(--green); color: #042; font-size: 15px; font-weight: 800; }
+  .feedback-sheet button:disabled { background: var(--surface-3); color: var(--text-mute); }
   .tabbar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: var(--phone-max); display: grid; grid-template-columns: repeat(5, 1fr); background: rgba(8,9,8,0.92); backdrop-filter: blur(20px); border-top: 1px solid var(--line); padding: 10px 0 22px; z-index: 50; }
   .tab { display: grid; place-items: center; gap: 5px; color: var(--text-mute); font-size: 11px; cursor: pointer; }
   .tab.active { color: var(--green); }

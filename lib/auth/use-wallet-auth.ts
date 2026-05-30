@@ -41,7 +41,7 @@ async function verifyWalletAuth(nonce: string, payload: WalletAuthPayload) {
  * Runs the World MiniKit walletAuth login flow and stores the authenticated wallet address.
  */
 export function useWalletAuth() {
-  const { address, setUser, clear } = useAuthStore();
+  const { address, username, setUser, clear } = useAuthStore();
   const [status, setStatus] = useState<WalletAuthStatus>("checking");
   const [error, setError] = useState<string | null>(null);
 
@@ -105,5 +105,6 @@ export function useWalletAuth() {
     login,
     logout,
     status,
+    username,
   };
 }
