@@ -115,6 +115,7 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
               functionName: "transfer",
               args: [params.recipient as Address, amountWei],
             }),
+            value: "0x0" as Hex,
           },
         ];
 
