@@ -182,7 +182,6 @@ function exposeMorphoTransactions() {
 
     return miniKit.sendTransaction({
       chainId: 480,
-      transaction: transactions,
       transactions,
     });
   };
@@ -352,9 +351,9 @@ function enhancePrototypeBuiltinTokenLogos() {
         return "<img class=\\"lumina-token-img\\" src=\\"" + world + "\\" alt=\\"" + sym + " logo\\" loading=\\"lazy\\" data-cache-key=\\"worldchain:" + address.toLowerCase() + "\\" data-fallback=\\"" + eth + "\\" data-initial=\\"" + fallback + "\\" onload=\\"try{var k=this.dataset.cacheKey;var c=JSON.parse(localStorage.getItem('lumina_token_logo_cache_v1')||'{}');c[k]={url:this.currentSrc||this.src,expiresAt:Date.now()+432000000};localStorage.setItem('lumina_token_logo_cache_v1',JSON.stringify(c));}catch(e){}\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
       }
       window.__luminaTokenLogoHtml = function(symbol, fallback){
+        if (mark(symbol)) return mark(symbol);
         var trusted = trustLogo(symbol);
         if (trusted) return trusted;
-        if (mark(symbol)) return mark(symbol);
         var fb = String(fallback || "");
         if (fb.indexOf("<svg") >= 0 || fb.indexOf("<img") >= 0) return fb;
         return initial(symbol);
@@ -1503,52 +1502,35 @@ function enhancePrototypeMe() {
   const source = `
     (function(){
       function meCopy(){
-        var zh = (window.currentLang || "en") === "zh-CN";
-        return zh ? {
-          support: "支持",
-          feedback: "在线反馈",
-          preferences: "偏好设置",
-          language: "语言",
-          currency: "显示货币",
-          notifications: "通知",
-          legal: "法律",
-          privacy: "隐私政策",
-          terms: "服务条款",
-          version: "版本",
-          connected: "World App 已连接",
-          notConnected: "未连接",
-          feedbackTitle: "在线反馈",
-          feedbackHint: "告诉我们哪里出错了，或你希望改进什么。反馈会保存给 Lumina 团队。",
-          feedbackPlaceholder: "请输入你的反馈...",
-          contactPlaceholder: "联系方式 / Telegram / email（可选）",
-          send: "发送反馈",
-          sending: "发送中...",
-          tooShort: "请输入至少 3 个字的反馈内容",
-          sent: "反馈已发送",
-          failed: "发送失败，请稍后重试"
-        } : {
-          support: "Support",
-          feedback: "Feedback",
-          preferences: "Preferences",
-          language: "Language",
-          currency: "Display currency",
-          notifications: "Notifications",
-          legal: "Legal",
-          privacy: "Privacy Policy",
-          terms: "Terms of Service",
-          version: "Version",
-          connected: "World App connected",
-          notConnected: "Not connected",
-          feedbackTitle: "Feedback",
-          feedbackHint: "Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.",
-          feedbackPlaceholder: "Tell us what happened...",
-          contactPlaceholder: "Telegram / email (optional)",
-          send: "Send feedback",
-          sending: "Sending...",
-          tooShort: "Please enter at least 3 characters.",
-          sent: "Feedback sent",
-          failed: "Unable to send feedback. Please try again."
+        var lang = window.currentLang || "en";
+        var labels = {
+          support: { en:"Support", fr:"Assistance", de:"Support", es:"Soporte", ja:"サポート", "zh-CN":"支持", "zh-TW":"支援" },
+          feedback: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
+          preferences: { en:"Preferences", fr:"Préférences", de:"Einstellungen", es:"Preferencias", ja:"設定", "zh-CN":"偏好设置", "zh-TW":"偏好設定" },
+          language: { en:"Language", fr:"Langue", de:"Sprache", es:"Idioma", ja:"言語", "zh-CN":"语言", "zh-TW":"語言" },
+          currency: { en:"Display currency", fr:"Devise d'affichage", de:"Anzeigewährung", es:"Moneda", ja:"表示通貨", "zh-CN":"显示货币", "zh-TW":"顯示貨幣" },
+          notifications: { en:"Notifications", fr:"Notifications", de:"Benachrichtigungen", es:"Notificaciones", ja:"通知", "zh-CN":"通知", "zh-TW":"通知" },
+          legal: { en:"Legal", fr:"Mentions légales", de:"Rechtliches", es:"Legal", ja:"法務", "zh-CN":"法律", "zh-TW":"法律" },
+          privacy: { en:"Privacy Policy", fr:"Politique de confidentialité", de:"Datenschutz", es:"Privacidad", ja:"プライバシー", "zh-CN":"隐私政策", "zh-TW":"隱私政策" },
+          terms: { en:"Terms of Service", fr:"Conditions d'utilisation", de:"Nutzungsbedingungen", es:"Términos", ja:"利用規約", "zh-CN":"服务条款", "zh-TW":"服務條款" },
+          version: { en:"Version", fr:"Version", de:"Version", es:"Versión", ja:"バージョン", "zh-CN":"版本", "zh-TW":"版本" },
+          connected: { en:"World App connected", fr:"World App connecté", de:"World App verbunden", es:"World App conectado", ja:"World App 接続済み", "zh-CN":"World App 已连接", "zh-TW":"World App 已連接" },
+          notConnected: { en:"Not connected", fr:"Non connecté", de:"Nicht verbunden", es:"No conectado", ja:"未接続", "zh-CN":"未连接", "zh-TW":"未連接" },
+          feedbackTitle: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
+          feedbackHint: { en:"Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.", fr:"Dites-nous ce qui ne va pas ou ce que vous voulez améliorer.", de:"Sag uns, was nicht funktioniert oder verbessert werden soll.", es:"Cuéntanos qué falló o qué quieres mejorar.", ja:"問題や改善してほしい点をお知らせください。", "zh-CN":"告诉我们哪里出错了，或你希望改进什么。反馈会保存给 Lumina 团队。", "zh-TW":"告訴我們哪裡出錯，或你希望改善什麼。" },
+          feedbackPlaceholder: { en:"Tell us what happened...", fr:"Dites-nous ce qui s'est passé...", de:"Beschreibe, was passiert ist...", es:"Cuéntanos qué pasó...", ja:"何が起きたか入力...", "zh-CN":"请输入你的反馈...", "zh-TW":"請輸入你的回饋..." },
+          contactPlaceholder: { en:"Telegram / email (optional)", fr:"Telegram / e-mail (facultatif)", de:"Telegram / E-Mail (optional)", es:"Telegram / email (opcional)", ja:"Telegram / email（任意）", "zh-CN":"联系方式 / Telegram / email（可选）", "zh-TW":"聯絡方式 / Telegram / email（選填）" },
+          send: { en:"Send feedback", fr:"Envoyer", de:"Senden", es:"Enviar", ja:"送信", "zh-CN":"发送反馈", "zh-TW":"送出回饋" },
+          sending: { en:"Sending...", fr:"Envoi...", de:"Wird gesendet...", es:"Enviando...", ja:"送信中...", "zh-CN":"发送中...", "zh-TW":"送出中..." },
+          tooShort: { en:"Please enter at least 3 characters.", fr:"Saisissez au moins 3 caractères.", de:"Bitte mindestens 3 Zeichen eingeben.", es:"Introduce al menos 3 caracteres.", ja:"3文字以上入力してください。", "zh-CN":"请输入至少 3 个字的反馈内容", "zh-TW":"請至少輸入 3 個字" },
+          sent: { en:"Feedback sent", fr:"Retour envoyé", de:"Feedback gesendet", es:"Comentarios enviados", ja:"送信しました", "zh-CN":"反馈已发送", "zh-TW":"回饋已送出" },
+          failed: { en:"Unable to send feedback. Please try again.", fr:"Impossible d'envoyer. Réessayez.", de:"Senden fehlgeschlagen. Bitte erneut versuchen.", es:"No se pudo enviar. Inténtalo de nuevo.", ja:"送信できません。もう一度お試しください。", "zh-CN":"发送失败，请稍后重试", "zh-TW":"送出失敗，請稍後再試" }
         };
+        var out = {};
+        Object.keys(labels).forEach(function(key){
+          out[key] = labels[key][lang] || labels[key].en;
+        });
+        return out;
       }
       function meIcon(name) {
         if (name === "feedback") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg>';
@@ -1644,6 +1626,9 @@ function enhancePrototypeMe() {
         var address = window.__luminaUserAddress || "";
         var short = address ? address.slice(0, 6) + "..." + address.slice(-4) : c.notConnected;
         var name = window.__luminaUsername || short;
+        var langObj = (typeof languages !== "undefined" && languages.filter(function(l){ return l.code === (window.currentLang || "en"); })[0]) || null;
+        var langValue = '<span id="langVal">' + (langObj ? langObj.name : "English") + '</span>';
+        var currencyValue = '<span id="currencyVal">' + (typeof currentCurrency !== "undefined" ? currentCurrency : "USD") + '</span>';
         view.innerHTML =
           '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
           '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr">' + short + '</div><span class="me-orb">' + c.connected + '</span></div></div>' +
@@ -1651,8 +1636,8 @@ function enhancePrototypeMe() {
             row("feedback", c.feedback, "", "openFeedback()") +
           '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
-            row("language", c.language, (document.getElementById("langVal") && document.getElementById("langVal").textContent) || "English", "openLangModal()") +
-            row("currency", c.currency, (document.getElementById("currencyVal") && document.getElementById("currencyVal").textContent) || "USD", "openCurrencyModal()") +
+            row("language", c.language, langValue, "openLangModal()") +
+            row("currency", c.currency, currencyValue, "openCurrencyModal()") +
             row("bell", c.notifications, "", "", toggleHtml()) +
           '</div>' +
           '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
@@ -1671,6 +1656,14 @@ function enhancePrototypeMe() {
           try { localStorage.setItem("ww_lang", code); } catch(e) {}
           if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
           updateFeedbackCopy();
+        };
+      }
+      if (!window.__luminaMeCurrencyPatch && typeof pickCurrency === "function") {
+        window.__luminaMeCurrencyPatch = true;
+        var previousPickCurrency = pickCurrency;
+        pickCurrency = function(code){
+          previousPickCurrency(code);
+          if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
         };
       }
       renderMe();
