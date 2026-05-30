@@ -261,11 +261,24 @@ function exposeMorphoTransactions() {
     };
     if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
 
+    console.log("[EARN] About to call MiniKit.sendTransaction");
+    console.log(
+      "[EARN] payload:",
+      JSON.stringify(
+        {
+          chainId: 480,
+          transactions,
+          ...(permit2 && permit2.length ? { permit2 } : {}),
+        },
+        (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+      ),
+    );
     const result = (await miniKit.sendTransaction({
       chainId: 480,
       transactions,
       ...(permit2 && permit2.length ? { permit2 } : {}),
     })) as MiniKitSendTransactionEnvelope;
+    console.log("[EARN] result:", JSON.stringify(result));
 
     const payload = result?.data ?? result;
     if (payload?.status && payload.status !== "success") {
@@ -827,15 +840,17 @@ function enhancePrototypeEarn() {
           });
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          console.log("[EARN] built tx:", JSON.stringify(data));
           var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2);
           var payload = result && (result.data || result);
           var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
           toast("Transaction submitted: " + String(hash).slice(0, 18));
           pollMorphoPositions();
         } catch(e) {
+          console.error("[EARN] error:", e);
           var msg = e && e.message ? e.message : "Deposit failed";
           if (/user_rejected/i.test(msg)) msg = "Cancelled in World App";
-          toast(msg);
+          toast("存款失败: " + msg);
         } finally {
           setMorphoBusy(false);
         }
