@@ -20,7 +20,7 @@ function shortAddress(address: string) {
 function formatTokenAmount(value: bigint, decimals: number) {
   const raw = formatUnits(value, decimals);
   const [whole, fraction = ""] = raw.split(".");
-  const trimmed = fraction.slice(0, 6).replace(/0+$/, "");
+  const trimmed = fraction.slice(0, 3).replace(/0+$/, "");
   return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
@@ -75,6 +75,8 @@ export async function GET(req: NextRequest) {
     const logs = await Promise.all(
       [...incoming, ...outgoing]
         .filter((log) => {
+          const value = log.args.value ?? 0n;
+          if (value <= 0n) return false;
           const key = `${log.transactionHash}-${log.logIndex}`;
           if (seen.has(key)) return false;
           seen.add(key);

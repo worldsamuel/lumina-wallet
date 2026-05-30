@@ -217,9 +217,9 @@ function renderBalanceError() {
 
 function formatTokenAmount(value: string) {
   const [integer, fraction = ""] = value.split(".");
-  const trimmedFraction = fraction.slice(0, 6).replace(/0+$/, "");
+  const trimmedFraction = fraction.slice(0, 3).replace(/0+$/, "");
   const body = trimmedFraction ? `${integer}.${trimmedFraction}` : integer;
-  return Number(body).toLocaleString(undefined, { maximumFractionDigits: 6 });
+  return Number(body).toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
 function runInPrototypeScope(source: string) {

@@ -989,7 +989,7 @@ function enhancePrototypeTokens() {
       function formatImportedAmount(value){
         var n = Number.parseFloat(String(value || "0"));
         if (!Number.isFinite(n) || n === 0) return "0";
-        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 });
+        return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
       }
       function importedList(){
         var list = readJson(importStoreKey, []);
@@ -1695,22 +1695,6 @@ function enhancePrototypeSend() {
         validation();
         toast("已填入全部可用余额");
       }
-      function rememberActivity(token, recipient, amount, hash){
-        try {
-          var key = "lumina_local_activity";
-          var rows = JSON.parse(localStorage.getItem(key) || "[]");
-          rows.unshift({
-            hash: hash || ("pending-" + Date.now()),
-            type: "out",
-            title: "Sent " + token.symbol,
-            subtitle: "To " + recipient.slice(0, 6) + "..." + recipient.slice(-4),
-            amount: "-" + amount + " " + token.symbol,
-            status: "Submitted",
-            createdAt: Date.now()
-          });
-          localStorage.setItem(key, JSON.stringify(rows.slice(0, 20)));
-        } catch(e) {}
-      }
       function confirmSendAction(state){
         return new Promise(function(resolve){
           var old = document.getElementById("sendConfirmModal");
@@ -1762,10 +1746,10 @@ function enhancePrototypeSend() {
           });
           if (result.status === "success") {
             var hash = result.txHash || "";
-            rememberActivity(state.token, state.recipient, state.amountText, hash);
-            toast("转账成功! 交易: " + (hash ? hash.slice(0, 18) : "submitted"));
+            try { localStorage.removeItem("lumina_local_activity"); } catch(e) {}
+            toast(hash ? "交易已提交: " + hash.slice(0, 18) : "交易已提交，等待链上确认");
             if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
-            setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 500);
+            setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 1500);
             recipientInput.value = "";
             amountInput.value = "";
           } else if (result.status === "user_rejected") {
@@ -1824,6 +1808,7 @@ function enhancePrototypeActivity() {
   const source = `
     (function(){
       var activityItems = [];
+      try { localStorage.removeItem("lumina_local_activity"); } catch(e) {}
       function emptyActivity(message){
         return '<div style="text-align:center;color:var(--text-mute);padding:42px var(--pad-screen);font-size:14px;line-height:1.5;">' + message + '</div>';
       }
@@ -1844,24 +1829,6 @@ function enhancePrototypeActivity() {
           '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + (a.status || "Completed") + '</div></div>' +
         '</div>';
       }
-      function localActivityItems(){
-        try {
-          var rows = JSON.parse(localStorage.getItem("lumina_local_activity") || "[]");
-          var cutoff = Date.now() - 24 * 60 * 60 * 1000;
-          return Array.isArray(rows) ? rows.filter(function(row){ return !row.createdAt || row.createdAt > cutoff; }) : [];
-        } catch(e) {
-          return [];
-        }
-      }
-      function mergeActivity(chainRows){
-        var seen = {};
-        return localActivityItems().concat(chainRows || []).filter(function(row){
-          var key = row.hash || (row.title + row.amount + row.subtitle);
-          if (seen[key]) return false;
-          seen[key] = true;
-          return true;
-        });
-      }
       renderActivity = function(){
         var box = document.getElementById("actList");
         if (!box) return;
@@ -1879,8 +1846,8 @@ function enhancePrototypeActivity() {
         }
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){ activityItems = mergeActivity(Array.isArray(rows) ? rows : []); renderActivity(); })
-          .catch(function(){ activityItems = mergeActivity([]); renderActivity(); });
+          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; renderActivity(); })
+          .catch(function(){ activityItems = []; renderActivity(); });
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
         window.__luminaActivityGoWrapped = true;

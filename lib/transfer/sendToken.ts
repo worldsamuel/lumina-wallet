@@ -70,16 +70,8 @@ function extractTxHash(payload: MiniKitSendResult) {
     payload.transactionHash ??
     payload.transaction_id ??
     payload.transactionId ??
-    payload.userOpHash ??
     undefined
   );
-}
-
-function minikitPaymentToken(symbol: string) {
-  const upper = symbol.toUpperCase();
-  if (upper === "WLD") return "WLD";
-  if (upper === "USDC" || upper === "USDCE") return "USDCE";
-  return null;
 }
 
 function normalizeError(error: unknown) {
@@ -104,41 +96,6 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
 
   if (amountWei <= 0n) {
     return { status: "failed", error: "Amount must be > 0" };
-  }
-
-  const paymentToken = params.tokenAddress === null ? null : minikitPaymentToken(params.tokenSymbol);
-  if (paymentToken) {
-    try {
-      const result = (await MiniKit.pay({
-        reference: crypto.randomUUID().replace(/-/g, ""),
-        to: params.recipient,
-        tokens: [{ symbol: paymentToken as never, token_amount: params.amountHuman.replace(/,/g, "").trim() }],
-        description: `Lumina transfer ${params.amountHuman} ${params.tokenSymbol.toUpperCase()}`,
-      })) as {
-        data?: MiniKitSendResult & { transactionId?: string; reference?: string };
-      } & MiniKitSendResult;
-      const payload = extractPayload(result);
-
-      if (payload.status && payload.status !== "success") {
-        const errCode = payload.error_code ?? payload.message ?? "generic_error";
-        if (errCode === "user_rejected") return { status: "user_rejected" };
-        return { status: "failed", error: errCode };
-      }
-
-      if (payload.error_code) {
-        if (payload.error_code === "user_rejected") return { status: "user_rejected" };
-        return { status: "failed", error: payload.error_code };
-      }
-
-      return {
-        status: "success",
-        txHash: extractTxHash(payload),
-      };
-    } catch (error) {
-      const code = normalizeError(error);
-      if (code === "user_rejected") return { status: "user_rejected" };
-      return { status: "failed", error: code };
-    }
   }
 
   const transaction =
