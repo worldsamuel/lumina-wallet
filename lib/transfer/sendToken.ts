@@ -149,11 +149,37 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     ),
   );
 
+  const miniKitStatus = MiniKit as unknown as { isInstalled?: () => boolean };
+  console.log("[STEP 1] About to call MiniKit.sendTransaction");
+  console.log("[STEP 1] MiniKit.isInstalled?", miniKitStatus.isInstalled?.());
+  console.log(
+    "[STEP 1] payload:",
+    JSON.stringify(
+      transaction,
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
+      2,
+    ),
+  );
+
+  const startTime = Date.now();
+
   try {
     const result = (await MiniKit.sendTransaction({
       chainId: 480,
       transactions: transaction as never,
-    })) as MiniKitSendResult;
+    })) as MiniKitSendResult & {
+      commandPayload?: unknown;
+      finalPayload?: {
+        status?: string;
+        transaction_id?: string;
+      };
+    };
+    console.log("[STEP 2] sendTransaction returned after", Date.now() - startTime, "ms");
+    console.log("[STEP 2] result:", JSON.stringify(result, null, 2));
+    console.log("[STEP 2] result.commandPayload:", result?.commandPayload);
+    console.log("[STEP 2] result.finalPayload:", result?.finalPayload);
+    console.log("[STEP 2] result.finalPayload?.status:", result?.finalPayload?.status);
+    console.log("[STEP 2] result.finalPayload?.transaction_id:", result?.finalPayload?.transaction_id);
     console.log("=== MiniKit success ===");
     console.log(JSON.stringify(result, null, 2));
     const payload = extractPayload(result);
@@ -179,6 +205,10 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
       message?: unknown;
       code?: unknown;
     };
+    console.log("[STEP 2 ERROR] threw after", Date.now() - startTime, "ms");
+    console.log("[STEP 2 ERROR] name:", err?.name);
+    console.log("[STEP 2 ERROR] message:", err?.message);
+    console.log("[STEP 2 ERROR] code:", err?.code);
     console.log("=== MiniKit error ===");
     console.log("name:", err?.name);
     console.log("message:", err?.message);
