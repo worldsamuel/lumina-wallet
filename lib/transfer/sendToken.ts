@@ -41,6 +41,9 @@ export const ERROR_MESSAGES: Record<string, string> = {
   insufficient_funds_for_gas: "ETH 不够付 gas 费",
   invalid_address: "收款地址格式不对",
   network_error: "网络错误,请重试",
+  payment_rejected: "交易被拒绝,请检查收款地址和金额",
+  invalid_receiver: "收款地址无效",
+  user_blocked: "当前账号暂时无法发起付款",
   input_error: "交易参数有误,请检查金额和地址",
   invalid_operation: "交易暂时无法执行",
   simulation_failed: "链上模拟失败,请检查余额或稍后重试",
@@ -72,6 +75,13 @@ function extractTxHash(payload: MiniKitSendResult) {
   );
 }
 
+function minikitPaymentToken(symbol: string) {
+  const upper = symbol.toUpperCase();
+  if (upper === "WLD") return "WLD";
+  if (upper === "USDC" || upper === "USDCE") return "USDCE";
+  return null;
+}
+
 function normalizeError(error: unknown) {
   if (typeof error === "object" && error && "code" in error) {
     return String((error as { code?: unknown }).code);
@@ -94,6 +104,41 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
 
   if (amountWei <= 0n) {
     return { status: "failed", error: "Amount must be > 0" };
+  }
+
+  const paymentToken = params.tokenAddress === null ? null : minikitPaymentToken(params.tokenSymbol);
+  if (paymentToken) {
+    try {
+      const result = (await MiniKit.pay({
+        reference: crypto.randomUUID().replace(/-/g, ""),
+        to: params.recipient,
+        tokens: [{ symbol: paymentToken as never, token_amount: params.amountHuman.replace(/,/g, "").trim() }],
+        description: `Lumina transfer ${params.amountHuman} ${params.tokenSymbol.toUpperCase()}`,
+      })) as {
+        data?: MiniKitSendResult & { transactionId?: string; reference?: string };
+      } & MiniKitSendResult;
+      const payload = extractPayload(result);
+
+      if (payload.status && payload.status !== "success") {
+        const errCode = payload.error_code ?? payload.message ?? "generic_error";
+        if (errCode === "user_rejected") return { status: "user_rejected" };
+        return { status: "failed", error: errCode };
+      }
+
+      if (payload.error_code) {
+        if (payload.error_code === "user_rejected") return { status: "user_rejected" };
+        return { status: "failed", error: payload.error_code };
+      }
+
+      return {
+        status: "success",
+        txHash: extractTxHash(payload),
+      };
+    } catch (error) {
+      const code = normalizeError(error);
+      if (code === "user_rejected") return { status: "user_rejected" };
+      return { status: "failed", error: code };
+    }
   }
 
   const transaction =
