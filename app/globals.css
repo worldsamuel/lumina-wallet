@@ -164,8 +164,8 @@
   #view-home .balance-top { display: block; position: relative; z-index: 1; }
   #view-home .balance-label { color: #a9afa9; font-size: 15px; font-weight: 600; gap: 10px; }
   #view-home .balance-label .eye { color: #8f958f; }
-  #view-home .balance-amount { position: relative; z-index: 1; margin: 16px 0 9px; font-size: clamp(46px, 14.5vw, 62px); line-height: .95; font-weight: 950; letter-spacing: 0; }
-  #view-home .balance-change { position: relative; z-index: 1; font-size: 17px; font-weight: 800; color: var(--green); }
+  #view-home .balance-amount { position: relative; z-index: 1; max-width: min(100%, 520px); margin: 16px 0 9px; font-size: clamp(40px, 12.4vw, 58px); line-height: .98; font-weight: 950; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  #view-home .balance-change { position: relative; z-index: 1; font-size: 16px; font-weight: 800; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   #view-home .balance-change .sub { color: var(--green); font-weight: 800; margin-left: 8px; }
   #view-home .balance-change.down,
   #view-home .balance-change.down .sub { color: var(--red); }
@@ -221,13 +221,14 @@
   .asset .spark { width: 80px; height: 34px; }
   .asset .vals { text-align: right; white-space: nowrap; } .asset .vals .amt { font-weight: 700; font-size: 15px; } .asset .vals .usd { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
   #view-home .assets { margin: 0 var(--pad-screen); border: none; border-radius: 24px; background: #101110; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025); }
-  #view-home .asset.home-v2-asset { grid-template-columns: 52px minmax(0,1fr) minmax(88px,auto) 14px; gap: 12px; min-height: 76px; padding: 12px 15px; border-bottom-color: rgba(255,255,255,0.055); }
+  #view-home .asset.home-v2-asset { grid-template-columns: 52px minmax(0,1fr) minmax(96px,104px) 14px; gap: 12px; min-height: 76px; padding: 12px 15px; border-bottom-color: rgba(255,255,255,0.055); }
   #view-home .asset.home-v2-asset .coin { width: 46px; height: 46px; font-size: 17px; flex-shrink: 0; }
   #view-home .asset.home-v2-asset .name { min-width: 0; }
   #view-home .asset.home-v2-asset .name .sym { font-size: 16px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #view-home .asset.home-v2-asset .name .full { margin-top: 4px; color: #8f958f; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #view-home .asset.home-v2-asset .vals .amt { font-size: 14px; font-weight: 900; }
-  #view-home .asset.home-v2-asset .vals .usd { margin-top: 5px; color: #8a908a; font-size: 13px; font-weight: 650; }
+  #view-home .asset.home-v2-asset .vals { min-width: 0; max-width: 104px; font-variant-numeric: tabular-nums; }
+  #view-home .asset.home-v2-asset .vals .amt { font-size: 14px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #view-home .asset.home-v2-asset .vals .usd { margin-top: 5px; color: #8a908a; font-size: 12px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #view-home .home-asset-chev { color: #787f78; font-size: 32px; line-height: 1; transform: translateY(-1px); }
   #view-home .home-add-token-row { width: calc(100% - 24px); min-height: 52px; margin: 12px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 16px; background: transparent; color: var(--green); display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 15px; font-weight: 850; cursor: pointer; }
   #view-home .home-add-token-row span { font-size: 25px; line-height: 1; transform: translateY(-1px); }

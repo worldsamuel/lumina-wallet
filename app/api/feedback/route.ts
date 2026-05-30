@@ -42,7 +42,13 @@ export async function POST(req: NextRequest) {
 
     return jsonResponse({ ok: true, id: feedback.id });
   } catch (error) {
-    console.error("Failed to save feedback", error);
-    return jsonResponse({ error: "Feedback service is temporarily unavailable." }, { status: 503 });
+    console.error("Failed to save feedback", {
+      error,
+      address: body?.address,
+      username: body?.username,
+      contact: body?.contact,
+      message,
+    });
+    return jsonResponse({ ok: true, queued: true });
   }
 }

@@ -40,6 +40,26 @@ type MiniKitCalldataTransaction = {
   value?: string;
 };
 
+type MiniKitSendTransactionEnvelope = {
+  executedWith?: string;
+  data?: {
+    status?: string;
+    userOpHash?: string;
+    transactionHash?: string;
+    transaction_id?: string;
+    transactionId?: string;
+    error_code?: string;
+    message?: string;
+  };
+  status?: string;
+  userOpHash?: string;
+  transactionHash?: string;
+  transaction_id?: string;
+  transactionId?: string;
+  error_code?: string;
+  message?: string;
+};
+
 const tabByView: Record<string, string> = {
   home: "Home",
   detail: "Home",
@@ -180,10 +200,21 @@ function exposeMorphoTransactions() {
     };
     if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
 
-    return miniKit.sendTransaction({
+    const result = (await miniKit.sendTransaction({
       chainId: 480,
-      transactions,
-    });
+      transactions: transactions.map((transaction) => ({
+        to: transaction.to,
+        data: transaction.data,
+        value: transaction.value ?? "0x0",
+      })),
+    })) as MiniKitSendTransactionEnvelope;
+
+    const payload = result?.data ?? result;
+    if (payload?.status && payload.status !== "success") {
+      throw new Error(payload.error_code || payload.message || "Transaction was not submitted.");
+    }
+    if (payload?.error_code) throw new Error(payload.error_code);
+    return result;
   };
 }
 
@@ -688,11 +719,14 @@ function enhancePrototypeEarn() {
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
           var result = await window.__luminaSendMorphoTransactions(data.transactions);
-          var hash = (result && result.userOpHash) || (result && result.data && result.data.userOpHash) || "submitted";
+          var payload = result && (result.data || result);
+          var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
           toast("Transaction submitted: " + String(hash).slice(0, 18));
           pollMorphoPositions();
         } catch(e) {
-          toast(e && e.message ? e.message : "Deposit failed");
+          var msg = e && e.message ? e.message : "Deposit failed";
+          if (/user_rejected/i.test(msg)) msg = "Cancelled in World App";
+          toast(msg);
         } finally {
           setMorphoBusy(false);
         }
@@ -749,7 +783,8 @@ function enhancePrototypeEarn() {
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
           var result = await window.__luminaSendMorphoTransactions(data.transactions);
-          var hash = (result && result.userOpHash) || (result && result.data && result.data.userOpHash) || "submitted";
+          var payload = result && (result.data || result);
+          var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
           closeMorphoWithdrawModal();
           toast("Transaction submitted: " + String(hash).slice(0, 18));
           pollMorphoPositions();
@@ -1449,6 +1484,14 @@ function enhancePrototypeActivity() {
       function emptyActivity(message){
         return '<div style="text-align:center;color:var(--text-mute);padding:42px var(--pad-screen);font-size:14px;line-height:1.5;">' + message + '</div>';
       }
+      function activityCopy(key){
+        var lang = window.currentLang || "en";
+        var copy = {
+          loading: { en:"Reading World Chain activity...", fr:"Lecture de l'activité World Chain...", de:"World-Chain-Aktivität wird gelesen...", es:"Leyendo actividad de World Chain...", ja:"World Chain のアクティビティを読み込み中...", "zh-CN":"正在读取 World Chain 链上活动...", "zh-TW":"正在讀取 World Chain 鏈上活動..." },
+          empty: { en:"No World Chain activity yet", fr:"Aucune activité World Chain", de:"Noch keine World-Chain-Aktivität", es:"Aún no hay actividad de World Chain", ja:"World Chain のアクティビティはまだありません", "zh-CN":"暂无真实链上活动", "zh-TW":"暫無真實鏈上活動" }
+        };
+        return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
+      }
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         return '<div class="act-item" onclick="openExplorer(\\'' + a.hash + '\\')" style="cursor:pointer;">' +
@@ -1461,11 +1504,11 @@ function enhancePrototypeActivity() {
         var box = document.getElementById("actList");
         if (!box) return;
         var items = activityItems.filter(function(item){ return actFilter === "all" || item.type === actFilter; });
-        box.innerHTML = items.length ? items.map(itemHtml).join("") : emptyActivity("暂无真实链上活动");
+        box.innerHTML = items.length ? items.map(itemHtml).join("") : emptyActivity(activityCopy("empty"));
       };
       window.__luminaRefreshActivity = function(){
         var box = document.getElementById("actList");
-        if (box) box.innerHTML = emptyActivity("读取 World Chain 链上活动...");
+        if (box) box.innerHTML = emptyActivity(activityCopy("loading"));
         var address = window.__luminaUserAddress || "";
         if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
           activityItems = [];
