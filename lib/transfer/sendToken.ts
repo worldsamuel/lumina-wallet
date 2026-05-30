@@ -1,21 +1,9 @@
 import { MiniKit } from "@worldcoin/minikit-js";
+import { Tokens } from "@worldcoin/minikit-js/commands";
 import { isAddress, parseUnits, type Address } from "viem";
 import { publicClient } from "../chain";
 
 const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address;
-
-const transferAbi = [
-  {
-    name: "transfer",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "to", type: "address" },
-      { name: "amount", type: "uint256" },
-    ],
-    outputs: [{ type: "bool" }],
-  },
-] as const;
 
 const erc20MinABI = [
   {
@@ -42,23 +30,24 @@ export interface SendResult {
   error?: string;
 }
 
-type MiniKitSendResult = {
-  status?: string;
-  userOpHash?: string;
-  transactionHash?: string | null;
-  transaction_id?: string | null;
-  transactionId?: string | null;
-  error_code?: string;
-  message?: string;
+type MiniKitPayResult = {
+  executedWith?: string;
   data?: {
+    transactionId?: string;
+    transaction_id?: string;
+    reference?: string;
+    from?: string;
+    chain?: string;
+    timestamp?: string;
     status?: string;
-    userOpHash?: string;
-    transactionHash?: string | null;
-    transaction_id?: string | null;
-    transactionId?: string | null;
     error_code?: string;
     message?: string;
   };
+  transactionId?: string;
+  transaction_id?: string;
+  status?: string;
+  error_code?: string;
+  message?: string;
 };
 
 export const ERROR_MESSAGES: Record<string, string> = {
@@ -87,17 +76,12 @@ export function friendlySendError(error?: string) {
   return ERROR_MESSAGES[error] ?? error;
 }
 
-function extractPayload(result: MiniKitSendResult) {
+function extractPayPayload(result: MiniKitPayResult) {
   return result.data ?? result;
 }
 
-function extractTxHash(payload: MiniKitSendResult) {
-  return (
-    payload.transactionHash ??
-    payload.transaction_id ??
-    payload.transactionId ??
-    undefined
-  );
+function extractPayTransactionId(payload: MiniKitPayResult) {
+  return payload.transactionId ?? payload.transaction_id ?? undefined;
 }
 
 function normalizeError(error: unknown) {
@@ -133,25 +117,34 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     return { status: "failed", error: "Amount must be > 0" };
   }
 
-  const transaction =
-    params.tokenAddress === null
-      ? [
-          {
-            address: params.recipient as Address,
-            abi: [],
-            functionName: "",
-            args: [],
-            value: amountWei.toString(),
-          },
-        ]
-      : [
-          {
-            address: params.tokenAddress,
-            abi: transferAbi,
-            functionName: "transfer",
-            args: [params.recipient as Address, amountWei.toString()],
-          },
-        ];
+  const payToken =
+    params.tokenSymbol.toUpperCase() === "WLD"
+      ? Tokens.WLD
+      : params.tokenSymbol.toUpperCase() === "USDC"
+        ? Tokens.USDC
+        : null;
+
+  if (!payToken) {
+    return {
+      status: "failed",
+      error: "MiniKit Pay currently supports WLD and USDC transfers only",
+    };
+  }
+
+  const referenceBase = params.userAddress && isAddress(params.userAddress)
+    ? params.userAddress.slice(2, 12)
+    : "guest";
+  const payPayload = {
+    reference: `lumina-${referenceBase}-${Date.now()}`.slice(0, 36),
+    to: params.recipient as Address,
+    tokens: [
+      {
+        symbol: payToken,
+        token_amount: amountWei.toString(),
+      },
+    ],
+    description: `Transfer ${params.amountHuman} ${params.tokenSymbol.toUpperCase()}`,
+  };
 
   console.log("=== SEND TX DEBUG ===");
   console.log("token:", {
@@ -163,10 +156,10 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
   console.log("recipient:", params.recipient);
   console.log("amountHuman:", params.amountHuman);
   console.log("amountWei:", amountWei.toString());
-  console.log("transaction payload:");
+  console.log("pay payload:");
   console.log(
     JSON.stringify(
-      transaction,
+      payPayload,
       (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       2,
     ),
@@ -196,12 +189,12 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
   }
 
   const miniKitStatus = MiniKit as unknown as { isInstalled?: () => boolean };
-  console.log("[STEP 1] About to call MiniKit.sendTransaction");
+  console.log("[STEP 1] About to call MiniKit.pay");
   console.log("[STEP 1] MiniKit.isInstalled?", miniKitStatus.isInstalled?.());
   console.log(
     "[STEP 1] payload:",
     JSON.stringify(
-      transaction,
+      payPayload,
       (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       2,
     ),
@@ -211,30 +204,17 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
 
   console.log("[A1] Before await");
   console.log("[A2] typeof MiniKit:", typeof MiniKit);
-  console.log(
-    "[A3] typeof MiniKit.commandsAsync:",
-    safeTypeOf(() => (MiniKit as unknown as { commandsAsync?: unknown }).commandsAsync),
-  );
-  console.log(
-    "[A4] typeof sendTransaction:",
-    safeTypeOf(
-      () =>
-        (MiniKit as unknown as { commandsAsync?: { sendTransaction?: unknown } }).commandsAsync
-          ?.sendTransaction,
-    ),
-  );
+  console.log("[A3] typeof MiniKit.pay:", safeTypeOf(() => MiniKit.pay));
+  console.log("[A4] typeof MiniKit.sendTransaction:", safeTypeOf(() => MiniKit.sendTransaction));
 
   try {
-    const txPromise = MiniKit.sendTransaction({
-      chainId: 480,
-      transactions: transaction as never,
-    });
+    const txPromise = MiniKit.pay(payPayload);
     const timeoutPromise = new Promise<never>((_resolve, reject) =>
       setTimeout(() => reject(new Error("TIMEOUT_15S")), 15000),
     );
     console.log("[A5] Promise created, racing with 15s timeout");
 
-    const result = (await Promise.race([txPromise, timeoutPromise])) as MiniKitSendResult & {
+    const result = (await Promise.race([txPromise, timeoutPromise])) as MiniKitPayResult & {
       commandPayload?: unknown;
       finalPayload?: {
         status?: string;
@@ -242,7 +222,7 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
       };
     };
     console.log("[A6] SUCCESS, result:", JSON.stringify(result, null, 2));
-    console.log("[STEP 2] sendTransaction returned after", Date.now() - startTime, "ms");
+    console.log("[STEP 2] pay returned after", Date.now() - startTime, "ms");
     console.log("[STEP 2] result:", JSON.stringify(result, null, 2));
     console.log("[STEP 2] result.commandPayload:", result?.commandPayload);
     console.log("[STEP 2] result.finalPayload:", result?.finalPayload);
@@ -250,7 +230,7 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     console.log("[STEP 2] result.finalPayload?.transaction_id:", result?.finalPayload?.transaction_id);
     console.log("=== MiniKit success ===");
     console.log(JSON.stringify(result, null, 2));
-    const payload = extractPayload(result);
+    const payload = extractPayPayload(result);
 
     if (payload.status && payload.status !== "success") {
       const errCode = payload.error_code ?? payload.message ?? "generic_error";
@@ -265,7 +245,7 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
 
     return {
       status: "success",
-      txHash: extractTxHash(payload),
+      txHash: extractPayTransactionId(payload),
     };
   } catch (error) {
     const err = error as {
