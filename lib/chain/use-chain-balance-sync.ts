@@ -38,7 +38,7 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
-    { dedupingInterval: 15_000, refreshInterval: 30_000, revalidateOnFocus: false },
+    { dedupingInterval: 5_000, refreshInterval: 10_000, revalidateOnFocus: true },
   );
   const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
     dedupingInterval: 15_000,
@@ -50,6 +50,20 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     refreshInterval: 30_000,
     revalidateOnFocus: false,
   });
+
+  useEffect(() => {
+    if (!enabled || !userAddress) return;
+
+    const refreshBalances = () => {
+      void balances.mutate();
+    };
+    document.addEventListener("visibilitychange", refreshBalances);
+    window.addEventListener("focus", refreshBalances);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshBalances);
+      window.removeEventListener("focus", refreshBalances);
+    };
+  }, [balances, enabled, userAddress]);
 
   useEffect(() => {
     if (!enabled) return;

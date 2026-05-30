@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress, type Address } from "viem";
 import { fetchBalances } from "@/lib/balances";
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 5_000;
 
 type CachedBalances = {
   expiresAt: number;
@@ -23,6 +23,7 @@ function serializeBalances(balances: Awaited<ReturnType<typeof fetchBalances>>) 
  */
 export async function GET(request: NextRequest) {
   const address = request.nextUrl.searchParams.get("address");
+  const refresh = request.nextUrl.searchParams.get("refresh") === "1";
 
   if (!address || !isAddress(address)) {
     return NextResponse.json({ error: "Invalid wallet address." }, { status: 400 });
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
 
   const cacheKey = address.toLowerCase();
   const cached = balanceCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  if (!refresh && cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ balances: cached.data, cached: true });
   }
 
