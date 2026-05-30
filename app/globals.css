@@ -47,7 +47,7 @@
   #view-swap .swap-head .back-btn { display: none; }
   .view > .swap-head .gear { position: absolute; top: 15px; right: var(--pad-screen); margin: 0; color: var(--text); background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   #view-swap > .swap-head { pointer-events: none; }
-  #view-swap .swap-head .gear { pointer-events: auto; top: 22px; right: calc(var(--pad-screen) + 16px); width: 40px; height: 40px; color: #e9eee9; background: #101210; border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
+  #view-swap .swap-head .gear { pointer-events: auto; top: 4px; right: calc(var(--pad-screen) + 16px); width: 40px; height: 40px; color: #e9eee9; background: #101210; border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
   #view-swap .swap-head .gear svg { width: 23px; height: 23px; }
   #view-home .balance-card,
   #view-earn .earn-hero,
@@ -511,6 +511,10 @@
   .earn-amount-row span { color: var(--text-dim); font-size: 13px; font-weight: 800; }
   .earn-action-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
   .earn-action-row button { min-height: 50px; border: none; border-radius: 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+  .earn-action-row button:disabled { background: var(--surface-3) !important; color: var(--text-mute) !important; cursor: not-allowed; }
+  .earn-dev-note { margin-bottom: 14px; padding: 12px; border: 1px solid rgba(245,196,81,0.18); border-radius: 12px; background: rgba(245,196,81,0.07); color: #d9b863; font-size: 12px; line-height: 1.5; }
+  .earn-dev-note strong { display: block; color: #f5c451; font-size: 13px; margin-bottom: 4px; }
+  .earn-dev-note span { display: block; }
   .earn-hero .claim:disabled { background: var(--surface-3); color: var(--text-mute); cursor: not-allowed; }
   /* Me */
   .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; display: flex; align-items: center; gap: 16px; }

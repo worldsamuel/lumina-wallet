@@ -72,6 +72,13 @@ export type MarketToken = {
 
 let cached: { expiresAt: number; data: MarketToken[] } | null = null;
 let lastGood: MarketToken[] = [];
+const ohlcvCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    data: Array<{ timestamp: number; open: number; high: number; low: number; close: number; volume: number }>;
+  }
+>();
 
 function num(value: unknown) {
   const parsed = Number.parseFloat(String(value ?? ""));
@@ -231,18 +238,25 @@ export async function getWorldChainMarkets() {
 export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggregate = "1", limit = "60") {
   if (!/^0x[a-fA-F0-9]{40}$/.test(poolAddress)) return [];
   const safeTimeframe = ["minute", "hour", "day"].includes(timeframe) ? timeframe : "day";
+  const safeAggregate = String(Math.max(1, Math.min(30, Number.parseInt(aggregate, 10) || 1)));
+  const safeLimit = String(Math.max(10, Math.min(365, Number.parseInt(limit, 10) || 60)));
+  const cacheKey = `${poolAddress.toLowerCase()}:${safeTimeframe}:${safeAggregate}:${safeLimit}`;
+  const cachedOhlcv = ohlcvCache.get(cacheKey);
+  if (cachedOhlcv && cachedOhlcv.expiresAt > Date.now()) return cachedOhlcv.data;
+
   const params = new URLSearchParams({
-    aggregate: String(Math.max(1, Math.min(30, Number.parseInt(aggregate, 10) || 1))),
-    limit: String(Math.max(10, Math.min(200, Number.parseInt(limit, 10) || 60))),
+    aggregate: safeAggregate,
+    limit: safeLimit,
     currency: "usd",
   });
   const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
     headers: { accept: "application/json" },
-    next: { revalidate: 30 },
+    next: { revalidate: 180 },
+    signal: AbortSignal.timeout(7000),
   });
   if (!response.ok) throw new Error(`GeckoTerminal OHLCV responded ${response.status}`);
   const body = (await response.json()) as GeckoOhlcvResponse;
-  return (body.data?.attributes?.ohlcv_list ?? []).map(([timestamp, open, high, low, close, volume]) => ({
+  const data = (body.data?.attributes?.ohlcv_list ?? []).map(([timestamp, open, high, low, close, volume]) => ({
     timestamp,
     open,
     high,
@@ -250,4 +264,6 @@ export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggre
     close,
     volume,
   }));
+  ohlcvCache.set(cacheKey, { data, expiresAt: Date.now() + 180_000 });
+  return data;
 }

@@ -357,24 +357,12 @@ function enhancePrototypeBuiltinTokenLogos() {
 }
 
 /**
- * Replaces prototype Earn demo balances with a zero-starting position flow.
+ * Keeps Earn read-only until audited contracts are connected.
  */
 function enhancePrototypeEarn() {
   const source = `
     (function(){
-      var storeKey = "lumina_earn_positions_v1";
       var activeEarnIndex = 0;
-      var earnTimer = null;
-
-      function readStore(){
-        try { return JSON.parse(localStorage.getItem(storeKey) || "{}"); } catch(e) { return {}; }
-      }
-      function writeStore(value){
-        try { localStorage.setItem(storeKey, JSON.stringify(value)); } catch(e) {}
-      }
-      function apyNum(product){
-        return (parseFloat(String(product.apy).replace("%", "")) || 0) / 100;
-      }
       function tokenFromMin(product){
         var parts = String(product.min || "").trim().split(/\\s+/);
         return parts[1] || "TOKEN";
@@ -382,37 +370,16 @@ function enhancePrototypeEarn() {
       function minAmount(product){
         return parseFloat(String(product.min || "0").replace(/,/g, "")) || 0;
       }
-      function earnedFor(product, position){
-        if (!position || !position.amount || !position.startedAt) return 0;
-        var elapsed = Math.max(0, Date.now() - position.startedAt) / 1000;
-        return position.amount * apyNum(product) * (elapsed / (365 * 24 * 60 * 60));
-      }
-      function fmtEarn(value){
-        var n = Number(value) || 0;
-        if (n === 0) return "0";
-        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 });
-      }
-      function totalEarned(){
-        var store = readStore();
-        return products.reduce(function(sum, p){
-          return sum + earnedFor(p, store[p.id]);
-        }, 0);
-      }
       function updateEarnHero(){
-        var total = totalEarned();
         var totalEl = document.getElementById("earnTotal");
-        if (totalEl) totalEl.textContent = fmtEarn(total);
+        if (totalEl) totalEl.textContent = "0";
         var sub = document.querySelector(".earn-hero .sub");
-        if (sub) sub.textContent = total > 0 ? "Earning live from active positions" : "No active positions yet";
+        if (sub) sub.textContent = "Earn contracts are not live yet";
         var claim = document.querySelector(".earn-hero .claim");
-        if (claim) claim.disabled = total <= 0;
-      }
-      function positionMeta(product){
-        var store = readStore();
-        var pos = store[product.id] || { amount: 0 };
-        var token = tokenFromMin(product);
-        var earned = earnedFor(product, pos);
-        return { pos: pos, token: token, earned: earned };
+        if (claim) {
+          claim.disabled = true;
+          claim.textContent = "Coming soon";
+        }
       }
 
       products.forEach(function(product){ product.mine = "0 " + tokenFromMin(product); });
@@ -422,7 +389,7 @@ function enhancePrototypeEarn() {
         if (!box) return;
         box.innerHTML = products.map(function(p, i){
           var border = p.icBorder ? ("border:" + p.icBorder + ";") : "";
-          var meta = positionMeta(p);
+          var token = tokenFromMin(p);
           return '<div class="prod" onclick="openEarn(' + i + ')">' +
             '<div class="top">' +
               '<div class="ic" style="background:' + p.icBg + ';color:' + p.icColor + ';' + border + '">' + p.ic + '</div>' +
@@ -431,18 +398,16 @@ function enhancePrototypeEarn() {
             '</div>' +
             '<div class="meta">' +
               '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span></div></div>' +
-              '<div class="m"><div class="k">Deposit</div><div class="val">' + fmtEarn(meta.pos.amount || 0) + ' ' + meta.token + '</div></div>' +
-              '<div class="m"><div class="k">Earned</div><div class="val">' + fmtEarn(meta.earned) + ' ' + meta.token + '</div></div>' +
+              '<div class="m"><div class="k">Deposit</div><div class="val">Not live</div></div>' +
+              '<div class="m"><div class="k">Earned</div><div class="val">0 ' + token + '</div></div>' +
             '</div></div>';
         }).join('');
         updateEarnHero();
       };
 
       function renderEarnDetail(product){
-        var meta = positionMeta(product);
-        var token = meta.token;
-        var amount = fmtEarn(meta.pos.amount || 0);
-        document.getElementById("edMine").textContent = amount + " " + token + " · Earned " + fmtEarn(meta.earned) + " " + token;
+        var token = tokenFromMin(product);
+        document.getElementById("edMine").textContent = "0 " + token + " · Earned 0 " + token;
         var card = document.getElementById("earnActionCard");
         if (!card) {
           card = document.createElement("div");
@@ -453,11 +418,12 @@ function enhancePrototypeEarn() {
         }
         var min = minAmount(product);
         card.innerHTML =
+          '<div class="earn-dev-note"><strong>Earn is not live</strong><span>Deposit/Withdraw will stay disabled until an audited World Chain vault or staking contract is connected. When live, funds will move from the user wallet to that on-chain contract by MiniKit.sendTransaction, not to Lumina servers.</span></div>' +
           '<label>Amount</label>' +
           '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" value="' + min + '" /><span>' + token + '</span></div>' +
           '<div class="earn-action-row">' +
-            '<button class="btn-primary" onclick="luminaEarnAction(\\'deposit\\')">Deposit</button>' +
-            '<button class="btn-ghost" onclick="luminaEarnAction(\\'withdraw\\')">Withdraw</button>' +
+            '<button class="btn-primary" disabled>Deposit</button>' +
+            '<button class="btn-ghost" disabled>Withdraw</button>' +
           '</div>';
       }
 
@@ -471,55 +437,22 @@ function enhancePrototypeEarn() {
         ic.style.border = p.icBorder || "none";
         document.getElementById("edApy").textContent = p.apy;
         document.getElementById("edRisk").innerHTML = '<span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span>';
-        document.getElementById("edLock").textContent = t(p.lockKey);
-        document.getElementById("edTvl").textContent = formatMoneyCompact(p.tvlNum);
+        document.getElementById("edLock").textContent = "Not live";
+        document.getElementById("edTvl").textContent = "—";
         document.getElementById("edMin").textContent = p.min;
-        document.getElementById("edDesc").textContent = t(p.descKey);
+        document.getElementById("edDesc").textContent = "Earn is currently informational only. No deposit, withdrawal, or yield is executed until a real audited contract is connected.";
         renderEarnDetail(p);
         go("earn-detail"); setTabByName("Earn");
       };
 
       window.luminaEarnAction = async function(action){
-        var product = products[activeEarnIndex];
-        var input = document.getElementById("earnAmountInput");
-        var amount = Math.max(0, parseFloat(String(input && input.value || "0").replace(/,/g, "")) || 0);
-        if (!amount) { toast("Enter amount"); return; }
-        var token = tokenFromMin(product);
-        var ok = true;
-        if (window.__luminaConfirmEarnAction) {
-          ok = await window.__luminaConfirmEarnAction({ action: action, amount: amount + " " + token, product: t(product.tKey) });
-        }
-        if (!ok) { toast("Cancelled"); return; }
-        var store = readStore();
-        var pos = store[product.id] || { amount: 0, startedAt: 0 };
-        if (action === "deposit") {
-          pos.amount = (Number(pos.amount) || 0) + amount;
-          pos.startedAt = Date.now();
-          store[product.id] = pos;
-          toast("Deposit confirmed");
-        } else {
-          pos.amount = Math.max(0, (Number(pos.amount) || 0) - amount);
-          pos.startedAt = pos.amount > 0 ? Date.now() : 0;
-          if (pos.amount > 0) store[product.id] = pos;
-          else delete store[product.id];
-          toast("Withdraw confirmed");
-        }
-        writeStore(store);
-        renderProducts();
-        go("earn"); setTabByName("Earn");
+        toast("Earn contracts are not live yet");
       };
 
       openClaimModal = function(){
-        if (totalEarned() <= 0) { toast("No yield yet"); return; }
-        toast("Claim comes after Earn contracts are live");
+        toast("Earn contracts are not live yet");
       };
 
-      if (earnTimer) clearInterval(earnTimer);
-      earnTimer = setInterval(function(){
-        updateEarnHero();
-        if (document.getElementById("view-earn").classList.contains("active")) renderProducts();
-        if (document.getElementById("view-earn-detail").classList.contains("active")) renderEarnDetail(products[activeEarnIndex]);
-      }, 5000);
       renderProducts();
       updateEarnHero();
     })();
@@ -1317,6 +1250,12 @@ function enhancePrototypeDetail() {
         pill.className = up ? "up" : "down";
         pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
       }
+      function formatChartPrice(value){
+        var n = Number(value || 0);
+        if (!Number.isFinite(n) || n <= 0) return "$0";
+        if (n >= 1) return "$" + n.toFixed(n >= 100 ? 0 : 2);
+        return "$" + n.toPrecision(3);
+      }
       function trendSvg(candles){
         if (!candles.length) return '<div class="market-detail-state"><strong>暂无 K 线</strong><span>GeckoTerminal 暂无该池子的 OHLCV 数据。</span></div>';
         var width = 420, height = 214, padX = 16, padY = 24;
@@ -1336,10 +1275,16 @@ function enhancePrototypeDetail() {
         var up = lastClose >= firstClose;
         var color = up ? "#4ade80" : "#f87171";
         var area = line + " L " + last[0].toFixed(1) + " " + (height - 10) + " L " + padX + " " + (height - 10) + " Z";
+        var labelX = Math.min(width - 88, Math.max(18, last[0] - 72));
+        var labelY = Math.max(16, Math.min(height - 42, last[1] - 32));
         return '<svg class="market-candles market-trend" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
           '<defs><linearGradient id="trendFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity="0.22"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
+          '<text x="' + (width - 12) + '" y="25" text-anchor="end" fill="#98a09a" font-size="13">' + formatChartPrice(max) + '</text>' +
+          '<text x="' + (width - 12) + '" y="' + (height - 16) + '" text-anchor="end" fill="#626862" font-size="13">' + formatChartPrice(min) + '</text>' +
           '<path d="' + area + '" fill="url(#trendFade)"/>' +
           '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<rect x="' + labelX.toFixed(1) + '" y="' + labelY.toFixed(1) + '" width="82" height="26" rx="13" fill="rgba(4,7,4,0.84)" stroke="' + color + '" stroke-opacity="0.28"/>' +
+          '<text x="' + (labelX + 41).toFixed(1) + '" y="' + (labelY + 17).toFixed(1) + '" text-anchor="middle" fill="' + color + '" font-size="12" font-weight="800">' + formatChartPrice(lastClose) + '</text>' +
           '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="5.5" fill="' + color + '"/>' +
           '</svg>';
       }
