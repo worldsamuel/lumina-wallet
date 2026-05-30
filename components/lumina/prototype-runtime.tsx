@@ -152,13 +152,12 @@ function exposeEarnWalletConfirm() {
     const miniKit = MiniKit as unknown as {
       signMessage?: (input: { message: string }) => Promise<unknown>;
     };
-    const signMessage = miniKit.signMessage;
-    if (!signMessage) {
+    if (!miniKit.signMessage) {
       return window.confirm(message);
     }
 
     try {
-      const result = await signMessage({ message });
+      const result = await miniKit.signMessage({ message });
       return !JSON.stringify(result).toLowerCase().includes("error");
     } catch {
       return false;
@@ -179,10 +178,9 @@ function exposeMorphoTransactions() {
         transactions?: MiniKitCalldataTransaction[];
       }) => Promise<unknown>;
     };
-    const sendTransaction = miniKit.sendTransaction;
-    if (!sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
+    if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
 
-    return sendTransaction({
+    return miniKit.sendTransaction({
       chainId: 480,
       transaction: transactions,
       transactions,
