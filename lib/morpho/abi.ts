@@ -18,6 +18,20 @@ export const ERC20_APPROVE_ABI = [
   },
 ] as const;
 
+export const erc20ABI = [
+  {
+    type: "function",
+    name: "transfer",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  ...ERC20_APPROVE_ABI,
+] as const;
+
 export const BUNDLER3_ABI = [
   {
     type: "function",

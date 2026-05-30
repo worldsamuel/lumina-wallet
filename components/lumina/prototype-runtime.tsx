@@ -2,12 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MiniKit } from "@worldcoin/minikit-js";
+import { useSWRConfig } from "swr";
 import { prototypeMarkup } from "./prototype-markup";
 import { prototypeScript } from "./prototype-script";
 import { shortenAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
 import { useBackendConfigSync } from "@/lib/backend/use-backend-config";
 import { useChainBalanceSync } from "@/lib/chain/use-chain-balance-sync";
+import { sendToken, friendlySendError, type SendParams, type SendResult } from "@/lib/transfer/sendToken";
+import { TOKENS } from "@/lib/tokens";
 
 type PrototypeRuntimeProps = {
   initialView: string;
@@ -28,6 +31,10 @@ declare global {
       transactions: MiniKitCalldataTransaction[],
       permit2?: MiniKitPermit2[],
     ) => Promise<unknown>;
+    __luminaSendToken?: (params: SendParams) => Promise<SendResult>;
+    __luminaFriendlySendError?: (error?: string) => string;
+    __luminaRefreshWalletData?: () => void;
+    __luminaRefreshActivity?: () => void;
   }
 }
 
@@ -100,6 +107,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const [prototypeReady, setPrototypeReady] = useState(false);
   const [dataSyncReady, setDataSyncReady] = useState(false);
   const { address, error, login, logout, status, username } = useWalletAuth();
+  const { mutate } = useSWRConfig();
   useBackendConfigSync(status === "authenticated" && dataSyncReady);
   useChainBalanceSync(status === "authenticated" && prototypeReady && dataSyncReady, address);
 
@@ -113,6 +121,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
     resetPrototypePortfolio();
+    exposeTokenTransfer(address, mutate);
     exposeEarnWalletConfirm();
     exposeMorphoTransactions();
 
@@ -136,6 +145,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeHome();
       enhancePrototypeMarket();
       enhancePrototypeSwapQuote();
+      enhancePrototypeSend();
       enhancePrototypeActivity();
       enhancePrototypeMe();
       if (initialView === "allassets") {
@@ -155,7 +165,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       setPrototypeReady(false);
       host.innerHTML = "";
     };
-  }, [address, initialView, login, logout, status, username]);
+  }, [address, initialView, login, logout, mutate, status, username]);
 
   useEffect(() => {
     if (status !== "authenticated" || !prototypeReady) {
@@ -240,6 +250,20 @@ function exposeMorphoTransactions() {
     }
     if (payload?.error_code) throw new Error(payload.error_code);
     return result;
+  };
+}
+
+function exposeTokenTransfer(
+  address: string | null,
+  mutate: ReturnType<typeof useSWRConfig>["mutate"],
+) {
+  window.__luminaFriendlySendError = friendlySendError;
+  window.__luminaSendToken = async (params) => sendToken(params);
+  window.__luminaRefreshWalletData = () => {
+    if (address) void mutate(`/api/balances?address=${address}`);
+    void mutate("/api/prices/market");
+    void mutate("/api/prices/onchain");
+    window.__luminaRefreshActivity?.();
   };
 }
 
@@ -1555,6 +1579,185 @@ function enhancePrototypeSwapQuote() {
 }
 
 /**
+ * Connects the prototype Send form to MiniKit.sendTransaction with validation and balance checks.
+ */
+function enhancePrototypeSend() {
+  const sendTokens = TOKENS.filter((token) => ["WLD", "USDC", "ETH"].includes(token.symbol)).map(
+    (token) => ({
+      symbol: token.symbol,
+      address: token.native ? null : token.contractAddress ?? null,
+      decimals: token.decimals,
+      name: token.name,
+      native: Boolean(token.native),
+    }),
+  );
+  const source = `
+    (function(){
+      var sendTokens = ${JSON.stringify(sendTokens)};
+      var sendTokenMap = {};
+      sendTokens.forEach(function(token){ sendTokenMap[token.symbol] = token; });
+      var sending = false;
+      var form = document.querySelector("#view-send .form-card");
+      if (!form) return;
+      var fields = form.querySelectorAll("input.field");
+      var recipientInput = fields[0];
+      var amountInput = fields[1];
+      var maxBtn = form.querySelector(".amount-row .max");
+      var submit = form.querySelector(".send-submit");
+      var recipientError = document.getElementById("sendRecipientError");
+      var amountError = document.getElementById("sendAmountError");
+      if (!recipientError) {
+        recipientError = document.createElement("div");
+        recipientError.id = "sendRecipientError";
+        recipientError.className = "send-field-error";
+        recipientInput.insertAdjacentElement("afterend", recipientError);
+      }
+      if (!amountError) {
+        amountError = document.createElement("div");
+        amountError.id = "sendAmountError";
+        amountError.className = "send-field-error";
+        form.querySelector(".amount-row").insertAdjacentElement("afterend", amountError);
+      }
+      function cleanAmount(value){ return String(value || "").replace(/,/g, "").trim(); }
+      function isValidAddress(value){ return /^0x[a-fA-F0-9]{40}$/.test(String(value || "").trim()); }
+      function selectedToken(){ return sendTokenMap[String(sendCurrentToken || "").toUpperCase()] || null; }
+      function balanceNumber(symbol){
+        var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
+        var n = Number(raw.replace(/,/g, ""));
+        return Number.isFinite(n) ? n : 0;
+      }
+      function setButtonLoading(active){
+        if (!submit) return;
+        submit.classList.toggle("is-loading", active);
+        submit.innerHTML = active ? '<span class="send-spinner"></span><span>处理中...</span>' : '<span data-i18n="confirmSend">确认转账</span>';
+      }
+      function validation(){
+        var token = selectedToken();
+        var recipient = recipientInput ? recipientInput.value.trim() : "";
+        var amountText = amountInput ? cleanAmount(amountInput.value) : "";
+        var amount = Number(amountText);
+        var balance = token ? balanceNumber(token.symbol) : 0;
+        var recipientMsg = "";
+        var amountMsg = "";
+        if (!token) amountMsg = "当前仅支持 WLD、USDC、ETH 转账";
+        if (recipient && !isValidAddress(recipient)) recipientMsg = "收款地址格式不对";
+        if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = "请输入大于 0 的金额";
+        if (token && Number.isFinite(amount) && amount > balance) amountMsg = "余额不足";
+        if (recipientError) recipientError.textContent = recipientMsg;
+        if (amountError) amountError.textContent = amountMsg;
+        var disabled = sending || !window.__luminaUserAddress || !token || !recipient || !isValidAddress(recipient) || !amountText || !Number.isFinite(amount) || amount <= 0 || amount > balance;
+        if (submit) {
+          submit.disabled = disabled;
+          if (!sending) setButtonLoading(false);
+        }
+        return { ok: !disabled, token: token, recipient: recipient, amountText: amountText, amount: amount, error: recipientMsg || amountMsg };
+      }
+      function setMaxAmount(){
+        var token = selectedToken();
+        if (!token || !amountInput) return;
+        var max = balanceNumber(token.symbol);
+        if (token.symbol === "ETH") max = Math.max(0, max - 0.001);
+        amountInput.value = max > 0 ? String(Number(max.toFixed(token.decimals === 6 ? 6 : 8))) : "";
+        validation();
+        toast("已填入全部可用余额");
+      }
+      function rememberActivity(token, recipient, amount, hash){
+        try {
+          var key = "lumina_local_activity";
+          var rows = JSON.parse(localStorage.getItem(key) || "[]");
+          rows.unshift({
+            hash: hash || ("pending-" + Date.now()),
+            type: "out",
+            title: "Sent " + token.symbol,
+            subtitle: "To " + recipient.slice(0, 6) + "..." + recipient.slice(-4),
+            amount: "-" + amount + " " + token.symbol,
+            status: "Submitted",
+            createdAt: Date.now()
+          });
+          localStorage.setItem(key, JSON.stringify(rows.slice(0, 20)));
+        } catch(e) {}
+      }
+      async function handleSendClick(){
+        var state = validation();
+        if (sending) return;
+        if (!state.ok) {
+          toast(state.error || "请先填写有效地址和金额");
+          return;
+        }
+        if (!window.confirm("确认转 " + state.amountText + " " + state.token.symbol + " 到 " + state.recipient + "?")) {
+          toast("已取消");
+          return;
+        }
+        sending = true;
+        setButtonLoading(true);
+        validation();
+        try {
+          if (!window.__luminaSendToken) throw new Error("MiniKit sendTransaction is unavailable.");
+          var result = await window.__luminaSendToken({
+            tokenSymbol: state.token.symbol,
+            tokenAddress: state.token.address,
+            tokenDecimals: state.token.decimals,
+            recipient: state.recipient,
+            amountHuman: state.amountText
+          });
+          if (result.status === "success") {
+            var hash = result.txHash || "";
+            rememberActivity(state.token, state.recipient, state.amountText, hash);
+            toast("转账成功! 交易: " + (hash ? hash.slice(0, 18) : "submitted"));
+            if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+            setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 500);
+            recipientInput.value = "";
+            amountInput.value = "";
+          } else if (result.status === "user_rejected") {
+            toast("您取消了交易");
+          } else {
+            var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "交易失败");
+            toast("转账失败: " + msg);
+          }
+        } catch(e) {
+          var code = e && e.message ? e.message : "generic_error";
+          var friendly = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(code) : code;
+          toast("转账失败: " + friendly);
+        } finally {
+          sending = false;
+          setButtonLoading(false);
+          validation();
+        }
+      }
+      var previousSelectSendToken = typeof selectSendToken === "function" ? selectSendToken : null;
+      if (previousSelectSendToken && !window.__luminaSendSelectWrapped) {
+        window.__luminaSendSelectWrapped = true;
+        selectSendToken = function(sym){
+          previousSelectSendToken(sym);
+          validation();
+        };
+      }
+      if (recipientInput && !recipientInput.__luminaSendWired) {
+        recipientInput.__luminaSendWired = true;
+        recipientInput.addEventListener("input", validation);
+        recipientInput.addEventListener("blur", validation);
+      }
+      if (amountInput && !amountInput.__luminaSendWired) {
+        amountInput.__luminaSendWired = true;
+        amountInput.addEventListener("input", validation);
+        amountInput.addEventListener("blur", validation);
+      }
+      if (maxBtn && !maxBtn.__luminaSendWired) {
+        maxBtn.__luminaSendWired = true;
+        maxBtn.textContent = "全部";
+        maxBtn.addEventListener("click", function(event){ event.preventDefault(); event.stopPropagation(); setMaxAmount(); });
+      }
+      if (submit && !submit.__luminaSendWired) {
+        submit.__luminaSendWired = true;
+        submit.onclick = function(event){ event.preventDefault(); handleSendClick(); };
+      }
+      validation();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance Send prototype");
+}
+
+/**
  * Replaces prototype Activity rows with real World Chain transfer history.
  */
 function enhancePrototypeActivity() {
@@ -1574,11 +1777,30 @@ function enhancePrototypeActivity() {
       }
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
-        return '<div class="act-item" onclick="openExplorer(\\'' + a.hash + '\\')" style="cursor:pointer;">' +
+        var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
+        return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'交易已提交,等待链上确认\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
-          '<div class="act-mid"><div class="t">' + a.title + ' <span style="color:var(--text-mute);font-size:11px;">↗</span></div><div class="s">' + a.subtitle + '</div></div>' +
+          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + a.subtitle + '</div></div>' +
           '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + (a.status || "Completed") + '</div></div>' +
         '</div>';
+      }
+      function localActivityItems(){
+        try {
+          var rows = JSON.parse(localStorage.getItem("lumina_local_activity") || "[]");
+          var cutoff = Date.now() - 24 * 60 * 60 * 1000;
+          return Array.isArray(rows) ? rows.filter(function(row){ return !row.createdAt || row.createdAt > cutoff; }) : [];
+        } catch(e) {
+          return [];
+        }
+      }
+      function mergeActivity(chainRows){
+        var seen = {};
+        return localActivityItems().concat(chainRows || []).filter(function(row){
+          var key = row.hash || (row.title + row.amount + row.subtitle);
+          if (seen[key]) return false;
+          seen[key] = true;
+          return true;
+        });
       }
       renderActivity = function(){
         var box = document.getElementById("actList");
@@ -1597,8 +1819,8 @@ function enhancePrototypeActivity() {
         }
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; renderActivity(); })
-          .catch(function(){ activityItems = []; renderActivity(); });
+          .then(function(rows){ activityItems = mergeActivity(Array.isArray(rows) ? rows : []); renderActivity(); })
+          .catch(function(){ activityItems = mergeActivity([]); renderActivity(); });
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
         window.__luminaActivityGoWrapped = true;
