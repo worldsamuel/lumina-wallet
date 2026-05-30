@@ -25,14 +25,15 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ error: "Username and password are required." }, { status: 400 });
   }
 
-  if (getLoginLock(username)) {
+  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
+  const initialPasswordOk = username === "admin" && !!initialPassword && password === initialPassword;
+
+  if (getLoginLock(username) && !initialPasswordOk) {
     return jsonResponse({ error: "Account temporarily locked." }, { status: 423 });
   }
 
   let admin = await db.adminUser.findUnique({ where: { username } });
   const ok = admin ? await bcrypt.compare(password, admin.passwordHash) : false;
-  const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
-  const initialPasswordOk = username === "admin" && !!initialPassword && password === initialPassword;
 
   if (!ok && initialPasswordOk) {
     const passwordHash = await bcrypt.hash(password, 12);
