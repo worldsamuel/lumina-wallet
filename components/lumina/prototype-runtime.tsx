@@ -150,10 +150,9 @@ function exposeEarnWalletConfirm() {
     }
 
     const miniKit = MiniKit as unknown as {
-      commandsAsync?: { signMessage?: (input: { message: string }) => Promise<unknown> };
       signMessage?: (input: { message: string }) => Promise<unknown>;
     };
-    const signMessage = miniKit.commandsAsync?.signMessage ?? miniKit.signMessage;
+    const signMessage = miniKit.signMessage;
     if (!signMessage) {
       return window.confirm(message);
     }
@@ -174,20 +173,13 @@ function exposeMorphoTransactions() {
     }
 
     const miniKit = MiniKit as unknown as {
-      commandsAsync?: {
-        sendTransaction?: (input: {
-          chainId?: number;
-          transaction?: MiniKitCalldataTransaction[];
-          transactions?: MiniKitCalldataTransaction[];
-        }) => Promise<unknown>;
-      };
       sendTransaction?: (input: {
         chainId?: number;
         transaction?: MiniKitCalldataTransaction[];
         transactions?: MiniKitCalldataTransaction[];
       }) => Promise<unknown>;
     };
-    const sendTransaction = miniKit.commandsAsync?.sendTransaction ?? miniKit.sendTransaction;
+    const sendTransaction = miniKit.sendTransaction;
     if (!sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
 
     return sendTransaction({
@@ -524,7 +516,7 @@ function enhancePrototypeEarn() {
       };
 
       function setMorphoBusy(isBusy){
-        ["morphoDepositBtn", "morphoBottomDepositBtn"].forEach(function(id){
+        ["morphoDepositBtn"].forEach(function(id){
           var btn = document.getElementById(id);
           if (!btn) return;
           btn.disabled = !!isBusy;
@@ -558,7 +550,39 @@ function enhancePrototypeEarn() {
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
         var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + token : "—";
-        document.getElementById("edMine").textContent = "已存入 " + deposited;
+        var lang = window.currentLang || "en";
+        var copy = lang === "zh-CN" ? {
+          deposited: "已存入 ",
+          amount: "金额",
+          wallet: "钱包余额",
+          yearly: "预计年收益",
+          daily: "预计日收益",
+          fee: "费用",
+          provider: "服务提供方",
+          curator: "Re7 Labs (Vault 策展方)",
+          deposit: "存入",
+          withdraw: "提现",
+          pausedTitle: "存款已暂停",
+          pausedBody: "紧急暂停已开启。已有仓位仍可提现。",
+          aboutTitle: "ⓘ 关于本产品",
+          aboutBody: "本理财服务由 Morpho 协议(morpho.org)提供,Re7 Labs 担任策展方。Lumina 仅作为第三方钱包入口,不托管您的资产。您的资产存入 Morpho Vault 智能合约,通过借贷市场赚取利息。智能合约已经 Spearbit、OpenZeppelin 审计,但任何 DeFi 都存在技术风险(智能合约漏洞、价格预言机故障等)。APY 实时变动,不保证收益。您可随时提现,但 vault 流动性不足时需要等待。"
+        } : {
+          deposited: "Deposited ",
+          amount: "Amount",
+          wallet: "Wallet balance",
+          yearly: "Estimated yearly yield",
+          daily: "Estimated daily yield",
+          fee: "Fee",
+          provider: "Provider",
+          curator: "Re7 Labs (Vault curator)",
+          deposit: "Deposit",
+          withdraw: "Withdraw",
+          pausedTitle: "Deposits paused",
+          pausedBody: "Emergency pause is active. Existing positions can still withdraw.",
+          aboutTitle: "ⓘ About this product",
+          aboutBody: "Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Your funds are deposited into a Morpho Vault smart contract earning yield from lending markets. Smart contracts have been audited by Spearbit and OpenZeppelin, but all DeFi protocols carry technical risk (smart contract bugs, oracle failures, etc). APY varies in real-time and is not guaranteed. You can withdraw anytime, subject to vault liquidity."
+        };
+        document.getElementById("edMine").textContent = copy.deposited + deposited;
         var card = document.getElementById("earnActionCard");
         if (!card) {
           card = document.createElement("div");
@@ -573,33 +597,28 @@ function enhancePrototypeEarn() {
         var daily = "—";
         var amount = "";
         card.innerHTML =
-          '<label>Amount</label>' +
+          '<label>' + copy.amount + '</label>' +
           '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" placeholder="0.00" /><span>' + token + '</span></div>' +
           '<div class="morpho-estimates">' +
-            '<div><span>Wallet balance</span><strong>' + wallet + '</strong></div>' +
-            '<div><span>Estimated yearly yield</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
-            '<div><span>Estimated daily yield</span><strong id="morphoDaily">' + daily + '</strong></div>' +
-            '<div><span>Fee</span><strong>0</strong></div>' +
-            '<div><span>Provider</span><strong>Morpho</strong></div>' +
+            '<div><span>' + copy.wallet + '</span><strong>' + wallet + '</strong></div>' +
+            '<div><span>' + copy.yearly + '</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
+            '<div><span>' + copy.daily + '</span><strong id="morphoDaily">' + daily + '</strong></div>' +
+            '<div><span>' + copy.fee + '</span><strong>0</strong></div>' +
+            '<div><span>' + copy.provider + '</span><strong>Morpho</strong></div>' +
           '</div>' +
-          '<div class="morpho-provider-note">Re7 Labs (Vault curator)</div>' +
+          '<div class="morpho-provider-note">' + copy.curator + '</div>' +
           '<div class="earn-action-row">' +
-            '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">Deposit</button>' +
-            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">Withdraw</button>' +
+            '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + copy.deposit + '</button>' +
+            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
           '</div>' +
-          (paused ? '<div class="earn-dev-note"><strong>Deposits paused</strong><span>Emergency pause is active. Existing positions can still withdraw.</span></div>' : "") +
+          (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + copy.pausedBody + '</span></div>' : "") +
           '<div class="morpho-compliance">' +
-            '<strong>ⓘ 关于本产品</strong>' +
-            '<p>本理财服务由 Morpho 协议(morpho.org)提供,Re7 Labs 担任策展方。Lumina 仅作为第三方钱包入口,不托管您的资产。您的资产存入 Morpho Vault 智能合约,通过借贷市场赚取利息。智能合约已经 Spearbit、OpenZeppelin 审计,但任何 DeFi 都存在技术风险(智能合约漏洞、价格预言机故障等)。APY 实时变动,不保证收益。您可随时提现,但 vault 流动性不足时需要等待。</p>' +
-            '<strong>ⓘ About this product</strong>' +
-            '<p>Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Your funds are deposited into a Morpho Vault smart contract earning yield from lending markets. Smart contracts have been audited by Spearbit and OpenZeppelin, but all DeFi protocols carry technical risk (smart contract bugs, oracle failures, etc). APY varies in real-time and is not guaranteed. You can withdraw anytime, subject to vault liquidity.</p>' +
+            '<strong>' + copy.aboutTitle + '</strong>' +
+            '<p>' + copy.aboutBody + '</p>' +
           '</div>';
         var bottomBtn = document.querySelector("#view-earn-detail > .send-submit");
         if (bottomBtn) {
-          bottomBtn.id = "morphoBottomDepositBtn";
-          bottomBtn.disabled = paused;
-          bottomBtn.textContent = paused ? "Deposits paused" : "Deposit";
-          bottomBtn.onclick = function(){ window.depositMorpho(); };
+          bottomBtn.remove();
         }
         var input = document.getElementById("earnAmountInput");
         var annualEl = document.getElementById("morphoAnnual");
@@ -618,6 +637,18 @@ function enhancePrototypeEarn() {
         }
         if (input) input.oninput = updateEstimate;
         updateEstimate();
+      }
+
+      if (!window.__luminaEarnLangPatch && typeof chooseLang === "function") {
+        window.__luminaEarnLangPatch = true;
+        var originalChooseLang = chooseLang;
+        chooseLang = function(code){
+          originalChooseLang(code);
+          var detailActive = document.getElementById("view-earn-detail");
+          if (detailActive && detailActive.classList.contains("active") && morphoVaults[activeEarnIndex]) {
+            renderEarnDetail(morphoVaults[activeEarnIndex]);
+          }
+        };
       }
 
       openEarn = function(i){
