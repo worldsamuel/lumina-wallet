@@ -35,6 +35,7 @@ declare global {
     __luminaFriendlySendError?: (error?: string) => string;
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
+    __luminaRefreshImportedTokens?: () => void;
   }
 }
 
@@ -263,6 +264,7 @@ function exposeTokenTransfer(
     if (address) void mutate(`/api/balances?address=${address}`);
     void mutate("/api/prices/market");
     void mutate("/api/prices/onchain");
+    window.__luminaRefreshImportedTokens?.();
     window.__luminaRefreshActivity?.();
   };
 }
@@ -1004,9 +1006,17 @@ function enhancePrototypeTokens() {
         list.unshift(token);
         writeJson(importStoreKey, list);
       }
+      function updateImported(token){
+        var list = importedList().map(function(item){
+          return String(item.address).toLowerCase() === String(token.address).toLowerCase() ? Object.assign({}, item, token) : item;
+        });
+        writeJson(importStoreKey, list);
+      }
       function registerImportedToken(token){
-        var key = token.symbol;
-        if (prices[key] && token.address) key = token.symbol + "_" + token.address.slice(-4).toUpperCase();
+        var key = Object.keys(customTokens || {}).find(function(sym){
+          return customTokens[sym] && String(customTokens[sym].address).toLowerCase() === String(token.address).toLowerCase();
+        }) || token.symbol;
+        if (!customTokens[key] && prices[key] && token.address) key = token.symbol + "_" + token.address.slice(-4).toUpperCase();
         var score = token.risk && token.risk.score ? token.risk.score : "mid";
         prices[key] = 0;
         tokenFull[key] = token.name || token.symbol;
@@ -1028,6 +1038,25 @@ function enhancePrototypeTokens() {
       function restoreImportedTokens(){
         importedList().forEach(function(token){ registerImportedToken(token); });
       }
+      async function refreshImportedBalances(){
+        var owner = window.__luminaUserAddress || "";
+        var list = importedList();
+        if (!owner || !/^0x[a-fA-F0-9]{40}$/.test(owner) || !list.length) return;
+        await Promise.all(list.map(async function(token){
+          try {
+            var res = await fetch("/api/token-info?address=" + encodeURIComponent(token.address) + "&owner=" + encodeURIComponent(owner), { cache: "no-store" });
+            var fresh = await res.json();
+            if (!res.ok) return;
+            updateImported(fresh);
+            registerImportedToken(fresh);
+          } catch(e) {}
+        }));
+        if (typeof renderAssets === "function") renderAssets();
+        if (typeof renderAllAssets === "function") renderAllAssets();
+      }
+      window.__luminaRefreshImportedTokens = function(){
+        refreshImportedBalances();
+      };
       function renderScanRows(risk){
         var checks = risk && Array.isArray(risk.checks) ? risk.checks : [];
         return checks.map(function(c){
@@ -1150,6 +1179,12 @@ function enhancePrototypeTokens() {
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
       restoreImportedTokens();
+      refreshImportedBalances();
+      if (!window.__luminaImportedRefreshTimer) {
+        window.__luminaImportedRefreshTimer = setInterval(refreshImportedBalances, 10000);
+        document.addEventListener("visibilitychange", refreshImportedBalances);
+        window.addEventListener("focus", refreshImportedBalances);
+      }
       ensureAllAssetsView();
     })();
   `;
@@ -1265,7 +1300,6 @@ function enhancePrototypeHome() {
         try {
           Object.keys(customTokens || {}).forEach(function(sym){
             var meta = customTokens[sym] || {};
-            if (meta.risk === "high") return;
             var full = tokenFull[sym] || meta.name || sym;
             if (filter && (sym + " " + full).toLowerCase().indexOf(filter) < 0) return;
             rows.push({ sym: sym, full: full, amt: (balances[sym] || meta.formatted || "0") + " " + sym, usdNum: 0, cls: "custom", logo: tokenLogo[sym] || tokenInitialHome(sym), custom: true });
