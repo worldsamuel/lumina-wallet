@@ -24,6 +24,7 @@ declare global {
     __luminaUserAddress?: string;
     __luminaUsername?: string;
     __luminaConfirmEarnAction?: (input: EarnConfirmInput) => Promise<boolean>;
+    __luminaSendMorphoTransactions?: (transactions: MiniKitCalldataTransaction[]) => Promise<unknown>;
   }
 }
 
@@ -31,6 +32,12 @@ type EarnConfirmInput = {
   action: "deposit" | "withdraw";
   amount: string;
   product: string;
+};
+
+type MiniKitCalldataTransaction = {
+  to: string;
+  data: string;
+  value?: string;
 };
 
 const tabByView: Record<string, string> = {
@@ -73,6 +80,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     host.appendChild(scriptEl);
     resetPrototypePortfolio();
     exposeEarnWalletConfirm();
+    exposeMorphoTransactions();
 
     requestAnimationFrame(() => {
       updatePrototypeAddress(host, address, username);
@@ -156,6 +164,37 @@ function exposeEarnWalletConfirm() {
     } catch {
       return false;
     }
+  };
+}
+
+function exposeMorphoTransactions() {
+  window.__luminaSendMorphoTransactions = async (transactions) => {
+    if (new URL(window.location.href).searchParams.get("mockWorld") === "1") {
+      return { userOpHash: `0xmock${Date.now().toString(16)}` };
+    }
+
+    const miniKit = MiniKit as unknown as {
+      commandsAsync?: {
+        sendTransaction?: (input: {
+          chainId?: number;
+          transaction?: MiniKitCalldataTransaction[];
+          transactions?: MiniKitCalldataTransaction[];
+        }) => Promise<unknown>;
+      };
+      sendTransaction?: (input: {
+        chainId?: number;
+        transaction?: MiniKitCalldataTransaction[];
+        transactions?: MiniKitCalldataTransaction[];
+      }) => Promise<unknown>;
+    };
+    const sendTransaction = miniKit.commandsAsync?.sendTransaction ?? miniKit.sendTransaction;
+    if (!sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
+
+    return sendTransaction({
+      chainId: 480,
+      transaction: transactions,
+      transactions,
+    });
   };
 }
 
@@ -320,7 +359,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         var world = "https://assets-cdn.trustwallet.com/blockchains/worldchain/assets/" + address + "/logo.png";
         var eth = "https://assets-cdn.trustwallet.com/blockchains/ethereum/assets/" + address + "/logo.png";
         var fallback = String(mark(sym) || initial(sym)).replace(/"/g, "&quot;");
-        return '<img class="lumina-token-img" src="' + world + '" alt="' + sym + ' logo" loading="lazy" data-fallback="' + eth + '" data-initial="' + fallback + '" onload="try{var k=\\'worldchain:' + address.toLowerCase() + '\\';var c=JSON.parse(localStorage.getItem(\\'lumina_token_logo_cache_v1\\')||\\'{}\\');c[k]={url:this.currentSrc||this.src,expiresAt:Date.now()+432000000};localStorage.setItem(\\'lumina_token_logo_cache_v1\\',JSON.stringify(c));}catch(e){}" onerror="if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=\\'\\';}else{this.outerHTML=this.dataset.initial||\\'';}"/>';
+        return "<img class=\\"lumina-token-img\\" src=\\"" + world + "\\" alt=\\"" + sym + " logo\\" loading=\\"lazy\\" data-cache-key=\\"worldchain:" + address.toLowerCase() + "\\" data-fallback=\\"" + eth + "\\" data-initial=\\"" + fallback + "\\" onload=\\"try{var k=this.dataset.cacheKey;var c=JSON.parse(localStorage.getItem('lumina_token_logo_cache_v1')||'{}');c[k]={url:this.currentSrc||this.src,expiresAt:Date.now()+432000000};localStorage.setItem('lumina_token_logo_cache_v1',JSON.stringify(c));}catch(e){}\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
       }
       window.__luminaTokenLogoHtml = function(symbol, fallback){
         var trusted = trustLogo(symbol);
@@ -383,58 +422,112 @@ function enhancePrototypeBuiltinTokenLogos() {
   runInPrototypeScope(source, "Failed to enhance built-in token logos");
 }
 
-/**
- * Keeps Earn read-only until audited contracts are connected.
- */
 function enhancePrototypeEarn() {
   const source = `
     (function(){
       var activeEarnIndex = 0;
-      function tokenFromMin(product){
-        var parts = String(product.min || "").trim().split(/\\s+/);
-        return parts[1] || "TOKEN";
+      var morphoVaults = [];
+      var morphoPositions = [];
+      var morphoLoading = true;
+      var morphoError = "";
+
+      function riskClass(level){
+        return level === "medium" ? "mid" : (level || "low");
       }
-      function minAmount(product){
-        return parseFloat(String(product.min || "0").replace(/,/g, "")) || 0;
+      function riskText(level){
+        var key = riskClass(level);
+        if (typeof riskKey !== "undefined" && riskKey[key]) return t(riskKey[key]);
+        return key.charAt(0).toUpperCase() + key.slice(1);
+      }
+      function fmtPct(value){
+        var n = Number(value);
+        if (!Number.isFinite(n)) return "—";
+        return (n * 100).toFixed(2) + "%";
+      }
+      function fmtCompactUsd(value){
+        var n = Number(value);
+        if (!Number.isFinite(n)) return "—";
+        return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+      }
+      function fmtAmount(value, max){
+        var n = Number(value);
+        if (!Number.isFinite(n)) return "—";
+        return n.toLocaleString(undefined, { maximumFractionDigits: max || 6 });
+      }
+      function positionFor(vault){
+        return morphoPositions.find(function(p){
+          return String(p.vaultAddress).toLowerCase() === String(vault.address).toLowerCase();
+        }) || null;
+      }
+      function vaultIcon(vault){
+        var sym = vault && vault.asset ? vault.asset.symbol : "?";
+        var fallback = sym ? sym.charAt(0).toUpperCase() : "?";
+        if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(sym, fallback);
+        return fallback;
+      }
+      function vaultDesc(vault){
+        var lang = window.currentLang || "en";
+        return (vault.description && (vault.description[lang] || vault.description.en)) || "";
       }
       function updateEarnHero(){
         var totalEl = document.getElementById("earnTotal");
-        if (totalEl) totalEl.textContent = "0";
+        if (totalEl) {
+          var active = morphoPositions.filter(function(p){ return Number(p.assetsFormatted || 0) > 0; }).length;
+          totalEl.textContent = active ? String(active) : "0";
+        }
         var sub = document.querySelector(".earn-hero .sub");
-        if (sub) sub.textContent = "Earn contracts are not live yet";
+        if (sub) sub.textContent = morphoError || "Morpho Re7 vaults on World Chain";
         var claim = document.querySelector(".earn-hero .claim");
         if (claim) {
-          claim.disabled = true;
-          claim.textContent = "Coming soon";
+          claim.disabled = morphoLoading;
+          claim.textContent = morphoLoading ? "Loading" : "Refresh";
+          claim.onclick = function(){ loadMorphoData(true); };
         }
       }
-
-      products.forEach(function(product){ product.mine = "0 " + tokenFromMin(product); });
 
       renderProducts = function(){
         var box = document.getElementById("prodList");
         if (!box) return;
-        box.innerHTML = products.map(function(p, i){
-          var border = p.icBorder ? ("border:" + p.icBorder + ";") : "";
-          var token = tokenFromMin(p);
+        if (morphoLoading && !morphoVaults.length) {
+          box.innerHTML = [0,1,2,3].map(function(){
+            return '<div class="prod morpho-skeleton"><div class="top"><div class="ic"></div><div class="nm"><div class="t"></div><div class="d"></div></div><div class="apy"><div class="v"></div><div class="l"></div></div></div><div class="meta"><div class="m"></div><div class="m"></div><div class="m"></div></div></div>';
+          }).join('');
+          updateEarnHero();
+          return;
+        }
+        if (morphoError && !morphoVaults.length) {
+          box.innerHTML = '<div class="import-load">Unable to load Morpho vaults. Pull to refresh later.</div>';
+          updateEarnHero();
+          return;
+        }
+        box.innerHTML = morphoVaults.map(function(vault, i){
+          var pos = positionFor(vault);
+          var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + vault.asset.symbol : "—";
+          var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
           return '<div class="prod" onclick="openEarn(' + i + ')">' +
             '<div class="top">' +
-              '<div class="ic" style="background:' + p.icBg + ';color:' + p.icColor + ';' + border + '">' + p.ic + '</div>' +
-              '<div class="nm"><div class="t">' + t(p.tKey) + '</div><div class="d">' + t(p.dKey) + '</div></div>' +
-              '<div class="apy"><div class="v">' + p.apy + '</div><div class="l">APY</div></div>' +
+              '<div class="ic morpho-vault-ic">' + vaultIcon(vault) + '</div>' +
+              '<div class="nm"><div class="t">' + vault.displayName + '</div><div class="d">' + vaultDesc(vault) + '</div></div>' +
+              '<div class="apy"><div class="v">' + apy + '</div><div class="l">APY <button class="apy-info-btn" onclick="event.stopPropagation(); showMorphoApyInfo()">i</button></div></div>' +
             '</div>' +
             '<div class="meta">' +
-              '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span></div></div>' +
-              '<div class="m"><div class="k">Deposit</div><div class="val">Not live</div></div>' +
-              '<div class="m"><div class="k">Earned</div><div class="val">0 ' + token + '</div></div>' +
+              '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + riskClass(vault.riskLevel) + '">' + riskText(vault.riskLevel) + '</span></div></div>' +
+              '<div class="m"><div class="k">My deposit</div><div class="val">' + deposited + '</div></div>' +
+              '<div class="m"><div class="k">TVL</div><div class="val">' + (vault.liveData ? fmtCompactUsd(vault.liveData.totalAssetsUsd) : "—") + '</div></div>' +
             '</div></div>';
         }).join('');
         updateEarnHero();
       };
 
-      function renderEarnDetail(product){
-        var token = tokenFromMin(product);
-        document.getElementById("edMine").textContent = "0 " + token + " · Earned 0 " + token;
+      window.showMorphoApyInfo = function(){
+        toast("APY 含 Morpho 协议奖励,每日变动");
+      };
+
+      function renderEarnDetail(vault){
+        var token = vault.asset.symbol;
+        var pos = positionFor(vault);
+        var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + token : "—";
+        document.getElementById("edMine").textContent = "已存入 " + deposited;
         var card = document.getElementById("earnActionCard");
         if (!card) {
           card = document.createElement("div");
@@ -443,45 +536,214 @@ function enhancePrototypeEarn() {
           var desc = document.getElementById("edDesc");
           desc.insertAdjacentElement("afterend", card);
         }
-        var min = minAmount(product);
+        var paused = !!vault.depositsPaused;
+        var wallet = pos ? fmtAmount(pos.walletBalanceFormatted, 6) + " " + token : "—";
+        var annual = "—";
+        var daily = "—";
+        var amount = "";
         card.innerHTML =
-          '<div class="earn-dev-note"><strong>Earn is not live</strong><span>Deposit/Withdraw will stay disabled until an audited World Chain vault or staking contract is connected. When live, funds will move from the user wallet to that on-chain contract by MiniKit.sendTransaction, not to Lumina servers.</span></div>' +
           '<label>Amount</label>' +
-          '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" value="' + min + '" /><span>' + token + '</span></div>' +
+          '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" placeholder="0.00" /><span>' + token + '</span></div>' +
+          '<div class="morpho-estimates">' +
+            '<div><span>Wallet balance</span><strong>' + wallet + '</strong></div>' +
+            '<div><span>Estimated yearly yield</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
+            '<div><span>Estimated daily yield</span><strong id="morphoDaily">' + daily + '</strong></div>' +
+            '<div><span>Fee</span><strong>0</strong></div>' +
+            '<div><span>Provider</span><strong>Morpho</strong></div>' +
+          '</div>' +
+          '<div class="morpho-provider-note">Re7 Labs (Vault curator)</div>' +
           '<div class="earn-action-row">' +
-            '<button class="btn-primary" disabled>Deposit</button>' +
-            '<button class="btn-ghost" disabled>Withdraw</button>' +
+            '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">Deposit</button>' +
+            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">Withdraw</button>' +
+          '</div>' +
+          (paused ? '<div class="earn-dev-note"><strong>Deposits paused</strong><span>Emergency pause is active. Existing positions can still withdraw.</span></div>' : "") +
+          '<div class="morpho-compliance">' +
+            '<strong>ⓘ 关于本产品</strong>' +
+            '<p>本理财服务由 Morpho 协议(morpho.org)提供,Re7 Labs 担任策展方。Lumina 仅作为第三方钱包入口,不托管您的资产。您的资产存入 Morpho Vault 智能合约,通过借贷市场赚取利息。智能合约已经 Spearbit、OpenZeppelin 审计,但任何 DeFi 都存在技术风险(智能合约漏洞、价格预言机故障等)。APY 实时变动,不保证收益。您可随时提现,但 vault 流动性不足时需要等待。</p>' +
+            '<strong>ⓘ About this product</strong>' +
+            '<p>Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Your funds are deposited into a Morpho Vault smart contract earning yield from lending markets. Smart contracts have been audited by Spearbit and OpenZeppelin, but all DeFi protocols carry technical risk (smart contract bugs, oracle failures, etc). APY varies in real-time and is not guaranteed. You can withdraw anytime, subject to vault liquidity.</p>' +
           '</div>';
+        var input = document.getElementById("earnAmountInput");
+        var annualEl = document.getElementById("morphoAnnual");
+        var dailyEl = document.getElementById("morphoDaily");
+        function updateEstimate(){
+          amount = input ? input.value : "";
+          var n = Number(String(amount).replace(/,/g, ""));
+          var apy = Number(vault.liveData && vault.liveData.netApy);
+          if (!Number.isFinite(n) || n <= 0 || !Number.isFinite(apy)) {
+            if (annualEl) annualEl.textContent = "—";
+            if (dailyEl) dailyEl.textContent = "—";
+            return;
+          }
+          if (annualEl) annualEl.textContent = fmtAmount(n * apy, 6) + " " + token;
+          if (dailyEl) dailyEl.textContent = fmtAmount(n * apy / 365, 8) + " " + token;
+        }
+        if (input) input.oninput = updateEstimate;
+        updateEstimate();
       }
 
       openEarn = function(i){
         activeEarnIndex = i;
-        var p = products[i];
-        document.getElementById("edTitle").textContent = t(p.tKey);
+        var p = morphoVaults[i];
+        if (!p) return;
+        document.getElementById("edTitle").textContent = p.displayName;
         var ic = document.getElementById("edIc");
-        ic.textContent = p.ic;
-        ic.style.background = p.icBg; ic.style.color = p.icColor;
-        ic.style.border = p.icBorder || "none";
-        document.getElementById("edApy").textContent = p.apy;
-        document.getElementById("edRisk").innerHTML = '<span class="risk ' + p.risk + '">' + t(riskKey[p.risk]) + '</span>';
-        document.getElementById("edLock").textContent = "Not live";
-        document.getElementById("edTvl").textContent = "—";
-        document.getElementById("edMin").textContent = p.min;
-        document.getElementById("edDesc").textContent = "Earn is currently informational only. No deposit, withdrawal, or yield is executed until a real audited contract is connected.";
+        ic.innerHTML = vaultIcon(p);
+        ic.className = "ed-ic morpho-vault-ic";
+        document.getElementById("edApy").textContent = p.liveData ? fmtPct(p.liveData.netApy) : "—";
+        document.getElementById("edRisk").innerHTML = '<span class="risk ' + riskClass(p.riskLevel) + '">' + riskText(p.riskLevel) + '</span>';
+        document.getElementById("edLock").textContent = "Anytime, subject to vault liquidity";
+        document.getElementById("edTvl").textContent = p.liveData ? fmtCompactUsd(p.liveData.totalAssetsUsd) : "—";
+        document.getElementById("edMin").textContent = "0.000001 " + p.asset.symbol;
+        document.getElementById("edDesc").textContent = vaultDesc(p);
         renderEarnDetail(p);
         go("earn-detail"); setTabByName("Earn");
       };
 
-      window.luminaEarnAction = async function(action){
-        toast("Earn contracts are not live yet");
+      window.depositMorpho = async function(){
+        var vault = morphoVaults[activeEarnIndex];
+        var input = document.getElementById("earnAmountInput");
+        var amount = input ? String(input.value || "").trim() : "";
+        var n = Number(amount.replace(/,/g, ""));
+        var pos = vault ? positionFor(vault) : null;
+        if (!vault || !Number.isFinite(n) || n <= 0) return toast("Enter an amount");
+        if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
+        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("先获取 " + vault.asset.symbol);
+        var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
+        if (!window.confirm("您将存入 " + amount + " " + vault.asset.symbol + " 到 " + vault.displayName + " Vault,当前 APY " + apy)) return;
+        try {
+          var res = await fetch("/api/morpho/tx", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ type: "deposit", vaultAddress: vault.address, amount: amount, userAddress: window.__luminaUserAddress || "" })
+          });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          var result = await window.__luminaSendMorphoTransactions(data.transactions);
+          var hash = (result && result.userOpHash) || (result && result.data && result.data.userOpHash) || "submitted";
+          toast("Transaction submitted: " + String(hash).slice(0, 18));
+          pollMorphoPositions();
+        } catch(e) {
+          toast(e && e.message ? e.message : "Deposit failed");
+        }
       };
+
+      window.luminaEarnAction = async function(action){
+        if (action === "withdraw") return window.openMorphoWithdrawModal();
+        return window.depositMorpho();
+      };
+
+      window.openMorphoWithdrawModal = function(){
+        var vault = morphoVaults[activeEarnIndex];
+        var pos = vault ? positionFor(vault) : null;
+        if (!vault || !pos || Number(pos.shares || 0) <= 0) return;
+        closeModal();
+        var mask = document.createElement("div");
+        mask.className = "modal-mask show morpho-withdraw-modal";
+        mask.id = "morphoWithdrawMask";
+        mask.innerHTML =
+          '<div class="modal"><div class="grab"></div><h3>Withdraw ' + vault.displayName + '</h3>' +
+          '<p class="hint">Available: ' + fmtAmount(pos.maxWithdrawFormatted, 6) + " " + vault.asset.symbol + '</p>' +
+          '<div class="earn-amount-row"><input id="morphoWithdrawAmount" inputmode="decimal" placeholder="0.00" /><span>' + vault.asset.symbol + '</span></div>' +
+          '<div class="earn-action-row"><button class="btn-primary" onclick="submitMorphoWithdraw(false)">Withdraw amount</button><button class="btn-ghost" onclick="submitMorphoWithdraw(true)">Withdraw all</button></div>' +
+          '<button class="sheet-cancel" onclick="closeMorphoWithdrawModal()">Cancel</button></div>';
+        document.body.appendChild(mask);
+      };
+
+      window.closeMorphoWithdrawModal = function(){
+        var mask = document.getElementById("morphoWithdrawMask");
+        if (mask) mask.remove();
+      };
+
+      window.submitMorphoWithdraw = async function(all){
+        var vault = morphoVaults[activeEarnIndex];
+        var pos = vault ? positionFor(vault) : null;
+        var input = document.getElementById("morphoWithdrawAmount");
+        if (!vault || !pos) return;
+        var body = { type: all ? "redeem" : "withdraw", vaultAddress: vault.address, userAddress: window.__luminaUserAddress || "" };
+        if (all) {
+          body.shares = pos.shares;
+        } else {
+          var amount = input ? String(input.value || "").trim() : "";
+          var n = Number(amount.replace(/,/g, ""));
+          if (!Number.isFinite(n) || n <= 0) return toast("Enter an amount");
+          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast("Vault 流动性暂时不足,请稍后再试或减少金额");
+          body.amount = amount;
+        }
+        try {
+          var res = await fetch("/api/morpho/tx", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          var data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          var result = await window.__luminaSendMorphoTransactions(data.transactions);
+          var hash = (result && result.userOpHash) || (result && result.data && result.data.userOpHash) || "submitted";
+          closeMorphoWithdrawModal();
+          toast("Transaction submitted: " + String(hash).slice(0, 18));
+          pollMorphoPositions();
+        } catch(e) {
+          var msg = e && e.message ? e.message : "Withdraw failed";
+          if (/liquid|withdraw/i.test(msg)) msg = "Vault 流动性暂时不足,请稍后再试或减少金额";
+          toast(msg);
+        }
+      };
+
+      function closeModal(){
+        if (typeof window.closeMorphoWithdrawModal === "function") window.closeMorphoWithdrawModal();
+      }
+
+      async function loadMorphoVaults(){
+        var res = await fetch("/api/morpho/vaults", { cache: "no-store" });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unable to load vaults");
+        morphoVaults = Array.isArray(data) ? data : [];
+      }
+      async function loadMorphoPositions(){
+        var address = window.__luminaUserAddress || "";
+        if (!address) { morphoPositions = []; return; }
+        var res = await fetch("/api/morpho/position/" + address, { cache: "no-store" });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Unable to load positions");
+        morphoPositions = Array.isArray(data.positions) ? data.positions : [];
+      }
+      async function loadMorphoData(force){
+        morphoLoading = true;
+        morphoError = "";
+        renderProducts();
+        try {
+          await loadMorphoVaults();
+          try { await loadMorphoPositions(); } catch(e) {}
+        } catch(e) {
+          morphoError = "Unable to load live vault data";
+        } finally {
+          morphoLoading = false;
+          renderProducts();
+          if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+            openEarn(activeEarnIndex);
+          }
+          if (force) toast(morphoError || "Updated");
+        }
+      }
+      function pollMorphoPositions(){
+        var tries = 0;
+        var timer = setInterval(async function(){
+          tries += 1;
+          try {
+            await loadMorphoPositions();
+            renderProducts();
+            if (document.getElementById("view-earn-detail").classList.contains("active")) openEarn(activeEarnIndex);
+          } catch(e) {}
+          if (tries >= 6) clearInterval(timer);
+        }, 5000);
+      }
 
       openClaimModal = function(){
-        toast("Earn contracts are not live yet");
+        loadMorphoData(true);
       };
 
-      renderProducts();
-      updateEarnHero();
+      loadMorphoData(false);
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance Earn prototype");

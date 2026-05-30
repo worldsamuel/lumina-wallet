@@ -524,6 +524,33 @@
   .earn-dev-note strong { display: block; color: #f5c451; font-size: 13px; margin-bottom: 4px; }
   .earn-dev-note span { display: block; }
   .earn-hero .claim:disabled { background: var(--surface-3); color: var(--text-mute); cursor: not-allowed; }
+  .morpho-vault-ic { background: #f5f7fb; color: #101315; overflow: hidden; }
+  .morpho-vault-ic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .apy-info-btn { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); color: var(--text-dim); font-size: 11px; font-weight: 800; line-height: 1; padding: 0; vertical-align: middle; cursor: pointer; }
+  .morpho-skeleton .ic,
+  .morpho-skeleton .t,
+  .morpho-skeleton .d,
+  .morpho-skeleton .v,
+  .morpho-skeleton .l,
+  .morpho-skeleton .m { color: transparent; background: linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.1s linear infinite; border-radius: 10px; }
+  .morpho-skeleton .t { width: 108px; height: 16px; }
+  .morpho-skeleton .d { width: 150px; height: 12px; }
+  .morpho-skeleton .v { width: 66px; height: 20px; }
+  .morpho-skeleton .l { width: 34px; height: 10px; margin-top: 4px; }
+  .morpho-skeleton .m { flex: 1; height: 28px; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .morpho-estimates { margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .morpho-estimates div { display: flex; justify-content: space-between; gap: 12px; padding: 11px 12px; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .morpho-estimates div:last-child { border-bottom: none; }
+  .morpho-estimates span { color: var(--text-dim); }
+  .morpho-estimates strong { color: var(--text); text-align: right; }
+  .morpho-provider-note { margin: 8px 2px 0; color: var(--text-mute); font-size: 12px; }
+  .morpho-compliance { margin-top: 16px; padding: 13px; border: 1px solid rgba(74,222,128,0.18); border-radius: 14px; background: rgba(74,222,128,0.06); color: var(--text-dim); font-size: 11px; line-height: 1.55; }
+  .morpho-compliance strong { display: block; color: var(--text); font-size: 12px; margin: 2px 0 6px; }
+  .morpho-compliance p { margin: 0 0 10px; }
+  .morpho-compliance p:last-child { margin-bottom: 0; }
+  .morpho-withdraw-modal .modal { padding-bottom: 20px; }
+  .morpho-withdraw-modal .hint { color: var(--text-dim); font-size: 13px; margin: 0 0 12px; }
   /* Me */
   .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; display: flex; align-items: center; gap: 16px; }
   .me-avatar { width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.7); flex-shrink: 0; }

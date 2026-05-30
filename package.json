@@ -13,7 +13,8 @@
     "prisma:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
     "db:deploy:prod": "dotenv -e .env.production -- npx prisma migrate deploy",
-    "db:seed:prod": "dotenv -e .env.production -- tsx prisma/seed.ts"
+    "db:seed:prod": "dotenv -e .env.production -- tsx prisma/seed.ts",
+    "verify:morpho:fork": "dotenv -e .env.test -- tsx scripts/verify-morpho-mainnet-fork.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

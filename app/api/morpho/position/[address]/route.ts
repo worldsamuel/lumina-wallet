@@ -1,0 +1,92 @@
+import { NextRequest } from "next/server";
+import { formatUnits, isAddress, type Address } from "viem";
+import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { rateLimit } from "@/lib/api/rate-limit";
+import { publicClient } from "@/lib/chain";
+import { ERC20_APPROVE_ABI, METAMORPHO_ABI } from "@/lib/morpho/abi";
+import { getEnabledVaults } from "@/lib/morpho/vaults";
+
+export const dynamic = "force-dynamic";
+
+export function OPTIONS() {
+  return optionsResponse();
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { address: string } },
+) {
+  if (!rateLimit(req, "public:morpho-position", 120).ok) {
+    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+  }
+
+  const userAddress = params.address;
+  if (!isAddress(userAddress)) {
+    return jsonResponse({ error: "Invalid wallet address." }, { status: 400 });
+  }
+
+  try {
+    const vaults = getEnabledVaults();
+    const contracts = vaults.flatMap((vault) => [
+      {
+        address: vault.address as Address,
+        abi: METAMORPHO_ABI,
+        functionName: "balanceOf",
+        args: [userAddress as Address],
+      },
+      {
+        address: vault.address as Address,
+        abi: METAMORPHO_ABI,
+        functionName: "maxWithdraw",
+        args: [userAddress as Address],
+      },
+      {
+        address: vault.asset.address as Address,
+        abi: ERC20_APPROVE_ABI,
+        functionName: "balanceOf",
+        args: [userAddress as Address],
+      },
+    ]);
+
+    const baseResults = await publicClient.multicall({ allowFailure: true, contracts });
+    const assetContracts = vaults.map((vault, index) => {
+      const shares = resultBigInt(baseResults[index * 3]);
+      return {
+        address: vault.address as Address,
+        abi: METAMORPHO_ABI,
+        functionName: "convertToAssets",
+        args: [shares],
+      };
+    });
+    const assetResults = await publicClient.multicall({ allowFailure: true, contracts: assetContracts });
+
+    const positions = vaults.map((vault, index) => {
+      const shares = resultBigInt(baseResults[index * 3]);
+      const maxWithdraw = resultBigInt(baseResults[index * 3 + 1]);
+      const walletBalance = resultBigInt(baseResults[index * 3 + 2]);
+      const assets = resultBigInt(assetResults[index]);
+      return {
+        vaultAddress: vault.address,
+        displayName: vault.displayName,
+        asset: vault.asset,
+        shares: shares.toString(),
+        sharesFormatted: formatUnits(shares, vault.asset.decimals),
+        assets: assets.toString(),
+        assetsFormatted: formatUnits(assets, vault.asset.decimals),
+        maxWithdraw: maxWithdraw.toString(),
+        maxWithdrawFormatted: formatUnits(maxWithdraw, vault.asset.decimals),
+        walletBalance: walletBalance.toString(),
+        walletBalanceFormatted: formatUnits(walletBalance, vault.asset.decimals),
+      };
+    });
+
+    return jsonResponse({ address: userAddress, positions });
+  } catch (error) {
+    console.error("Failed to read Morpho positions", error);
+    return jsonResponse({ error: "Unable to read Morpho positions." }, { status: 502 });
+  }
+}
+
+function resultBigInt(result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined) {
+  return result?.status === "success" && typeof result.result === "bigint" ? result.result : 0n;
+}
