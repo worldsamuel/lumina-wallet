@@ -1,6 +1,18 @@
 import { MiniKit } from "@worldcoin/minikit-js";
-import { encodeFunctionData, isAddress, parseUnits, toHex, type Address, type Hex } from "viem";
-import { erc20ABI } from "../morpho/abi";
+import { isAddress, parseUnits, type Address } from "viem";
+
+const transferAbi = [
+  {
+    name: "transfer",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ type: "bool" }],
+  },
+] as const;
 
 export interface SendParams {
   tokenSymbol: "WLD" | "USDC" | "ETH" | string;
@@ -102,20 +114,19 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     params.tokenAddress === null
       ? [
           {
-            to: params.recipient as Address,
-            value: toHex(amountWei),
-            data: "0x" as Hex,
+            address: params.recipient as Address,
+            abi: [],
+            functionName: "",
+            args: [],
+            value: amountWei.toString(),
           },
         ]
       : [
           {
-            to: params.tokenAddress,
-            data: encodeFunctionData({
-              abi: erc20ABI,
-              functionName: "transfer",
-              args: [params.recipient as Address, amountWei],
-            }),
-            value: "0x0" as Hex,
+            address: params.tokenAddress,
+            abi: transferAbi,
+            functionName: "transfer",
+            args: [params.recipient as Address, amountWei.toString()],
           },
         ];
 
@@ -141,7 +152,7 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
   try {
     const result = (await MiniKit.sendTransaction({
       chainId: 480,
-      transactions: transaction,
+      transactions: transaction as never,
     })) as MiniKitSendResult;
     console.log("=== MiniKit success ===");
     console.log(JSON.stringify(result, null, 2));

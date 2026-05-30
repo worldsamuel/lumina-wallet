@@ -48,8 +48,10 @@ type EarnConfirmInput = {
 };
 
 type MiniKitCalldataTransaction = {
-  to: string;
-  data: string;
+  address: string;
+  abi: readonly unknown[];
+  functionName: string;
+  args: string[];
   value?: string;
 };
 
@@ -253,7 +255,6 @@ function exposeMorphoTransactions() {
     const miniKit = MiniKit as unknown as {
       sendTransaction?: (input: {
         chainId?: number;
-        transaction?: MiniKitCalldataTransaction[];
         transactions?: MiniKitCalldataTransaction[];
         permit2?: MiniKitPermit2[];
       }) => Promise<unknown>;
@@ -262,12 +263,8 @@ function exposeMorphoTransactions() {
 
     const result = (await miniKit.sendTransaction({
       chainId: 480,
-      transactions: transactions.map((transaction) => ({
-        to: transaction.to,
-        data: transaction.data,
-        value: transaction.value ?? "0x0",
-      })),
-      permit2,
+      transactions,
+      ...(permit2 && permit2.length ? { permit2 } : {}),
     })) as MiniKitSendTransactionEnvelope;
 
     const payload = result?.data ?? result;
