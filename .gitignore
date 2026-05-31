@@ -26,6 +26,10 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env*
+!.env.example
+!.env.production.example
+!.env.test.example
 .env*.local
 .env.test
 
@@ -35,5 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-.env
