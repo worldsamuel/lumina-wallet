@@ -82,15 +82,3 @@ model Feedback {
   status    String   @default("new")
   createdAt DateTime @default(now())
 }
-
-model AnalyticsEvent {
-  id        Int      @id @default(autoincrement())
-  event     String
-  path      String?
-  address   String?
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  @@index([event, createdAt])
-  @@index([address, createdAt])
-}

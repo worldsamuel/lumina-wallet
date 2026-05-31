@@ -1,8 +1,17 @@
 import { NextRequest } from "next/server";
-import { getSessionFromRequest } from "@/lib/auth/session";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { db } from "@/lib/db";
+
+const ANALYTICS_KEY = "analytics_counters";
+
+type AnalyticsCounters = {
+  opens: number;
+  visits: number;
+  todayOpens: number;
+  todayVisits: number;
+  day: string;
+};
 
 export function OPTIONS() {
   return optionsResponse();
@@ -15,16 +24,23 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => ({}))) as { event?: string; path?: string };
   const event = String(body.event || "visit").slice(0, 40);
-  const path = String(body.path || req.headers.get("referer") || "/").slice(0, 180);
-  const session = getSessionFromRequest(req);
+  const today = new Date().toISOString().slice(0, 10);
 
-  await db.analyticsEvent.create({
-    data: {
-      event,
-      path,
-      address: session?.address ?? null,
-      userAgent: req.headers.get("user-agent")?.slice(0, 240) ?? null,
-    },
+  const page = await db.contentPage.findUnique({ where: { key: ANALYTICS_KEY } }).catch(() => null);
+  const current = (typeof page?.bodyI18n === "object" && page.bodyI18n ? page.bodyI18n : {}) as Partial<AnalyticsCounters>;
+  const resetDay = current.day === today;
+  const next: AnalyticsCounters = {
+    opens: Number(current.opens || 0) + (event === "open" ? 1 : 0),
+    visits: Number(current.visits || 0) + (event === "visit" ? 1 : 0),
+    todayOpens: (resetDay ? Number(current.todayOpens || 0) : 0) + (event === "open" ? 1 : 0),
+    todayVisits: (resetDay ? Number(current.todayVisits || 0) : 0) + (event === "visit" ? 1 : 0),
+    day: today,
+  };
+
+  await db.contentPage.upsert({
+    where: { key: ANALYTICS_KEY },
+    update: { bodyI18n: next },
+    create: { key: ANALYTICS_KEY, bodyI18n: next },
   }).catch((error: unknown) => {
     console.error("Failed to record analytics event", error);
   });
