@@ -7,6 +7,7 @@ import type {
   BackendContentPage,
   BackendCurrencyRate,
   BackendFeeConfig,
+  BackendSystemConfig,
   BackendToken,
 } from "./types";
 
@@ -18,6 +19,7 @@ declare global {
     renderAssets?: () => void;
     updateBellDot?: () => void;
     __luminaRefreshTokenLogos?: () => void;
+    __luminaApplySystemConfig?: () => void;
   }
 }
 
@@ -72,6 +74,11 @@ export function useBackendConfigSync(enabled: boolean) {
   const tokens = useSWR<BackendToken[]>(enabled ? "/api/tokens" : null, fetcher, swrOptions);
   const topTokens = useSWR<BackendToken[]>(enabled ? "/api/tokens/top" : null, fetcher, swrOptions);
   const fees = useSWR<BackendFeeConfig[]>(enabled ? "/api/fees" : null, fetcher, swrOptions);
+  const systemConfig = useSWR<BackendSystemConfig>(
+    enabled ? "/api/system-config" : null,
+    fetcher,
+    swrOptions,
+  );
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
@@ -124,6 +131,10 @@ export function useBackendConfigSync(enabled: boolean) {
       window.renderAssets?.();
     }
     if (fees.data) window.localStorage.setItem("ww_fee_configs", JSON.stringify(fees.data));
+    if (systemConfig.data) {
+      window.localStorage.setItem("ww_system_config", JSON.stringify(systemConfig.data));
+      window.__luminaApplySystemConfig?.();
+    }
   }, [
     about.data,
     announcements.data,
@@ -131,6 +142,7 @@ export function useBackendConfigSync(enabled: boolean) {
     fees.data,
     help.data,
     rates.data,
+    systemConfig.data,
     tokens.data,
     topTokens.data,
   ]);

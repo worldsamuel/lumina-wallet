@@ -160,6 +160,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeSend();
       enhancePrototypeActivity();
       enhancePrototypeMe();
+      enhancePrototypeSystemConfig();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -783,6 +784,9 @@ function enhancePrototypeEarn() {
         if (!Number.isFinite(n)) return "—";
         return n.toLocaleString(undefined, { maximumFractionDigits: max || 6 });
       }
+      function systemConfig(){
+        try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
+      }
       function positionFor(vault){
         return morphoPositions.find(function(p){
           return String(p.vaultAddress).toLowerCase() === String(vault.address).toLowerCase();
@@ -929,7 +933,8 @@ function enhancePrototypeEarn() {
           var desc = document.getElementById("edDesc");
           desc.insertAdjacentElement("afterend", card);
         }
-        var paused = !!vault.depositsPaused;
+        var cfg = systemConfig();
+        var paused = !!vault.depositsPaused || cfg.morphoDepositEnabled === false;
         var wallet = pos ? fmtAmount(pos.walletBalanceFormatted, 6) + " " + token : "—";
         var annual = "—";
         var daily = "—";
@@ -949,7 +954,7 @@ function enhancePrototypeEarn() {
             '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + copy.deposit + '</button>' +
             '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
           '</div>' +
-          (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + copy.pausedBody + '</span></div>' : "") +
+          (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + (cfg.morphoDepositEnabled === false ? "Deposits are temporarily paused by Lumina operations." : copy.pausedBody) + '</span></div>' : "") +
           '<div class="morpho-compliance">' +
             '<strong>' + copy.aboutTitle + '</strong>' +
             '<p>' + copy.aboutBody + '</p>' +
@@ -1182,6 +1187,32 @@ function enhancePrototypeEarn() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance Earn prototype");
+}
+
+function enhancePrototypeSystemConfig() {
+  const source = `
+    (function(){
+      function readConfig(){
+        try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
+      }
+      window.__luminaApplySystemConfig = function(){
+        var existing = document.getElementById("luminaMaintenanceOverlay");
+        var cfg = readConfig();
+        if (!cfg.maintenance) {
+          if (existing) existing.remove();
+          return;
+        }
+        if (existing) return;
+        var overlay = document.createElement("div");
+        overlay.id = "luminaMaintenanceOverlay";
+        overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:#030503;display:flex;align-items:center;justify-content:center;padding:28px;color:#fff;text-align:center;";
+        overlay.innerHTML = '<div style="max-width:320px;"><div style="width:74px;height:74px;margin:0 auto 22px;border-radius:50%;border:2px solid #6ee787;display:flex;align-items:center;justify-content:center;color:#6ee787;font-size:34px;font-weight:900;box-shadow:0 0 40px rgba(74,222,128,.22);">L</div><h1 style="font-size:30px;line-height:1.05;margin:0 0 12px;font-weight:950;">Lumina is under maintenance</h1><p style="margin:0;color:#9ca39c;font-size:15px;line-height:1.55;">We are updating the service. Please check back shortly.</p></div>';
+        document.body.appendChild(overlay);
+      };
+      window.__luminaApplySystemConfig();
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to apply system config");
 }
 
 /**

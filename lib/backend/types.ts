@@ -36,3 +36,8 @@ export type BackendFeeConfig = {
   percent: string;
   recipient: string | null;
 };
+
+export type BackendSystemConfig = {
+  maintenance: boolean;
+  morphoDepositEnabled: boolean;
+};
