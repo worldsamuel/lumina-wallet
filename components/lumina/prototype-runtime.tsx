@@ -447,8 +447,8 @@ function appendLegalLinks(host: HTMLDivElement) {
   wrapper.innerHTML = [
     "<h2>Legal</h2>",
     "<p>Review Lumina's public legal documents for World Mini App review and user transparency.</p>",
-    '<a class="legal-link-row" href="/privacy">隐私政策 / Privacy Policy <span aria-hidden="true">›</span></a>',
-    '<a class="legal-link-row" href="/terms">服务条款 / Terms of Service <span aria-hidden="true">›</span></a>',
+    '<a class="legal-link-row" href="/privacy">Privacy Policy <span aria-hidden="true">›</span></a>',
+    '<a class="legal-link-row" href="/terms">Terms of Service <span aria-hidden="true">›</span></a>',
   ].join("");
   aboutContent.appendChild(wrapper);
 }
@@ -2056,9 +2056,9 @@ function enhancePrototypeMe() {
           language: { en:"Language", fr:"Langue", de:"Sprache", es:"Idioma", ja:"言語", "zh-CN":"语言", "zh-TW":"語言" },
           currency: { en:"Display currency", fr:"Devise d'affichage", de:"Anzeigewährung", es:"Moneda", ja:"表示通貨", "zh-CN":"显示货币", "zh-TW":"顯示貨幣" },
           notifications: { en:"Notifications", fr:"Notifications", de:"Benachrichtigungen", es:"Notificaciones", ja:"通知", "zh-CN":"通知", "zh-TW":"通知" },
-          legal: { en:"Legal", fr:"Mentions légales", de:"Rechtliches", es:"Legal", ja:"法務", "zh-CN":"法律", "zh-TW":"法律" },
-          privacy: { en:"Privacy Policy", fr:"Politique de confidentialité", de:"Datenschutz", es:"Privacidad", ja:"プライバシー", "zh-CN":"隐私政策", "zh-TW":"隱私政策" },
-          terms: { en:"Terms of Service", fr:"Conditions d'utilisation", de:"Nutzungsbedingungen", es:"Términos", ja:"利用規約", "zh-CN":"服务条款", "zh-TW":"服務條款" },
+          legal: { en:"Legal", fr:"Legal", de:"Legal", es:"Legal", ja:"Legal", "zh-CN":"Legal", "zh-TW":"Legal" },
+          privacy: { en:"Privacy Policy", fr:"Privacy Policy", de:"Privacy Policy", es:"Privacy Policy", ja:"Privacy Policy", "zh-CN":"Privacy Policy", "zh-TW":"Privacy Policy" },
+          terms: { en:"Terms of Service", fr:"Terms of Service", de:"Terms of Service", es:"Terms of Service", ja:"Terms of Service", "zh-CN":"Terms of Service", "zh-TW":"Terms of Service" },
           version: { en:"Version", fr:"Version", de:"Version", es:"Versión", ja:"バージョン", "zh-CN":"版本", "zh-TW":"版本" },
           connected: { en:"World App connected", fr:"World App connecté", de:"World App verbunden", es:"World App conectado", ja:"World App 接続済み", "zh-CN":"World App 已连接", "zh-TW":"World App 已連接" },
           notConnected: { en:"Not connected", fr:"Non connecté", de:"Nicht verbunden", es:"No conectado", ja:"未接続", "zh-CN":"未连接", "zh-TW":"未連接" },
