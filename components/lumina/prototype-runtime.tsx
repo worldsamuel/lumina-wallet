@@ -1507,6 +1507,9 @@ function enhancePrototypeMarket() {
           gainers: zh ? "24h 涨幅" : "24h Gainers",
           losers: zh ? "24h 跌幅" : "24h Losers",
           newest: zh ? "新币" : "New Tokens",
+          tabGainers: zh ? "涨幅" : "Gainers",
+          tabLosers: zh ? "跌幅" : "Losers",
+          tabNewest: zh ? "新币" : "New",
           emptyPrefix: zh ? "World Chain 暂无满足流动性条件的" : "No liquid World Chain ",
           emptySuffix: zh ? "数据" : " data yet",
           meta: "24h · on-chain",
@@ -1529,9 +1532,9 @@ function enhancePrototypeMarket() {
         tabs.id = "marketTabs";
         tabs.className = "market-tabs";
         tabs.innerHTML =
-          '<button type="button" data-tab="gainers" class="sel"><span></span><i>↕</i></button>' +
-          '<button type="button" data-tab="losers"><span></span><i>↕</i></button>' +
-          '<button type="button" data-tab="new"><span></span><i>↕</i></button>';
+          '<button type="button" data-tab="gainers" class="sel"><span></span><i aria-hidden="true"></i></button>' +
+          '<button type="button" data-tab="losers"><span></span><i aria-hidden="true"></i></button>' +
+          '<button type="button" data-tab="new"><span></span><i aria-hidden="true"></i></button>';
         head.insertAdjacentElement("afterend", tabs);
         tabs.addEventListener("click", function(event){
           var btn = event.target && event.target.closest ? event.target.closest("button[data-tab]") : null;
@@ -1547,7 +1550,7 @@ function enhancePrototypeMarket() {
           btn.classList.toggle("sel", tab === marketTab);
           var span = btn.querySelector("span");
           if (span) {
-            span.textContent = tab === "losers" ? marketCopy("losers") : (tab === "new" ? marketCopy("newest") : marketCopy("gainers"));
+            span.textContent = tab === "losers" ? marketCopy("tabLosers") : (tab === "new" ? marketCopy("tabNewest") : marketCopy("tabGainers"));
           }
         });
         var title = document.querySelector(".gainers-head .l");
