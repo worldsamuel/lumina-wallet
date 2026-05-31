@@ -508,7 +508,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       }
       function builtinLogo(symbol){
         var sym = String(symbol || "").toUpperCase();
-        if (sym === "WLD") return '<svg class="lumina-token-mark lumina-token-mark-wld" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M18 22l5.4 20.5L29.1 22h5.8l5.7 20.5L46 22h6L43.6 47h-6.2L32 28.1 26.6 47h-6.2L12 22h6z" fill="#060706"/></svg>';
+        if (sym === "WLD") return logoImg("WLD", "https://cryptologos.cc/logos/worldcoin-org-wld-logo.svg", "");
         if (sym === "USDC") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#2775ca"/><circle cx="32" cy="32" r="22" fill="none" stroke="#fff" stroke-width="4"/><path d="M32 16v32M39.5 25.5c-1.6-2.4-4.1-3.4-7.2-3.4-4 0-6.8 2-6.8 5.1 0 7.1 14 3.2 14 10.3 0 3.4-2.9 5.8-7.4 5.8-3.7 0-6.6-1.4-8.3-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>';
         if (sym === "USDT") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#26a17b"/><path d="M18 18h28v7H35.7v7.2c7.1.4 12.3 1.9 12.3 3.8 0 2.2-7.2 4-16 4s-16-1.8-16-4c0-1.9 5.2-3.4 12.3-3.8V25H18v-7zm14 19.1c5.5 0 10-.8 10-1.8 0-.8-2.7-1.4-6.3-1.7v5h-7.4v-5c-3.6.3-6.3.9-6.3 1.7 0 1 4.5 1.8 10 1.8z" fill="#fff"/></svg>';
         if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#1c2536"/><path d="M32 8l15 25-15 8-15-8L32 8z" fill="#d7e2ff"/><path d="M32 8v33l15-8L32 8z" fill="#8aa3d8"/><path d="M17 36l15 20 15-20-15 8-15-8z" fill="#d7e2ff"/><path d="M32 44v12l15-20-15 8z" fill="#8aa3d8"/></svg>';
@@ -1498,10 +1498,28 @@ function enhancePrototypeMarket() {
       }
       window.openMarketDetail = openMarketDetail;
       var marketTab = "gainers";
+      function marketLang(){
+        return (window.currentLang || "en") === "zh-CN" ? "zh-CN" : "en";
+      }
+      function marketCopy(key){
+        var zh = marketLang() === "zh-CN";
+        var copy = {
+          gainers: zh ? "24h 涨幅" : "24h Gainers",
+          losers: zh ? "24h 跌幅" : "24h Losers",
+          newest: zh ? "新币" : "New Tokens",
+          emptyPrefix: zh ? "World Chain 暂无满足流动性条件的" : "No liquid World Chain ",
+          emptySuffix: zh ? "数据" : " data yet",
+          meta: "24h · on-chain",
+          note: zh
+            ? "以下为链上 24h 行情排行,仅为市场数据,非投资建议。新币和高波动代币风险更高。"
+            : "On-chain 24h market rankings. Market data only, not investment advice. New and volatile tokens carry higher risk."
+        };
+        return copy[key] || key;
+      }
       function marketTabTitle(){
-        if (marketTab === "losers") return "24h 跌幅";
-        if (marketTab === "new") return "新币";
-        return "24h 涨幅";
+        if (marketTab === "losers") return marketCopy("losers");
+        if (marketTab === "new") return marketCopy("newest");
+        return marketCopy("gainers");
       }
       function ensureMarketTabs(){
         if (document.getElementById("marketTabs")) return;
@@ -1511,9 +1529,9 @@ function enhancePrototypeMarket() {
         tabs.id = "marketTabs";
         tabs.className = "market-tabs";
         tabs.innerHTML =
-          '<button type="button" data-tab="gainers" class="sel">24h 涨幅</button>' +
-          '<button type="button" data-tab="losers">24h 跌幅</button>' +
-          '<button type="button" data-tab="new">新币</button>';
+          '<button type="button" data-tab="gainers" class="sel"><span></span><i>↕</i></button>' +
+          '<button type="button" data-tab="losers"><span></span><i>↕</i></button>' +
+          '<button type="button" data-tab="new"><span></span><i>↕</i></button>';
         head.insertAdjacentElement("afterend", tabs);
         tabs.addEventListener("click", function(event){
           var btn = event.target && event.target.closest ? event.target.closest("button[data-tab]") : null;
@@ -1525,19 +1543,26 @@ function enhancePrototypeMarket() {
       function updateMarketTabs(){
         ensureMarketTabs();
         document.querySelectorAll("#marketTabs button").forEach(function(btn){
-          btn.classList.toggle("sel", btn.getAttribute("data-tab") === marketTab);
+          var tab = btn.getAttribute("data-tab");
+          btn.classList.toggle("sel", tab === marketTab);
+          var span = btn.querySelector("span");
+          if (span) {
+            span.textContent = tab === "losers" ? marketCopy("losers") : (tab === "new" ? marketCopy("newest") : marketCopy("gainers"));
+          }
         });
         var title = document.querySelector(".gainers-head .l");
         if (title) title.textContent = marketTabTitle();
         var meta = document.querySelector(".gainers-head .r");
-        if (meta) meta.textContent = "24h · on-chain";
+        if (meta) meta.textContent = marketCopy("meta");
+        var note = document.querySelector(".gainers-note span:last-child");
+        if (note) note.textContent = marketCopy("note");
       }
       function renderGainersFromMarkets(markets){
         var box = document.getElementById("gainersList");
         if (!box) return;
         updateMarketTabs();
         if (!markets.length) {
-          box.innerHTML = '<div class="import-load">World Chain 暂无满足流动性条件的' + marketTabTitle() + '数据</div>';
+          box.innerHTML = '<div class="import-load">' + marketCopy("emptyPrefix") + marketTabTitle() + marketCopy("emptySuffix") + '</div>';
           return;
         }
         box.innerHTML = markets.map(function(g, i){
@@ -2397,9 +2422,9 @@ function enhancePrototypeDetail() {
             '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
-            '<button class="btn-ghost" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
-            '<button class="btn-primary" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
-            '<button class="btn-ghost" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
+            '<button class="btn-ghost detail-action-receive" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
+            '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
+            '<button class="btn-ghost detail-action-swap" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
           '</div>' +
           '<section class="detail-v2-menu">' +
             '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +
