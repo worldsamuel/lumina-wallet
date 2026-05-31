@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { legalContent, normalizeLegalLanguage, type LegalLanguage, type LegalPageKind } from "@/lib/legal-content";
+import { useState } from "react";
+import { legalContent, type LegalLanguage, type LegalPageKind } from "@/lib/legal-content";
 
 type LegalPageProps = {
   kind: LegalPageKind;
@@ -14,16 +14,11 @@ type LegalPageProps = {
 export function LegalPage({ kind }: LegalPageProps) {
   const [language, setLanguage] = useState<LegalLanguage>("en");
 
-  useEffect(() => {
-    setLanguage(normalizeLegalLanguage(window.localStorage.getItem("ww_lang")));
-  }, []);
-
   const document = legalContent[kind][language];
   const alternateLanguage: LegalLanguage = language === "en" ? "zh-CN" : "en";
 
   function switchLanguage(nextLanguage: LegalLanguage) {
     setLanguage(nextLanguage);
-    window.localStorage.setItem("ww_lang", nextLanguage);
   }
 
   function goBack() {

@@ -1773,7 +1773,7 @@ function enhancePrototypeSwapQuote() {
  * Connects the prototype Send form to MiniKit.sendTransaction with validation and balance checks.
  */
 function enhancePrototypeSend() {
-  const sendTokens = TOKENS.filter((token) => ["WLD", "USDC", "ETH"].includes(token.symbol)).map(
+  const sendTokens = TOKENS.map(
     (token) => ({
       symbol: token.symbol,
       address: token.native ? null : token.contractAddress ?? null,
@@ -1811,7 +1811,21 @@ function enhancePrototypeSend() {
       }
       function cleanAmount(value){ return String(value || "").replace(/,/g, "").trim(); }
       function isValidAddress(value){ return /^0x[a-fA-F0-9]{40}$/.test(String(value || "").trim()); }
-      function selectedToken(){ return sendTokenMap[String(sendCurrentToken || "").toUpperCase()] || null; }
+      function selectedToken(){
+        var sym = String(sendCurrentToken || "").toUpperCase();
+        if (sendTokenMap[sym]) return sendTokenMap[sym];
+        var custom = customTokens && customTokens[sym] ? customTokens[sym] : null;
+        if (custom && custom.address) {
+          return {
+            symbol: sym,
+            address: custom.address,
+            decimals: Number(custom.decimals || 18),
+            name: custom.name || tokenFull[sym] || sym,
+            native: false
+          };
+        }
+        return null;
+      }
       function balanceNumber(symbol){
         var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
         var n = Number(raw.replace(/,/g, ""));
@@ -1830,7 +1844,8 @@ function enhancePrototypeSend() {
         var balance = token ? balanceNumber(token.symbol) : 0;
         var recipientMsg = "";
         var amountMsg = "";
-        if (!token) amountMsg = "当前仅支持 WLD、USDC、ETH 转账";
+        if (!token) amountMsg = "请选择可发送的 World Chain 代币";
+        if (token && !token.native && !token.address) amountMsg = "缺少代币合约地址";
         if (recipient && !isValidAddress(recipient)) recipientMsg = "收款地址格式不对";
         if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = "请输入大于 0 的金额";
         if (token && Number.isFinite(amount) && amount > balance) amountMsg = "余额不足";
@@ -1996,7 +2011,7 @@ function enhancePrototypeActivity() {
       };
       window.__luminaRefreshActivity = function(){
         var box = document.getElementById("actList");
-        if (box) box.innerHTML = emptyActivity(activityCopy("loading"));
+        if (box && !activityItems.length && !box.children.length) box.innerHTML = emptyActivity(activityCopy("loading"));
         var address = window.__luminaUserAddress || "";
         if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
           activityItems = [];
@@ -2020,7 +2035,7 @@ function enhancePrototypeActivity() {
       setInterval(function(){
         var view = document.getElementById("view-activity");
         if (view && view.classList.contains("active")) window.__luminaRefreshActivity();
-      }, 20000);
+      }, 60000);
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance real activity");
