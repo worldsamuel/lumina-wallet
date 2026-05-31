@@ -18,11 +18,19 @@ export async function PATCH(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
-  const body = (await req.json()) as { maintenance?: boolean; morphoDepositEnabled?: boolean };
+  const body = (await req.json()) as {
+    maintenance?: boolean;
+    morphoDepositEnabled?: boolean;
+    adminLogoUrl?: string | null;
+    faviconUrl?: string | null;
+  };
   const config = await updateSystemConfig({
     maintenance: typeof body.maintenance === "boolean" ? body.maintenance : undefined,
     morphoDepositEnabled:
       typeof body.morphoDepositEnabled === "boolean" ? body.morphoDepositEnabled : undefined,
+    adminLogoUrl:
+      typeof body.adminLogoUrl === "string" || body.adminLogoUrl === null ? body.adminLogoUrl : undefined,
+    faviconUrl: typeof body.faviconUrl === "string" || body.faviconUrl === null ? body.faviconUrl : undefined,
   });
   await auditLog(admin.id, "update_system_config", "system_config", body);
   return jsonResponse(config);

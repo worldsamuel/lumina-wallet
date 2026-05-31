@@ -3,11 +3,15 @@ import { db } from "@/lib/db";
 export type SystemConfig = {
   maintenance: boolean;
   morphoDepositEnabled: boolean;
+  adminLogoUrl: string | null;
+  faviconUrl: string | null;
 };
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   maintenance: false,
   morphoDepositEnabled: true,
+  adminLogoUrl: null,
+  faviconUrl: null,
 };
 
 const SYSTEM_CONFIG_KEY = "system_config";
@@ -23,6 +27,8 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
       typeof source.morphoDepositEnabled === "boolean"
         ? source.morphoDepositEnabled
         : DEFAULT_SYSTEM_CONFIG.morphoDepositEnabled,
+    adminLogoUrl: typeof source.adminLogoUrl === "string" && source.adminLogoUrl ? source.adminLogoUrl : null,
+    faviconUrl: typeof source.faviconUrl === "string" && source.faviconUrl ? source.faviconUrl : null,
   };
 }
 
