@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
 
   const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
-  const initialPasswordOk = username === "admin" && !!initialPassword && password === initialPassword;
+  const initialPasswordOk = !!initialPassword && password === initialPassword;
 
   if (getLoginLock(username) && !initialPasswordOk) {
     return jsonResponse({ error: "Account temporarily locked." }, { status: 423 });
@@ -69,13 +69,14 @@ export async function POST(req: NextRequest) {
   if (!ok && initialPasswordOk) {
     const passwordHash = await bcrypt.hash(password, 12);
     admin = await db.adminUser.upsert({
-      where: { username: "admin" },
+      where: { username },
       update: { passwordHash, role: "super_admin" },
-      create: { username: "admin", passwordHash, role: "super_admin" },
+      create: { username, passwordHash, role: "super_admin" },
     });
+    ok = true;
   }
 
-  if (!admin || (!ok && !initialPasswordOk)) {
+  if (!admin || !ok) {
     recordLoginFailure(username);
     return jsonResponse({ error: "Invalid credentials." }, { status: 401 });
   }
