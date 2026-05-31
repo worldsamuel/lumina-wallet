@@ -579,6 +579,10 @@ function renderPrototypeReceive(address?: string | null) {
   }
   const addr = document.querySelector<HTMLElement>(".recv-addr");
   if (addr && actual) addr.textContent = actual;
+  const note = document.querySelector<HTMLElement>(".recv-note");
+  if (note) note.innerHTML = "Send only World Chain assets to this address.<br />Assets sent from other networks may be lost.";
+  const copy = document.querySelector<HTMLButtonElement>(".copy-btn");
+  if (copy) copy.textContent = "Copy address";
 }
 
 /**

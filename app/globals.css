@@ -291,6 +291,14 @@
   .recv-note { color: var(--text-mute); font-size: 13px; margin: 16px var(--pad-screen) 0; text-align: center; line-height: 1.5; }
   .copy-btn { margin: 18px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--green); color: #042; border: none; border-radius: var(--radius-md); padding: 15px; font-size: 16px; font-weight: 700; cursor: pointer; }
   .copy-btn:active { opacity: 0.85; }
+  #view-receive { min-height: 100dvh; padding: 84px var(--pad-screen) 112px; background: radial-gradient(90% 38% at 50% 14%, rgba(74,222,128,0.09), transparent 64%), #000; }
+  #view-receive .qr-wrap { position: relative; margin: 0 auto !important; width: min(100%, 360px); padding: 22px 18px 18px; border-radius: 32px; border: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, rgba(16,18,16,0.92), rgba(9,10,9,0.96)); box-shadow: 0 28px 80px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.04); overflow: visible; }
+  #view-receive .qr-wrap::before { content: "World Chain"; display: inline-flex; align-items: center; justify-content: center; height: 28px; margin: 0 auto 18px; padding: 0 12px; border-radius: 999px; background: rgba(74,222,128,0.12); color: var(--green); font-size: 12px; font-weight: 900; letter-spacing: .02em; }
+  #view-receive .qr { width: min(232px, calc(100vw - 128px)); height: min(232px, calc(100vw - 128px)); margin: 0 auto 18px; padding: 13px; border-radius: 28px; background: #fff; box-shadow: 0 18px 46px rgba(0,0,0,0.32), 0 0 0 1px rgba(255,255,255,0.1); }
+  #view-receive .recv-addr { max-width: 100%; margin: 0 auto; padding: 13px 14px; border-radius: 18px; background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.055); color: #b8beb8; font-size: 12px; line-height: 1.45; }
+  #view-receive .recv-note { width: min(100%, 340px); margin: 18px auto 0; color: #727972; font-size: 13px; line-height: 1.55; text-align: center; }
+  #view-receive .copy-btn { width: min(100%, 360px); min-height: 58px; margin: 24px auto 0; display: block; border-radius: 22px; background: var(--green); color: #072f17; font-size: 17px; font-weight: 900; box-shadow: 0 18px 42px rgba(74,222,128,0.18); }
+  #view-receive .subhead .back-btn { top: -54px; left: 0; width: 42px; height: 42px; background: rgba(18,20,18,0.92); }
   .receive-screen { max-width: var(--phone-max); min-height: 100dvh; margin: 0 auto; padding: 12px var(--pad-screen) 110px; background: var(--bg); color: var(--text); overflow-x: hidden; overscroll-behavior-y: none; }
   .receive-back { display: inline-flex; align-items: center; gap: 4px; min-height: 38px; margin: 2px 0 12px; color: #d8ded8; text-decoration: none; font-size: 15px; font-weight: 700; }
   .receive-back span { font-size: 30px; line-height: 1; transform: translateY(-1px); }
@@ -713,7 +721,7 @@ button, input, select {
   overflow: hidden;
   justify-content: flex-start;
   gap: 10px;
-  padding-top: max(90px, 13vh);
+  padding-top: max(160px, 24vh);
 }
 
 .mini-auth-grid {
@@ -732,7 +740,7 @@ button, input, select {
   position: absolute;
   left: 12%;
   right: 12%;
-  top: 14%;
+  top: 27%;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(74, 222, 128, .55), transparent);
   animation: authScan 2.4s ease-in-out infinite;
@@ -741,11 +749,11 @@ button, input, select {
 .mini-auth-logo-stage {
   position: relative;
   z-index: 1;
-  width: 230px;
-  height: 230px;
+  width: 250px;
+  height: 250px;
   display: grid;
   place-items: center;
-  margin-bottom: 28px;
+  margin-bottom: 10px;
 }
 
 .mini-auth-copy {
@@ -755,14 +763,14 @@ button, input, select {
   display: grid;
   justify-items: center;
   gap: 12px;
-  margin-top: 4px;
+  margin-top: 16px;
 }
 
 .mini-auth-orb {
   position: absolute;
   inset: 0;
-  width: 230px;
-  height: 230px;
+  width: 250px;
+  height: 250px;
   border-radius: 50%;
   border: 1px solid rgba(74, 222, 128, .14);
   box-shadow: 0 0 80px rgba(74, 222, 128, .1), inset 0 0 46px rgba(74, 222, 128, .08);
@@ -809,7 +817,7 @@ button, input, select {
   z-index: 1;
   max-width: 340px;
   margin: 0;
-  font-size: 26px;
+  font-size: 30px;
   line-height: 1.15;
   font-weight: 800;
 }
@@ -820,16 +828,16 @@ button, input, select {
   max-width: 320px;
   margin: 0;
   color: var(--text-dim);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
 }
 
 .mini-auth-progress {
   position: relative;
   z-index: 1;
-  width: min(310px, 82vw);
+  width: min(330px, 82vw);
   height: 8px;
-  margin-top: 6px;
+  margin-top: 14px;
   overflow: hidden;
   border: 1px solid rgba(74, 222, 128, .24);
   border-radius: var(--radius-pill);
@@ -849,10 +857,10 @@ button, input, select {
 .mini-auth-steps {
   position: relative;
   z-index: 1;
-  width: min(310px, 82vw);
+  width: min(330px, 82vw);
   display: grid;
   gap: 9px;
-  margin-top: 8px;
+  margin-top: 14px;
   color: rgba(236, 255, 241, .68);
   font-size: 12px;
   text-align: left;
