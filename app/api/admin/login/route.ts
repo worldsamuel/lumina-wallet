@@ -6,6 +6,7 @@ import {
   clearLoginFailures,
   getAdminSessionMaxAgeSeconds,
   getLoginLock,
+  hasAdminSessionSecret,
   recordLoginFailure,
   signAdminSession,
 } from "@/lib/api/admin-auth";
@@ -16,13 +17,25 @@ export function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!hasAdminSessionSecret()) {
+    return jsonResponse(
+      { error: "Admin session secret is not configured. Set ADMIN_SESSION_SECRET in Vercel." },
+      { status: 500 },
+    );
+  }
+
   if (!rateLimit(req, "admin:login", 5).ok) {
     return jsonResponse({ error: "Too many login attempts." }, { status: 429 });
   }
 
-  const { username, password } = (await req.json()) as { username?: string; password?: string };
+  const body = (await req.json()) as { username?: string; password?: string };
+  const username = body.username?.trim();
+  const password = body.password ?? "";
   if (!username || !password) {
     return jsonResponse({ error: "Username and password are required." }, { status: 400 });
+  }
+  if (username.length < 3 || username.length > 40) {
+    return jsonResponse({ error: "Username must be 3-40 characters." }, { status: 400 });
   }
 
   const initialPassword = process.env.ADMIN_INITIAL_PASSWORD;
@@ -33,7 +46,25 @@ export async function POST(req: NextRequest) {
   }
 
   let admin = await db.adminUser.findUnique({ where: { username } });
-  const ok = admin ? await bcrypt.compare(password, admin.passwordHash) : false;
+  let ok = admin ? await bcrypt.compare(password, admin.passwordHash) : false;
+
+  if (!admin) {
+    const adminCount = await db.adminUser.count();
+    if (adminCount === 0) {
+      if (password.length < 10) {
+        return jsonResponse({ error: "First admin password must be at least 10 characters." }, { status: 400 });
+      }
+      const passwordHash = await bcrypt.hash(password, 12);
+      admin = await db.adminUser.create({
+        data: {
+          username,
+          passwordHash,
+          role: "super_admin",
+        },
+      });
+      ok = true;
+    }
+  }
 
   if (!ok && initialPasswordOk) {
     const passwordHash = await bcrypt.hash(password, 12);

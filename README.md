@@ -18,7 +18,7 @@ Open `http://localhost:3000`. A normal browser should show `Please open this app
 2. Copy the shared transaction pooler URI to `DATABASE_URL`.
 3. Copy the session pooler URI to `DIRECT_URL`.
 4. Replace `[PASSWORD]` in both URLs.
-5. Keep `DATABASE_URL`, `DIRECT_URL`, `WORLD_APP_SECRET`, `SESSION_SECRET`, `ADMIN_SESSION_SECRET`, and `ADMIN_INITIAL_PASSWORD` out of git.
+5. Keep `DATABASE_URL`, `DIRECT_URL`, `WORLD_APP_SECRET`, `SESSION_SECRET`, `ADMIN_SESSION_SECRET`, and any admin recovery password out of git.
 
 ## Prisma
 
@@ -57,12 +57,9 @@ npm run prisma:migrate
 
 ## Admin Bootstrap
 
-Set `ADMIN_INITIAL_PASSWORD` before `npm run db:seed`. The seed creates:
+Set `ADMIN_SESSION_SECRET` in the deployment environment. On a fresh database with no admin users, the first successful login creates the first `super_admin` account using the username and password entered on the login page.
 
-- username: `admin`
-- password: value of `ADMIN_INITIAL_PASSWORD`
-
-Admin login sets an httpOnly `admin_session` cookie. Write routes record `AuditLog` rows.
+`ADMIN_INITIAL_PASSWORD` is optional and only kept as a recovery/bootstrap shortcut for the `admin` user. Admin login sets an httpOnly `admin_session` cookie. Write routes record `AuditLog` rows.
 
 ## Useful API Checks
 

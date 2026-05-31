@@ -19,6 +19,10 @@ function adminSecret() {
   return secret;
 }
 
+export function hasAdminSessionSecret() {
+  return Boolean(process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET);
+}
+
 export function getAdminSessionMaxAgeSeconds() {
   return ADMIN_SESSION_MAX_AGE_SECONDS;
 }
