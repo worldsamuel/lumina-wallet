@@ -4,6 +4,7 @@ import { TOKENS } from "./tokens";
 const GECKO_NETWORK = "world-chain";
 const GECKO_POOLS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
 const GECKO_OHLCV_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
+const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
 const CACHE_TTL_MS = 30_000;
 const MIN_LIQUIDITY_USD = 100;
 const MIN_VOLUME_24H_USD = 1;
@@ -57,6 +58,24 @@ type GeckoOhlcvResponse = {
   };
 };
 
+type GeckoTradesResponse = {
+  data?: Array<{
+    id?: string;
+    attributes?: Record<string, unknown>;
+  }>;
+};
+
+type WorldscanHoldersResponse = {
+  items?: Array<{
+    value?: string;
+    address_hash?: {
+      hash?: string;
+      name?: string | null;
+      is_contract?: boolean;
+    };
+  }>;
+};
+
 export type MarketToken = {
   symbol: string;
   name: string;
@@ -68,6 +87,24 @@ export type MarketToken = {
   logoUrl: string | null;
   poolAddress: string;
   verified: boolean;
+  decimals: number | null;
+};
+
+export type PoolTrade = {
+  hash: string | null;
+  side: "buy" | "sell";
+  timestamp: string | null;
+  amount: string | null;
+  amountUsd: number | null;
+  priceUsd: number | null;
+  maker: string | null;
+};
+
+export type TokenHolder = {
+  address: string;
+  label: string | null;
+  balance: string;
+  isContract: boolean;
 };
 
 let cached: { expiresAt: number; data: MarketToken[] } | null = null;
@@ -209,6 +246,7 @@ export async function getWorldChainMarketCatalog() {
           logoUrl: marketSide.token?.attributes?.image_url ?? null,
           poolAddress: pool.attributes?.address ?? pool.id,
           verified: verifiedBySymbol(symbol),
+          decimals: TOKENS.find((token) => token.symbol.toUpperCase() === symbol.toUpperCase())?.decimals ?? null,
         });
       }
     }
@@ -287,4 +325,75 @@ export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggre
   }));
   ohlcvCache.set(cacheKey, { data, expiresAt: Date.now() + 180_000 });
   return data;
+}
+
+export async function getPoolTrades(poolAddress: string, tokenAddress?: string | null) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(poolAddress)) return [];
+  const params = new URLSearchParams({
+    trade_volume_in_usd_greater_than: "0",
+  });
+  if (tokenAddress && /^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) {
+    params.set("token", tokenAddress);
+  }
+
+  const response = await fetch(`${GECKO_POOLS_URL}/${poolAddress}/trades?${params}`, {
+    headers: { accept: "application/json;version=20230203" },
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) throw new Error(`GeckoTerminal trades responded ${response.status}`);
+  const body = (await response.json()) as GeckoTradesResponse;
+
+  return (body.data ?? []).slice(0, 20).map((trade): PoolTrade => {
+    const attrs = trade.attributes ?? {};
+    const sideRaw = String(attrs.kind ?? attrs.trade_type ?? attrs.tx_type ?? "").toLowerCase();
+    const side: "buy" | "sell" = sideRaw.includes("sell") ? "sell" : "buy";
+    const amount =
+      stringAttr(attrs.from_token_amount) ??
+      stringAttr(attrs.to_token_amount) ??
+      stringAttr(attrs.amount) ??
+      null;
+    return {
+      hash: stringAttr(attrs.tx_hash) ?? trade.id ?? null,
+      side,
+      timestamp: stringAttr(attrs.block_timestamp) ?? stringAttr(attrs.timestamp) ?? null,
+      amount,
+      amountUsd: numberOrNull(attrs.volume_in_usd ?? attrs.volume_usd ?? attrs.amount_usd),
+      priceUsd: numberOrNull(attrs.price_from_in_usd ?? attrs.price_to_in_usd ?? attrs.price_in_usd),
+      maker:
+        stringAttr(attrs.tx_from_address) ??
+        stringAttr(attrs.maker) ??
+        stringAttr(attrs.from_address) ??
+        null,
+    };
+  });
+}
+
+export async function getTokenHolders(tokenAddress: string | null) {
+  if (!tokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) return [];
+  const response = await fetch(`${WORLDSCAN_API_URL}/tokens/${tokenAddress}/holders`, {
+    headers: { accept: "application/json" },
+    next: { revalidate: 300 },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) throw new Error(`Worldscan holders responded ${response.status}`);
+  const body = (await response.json()) as WorldscanHoldersResponse;
+  return (body.items ?? []).slice(0, 10).map((holder): TokenHolder => {
+    const hash = holder.address_hash?.hash ?? "";
+    return {
+      address: hash,
+      label: holder.address_hash?.name ?? null,
+      balance: holder.value ?? "0",
+      isContract: Boolean(holder.address_hash?.is_contract),
+    };
+  });
+}
+
+function stringAttr(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function numberOrNull(value: unknown) {
+  const parsed = Number.parseFloat(String(value ?? ""));
+  return Number.isFinite(parsed) ? parsed : null;
 }

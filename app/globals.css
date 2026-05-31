@@ -379,13 +379,14 @@
   .detail-v2-change span.down { background: rgba(248,113,113,0.14); color: var(--red); }
   .detail-v2-change span.none { background: rgba(255,255,255,0.06); color: var(--text-mute); }
   .detail-v2-change em { font-style: normal; }
-  .detail-v2-chart-card { margin: 0; background: linear-gradient(180deg, rgba(14,26,17,0.98), rgba(12,13,12,0.98)); border: 1px solid rgba(255,255,255,0.04); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 46px rgba(0,0,0,0.28); }
+  .detail-v2-chart-card { margin: 0; background: linear-gradient(180deg, rgba(5,8,8,0.98), rgba(5,5,5,0.98)); border: 1px solid rgba(255,255,255,0.06); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 46px rgba(0,0,0,0.28); }
   .detail-v2-ranges { margin: 0; padding: 0 16px 14px; }
   .detail-v2-ranges .range { min-width: 52px; padding: 9px 0; font-size: 15px; font-weight: 800; }
   .detail-v2-ranges .range.sel { background: rgba(255,255,255,0.045); color: var(--green); }
-  .detail-v2-chart-card .detail-chart { margin: 0; height: 230px; }
+  .detail-v2-chart-card .detail-chart { margin: 0; height: 230px; background: radial-gradient(circle at 50% 0%, rgba(74,222,128,0.06), transparent 42%); }
   .market-candles { width: 100%; height: 100%; display: block; }
   .market-trend { filter: drop-shadow(0 0 18px rgba(74,222,128,0.12)); }
+  .market-terminal { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
   .pool-info-modal { display: none; position: fixed; inset: 0; z-index: 120; background: rgba(0,0,0,0.55); align-items: flex-end; justify-content: center; padding: 18px; }
   .pool-info-modal.open { display: flex; }
   .pool-info-sheet { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 22px; background: #101210; padding: 22px; color: var(--text); box-shadow: 0 24px 70px rgba(0,0,0,0.45); position: relative; }
@@ -400,6 +401,29 @@
   .detail-v2-actions .detail-action-send svg { color: var(--green); }
   .detail-v2-actions .detail-action-swap { background: var(--green); color: #073719; box-shadow: none; }
   .detail-v2-actions .detail-action-swap svg { color: #073719; }
+  .detail-market-panels { display: grid; gap: 12px; margin-top: 16px; }
+  .detail-market-card { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
+  .detail-market-title { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+  .detail-market-title span { font-size: 16px; font-weight: 900; }
+  .detail-market-title em { font-style: normal; color: var(--text-mute); font-size: 12px; font-weight: 700; }
+  .detail-trade-row,
+  .detail-holder-row { min-height: 54px; display: grid; grid-template-columns: 52px 1fr auto; align-items: center; gap: 10px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,0.055); }
+  .detail-trade-row:last-child,
+  .detail-holder-row:last-child { border-bottom: none; }
+  .detail-trade-row { cursor: pointer; }
+  .trade-side { font-size: 12px; font-weight: 900; text-transform: uppercase; }
+  .trade-side.buy { color: #00e676; }
+  .trade-side.sell { color: #ff4d5f; }
+  .trade-main,
+  .holder-main { min-width: 0; display: grid; gap: 3px; }
+  .trade-main b,
+  .holder-main b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .trade-main em,
+  .holder-main em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-mute); font-size: 11px; font-style: normal; }
+  .trade-usd,
+  .holder-bal { color: #d9ded9; font-size: 13px; font-weight: 850; white-space: nowrap; text-align: right; }
+  .holder-rank { width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.055); color: #9ba19b; font-size: 12px; font-weight: 900; }
+  .detail-empty-row { min-height: 54px; display: grid; place-items: center; color: var(--text-mute); font-size: 13px; }
   .detail-v2-menu { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
   .detail-v2-menu a,
   .detail-v2-menu button { width: 100%; min-height: 66px; padding: 0 20px; display: flex; align-items: center; gap: 18px; background: transparent; border: none; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; cursor: pointer; }

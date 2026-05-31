@@ -2578,39 +2578,121 @@ function enhancePrototypeDetail() {
         var n = Number(value || 0);
         if (!Number.isFinite(n) || n <= 0) return "$0";
         if (n >= 1) return "$" + n.toFixed(n >= 100 ? 0 : 2);
-        return "$" + n.toPrecision(3);
+        if (n >= 0.01) return "$" + n.toFixed(4);
+        return "$" + n.toPrecision(5);
       }
       function trendSvg(candles, range){
         if (!candles.length) return chartSvg(range || "1D");
-        var width = 420, height = 214, padX = 44, padY = 24;
-        var closes = candles.map(function(c){ return Number(c.close || c[4] || 0); }).filter(function(v){ return Number.isFinite(v) && v > 0; });
-        if (closes.length < 2) return chartSvg(range || "1D");
-        var max = Math.max.apply(null, closes), min = Math.min.apply(null, closes);
+        var width = 430, height = 230, padL = 54, padR = 48, padT = 26, chartH = 132, volY = 174, volH = 24;
+        var rows = candles.map(function(c){
+          return {
+            open: Number(c.open || c[1] || 0),
+            high: Number(c.high || c[2] || 0),
+            low: Number(c.low || c[3] || 0),
+            close: Number(c.close || c[4] || 0),
+            volume: Number(c.volume || c[5] || 0),
+            timestamp: Number(c.timestamp || c[0] || 0)
+          };
+        }).filter(function(c){ return c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0; });
+        if (rows.length < 2) return chartSvg(range || "1D");
+        var highs = rows.map(function(c){ return c.high; });
+        var lows = rows.map(function(c){ return c.low; });
+        var max = Math.max.apply(null, highs), min = Math.min.apply(null, lows);
         if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return chartSvg(range || "1D");
-        function y(v){ return padY + (max - v) / (max - min) * (height - padY * 2); }
-        var points = closes.map(function(v, i){
-          var x = padX + (i / Math.max(1, closes.length - 1)) * (width - padX * 2);
-          return [x, y(v)];
+        var maxVol = Math.max.apply(null, rows.map(function(c){ return c.volume || 0; }).concat([1]));
+        function y(v){ return padT + (max - v) / (max - min) * chartH; }
+        function x(i){ return padL + (i / Math.max(1, rows.length - 1)) * (width - padL - padR); }
+        var band = (width - padL - padR) / Math.max(8, rows.length);
+        var bodyW = Math.max(2, Math.min(9, band * 0.56));
+        var firstClose = rows[0].close;
+        var lastClose = rows[rows.length - 1].close;
+        var upTrend = lastClose >= firstClose;
+        var trendColor = upTrend ? "#00c2a8" : "#ff4d5f";
+        var candlesSvg = rows.map(function(c, i){
+          var cx = x(i);
+          var up = c.close >= c.open;
+          var color = up ? "#00c2a8" : "#ff4d5f";
+          var top = Math.min(y(c.open), y(c.close));
+          var bottom = Math.max(y(c.open), y(c.close));
+          var bodyH = Math.max(2, bottom - top);
+          var volHeight = Math.max(1, (c.volume || 0) / maxVol * volH);
+          return '<line x1="' + cx.toFixed(1) + '" x2="' + cx.toFixed(1) + '" y1="' + y(c.high).toFixed(1) + '" y2="' + y(c.low).toFixed(1) + '" stroke="' + color + '" stroke-width="1.15"/>' +
+            '<rect x="' + (cx - bodyW / 2).toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + bodyW.toFixed(1) + '" height="' + bodyH.toFixed(1) + '" rx="0.8" fill="' + color + '"/>' +
+            '<rect x="' + (cx - bodyW / 2).toFixed(1) + '" y="' + (volY + volH - volHeight).toFixed(1) + '" width="' + bodyW.toFixed(1) + '" height="' + volHeight.toFixed(1) + '" fill="' + color + '" opacity="0.52"/>';
+        }).join("");
+        var grid = [0,1,2,3].map(function(i){
+          var gy = padT + (chartH / 3) * i;
+          return '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (width - padR) + '" y2="' + gy.toFixed(1) + '" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>';
         });
-        var line = points.map(function(p, i){ return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1); }).join(" ");
-        var last = points[points.length - 1];
-        var firstClose = closes[0];
-        var lastClose = closes[closes.length - 1];
-        var up = lastClose >= firstClose;
-        var color = up ? "#4ade80" : "#f87171";
-        var area = line + " L " + last[0].toFixed(1) + " " + (height - 10) + " L " + padX + " " + (height - 10) + " Z";
-        var labelX = Math.min(width - 88, Math.max(18, last[0] - 72));
-        var labelY = Math.max(16, Math.min(height - 42, last[1] - 32));
-        return '<svg class="market-candles market-trend" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
-          '<defs><linearGradient id="trendFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity="0.22"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
-          '<text x="8" y="28" text-anchor="start" fill="#98a09a" font-size="12">' + formatChartPrice(max) + '</text>' +
-          '<text x="8" y="' + (height - 18) + '" text-anchor="start" fill="#626862" font-size="12">' + formatChartPrice(min) + '</text>' +
-          '<path d="' + area + '" fill="url(#trendFade)"/>' +
-          '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<rect x="' + labelX.toFixed(1) + '" y="' + labelY.toFixed(1) + '" width="82" height="26" rx="13" fill="rgba(4,7,4,0.84)" stroke="' + color + '" stroke-opacity="0.28"/>' +
-          '<text x="' + (labelX + 41).toFixed(1) + '" y="' + (labelY + 17).toFixed(1) + '" text-anchor="middle" fill="' + color + '" font-size="12" font-weight="800">' + formatChartPrice(lastClose) + '</text>' +
-          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="5.5" fill="' + color + '"/>' +
+        var lastX = width - padR + 5;
+        var lastY = y(lastClose);
+        return '<svg class="market-candles market-terminal" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
+          '<rect x="0" y="0" width="' + width + '" height="' + height + '" fill="rgba(2,4,4,0.2)"/>' +
+          '<text x="10" y="20" fill="#b6bdc8" font-size="10">Volume SMA</text>' +
+          '<text x="82" y="20" fill="' + trendColor + '" font-size="10">' + rows.length + '</text>' +
+          grid.join("") +
+          '<line x1="' + padL + '" y1="' + lastY.toFixed(1) + '" x2="' + (width - padR) + '" y2="' + lastY.toFixed(1) + '" stroke="' + trendColor + '" stroke-dasharray="2 3" opacity="0.7"/>' +
+          candlesSvg +
+          '<text x="8" y="' + (padT + 4) + '" text-anchor="start" fill="#a9b0b8" font-size="11">' + formatChartPrice(max) + '</text>' +
+          '<text x="8" y="' + (padT + chartH + 3) + '" text-anchor="start" fill="#7b828c" font-size="11">' + formatChartPrice(min) + '</text>' +
+          '<rect x="' + lastX.toFixed(1) + '" y="' + (lastY - 10).toFixed(1) + '" width="70" height="20" rx="5" fill="' + trendColor + '"/>' +
+          '<text x="' + (lastX + 35).toFixed(1) + '" y="' + (lastY + 4).toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="11" font-weight="800">' + formatChartPrice(lastClose).replace("$","") + '</text>' +
+          '<text x="26" y="218" fill="#9da3ad" font-size="13">' + (range === "1H" ? "5m" : range === "1D" ? "1h" : range === "1W" ? "4h" : "1d") + '</text>' +
+          '<text x="188" y="218" fill="#9da3ad" font-size="13">' + (range || "1D") + '</text>' +
+          '<text x="342" y="218" fill="#9da3ad" font-size="13">auto</text>' +
           '</svg>';
+      }
+      function shortAddr(value){
+        value = String(value || "");
+        return value.length > 12 ? value.slice(0, 6) + "..." + value.slice(-4) : value;
+      }
+      function tradeRows(trades, asset){
+        if (!trades || !trades.length) return '<div class="detail-empty-row">No recent swaps found.</div>';
+        return trades.slice(0, 8).map(function(t){
+          var side = t.side === "sell" ? "sell" : "buy";
+          var amount = t.amount ? Number(t.amount).toLocaleString(undefined, { maximumFractionDigits: 4 }) + " " + asset.sym : "—";
+          var usd = t.amountUsd ? compactUsd(t.amountUsd) : (t.priceUsd ? formatChartPrice(t.priceUsd) : "—");
+          var time = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
+          var hash = t.hash ? String(t.hash) : "";
+          var open = hash ? ' onclick="window.open(\\'https://worldscan.org/tx/' + hash + '\\', \\'_blank\\')"' : "";
+          return '<div class="detail-trade-row"' + open + '><span class="trade-side ' + side + '">' + (side === "buy" ? "Buy" : "Sell") + '</span><span class="trade-main"><b>' + amount + '</b><em>' + time + ' · ' + shortAddr(t.maker) + '</em></span><span class="trade-usd">' + usd + '</span></div>';
+        }).join("");
+      }
+      function holderRows(holders, asset){
+        if (!holders || !holders.length) return '<div class="detail-empty-row">No holder ranking available.</div>';
+        var market = marketForAsset(asset) || {};
+        var decimals = Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : (asset.sym === "USDC" || asset.sym === "USDT" ? 6 : 18);
+        var divisor = Math.pow(10, decimals);
+        return holders.slice(0, 8).map(function(h, i){
+          var raw = Number(h.balance || 0);
+          var amount = raw > divisor ? raw / divisor : raw;
+          var label = h.label || shortAddr(h.address);
+          var tag = h.isContract ? "Contract" : "Wallet";
+          return '<div class="detail-holder-row"><span class="holder-rank">' + (i + 1) + '</span><span class="holder-main"><b>' + label + '</b><em>' + tag + '</em></span><span class="holder-bal">' + amount.toLocaleString(undefined, { maximumFractionDigits: 3 }) + ' ' + asset.sym + '</span></div>';
+        }).join("");
+      }
+      function renderMarketTables(asset) {
+        var tradesBox = document.getElementById("detTrades");
+        var holdersBox = document.getElementById("detHolders");
+        if (!tradesBox || !holdersBox) return;
+        var market = marketForAsset(asset);
+        if (!market || !market.poolAddress || !market.address) {
+          tradesBox.innerHTML = '<div class="detail-empty-row">Market pair unavailable.</div>';
+          holdersBox.innerHTML = '<div class="detail-empty-row">Holder ranking unavailable.</div>';
+          return;
+        }
+        tradesBox.innerHTML = '<div class="detail-empty-row">Loading trades...</div>';
+        holdersBox.innerHTML = '<div class="detail-empty-row">Loading holders...</div>';
+        fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : { trades: [], holders: [] }; })
+          .then(function(data){
+            tradesBox.innerHTML = tradeRows(Array.isArray(data.trades) ? data.trades : [], asset);
+            holdersBox.innerHTML = holderRows(Array.isArray(data.holders) ? data.holders : [], asset);
+          })
+          .catch(function(){
+            tradesBox.innerHTML = '<div class="detail-empty-row">Unable to load trades.</div>';
+            holdersBox.innerHTML = '<div class="detail-empty-row">Unable to load holders.</div>';
+          });
       }
       window.openPoolInfo = function(){
         var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
@@ -2666,6 +2748,10 @@ function enhancePrototypeDetail() {
             '<button class="btn-ghost detail-action-swap" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
             '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
           '</div>' +
+          '<section class="detail-market-panels">' +
+            '<div class="detail-market-card"><div class="detail-market-title"><span>Trades</span><em>Live pool</em></div><div id="detTrades"></div></div>' +
+            '<div class="detail-market-card"><div class="detail-market-title"><span>Holders</span><em>Top ranking</em></div><div id="detHolders"></div></div>' +
+          '</section>' +
           '<section class="detail-v2-menu">' +
             '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +
             '<a id="detExplorer" target="_blank" rel="noreferrer"><span>' + detailIcon("globe") + '</span><strong>View on Explorer</strong><i>›</i></a>' +
@@ -2724,6 +2810,7 @@ function enhancePrototypeDetail() {
         var change = null;
         try { change = tokenChanges24h && tokenChanges24h[asset.sym] !== undefined ? tokenChanges24h[asset.sym] : null; } catch(e) { change = null; }
         var pill = document.getElementById("detChangePill");
+        renderMarketTables(asset);
         if (change === null || change === undefined || !Number.isFinite(Number(change))) {
           pill.className = "none";
           pill.textContent = "No data";
