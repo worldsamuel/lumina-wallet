@@ -200,7 +200,7 @@ export async function getWorldChainMarketCatalog() {
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
   try {
-    const settledPages = await Promise.allSettled([1, 2, 3, 4, 5].map(fetchGeckoPage));
+    const settledPages = await Promise.allSettled([1, 2, 3, 4, 5, 6, 7, 8].map(fetchGeckoPage));
     const pages = settledPages
       .filter((result): result is PromiseFulfilledResult<GeckoResponse> => result.status === "fulfilled")
       .map((result) => result.value);
@@ -273,7 +273,7 @@ export async function getWorldChainMarkets(mode: WorldChainMarketMode = "gainers
     Number(market.volume24hUsd || 0) >= MIN_VOLUME_24H_USD &&
     !!market.poolAddress
   );
-  if (mode === "all") return catalog.slice(0, 80);
+  if (mode === "all") return catalog;
 
   const changed = catalog
     .filter((market) => market.change24h !== null && Number.isFinite(Number(market.change24h)));

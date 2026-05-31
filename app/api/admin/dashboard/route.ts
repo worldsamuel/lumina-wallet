@@ -29,12 +29,39 @@ export async function GET() {
     .map((user) => user.address)
     .filter((address): address is Address => isAddress(address));
 
-  let transactions = 0;
+  let activity: Awaited<ReturnType<typeof getRecentUserActivity>> = [];
   try {
-    transactions = (await getRecentUserActivity(addresses, 200)).length;
+    activity = await getRecentUserActivity(addresses, 200);
   } catch (error) {
     console.error("Failed to count dashboard transactions", error);
   }
+  const transactions = activity.length;
+  const todayIso = today.toISOString().slice(0, 10);
+  const todayActivity = activity.filter((row) => row.createdAt.slice(0, 10) === todayIso);
+  const feeNative = activity.reduce((sum, row) => sum + (row.feeNative || 0), 0);
+  const todayFeeNative = todayActivity.reduce((sum, row) => sum + (row.feeNative || 0), 0);
+  const volumeBySymbol = new Map<string, number>();
+  for (const row of activity) {
+    volumeBySymbol.set(row.tokenSymbol, (volumeBySymbol.get(row.tokenSymbol) || 0) + Math.abs(row.tokenAmount || 0));
+  }
+  const transferVolumeLabel =
+    [...volumeBySymbol.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2)
+      .map(([symbol, value]) => `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${symbol}`)
+      .join(" / ") || "0";
+  const feeSeries = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (6 - index));
+    const day = date.toISOString().slice(5, 10);
+    const iso = date.toISOString().slice(0, 10);
+    const rows = activity.filter((row) => row.createdAt.slice(0, 10) === iso);
+    return {
+      day,
+      count: rows.length,
+      feeNative: rows.reduce((sum, row) => sum + (row.feeNative || 0), 0),
+    };
+  });
 
   const [analytics, feedbackNew] = await Promise.all([
     db.contentPage.findUnique({ where: { key: "analytics_counters" } }),
@@ -53,6 +80,11 @@ export async function GET() {
     totalUsers,
     todayUsers,
     transactions,
+    todayTransactions: todayActivity.length,
+    transferVolumeLabel,
+    feeNative,
+    todayFeeNative,
+    feeSeries,
     opens: Number(counters.opens || 0),
     visits: Number(counters.visits || 0),
     todayOpens: isToday ? Number(counters.todayOpens || 0) : 0,

@@ -51,6 +51,10 @@ export type AdminActivityRow = {
   createdAt: string;
   blockNumber: number;
   logIndex: number;
+  direction: "in" | "out";
+  tokenSymbol: string;
+  tokenAmount: number;
+  feeNative: number;
 };
 
 export async function getRecentUserActivity(addresses: Address[], maxRows = 80) {
@@ -92,6 +96,14 @@ export async function getRecentUserActivity(addresses: Address[], maxRows = 80) 
           const to = String(log.args.to ?? "");
           const incomingTx = to.toLowerCase() === lower;
           const meta = await getTokenMeta(log.address);
+          const tokenAmount = Number(formatUnits(value, meta.decimals));
+          let feeNative = 0;
+          try {
+            const receipt = await publicClient.getTransactionReceipt({ hash: log.transactionHash });
+            feeNative = Number(formatUnits(receipt.gasUsed * receipt.effectiveGasPrice, 18));
+          } catch {
+            feeNative = 0;
+          }
           const createdAt = new Date().toISOString();
 
           rows.push({
@@ -108,6 +120,10 @@ export async function getRecentUserActivity(addresses: Address[], maxRows = 80) 
             createdAt,
             blockNumber: Number(log.blockNumber),
             logIndex: log.logIndex,
+            direction: incomingTx ? "in" : "out",
+            tokenSymbol: meta.symbol,
+            tokenAmount: Number.isFinite(tokenAmount) ? tokenAmount : 0,
+            feeNative,
           });
         }),
       );

@@ -12,8 +12,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
   const body = (await req.json()) as Record<string, unknown>;
+  const current = await db.token.findFirst({ where: { OR: [{ id: params.id }, { symbol: params.id.toUpperCase() }] } });
+  if (!current) return jsonResponse({ error: "Token not found." }, { status: 404 });
   const token = await db.token.update({
-    where: { id: params.id },
+    where: { id: current.id },
     data: {
       symbol: typeof body.symbol === "string" ? body.symbol : undefined,
       name: typeof body.name === "string" ? body.name : undefined,
@@ -35,7 +37,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
-  await db.token.delete({ where: { id: params.id } });
+  const current = await db.token.findFirst({ where: { OR: [{ id: params.id }, { symbol: params.id.toUpperCase() }] } });
+  if (!current) return jsonResponse({ error: "Token not found." }, { status: 404 });
+  await db.token.delete({ where: { id: current.id } });
   await auditLog(admin.id, "delete_token", params.id);
   return jsonResponse({ ok: true });
 }
