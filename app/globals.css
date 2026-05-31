@@ -47,8 +47,8 @@
   #view-swap .swap-head .back-btn { display: none; }
   .view > .swap-head .gear { position: absolute; top: 15px; right: var(--pad-screen); margin: 0; color: var(--text); background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   #view-swap > .swap-head { pointer-events: none; }
-  #view-swap .swap-head .gear { pointer-events: auto; top: 4px; right: calc(var(--pad-screen) + 16px); width: 40px; height: 40px; color: #e9eee9; background: #101210; border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
-  #view-swap .swap-head .gear svg { width: 23px; height: 23px; }
+  #view-swap .swap-head .gear { pointer-events: auto; top: 10px; right: var(--pad-screen); width: 34px; height: 34px; z-index: 20; color: #e9eee9; background: rgba(16,18,16,0.9); border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
+  #view-swap .swap-head .gear svg { width: 20px; height: 20px; }
   #view-home .balance-card,
   #view-earn .earn-hero,
   #view-me .me-card { margin-top: 10px; }
@@ -217,7 +217,7 @@
   .gainer .ic .lumina-token-img,
   .detail-v2-token-icon .lumina-token-mark,
   .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; }
-  .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
+  .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.btc { background: #f7931a; color: #fff; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
   .coin.custom, .token-initial { background: linear-gradient(135deg,#202820,#324036); color: var(--green); border: 1px solid rgba(74,222,128,0.28); font-size: 12px; letter-spacing: 0; }
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
   .asset .spark { width: 80px; height: 34px; }

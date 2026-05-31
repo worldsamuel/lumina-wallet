@@ -345,10 +345,11 @@ function resetPrototypePortfolio() {
       { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "W" },
       { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "$" },
       { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$" },
-      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E" }
+      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E" },
+      { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true }
     ];
-    balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0" };
-    availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH" };
+    balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0", BTC: "0" };
+    availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH", BTC: "0 BTC" };
     totalUsdNum = 0;
     change24hUsdNum = 0;
     if (document.querySelector(".balance-change")) {
@@ -508,10 +509,15 @@ function enhancePrototypeBuiltinTokenLogos() {
       }
       function builtinLogo(symbol){
         var sym = String(symbol || "").toUpperCase();
-        if (sym === "WLD") return logoImg("WLD", "https://cryptologos.cc/logos/worldcoin-org-wld-logo.svg", "");
-        if (sym === "USDC") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#2775ca"/><circle cx="32" cy="32" r="22" fill="none" stroke="#fff" stroke-width="4"/><path d="M32 16v32M39.5 25.5c-1.6-2.4-4.1-3.4-7.2-3.4-4 0-6.8 2-6.8 5.1 0 7.1 14 3.2 14 10.3 0 3.4-2.9 5.8-7.4 5.8-3.7 0-6.6-1.4-8.3-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>';
-        if (sym === "USDT") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#26a17b"/><path d="M18 18h28v7H35.7v7.2c7.1.4 12.3 1.9 12.3 3.8 0 2.2-7.2 4-16 4s-16-1.8-16-4c0-1.9 5.2-3.4 12.3-3.8V25H18v-7zm14 19.1c5.5 0 10-.8 10-1.8 0-.8-2.7-1.4-6.3-1.7v5h-7.4v-5c-3.6.3-6.3.9-6.3 1.7 0 1 4.5 1.8 10 1.8z" fill="#fff"/></svg>';
-        if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#1c2536"/><path d="M32 8l15 25-15 8-15-8L32 8z" fill="#d7e2ff"/><path d="M32 8v33l15-8L32 8z" fill="#8aa3d8"/><path d="M17 36l15 20 15-20-15 8-15-8z" fill="#d7e2ff"/><path d="M32 44v12l15-20-15 8z" fill="#8aa3d8"/></svg>';
+        var cryptologos = {
+          WLD: "https://cryptologos.cc/logos/worldcoin-org-wld-logo.svg",
+          USDT: "https://cryptologos.cc/logos/tether-usdt-logo.svg",
+          USDC: "https://cryptologos.cc/logos/usd-coin-usdc-logo.svg",
+          ETH: "https://cryptologos.cc/logos/ethereum-eth-logo.svg",
+          BTC: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg",
+          WBTC: "https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.svg"
+        };
+        if (cryptologos[sym]) return logoImg(sym, cryptologos[sym], "");
         return "";
       }
       function trustedLogoUrl(symbol){
@@ -549,6 +555,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.USDC = window.__luminaTokenLogoHtml("USDC", "");
         tokenLogo.USDT = window.__luminaTokenLogoHtml("USDT", "");
         tokenLogo.ETH = window.__luminaTokenLogoHtml("ETH", "");
+        tokenLogo.BTC = window.__luminaTokenLogoHtml("BTC", "");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -654,17 +661,18 @@ function enhancePrototypeEarn() {
         return (vault.description && (vault.description[lang] || vault.description.en)) || "";
       }
       function updateEarnHero(){
+        var zh = (window.currentLang || "en") === "zh-CN";
         var totalEl = document.getElementById("earnTotal");
         if (totalEl) {
           var active = morphoPositions.filter(function(p){ return Number(p.assetsFormatted || 0) > 0; }).length;
           totalEl.textContent = active ? String(active) : "0";
         }
         var sub = document.querySelector(".earn-hero .sub");
-        if (sub) sub.textContent = morphoError || "Morpho Re7 vaults on World Chain";
+        if (sub) sub.textContent = morphoError || (zh ? "Re7 理财金库" : "Re7 yield vaults");
         var claim = document.querySelector(".earn-hero .claim");
         if (claim) {
           claim.disabled = morphoLoading;
-          claim.textContent = morphoLoading ? "Loading" : "Refresh";
+          claim.textContent = morphoLoading ? (zh ? "加载中" : "Loading") : (zh ? "刷新" : "Refresh");
           claim.onclick = function(){ loadMorphoData(true); };
         }
       }
@@ -1459,8 +1467,9 @@ function enhancePrototypeMarket() {
         tokenLogo.USDC = iconFor("USDC", "");
         tokenLogo.USDT = iconFor("USDT", "");
         tokenLogo.ETH = iconFor("ETH", "");
+        tokenLogo.BTC = iconFor("BTC", "");
         (assets || []).forEach(function(asset){
-          if (["WLD","USDC","USDT","ETH"].indexOf(asset.sym) >= 0) asset.logo = iconFor(asset.sym, asset.logo);
+          if (["WLD","USDC","USDT","ETH","BTC"].indexOf(asset.sym) >= 0) asset.logo = iconFor(asset.sym, asset.logo);
         });
       }
       function registerMarketToken(market){
@@ -1510,8 +1519,9 @@ function enhancePrototypeMarket() {
           tabGainers: zh ? "涨幅" : "Gainers",
           tabLosers: zh ? "跌幅" : "Losers",
           tabNewest: zh ? "新币" : "New",
-          emptyPrefix: zh ? "World Chain 暂无满足流动性条件的" : "No liquid World Chain ",
+          emptyPrefix: zh ? "暂无" : "No ",
           emptySuffix: zh ? "数据" : " data yet",
+          loading: zh ? "正在读取行情..." : "Loading market data...",
           meta: "24h · on-chain",
           note: zh
             ? "以下为链上 24h 行情排行,仅为市场数据,非投资建议。新币和高波动代币风险更高。"
@@ -1607,7 +1617,7 @@ function enhancePrototypeMarket() {
         renderGainers = function(){
           updateMarketTabs();
           var box = document.getElementById("gainersList");
-          if (box) box.innerHTML = '<div class="import-load">读取 GeckoTerminal 行情...</div>';
+          if (box) box.innerHTML = '<div class="import-load">' + marketCopy("loading") + '</div>';
           Promise.all([
             fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
             fetch("/api/prices/market", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
@@ -1616,7 +1626,10 @@ function enhancePrototypeMarket() {
               registerMarketsFromPriceMeta(results[1]);
               var cg = marketsFromCoinGecko(results[1]);
               var poolMarkets = Array.isArray(results[0]) ? results[0] : [];
-              var merged = marketTab === "gainers" ? cg.concat(poolMarkets.filter(function(item){
+              var merged = marketTab === "gainers" ? cg.map(function(item){
+                var pool = poolMarkets.find(function(candidate){ return candidate.symbol === item.symbol; });
+                return pool ? Object.assign({}, item, pool, { priceUsd: item.priceUsd || pool.priceUsd, change24h: item.change24h != null ? item.change24h : pool.change24h }) : item;
+              }).concat(poolMarkets.filter(function(item){
                 return !cg.some(function(existing){ return existing.symbol === item.symbol; });
               })) : poolMarkets;
               renderGainersFromMarkets(merged);
@@ -1961,8 +1974,8 @@ function enhancePrototypeActivity() {
       function activityCopy(key){
         var lang = window.currentLang || "en";
         var copy = {
-          loading: { en:"Reading World Chain activity...", fr:"Lecture de l'activité World Chain...", de:"World-Chain-Aktivität wird gelesen...", es:"Leyendo actividad de World Chain...", ja:"World Chain のアクティビティを読み込み中...", "zh-CN":"正在读取 World Chain 链上活动...", "zh-TW":"正在讀取 World Chain 鏈上活動..." },
-          empty: { en:"No World Chain activity yet", fr:"Aucune activité World Chain", de:"Noch keine World-Chain-Aktivität", es:"Aún no hay actividad de World Chain", ja:"World Chain のアクティビティはまだありません", "zh-CN":"暂无真实链上活动", "zh-TW":"暫無真實鏈上活動" }
+          loading: { en:"Loading activity...", fr:"Chargement de l'activité...", de:"Aktivität wird geladen...", es:"Cargando actividad...", ja:"アクティビティを読み込み中...", "zh-CN":"正在读取活动...", "zh-TW":"正在讀取活動..." },
+          empty: { en:"No activity yet", fr:"Aucune activité pour le moment", de:"Noch keine Aktivität", es:"Aún no hay actividad", ja:"アクティビティはまだありません", "zh-CN":"暂无活动", "zh-TW":"暫無活動" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
       }
@@ -2202,11 +2215,12 @@ function enhancePrototypeDetail() {
         USDC: "0x79a02482a880bce3f13e09da970dc34db4cd24d1"
       };
       var seriesByRange = {
+        "1H": [44,46,45,48,47,50,49,53,52,56,55,58],
         "1D": [35,40,39,43,38,41,47,54,57,66,65,71,58,54,48,44,39,42,51,56,64,62,71,77,77,69,65,65],
         "1W": [40,44,47,43,52,59,63,61,67,71,69,74,78,73,80,84,82],
         "1M": [62,65,63,55,51,57,66,73,74,62,54,48,39,41,53,61,67,58],
         "1Y": [28,35,41,38,47,55,62,59,66,74,70,78,82,76,86,90,87],
-        "ALL": [22,25,29,34,32,39,45,44,51,57,63,60,66,72,76,73,80,84,82]
+        "ALL": [18,20,24,23,28,32,31,36,40,45,43,50,54,53,59,64,62,69,72,76,74,81,79,86]
       };
 
       function chartSvg(range) {
@@ -2281,7 +2295,7 @@ function enhancePrototypeDetail() {
         if (!market || !market.liquidityUsd) {
           if (asset && !asset.__marketLookupStarted) {
             asset.__marketLookupStarted = true;
-            chart.innerHTML = '<div class="market-detail-state">匹配真实 K 线池...</div>';
+            chart.innerHTML = '<div class="market-detail-state">' + (((window.currentLang || "en") === "zh-CN") ? "正在加载行情..." : "Loading market data...") + '</div>';
             fetch("/api/tokens/top?mode=all", { cache: "no-store" })
               .then(function(res){ return res.ok ? res.json() : []; })
               .then(function(markets){
@@ -2289,11 +2303,11 @@ function enhancePrototypeDetail() {
                 renderMarketCard(asset);
               })
               .catch(function(){
-                chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
+                chart.innerHTML = '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无行情数据" : "No market data") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该代币暂时没有可用的价格走势图。" : "No chart is available for this token yet.") + '</span></div>';
               });
             return;
           }
-          chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
+          chart.innerHTML = '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无行情数据" : "No market data") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该代币暂时没有可用的价格走势图。" : "No chart is available for this token yet.") + '</span></div>';
           return;
         }
         renderMarketChart(asset, "1D");
@@ -2302,7 +2316,7 @@ function enhancePrototypeDetail() {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
         if (!chart || !market || !market.poolAddress) return;
-        chart.innerHTML = '<div class="market-detail-state">读取 K 线...</div>';
+        chart.innerHTML = '<div class="market-detail-state">' + (((window.currentLang || "en") === "zh-CN") ? "正在加载走势图..." : "Loading chart...") + '</div>';
         fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
@@ -2344,7 +2358,7 @@ function enhancePrototypeDetail() {
         return "$" + n.toPrecision(3);
       }
       function trendSvg(candles){
-        if (!candles.length) return '<div class="market-detail-state"><strong>暂无 K 线</strong><span>GeckoTerminal 暂无该池子的 OHLCV 数据。</span></div>';
+        if (!candles.length) return '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无走势图" : "No chart yet") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该交易池暂时没有可用的历史行情。" : "Historical prices are not available for this pool yet.") + '</span></div>';
         var width = 420, height = 214, padX = 16, padY = 24;
         var closes = candles.map(function(c){ return Number(c.close || c[4] || 0); }).filter(function(v){ return Number.isFinite(v) && v > 0; });
         if (closes.length < 2) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
@@ -2422,7 +2436,7 @@ function enhancePrototypeDetail() {
           '</section>' +
           '<section class="detail-v2-chart-card">' +
             '<div class="detail-chart" id="detChart"></div>' +
-            '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div></div>' +
+            '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
             '<button class="btn-ghost detail-action-receive" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +

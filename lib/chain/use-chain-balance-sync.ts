@@ -111,24 +111,40 @@ function syncBalancesToPrototype(
       logo: item.logo,
     };
   });
-  const balanceMap = Object.fromEntries(
+  if (!assets.some((item) => item.sym === "BTC")) {
+    assets.push({
+      sym: "BTC",
+      full: "Bitcoin",
+      amt: "0 BTC",
+      usdNum: 0,
+      cls: "btc",
+      logo: "B",
+    });
+  }
+  const balanceMap: Record<string, string> = Object.fromEntries(
     items.map((item) => [item.symbol, formatTokenAmount(item.formatted)]),
   );
-  const availableMap = Object.fromEntries(
+  balanceMap.BTC ??= "0";
+  const availableMap: Record<string, string> = Object.fromEntries(
     items.map((item) => [item.symbol, `${formatTokenAmount(item.formatted)} ${item.symbol}`]),
   );
-  const priceMap = Object.fromEntries(
+  availableMap.BTC ??= "0 BTC";
+  const priceMap: Record<string, number | null> = Object.fromEntries(
     items.map((item) => [item.symbol, pickOnchainPrice(item.symbol, onchainData)]),
   );
-  const marketPriceMap = Object.fromEntries(
+  priceMap.BTC ??= pickMarketPrice("BTC", marketData);
+  const marketPriceMap: Record<string, number | null> = Object.fromEntries(
     items.map((item) => [item.symbol, pickMarketPrice(item.symbol, marketData)]),
   );
-  const changeMap = Object.fromEntries(
+  marketPriceMap.BTC ??= pickMarketPrice("BTC", marketData);
+  const changeMap: Record<string, number | null> = Object.fromEntries(
     items.map((item) => [item.symbol, pickMarketChange(item.symbol, marketData)]),
   );
-  const marketCapMap = Object.fromEntries(
+  changeMap.BTC ??= pickMarketChange("BTC", marketData);
+  const marketCapMap: Record<string, number | null> = Object.fromEntries(
     items.map((item) => [item.symbol, pickMarketCap(item.symbol, marketData)]),
   );
+  marketCapMap.BTC ??= pickMarketCap("BTC", marketData);
   const totalUsd = assets.reduce((sum, item) => sum + (item.usdNum ?? 0), 0);
   const changeUsd = items.reduce((sum, item) => {
     const priceUsd = pickOnchainPrice(item.symbol, onchainData);

@@ -28,6 +28,11 @@ export async function GET(req: NextRequest) {
                 { timeframe: "day", aggregate: "7", limit: "52" },
                 { timeframe: "day", aggregate: "1", limit: "180" },
               ]
+            : range === "ALL"
+              ? [
+                  { timeframe: "day", aggregate: "7", limit: "260" },
+                  { timeframe: "day", aggregate: "1", limit: "365" },
+                ]
             : [{ timeframe: "hour", aggregate: "1", limit: "24" }];
 
   try {
