@@ -102,9 +102,26 @@
   .legal-link-card { margin: 16px var(--pad-screen) 0; }
   .legal-link-card h2 { margin-bottom: 10px; }
   .legal-link-card p { margin-bottom: 14px; }
-  .legal-link-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 13px 0; border-top: 1px solid var(--line); color: var(--text); text-decoration: none; font-size: 14px; font-weight: 700; }
+  .legal-link-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 13px 0; border: 0; border-top: 1px solid var(--line); background: transparent; color: var(--text); text-align: left; text-decoration: none; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
   .legal-link-row span { color: var(--text-mute); display: inline-flex; }
   .legal-link-row:active { color: var(--green); }
+  .lumina-legal-open { overflow: hidden; }
+  .lumina-legal-sheet { position: fixed; inset: 0; z-index: 1200; display: none; background: rgba(0,0,0,0.76); backdrop-filter: blur(8px); padding: max(18px, env(safe-area-inset-top)) var(--pad-screen) max(18px, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .lumina-legal-sheet.open { display: block; }
+  .lumina-legal-panel { width: min(100%, var(--phone-max)); min-height: calc(100vh - 36px); margin: 0 auto; color: var(--text); background: radial-gradient(92% 30% at 50% 0%, rgba(74,222,128,0.12), transparent 68%), #050705; border: 1px solid rgba(255,255,255,0.08); border-radius: 28px; box-shadow: 0 24px 80px rgba(0,0,0,0.48); padding: 18px 18px 24px; }
+  .lumina-legal-panel-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 44px; margin-bottom: 18px; }
+  .lumina-legal-close { justify-self: start; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 15px 0 12px; border: 1px solid var(--line); border-radius: 999px; background: rgba(22,24,22,0.9); color: var(--text); font-size: 14px; font-weight: 800; cursor: pointer; }
+  .lumina-legal-logo { grid-column: 2; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 50%; display: grid; place-items: center; background: rgba(16,18,16,0.82); color: var(--text); font-size: 18px; font-weight: 900; }
+  .lumina-legal-content { padding: 8px 4px 0; }
+  .lumina-legal-kicker { color: var(--green); font-size: 14px; font-weight: 850; text-align: center; margin: 16px 0 10px; }
+  .lumina-legal-content h2 { color: var(--text); font-size: 34px; line-height: 1.04; text-align: center; font-weight: 950; letter-spacing: 0; margin: 0 0 10px; }
+  .lumina-legal-subtitle { color: var(--text-dim); font-size: 15px; line-height: 1.45; text-align: center; margin: 0 0 22px; }
+  .lumina-legal-date { color: var(--text-dim); font-size: 13px; line-height: 1.6; padding: 17px 18px; margin-bottom: 12px; background: rgba(18,20,18,0.84); border: 1px solid var(--line); border-radius: 18px; }
+  .lumina-legal-section { padding: 18px; margin-bottom: 12px; background: rgba(13,15,13,0.92); border: 1px solid var(--line); border-radius: 18px; }
+  .lumina-legal-section h3 { color: var(--text); font-size: 19px; line-height: 1.2; font-weight: 900; margin: 0 0 12px; letter-spacing: 0; }
+  .lumina-legal-section p { color: #a5aaa5; font-size: 14px; line-height: 1.72; margin: 0 0 12px; }
+  .lumina-legal-section p:last-child { margin-bottom: 0; }
+  .lumina-legal-updated { color: var(--text-mute); font-size: 12px; line-height: 1.6; padding: 8px 18px 0; }
   /* Connected apps */
   .app-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); border-bottom: 1px solid var(--line); }
   .app-row:last-child { border-bottom: none; }

@@ -9,6 +9,7 @@ import { shortenAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
 import { useBackendConfigSync } from "@/lib/backend/use-backend-config";
 import { useChainBalanceSync } from "@/lib/chain/use-chain-balance-sync";
+import { legalContent, type LegalPageKind } from "@/lib/legal-content";
 import { sendToken, friendlySendError, type SendParams, type SendResult } from "@/lib/transfer/sendToken";
 import { TOKENS } from "@/lib/tokens";
 
@@ -36,6 +37,8 @@ declare global {
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
+    __luminaOpenLegal?: (kind: LegalPageKind) => void;
+    __luminaCloseLegal?: () => void;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -127,6 +130,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
     resetPrototypePortfolio();
+    installLegalSheet(host);
     exposeTokenTransfer(address, mutate);
     exposeEarnWalletConfirm();
     exposeMorphoTransactions();
@@ -142,7 +146,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
         window.go?.(targetView);
       }
       window.setTabByName?.(tabByView[initialView] ?? "Home");
-      if (initialView === "about") appendLegalLinks(host);
+      appendLegalLinks(host);
       wireRealReceiveLinks(host);
       enhancePrototypeDetail();
       enhancePrototypeEarn();
@@ -203,6 +207,10 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
 function installMobileConsole() {
   if (typeof window === "undefined" || window.__luminaErudaInstalled) return;
+  const debugAllowed =
+    process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true" ||
+    new URLSearchParams(window.location.search).get("debug") === "eruda";
+  if (!debugAllowed) return;
   window.__luminaErudaInstalled = true;
 
   const existing = document.getElementById("lumina-eruda-script") as HTMLScriptElement | null;
@@ -447,10 +455,79 @@ function appendLegalLinks(host: HTMLDivElement) {
   wrapper.innerHTML = [
     "<h2>Legal</h2>",
     "<p>Review Lumina's public legal documents for World Mini App review and user transparency.</p>",
-    '<a class="legal-link-row" href="/privacy">Privacy Policy <span aria-hidden="true">›</span></a>',
-    '<a class="legal-link-row" href="/terms">Terms of Service <span aria-hidden="true">›</span></a>',
+    '<button class="legal-link-row" type="button" data-legal-kind="privacy">Privacy Policy <span aria-hidden="true">›</span></button>',
+    '<button class="legal-link-row" type="button" data-legal-kind="terms">Terms of Service <span aria-hidden="true">›</span></button>',
   ].join("");
   aboutContent.appendChild(wrapper);
+  wrapper.querySelectorAll<HTMLButtonElement>("[data-legal-kind]").forEach((button) => {
+    button.addEventListener("click", () => {
+      window.__luminaOpenLegal?.(button.dataset.legalKind as LegalPageKind);
+    });
+  });
+}
+
+function escapeLegalText(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function legalDocumentHtml(kind: LegalPageKind) {
+  const doc = legalContent[kind].en;
+  const sections = doc.sections
+    .map(
+      (section) =>
+        `<section class="lumina-legal-section"><h3>${escapeLegalText(section.title)}</h3>${section.body
+          .map((paragraph) => `<p>${escapeLegalText(paragraph)}</p>`)
+          .join("")}</section>`,
+    )
+    .join("");
+
+  return [
+    `<div class="lumina-legal-kicker">${kind === "privacy" ? "How Lumina handles your data" : "Rules for using Lumina"}</div>`,
+    `<h2>${escapeLegalText(doc.title)}</h2>`,
+    `<p class="lumina-legal-subtitle">${escapeLegalText(doc.subtitle)}</p>`,
+    `<div class="lumina-legal-date">Effective date: ${escapeLegalText(doc.effectiveDate)}</div>`,
+    sections,
+    `<div class="lumina-legal-updated">Last updated: ${escapeLegalText(doc.lastUpdated)}</div>`,
+  ].join("");
+}
+
+function installLegalSheet(host: HTMLDivElement) {
+  if (document.getElementById("luminaLegalSheet")) return;
+
+  const sheet = document.createElement("div");
+  sheet.id = "luminaLegalSheet";
+  sheet.className = "lumina-legal-sheet";
+  sheet.innerHTML = [
+    '<div class="lumina-legal-panel" role="dialog" aria-modal="true" aria-label="Lumina legal document">',
+    '<div class="lumina-legal-panel-top"><button class="lumina-legal-close" type="button" aria-label="Back"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Back</button><div class="lumina-legal-logo">L</div></div>',
+    '<div class="lumina-legal-content"></div>',
+    "</div>",
+  ].join("");
+  host.appendChild(sheet);
+
+  const content = sheet.querySelector<HTMLElement>(".lumina-legal-content");
+  const close = () => {
+    sheet.classList.remove("open");
+    document.body.classList.remove("lumina-legal-open");
+  };
+
+  window.__luminaCloseLegal = close;
+  window.__luminaOpenLegal = (kind) => {
+    if (!content) return;
+    content.innerHTML = legalDocumentHtml(kind === "terms" ? "terms" : "privacy");
+    sheet.classList.add("open");
+    document.body.classList.add("lumina-legal-open");
+  };
+
+  sheet.querySelector<HTMLButtonElement>(".lumina-legal-close")?.addEventListener("click", close);
+  sheet.addEventListener("click", (event) => {
+    if (event.target === sheet) close();
+  });
 }
 
 /**
@@ -2187,8 +2264,8 @@ function enhancePrototypeMe() {
             row("bell", c.notifications, "", "", toggleHtml()) +
           '</div>' +
           '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
-            row("privacy", c.privacy, "", "window.location.href=\\'/privacy\\'") +
-            row("terms", c.terms, "", "window.location.href=\\'/terms\\'") +
+            row("privacy", c.privacy, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'privacy\\')") +
+            row("terms", c.terms, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'terms\\')") +
             row("version", c.version, "Lumina v1.0.0", "", "") +
           '</div>';
         ensureFeedbackModal();
@@ -2310,7 +2387,7 @@ function enhancePrototypeDetail() {
         if (!market || !market.liquidityUsd) {
           if (asset && !asset.__marketLookupStarted) {
             asset.__marketLookupStarted = true;
-            chart.innerHTML = '<div class="market-detail-state">' + (((window.currentLang || "en") === "zh-CN") ? "正在加载行情..." : "Loading market data...") + '</div>';
+            chart.innerHTML = '<div class="market-detail-state">Loading market data...</div>';
             fetch("/api/tokens/top?mode=all", { cache: "no-store" })
               .then(function(res){ return res.ok ? res.json() : []; })
               .then(function(markets){
@@ -2318,11 +2395,13 @@ function enhancePrototypeDetail() {
                 renderMarketCard(asset);
               })
               .catch(function(){
-                chart.innerHTML = '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无行情数据" : "No market data") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该代币暂时没有可用的价格走势图。" : "No chart is available for this token yet.") + '</span></div>';
+                chart.innerHTML = chartSvg("1D");
+                updateRangeChange(null, "1D", asset);
               });
             return;
           }
-          chart.innerHTML = '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无行情数据" : "No market data") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该代币暂时没有可用的价格走势图。" : "No chart is available for this token yet.") + '</span></div>';
+          chart.innerHTML = chartSvg("1D");
+          updateRangeChange(null, "1D", asset);
           return;
         }
         renderMarketChart(asset, "1D");
@@ -2330,16 +2409,29 @@ function enhancePrototypeDetail() {
       function renderMarketChart(asset, range) {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
-        if (!chart || !market || !market.poolAddress) return;
-        chart.innerHTML = '<div class="market-detail-state">' + (((window.currentLang || "en") === "zh-CN") ? "正在加载走势图..." : "Loading chart...") + '</div>';
+        if (!chart) return;
+        if (!market || !market.poolAddress) {
+          chart.innerHTML = chartSvg(range || "1D");
+          updateRangeChange(null, range || "1D", asset);
+          return;
+        }
+        chart.innerHTML = '<div class="market-detail-state">Loading chart...</div>';
         fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
-            chart.innerHTML = trendSvg(candles);
-            updateRangeChange(candles, range || "1D", asset);
+            if (candles.length) {
+              chart.innerHTML = trendSvg(candles, range || "1D");
+              updateRangeChange(candles, range || "1D", asset);
+            } else {
+              chart.innerHTML = chartSvg(range || "1D");
+              updateRangeChange(null, range || "1D", asset);
+            }
           })
-          .catch(function(){ chart.innerHTML = trendSvg([]); });
+          .catch(function(){
+            chart.innerHTML = chartSvg(range || "1D");
+            updateRangeChange(null, range || "1D", asset);
+          });
       }
       function updateRangeChange(candles, range, asset){
         var pill = document.getElementById("detChangePill");
@@ -2359,7 +2451,7 @@ function enhancePrototypeDetail() {
         }
         if (change === null || change === undefined || !Number.isFinite(Number(change))) {
           pill.className = "none";
-          pill.textContent = "无行情";
+          pill.textContent = "No data";
           return;
         }
         var up = Number(change) >= 0;
@@ -2372,13 +2464,13 @@ function enhancePrototypeDetail() {
         if (n >= 1) return "$" + n.toFixed(n >= 100 ? 0 : 2);
         return "$" + n.toPrecision(3);
       }
-      function trendSvg(candles){
-        if (!candles.length) return '<div class="market-detail-state"><strong>' + (((window.currentLang || "en") === "zh-CN") ? "暂无走势图" : "No chart yet") + '</strong><span>' + (((window.currentLang || "en") === "zh-CN") ? "该交易池暂时没有可用的历史行情。" : "Historical prices are not available for this pool yet.") + '</span></div>';
+      function trendSvg(candles, range){
+        if (!candles.length) return chartSvg(range || "1D");
         var width = 420, height = 214, padX = 16, padY = 24;
         var closes = candles.map(function(c){ return Number(c.close || c[4] || 0); }).filter(function(v){ return Number.isFinite(v) && v > 0; });
-        if (closes.length < 2) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
+        if (closes.length < 2) return chartSvg(range || "1D");
         var max = Math.max.apply(null, closes), min = Math.min.apply(null, closes);
-        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state"><strong>暂无 K 线</strong></div>';
+        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return chartSvg(range || "1D");
         function y(v){ return padY + (max - v) / (max - min) * (height - padY * 2); }
         var points = closes.map(function(v, i){
           var x = padX + (i / Math.max(1, closes.length - 1)) * (width - padX * 2);
@@ -2518,7 +2610,7 @@ function enhancePrototypeDetail() {
         var pill = document.getElementById("detChangePill");
         if (change === null || change === undefined || !Number.isFinite(Number(change))) {
           pill.className = "none";
-          pill.textContent = "无行情";
+          pill.textContent = "No data";
           renderMarketCard(asset);
           return;
         }
