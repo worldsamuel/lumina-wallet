@@ -36,5 +36,22 @@ export async function GET() {
     console.error("Failed to count dashboard transactions", error);
   }
 
-  return jsonResponse({ totalUsers, todayUsers, transactions });
+  const [opens, visits, todayOpens, todayVisits, feedbackNew] = await Promise.all([
+    db.analyticsEvent.count({ where: { event: "open" } }),
+    db.analyticsEvent.count({ where: { event: "visit" } }),
+    db.analyticsEvent.count({ where: { event: "open", createdAt: { gte: today } } }),
+    db.analyticsEvent.count({ where: { event: "visit", createdAt: { gte: today } } }),
+    db.feedback.count({ where: { status: "new" } }),
+  ]).catch(() => [0, 0, 0, 0, 0] as const);
+
+  return jsonResponse({
+    totalUsers,
+    todayUsers,
+    transactions,
+    opens,
+    visits,
+    todayOpens,
+    todayVisits,
+    feedbackNew,
+  });
 }

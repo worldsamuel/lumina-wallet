@@ -7,7 +7,7 @@ const GECKO_OHLCV_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_N
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
 const CACHE_TTL_MS = 30_000;
 const MIN_LIQUIDITY_USD = 100;
-const MIN_VOLUME_24H_USD = 1;
+const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
 const STABLE_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE"]);
 const KNOWN_TOKEN_ADDRESSES = new Map(
@@ -267,7 +267,12 @@ export type WorldChainMarketMode = "gainers" | "losers" | "new" | "all";
  * Returns ranked World Chain markets from GeckoTerminal pools.
  */
 export async function getWorldChainMarkets(mode: WorldChainMarketMode = "gainers") {
-  const catalog = await getWorldChainMarketCatalog();
+  const catalog = (await getWorldChainMarketCatalog()).filter((market) =>
+    Number(market.priceUsd || 0) > 0 &&
+    Number(market.liquidityUsd || 0) >= MIN_LIQUIDITY_USD &&
+    Number(market.volume24hUsd || 0) >= MIN_VOLUME_24H_USD &&
+    !!market.poolAddress
+  );
   if (mode === "all") return catalog.slice(0, 80);
 
   const changed = catalog

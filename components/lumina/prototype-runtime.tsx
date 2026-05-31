@@ -161,6 +161,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeActivity();
       enhancePrototypeMe();
       enhancePrototypeSystemConfig();
+      enhancePrototypeAnalytics();
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -1213,6 +1214,34 @@ function enhancePrototypeSystemConfig() {
     })();
   `;
   runInPrototypeScope(source, "Failed to apply system config");
+}
+
+function enhancePrototypeAnalytics() {
+  const source = `
+    (function(){
+      if (window.__luminaAnalyticsStarted) return;
+      window.__luminaAnalyticsStarted = true;
+      function send(event){
+        try {
+          fetch("/api/analytics", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ event: event, path: location.pathname }),
+            keepalive: true
+          }).catch(function(){});
+        } catch(e) {}
+      }
+      send("open");
+      var originalGo = typeof go === "function" ? go : null;
+      if (originalGo) {
+        go = function(name){
+          originalGo(name);
+          send("visit");
+        };
+      }
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to install analytics");
 }
 
 /**
