@@ -39,6 +39,7 @@ declare global {
     __luminaRefreshImportedTokens?: () => void;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
+    __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -398,10 +399,12 @@ function AuthLoading() {
         </div>
         <div className="mini-auth-logo mini-auth-logo-live">L</div>
       </div>
-      <h1>Connecting Lumina</h1>
-      <p>Confirm wallet authentication in World App.</p>
-      <div className="mini-auth-progress" aria-hidden="true">
-        <div className="mini-auth-progress-fill" />
+      <div className="mini-auth-copy">
+        <h1>Connecting Lumina</h1>
+        <p>Confirm wallet authentication in World App.</p>
+        <div className="mini-auth-progress" aria-hidden="true">
+          <div className="mini-auth-progress-fill" />
+        </div>
       </div>
       <div className="mini-auth-steps" aria-hidden="true">
         <span><i />World App session</span>
@@ -1661,10 +1664,11 @@ function enhancePrototypeMarket() {
           var bg = g.symbol === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
           var color = g.symbol === "WLD" ? "#000" : "#fff";
           var pctClass = Number(g.change24h || 0) >= 0 ? "pct" : "pct down";
+          var routeBadge = ["WLD","USDC","USDT","ETH","BTC"].indexOf(String(g.symbol || "").toUpperCase()) >= 0 ? "" : '<span class="market-route-badge">Market only</span>';
           return '<div class="gainer" onclick="openMarketDetail(\\'' + g.symbol + '\\')">' +
             '<div class="' + rankCls + '">' + (i + 1) + '</div>' +
             '<div class="ic" style="background:' + bg + ';color:' + color + '">' + iconFor(g.symbol, g.symbol.slice(0, 3)) + '</div>' +
-            '<div class="mid"><div class="s">' + g.symbol + '</div><div class="p">' + formatMarketPrice(g.priceUsd) + '</div></div>' +
+            '<div class="mid"><div class="s">' + g.symbol + routeBadge + '</div><div class="p">' + formatMarketPrice(g.priceUsd) + '</div></div>' +
             '<div class="chg"><div class="' + pctClass + '">' + (Number(g.change24h || 0) >= 0 ? "+" : "") + Number(g.change24h || 0).toFixed(2) + '%</div><div class="vol">Vol ' + moneyCompact(g.volume24hUsd) + '</div></div>' +
           '</div>';
         }).join("");
@@ -1756,7 +1760,19 @@ function enhancePrototypeSwapQuote() {
         if (!btn) return;
         btn.classList.add("quote-only");
         btn.disabled = false;
-        btn.onclick = function(){ toast("真实兑换交易即将上线"); };
+        btn.onclick = function(){ toast("Swap execution is not live yet. Quotes are read-only."); };
+      }
+      function tokenLogoForSwap(symbol){
+        if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : symbol);
+        return tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : String(symbol || "?").slice(0, 1);
+      }
+      function setSwapPillLogo(id, symbol){
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.innerHTML = tokenLogoForSwap(symbol);
+        el.className = "dot2 coin " + String(symbol || "").toLowerCase();
+        el.style.background = symbol === "WLD" ? "#fff" : (dotColor && dotColor[symbol] ? dotColor[symbol] : "linear-gradient(135deg,#1b231e,#26362b)");
+        el.style.color = symbol === "WLD" ? "#000" : "#fff";
       }
       function setQuoteState(message, impactClass){
         var buy = document.getElementById("buyAmt");
@@ -1791,15 +1807,15 @@ function enhancePrototypeSwapQuote() {
         var sell = document.getElementById("sellAmt");
         var amount = sell ? String(sell.value || "").trim() : "";
         if (!amount || Number(amount) <= 0) {
-          setQuoteState("输入卖出数量获取报价");
+          setQuoteState("Enter an amount to get a quote");
           return;
         }
         if (customTokens && (customTokens[swapState.sell] || customTokens[swapState.buy])) {
-          setQuoteState("导入代币暂不支持报价,需要先验证池子和 approve 风险", "impact-high");
+          setQuoteState("No route yet. Imported tokens need verified liquidity and approval checks.", "impact-high");
           return;
         }
         var seq = ++quoteSeq;
-        setQuoteState("正在读取真实 DEX 报价...");
+        setQuoteState("Reading DEX route...");
         try {
           var res = await fetch("/api/swap/quote", {
             method: "POST",
@@ -1817,7 +1833,9 @@ function enhancePrototypeSwapQuote() {
           applyQuote(data);
         } catch(e) {
           if (seq !== quoteSeq) return;
-          setQuoteState(e && e.message ? e.message : "报价失败", "impact-high");
+          var msg = e && e.message ? e.message : "Quote failed";
+          if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = "No executable route for this pair. Top rankings are market discovery only.";
+          setQuoteState(msg, "impact-high");
         }
       }
       function scheduleQuote(){
@@ -1829,17 +1847,21 @@ function enhancePrototypeSwapQuote() {
         window.__luminaQuoteRefreshWrapped = true;
         refreshSwapLabels = function(){
           previousRefresh();
+          setSwapPillLogo("sellDot", swapState.sell);
+          setSwapPillLogo("buyDot", swapState.buy);
           scheduleQuote();
         };
       }
       recalc = scheduleQuote;
-      confirmSwap = function(){ toast("功能即将上线: 当前只显示报价,不会发起交易"); };
+      confirmSwap = function(){ toast("Swap execution is not live yet. Quotes are read-only."); };
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
       var customSlip = document.querySelector(".slip-custom");
       if (customSlip) customSlip.addEventListener("input", scheduleQuote);
       setSwapButtonPending();
+      setSwapPillLogo("sellDot", swapState.sell);
+      setSwapPillLogo("buyDot", swapState.buy);
       scheduleQuote();
     })();
   `;
@@ -1969,6 +1991,38 @@ function enhancePrototypeSend() {
           document.getElementById("sendConfirmOk").onclick = function(){ done(true); };
         });
       }
+      function shortHash(hash){
+        var value = String(hash || "");
+        if (!value) return "Submitted";
+        if (value.length <= 22) return value;
+        return value.slice(0, 10) + "..." + value.slice(-6);
+      }
+      function showTransactionSubmitted(hash){
+        var existing = document.getElementById("luminaTxSubmitted");
+        if (existing) existing.remove();
+        var tx = String(hash || "");
+        var canOpen = /^0x[a-fA-F0-9]{64}$/.test(tx);
+        var panel = document.createElement("div");
+        panel.id = "luminaTxSubmitted";
+        panel.className = "tx-submitted-toast";
+        panel.innerHTML =
+          '<div class="tx-submitted-card">' +
+            '<div class="tx-submitted-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>' +
+            '<div class="tx-submitted-body"><strong>Transaction submitted</strong><p>Waiting for World Chain confirmation. Activity will update automatically.</p><span class="tx-submitted-hash">' + shortHash(tx) + '</span></div>' +
+            '<div class="tx-submitted-actions"><button type="button" class="primary" id="txToastActivity">View Activity</button>' +
+            (canOpen ? '<a href="https://worldscan.org/tx/' + tx + '" target="_blank" rel="noreferrer">Explorer</a>' : '<button type="button" id="txToastClose">Close</button>') +
+            '</div>' +
+          '</div>';
+        document.body.appendChild(panel);
+        requestAnimationFrame(function(){ panel.classList.add("show"); });
+        var close = function(){ panel.classList.remove("show"); setTimeout(function(){ panel.remove(); }, 220); };
+        var activity = document.getElementById("txToastActivity");
+        if (activity) activity.onclick = function(){ close(); go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); };
+        var closeBtn = document.getElementById("txToastClose");
+        if (closeBtn) closeBtn.onclick = close;
+        clearTimeout(window.__luminaTxToastTimer);
+        window.__luminaTxToastTimer = setTimeout(close, 5200);
+      }
       async function handleSendClick(){
         var state = validation();
         if (sending) return;
@@ -1997,7 +2051,7 @@ function enhancePrototypeSend() {
           if (result.status === "success") {
             var hash = result.txHash || "";
             try { localStorage.removeItem("lumina_local_activity"); } catch(e) {}
-            toast(hash ? "交易已提交: " + hash.slice(0, 18) : "交易已提交，等待链上确认");
+            showTransactionSubmitted(hash);
             if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
             setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 1500);
             recipientInput.value = "";
