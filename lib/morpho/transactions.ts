@@ -14,19 +14,6 @@ const approveAbi = [
   },
 ] as const;
 
-const transferAbi = [
-  {
-    inputs: [
-      { internalType: "address", name: "to", type: "address" },
-      { internalType: "uint256", name: "amount", type: "uint256" },
-    ],
-    name: "transfer",
-    outputs: [{ internalType: "bool", name: "", type: "bool" }],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-] as const;
-
 const depositAbi = [
   {
     name: "deposit",
@@ -92,15 +79,21 @@ export type MorphoDepositTx = {
 };
 
 export function buildDepositTx(vault: MorphoVault, amount: bigint, userAddress: Address): MorphoDepositTx {
-  const testUserAddress = "0x0f3b31df2fa6781de2103588da675f02599b2b26" as Address;
+  const token = vault.asset.address as Address;
 
   return {
     transactions: [
       {
-        address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as Address,
-        abi: transferAbi,
-        functionName: "transfer",
-        args: [testUserAddress, "1000"],
+        address: token,
+        abi: approveAbi,
+        functionName: "approve",
+        args: [vault.address, amount.toString()],
+      },
+      {
+        address: vault.address,
+        abi: depositAbi,
+        functionName: "deposit",
+        args: [amount.toString(), userAddress],
       },
     ],
     permit2: [],

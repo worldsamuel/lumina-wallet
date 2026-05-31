@@ -213,6 +213,8 @@
   .tk-row .ic .lumina-token-img,
   .send-token-picker .coin .lumina-token-mark,
   .send-token-picker .coin .lumina-token-img,
+  .gainer .ic .lumina-token-mark,
+  .gainer .ic .lumina-token-img,
   .detail-v2-token-icon .lumina-token-mark,
   .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; }
   .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
@@ -370,8 +372,8 @@
   .pool-info-sheet { width: min(420px, 100%); border: 1px solid var(--line); border-radius: 22px; background: #101210; padding: 22px; color: var(--text); box-shadow: 0 24px 70px rgba(0,0,0,0.45); position: relative; }
   .pool-info-sheet strong { display: block; font-size: 19px; margin-bottom: 16px; }
   .pool-close { position: absolute; right: 14px; top: 12px; width: 30px; height: 30px; border: none; border-radius: 50%; background: rgba(255,255,255,0.06); color: var(--text); font-size: 22px; line-height: 1; }
-  .detail-v2-actions { margin: 22px 0 0; }
-  .detail-v2-actions button { min-height: 64px; border-radius: 19px; display: inline-flex; align-items: center; justify-content: center; gap: 12px; font-size: 18px; }
+  .detail-v2-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 22px 0 0; }
+  .detail-v2-actions button { min-height: 64px; border-radius: 19px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px; }
   .detail-v2-actions .btn-ghost { background: var(--surface); color: var(--text); }
   .detail-v2-actions .btn-ghost svg { color: var(--green); }
   .detail-v2-menu { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
@@ -480,6 +482,9 @@
   .gainers-head .l { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 700; }
   .gainers-head .fire { color: #f5854a; display: inline-flex; }
   .gainers-head .r { color: var(--text-mute); font-size: 12px; }
+  .market-tabs { margin: 12px var(--pad-screen) 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .market-tabs button { min-height: 38px; border: 1px solid var(--line); border-radius: 999px; background: #101210; color: #8f958f; font-size: 13px; font-weight: 800; cursor: pointer; }
+  .market-tabs button.sel { border-color: rgba(116,232,139,0.7); background: rgba(116,232,139,0.12); color: var(--green); }
   .gainers-note { margin: 8px var(--pad-screen) 0; display: flex; gap: 8px; padding: 10px 12px; background: rgba(245,196,81,0.07); border-radius: 10px; font-size: 11px; color: #c9a24a; line-height: 1.5; }
   .gainers { margin: 12px var(--pad-screen) 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
   .gainer { display: grid; grid-template-columns: 22px 36px 1fr auto; gap: 11px; align-items: center; padding: 13px 16px; border-bottom: 1px solid var(--line); cursor: pointer; }

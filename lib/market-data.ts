@@ -223,14 +223,35 @@ export async function getWorldChainMarketCatalog() {
   }
 }
 
+export type WorldChainMarketMode = "gainers" | "losers" | "new" | "all";
+
 /**
- * Returns the top 24h gainers from GeckoTerminal World Chain pools.
+ * Returns ranked World Chain markets from GeckoTerminal pools.
  */
-export async function getWorldChainMarkets() {
+export async function getWorldChainMarkets(mode: WorldChainMarketMode = "gainers") {
   const catalog = await getWorldChainMarketCatalog();
-  return catalog
-    .filter((market) => !EXCLUDED_TOP_SYMBOLS.has(market.symbol))
-    .filter((market) => market.change24h !== null && Number.isFinite(Number(market.change24h)))
+  if (mode === "all") return catalog.slice(0, 80);
+
+  const changed = catalog
+    .filter((market) => market.change24h !== null && Number.isFinite(Number(market.change24h)));
+
+  if (mode === "new") {
+    return catalog
+      .filter((market) => !market.verified && !EXCLUDED_TOP_SYMBOLS.has(market.symbol))
+      .sort((a, b) => (b.volume24hUsd || b.liquidityUsd || 0) - (a.volume24hUsd || a.liquidityUsd || 0))
+      .slice(0, 10);
+  }
+
+  const ranked = changed.filter((market) => !EXCLUDED_TOP_SYMBOLS.has(market.symbol));
+  if (mode === "losers") {
+    return ranked
+      .filter((market) => (market.change24h ?? 0) < 0)
+      .sort((a, b) => (a.change24h ?? 0) - (b.change24h ?? 0))
+      .slice(0, 10);
+  }
+
+  return ranked
+    .filter((market) => (market.change24h ?? 0) > 0)
     .sort((a, b) => (b.change24h ?? 0) - (a.change24h ?? 0))
     .slice(0, 10);
 }

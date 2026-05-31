@@ -504,7 +504,15 @@ function enhancePrototypeBuiltinTokenLogos() {
       function logoImg(symbol, url, fallbackUrl){
         var sym = String(symbol || "").toUpperCase();
         var fallback = isLogoUrl(fallbackUrl) ? String(fallbackUrl) : "";
-        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"lazy\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" data-initial=\\"" + htmlEscape(initial(sym)) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
+        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"eager\\" decoding=\\"async\\" fetchpriority=\\"high\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" data-initial=\\"" + htmlEscape(initial(sym)) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
+      }
+      function builtinLogo(symbol){
+        var sym = String(symbol || "").toUpperCase();
+        if (sym === "WLD") return '<svg class="lumina-token-mark lumina-token-mark-wld" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#fff"/><path d="M18 22l5.4 20.5L29.1 22h5.8l5.7 20.5L46 22h6L43.6 47h-6.2L32 28.1 26.6 47h-6.2L12 22h6z" fill="#060706"/></svg>';
+        if (sym === "USDC") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#2775ca"/><circle cx="32" cy="32" r="22" fill="none" stroke="#fff" stroke-width="4"/><path d="M32 16v32M39.5 25.5c-1.6-2.4-4.1-3.4-7.2-3.4-4 0-6.8 2-6.8 5.1 0 7.1 14 3.2 14 10.3 0 3.4-2.9 5.8-7.4 5.8-3.7 0-6.6-1.4-8.3-4" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>';
+        if (sym === "USDT") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#26a17b"/><path d="M18 18h28v7H35.7v7.2c7.1.4 12.3 1.9 12.3 3.8 0 2.2-7.2 4-16 4s-16-1.8-16-4c0-1.9 5.2-3.4 12.3-3.8V25H18v-7zm14 19.1c5.5 0 10-.8 10-1.8 0-.8-2.7-1.4-6.3-1.7v5h-7.4v-5c-3.6.3-6.3.9-6.3 1.7 0 1 4.5 1.8 10 1.8z" fill="#fff"/></svg>';
+        if (sym === "ETH") return '<svg class="lumina-token-mark" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="31" fill="#1c2536"/><path d="M32 8l15 25-15 8-15-8L32 8z" fill="#d7e2ff"/><path d="M32 8v33l15-8L32 8z" fill="#8aa3d8"/><path d="M17 36l15 20 15-20-15 8-15-8z" fill="#d7e2ff"/><path d="M32 44v12l15-20-15 8z" fill="#8aa3d8"/></svg>';
+        return "";
       }
       function trustedLogoUrl(symbol){
         var sym = String(symbol || "").toUpperCase();
@@ -525,6 +533,8 @@ function enhancePrototypeBuiltinTokenLogos() {
       };
       window.__luminaTokenLogoHtml = function(symbol, fallback){
         var sym = String(symbol || "").toUpperCase();
+        var builtin = builtinLogo(sym);
+        if (builtin) return builtin;
         var configured = logoUrlsBySymbol[sym];
         if (configured) return logoImg(sym, configured, ethTrustLogoUrl(sym));
         var trusted = trustedLogoUrl(sym);
@@ -1487,11 +1497,47 @@ function enhancePrototypeMarket() {
         openDetail(idx);
       }
       window.openMarketDetail = openMarketDetail;
+      var marketTab = "gainers";
+      function marketTabTitle(){
+        if (marketTab === "losers") return "24h 跌幅";
+        if (marketTab === "new") return "新币";
+        return "24h 涨幅";
+      }
+      function ensureMarketTabs(){
+        if (document.getElementById("marketTabs")) return;
+        var head = document.querySelector(".gainers-head");
+        if (!head) return;
+        var tabs = document.createElement("div");
+        tabs.id = "marketTabs";
+        tabs.className = "market-tabs";
+        tabs.innerHTML =
+          '<button type="button" data-tab="gainers" class="sel">24h 涨幅</button>' +
+          '<button type="button" data-tab="losers">24h 跌幅</button>' +
+          '<button type="button" data-tab="new">新币</button>';
+        head.insertAdjacentElement("afterend", tabs);
+        tabs.addEventListener("click", function(event){
+          var btn = event.target && event.target.closest ? event.target.closest("button[data-tab]") : null;
+          if (!btn) return;
+          marketTab = btn.getAttribute("data-tab") || "gainers";
+          renderGainers();
+        });
+      }
+      function updateMarketTabs(){
+        ensureMarketTabs();
+        document.querySelectorAll("#marketTabs button").forEach(function(btn){
+          btn.classList.toggle("sel", btn.getAttribute("data-tab") === marketTab);
+        });
+        var title = document.querySelector(".gainers-head .l");
+        if (title) title.textContent = marketTabTitle();
+        var meta = document.querySelector(".gainers-head .r");
+        if (meta) meta.textContent = "24h · on-chain";
+      }
       function renderGainersFromMarkets(markets){
         var box = document.getElementById("gainersList");
         if (!box) return;
+        updateMarketTabs();
         if (!markets.length) {
-          box.innerHTML = '<div class="import-load">World Chain 暂无满足流动性条件的 24h 涨幅数据</div>';
+          box.innerHTML = '<div class="import-load">World Chain 暂无满足流动性条件的' + marketTabTitle() + '数据</div>';
           return;
         }
         box.innerHTML = markets.map(function(g, i){
@@ -1531,19 +1577,20 @@ function enhancePrototypeMarket() {
       applyTokenLogos();
       if (typeof renderGainers === "function") {
         renderGainers = function(){
+          updateMarketTabs();
           var box = document.getElementById("gainersList");
           if (box) box.innerHTML = '<div class="import-load">读取 GeckoTerminal 行情...</div>';
           Promise.all([
-            fetch("/api/tokens/top", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
+            fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
             fetch("/api/prices/market", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
           ])
             .then(function(results){
               registerMarketsFromPriceMeta(results[1]);
               var cg = marketsFromCoinGecko(results[1]);
               var poolMarkets = Array.isArray(results[0]) ? results[0] : [];
-              var merged = cg.concat(poolMarkets.filter(function(item){
+              var merged = marketTab === "gainers" ? cg.concat(poolMarkets.filter(function(item){
                 return !cg.some(function(existing){ return existing.symbol === item.symbol; });
-              }));
+              })) : poolMarkets;
               renderGainersFromMarkets(merged);
             })
             .catch(function(){ renderGainersFromMarkets([]); });
@@ -2204,6 +2251,20 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         if (!market || !market.liquidityUsd) {
+          if (asset && !asset.__marketLookupStarted) {
+            asset.__marketLookupStarted = true;
+            chart.innerHTML = '<div class="market-detail-state">匹配真实 K 线池...</div>';
+            fetch("/api/tokens/top?mode=all", { cache: "no-store" })
+              .then(function(res){ return res.ok ? res.json() : []; })
+              .then(function(markets){
+                if (Array.isArray(markets)) markets.forEach(registerMarketToken);
+                renderMarketCard(asset);
+              })
+              .catch(function(){
+                chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
+              });
+            return;
+          }
           chart.innerHTML = '<div class="market-detail-state"><strong>无行情数据</strong><span>该代币在 World Chain 上没有满足流动性条件的价格池,不展示模拟走势图。</span></div>';
           return;
         }
@@ -2305,6 +2366,16 @@ function enhancePrototypeDetail() {
           '</div>';
         modal.classList.add("open");
       }
+      window.goSwapFromDetail = function(){
+        var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
+        if (asset && typeof swapState !== "undefined") {
+          swapState.sell = asset.sym;
+          if (swapState.buy === asset.sym) swapState.buy = asset.sym === "WLD" ? "USDC" : "WLD";
+          if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+        }
+        go("swap");
+        setTabByName("Swap");
+      }
 
       function ensureDetailShell() {
         var view = document.getElementById("view-detail");
@@ -2328,6 +2399,7 @@ function enhancePrototypeDetail() {
           '<div class="detail-actions detail-v2-actions">' +
             '<button class="btn-ghost" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
             '<button class="btn-primary" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
+            '<button class="btn-ghost" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
           '</div>' +
           '<section class="detail-v2-menu">' +
             '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getWorldChainMarkets } from "@/lib/market-data";
+import { getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
 export function OPTIONS() {
   return optionsResponse();
@@ -12,6 +12,9 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
 
-  const tokens = await getWorldChainMarkets();
+  const requestedMode = req.nextUrl.searchParams.get("mode");
+  const mode: WorldChainMarketMode =
+    requestedMode === "losers" || requestedMode === "new" || requestedMode === "all" ? requestedMode : "gainers";
+  const tokens = await getWorldChainMarkets(mode);
   return jsonResponse(tokens);
 }
