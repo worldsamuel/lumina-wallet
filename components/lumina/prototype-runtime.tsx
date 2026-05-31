@@ -261,6 +261,8 @@ function exposeMorphoTransactions() {
     };
     if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
 
+    console.log("[EARN A1] Before MiniKit.sendTransaction");
+    console.log("[EARN A1] typeof MiniKit.sendTransaction:", typeof MiniKit.sendTransaction);
     console.log("[EARN] About to call MiniKit.sendTransaction");
     console.log(
       "[EARN] payload:",
@@ -273,12 +275,42 @@ function exposeMorphoTransactions() {
         (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       ),
     );
-    const result = (await miniKit.sendTransaction({
+    const startTime = Date.now();
+    const txPromise = miniKit.sendTransaction({
       chainId: 480,
       transactions,
       ...(permit2 && permit2.length ? { permit2 } : {}),
-    })) as MiniKitSendTransactionEnvelope;
-    console.log("[EARN] result:", JSON.stringify(result));
+    });
+    const timeoutPromise = new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error("EARN_TIMEOUT_20S")), 20000),
+    );
+    let result: MiniKitSendTransactionEnvelope;
+    try {
+      result = (await Promise.race([txPromise, timeoutPromise])) as MiniKitSendTransactionEnvelope;
+      const debugResult = result as MiniKitSendTransactionEnvelope & {
+        finalPayload?: {
+          status?: unknown;
+          error_code?: unknown;
+          transaction_id?: unknown;
+        };
+      };
+      console.log("[EARN A2] returned after", Date.now() - startTime, "ms");
+      console.log("[EARN A2] result full:", JSON.stringify(result, null, 2));
+      console.log("[EARN A2] result.finalPayload:", debugResult?.finalPayload);
+      console.log("[EARN A2] result.finalPayload.status:", debugResult?.finalPayload?.status);
+      console.log("[EARN A2] result.finalPayload.error_code:", debugResult?.finalPayload?.error_code);
+      console.log("[EARN A2] result.finalPayload.transaction_id:", debugResult?.finalPayload?.transaction_id);
+      console.log("[EARN] result:", JSON.stringify(result));
+    } catch (error) {
+      const err = error as { name?: unknown; message?: unknown };
+      console.log("[EARN A3] threw after", Date.now() - startTime, "ms");
+      console.log("[EARN A3] name:", err?.name);
+      console.log("[EARN A3] message:", err?.message);
+      console.log("[EARN A3] full:", JSON.stringify(error, Object.getOwnPropertyNames(error || {}), 2));
+      throw error;
+    } finally {
+      console.log("[EARN A4] finally");
+    }
 
     const payload = result?.data ?? result;
     if (payload?.status && payload.status !== "success") {
