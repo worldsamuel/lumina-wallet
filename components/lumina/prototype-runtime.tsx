@@ -1813,18 +1813,16 @@ function enhancePrototypeMarket() {
       }
       applyTokenLogos();
       if (typeof renderGainers === "function") {
-        renderGainers = function(){
+        renderGainers = function(pricePayload){
           updateMarketTabs();
           var box = document.getElementById("gainersList");
           if (box) box.innerHTML = '<div class="import-load">' + marketCopy("loading") + '</div>';
-          Promise.all([
-            fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; }),
-            fetch("/api/prices/market", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; })
-          ])
-            .then(function(results){
-              registerMarketsFromPriceMeta(results[1]);
-              var cg = marketsFromCoinGecko(results[1]);
-              var poolMarkets = Array.isArray(results[0]) ? results[0] : [];
+          var pricesPayload = pricePayload || window.__luminaMarketPrices || null;
+          fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
+            .then(function(result){
+              registerMarketsFromPriceMeta(pricesPayload);
+              var cg = marketsFromCoinGecko(pricesPayload);
+              var poolMarkets = Array.isArray(result) ? result : [];
               var merged = marketTab === "gainers" ? cg.map(function(item){
                 var pool = poolMarkets.find(function(candidate){ return candidate.symbol === item.symbol; });
                 return pool ? Object.assign({}, item, pool, { priceUsd: item.priceUsd || pool.priceUsd, change24h: item.change24h != null ? item.change24h : pool.change24h }) : item;
@@ -1835,7 +1833,7 @@ function enhancePrototypeMarket() {
             })
             .catch(function(){ renderGainersFromMarkets([]); });
         };
-        setTimeout(renderGainers, 1200);
+        setTimeout(function(){ renderGainers(window.__luminaMarketPrices); }, 1200);
       }
       var previousRenderAssets = typeof renderAssets === "function" ? renderAssets : null;
       if (previousRenderAssets && !window.__luminaMarketRenderAssets) {

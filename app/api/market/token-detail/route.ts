@@ -3,6 +3,8 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolTrades, getTokenHolders } from "@/lib/market-data";
 
+export const runtime = "edge";
+
 export function OPTIONS() {
   return optionsResponse();
 }

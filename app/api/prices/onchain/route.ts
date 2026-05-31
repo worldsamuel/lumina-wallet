@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { readOraclePrices } from "@/lib/oracle";
 import type { OnchainPricesResponse } from "@/lib/prices";
 
+export const runtime = "edge";
+
 const CACHE_TTL_MS = 60_000;
 
 export const dynamic = "force-dynamic";

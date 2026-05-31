@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
 import { type MarketPrice, type MarketPricesResponse, PRICE_SYMBOLS } from "@/lib/prices";
 
+export const runtime = "edge";
+
 const CACHE_TTL_MS = 30_000;
 const COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
 const VS_CURRENCIES = ["usd", "eur", "jpy", "cny", "hkd", "gbp"] as const;
-
-export const dynamic = "force-dynamic";
 
 let cachedMarket: { expiresAt: number; data: MarketPricesResponse } | null = null;
 let lastGoodMarket: MarketPricesResponse | null = null;
@@ -51,7 +51,7 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
 
   const response = await fetch(`${COINGECKO_SIMPLE_PRICE_URL}?${params}`, {
     headers,
-    cache: "no-store",
+    next: { revalidate: 30 },
   });
   if (!response.ok) throw new Error(`CoinGecko simple/price responded ${response.status}`);
 
@@ -79,22 +79,31 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
   return data;
 }
 
+function marketResponse(data: MarketPricesResponse) {
+  return new Response(JSON.stringify(data), {
+    headers: {
+      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+      "Content-Type": "application/json",
+    },
+  });
+}
+
 export async function GET() {
   if (cachedMarket && cachedMarket.expiresAt > Date.now()) {
-    return NextResponse.json(cachedMarket.data);
+    return marketResponse(cachedMarket.data);
   }
 
   try {
     const data = await fetchCoinGeckoMarket();
     cachedMarket = { data, expiresAt: Date.now() + CACHE_TTL_MS };
     lastGoodMarket = data;
-    return NextResponse.json(data);
+    return marketResponse(data);
   } catch (error) {
     console.error("Failed to fetch CoinGecko market prices", error);
     if (lastGoodMarket) {
       const staleData = { ...lastGoodMarket, stale: true, updated_at: new Date().toISOString() };
       cachedMarket = { data: staleData, expiresAt: Date.now() + CACHE_TTL_MS };
-      return NextResponse.json(staleData);
+      return marketResponse(staleData);
     }
 
     return NextResponse.json(

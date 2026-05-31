@@ -167,6 +167,7 @@ function syncBalancesToPrototype(
     tokenMarketCaps = ${JSON.stringify(marketCapMap)};
     window.__luminaOnchainPrices = ${JSON.stringify(onchainData ?? null)};
     window.__luminaMarketPrices = ${JSON.stringify(marketData ?? null)};
+    if (typeof renderGainers === "function") renderGainers(window.__luminaMarketPrices);
     if (document.querySelector(".balance-change")) {
       document.querySelector(".balance-change").childNodes[0].textContent = ${JSON.stringify(formatChangePct(weightedChangePct))} + " ";
       document.querySelector(".balance-change").classList.toggle("down", ${JSON.stringify(weightedChangePct < 0)});
