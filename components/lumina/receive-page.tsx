@@ -2,7 +2,7 @@
 
 import { QRCodeSVG } from "qrcode.react";
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuthStore, useUserAddress } from "@/lib/auth/store";
 import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
 
@@ -14,6 +14,10 @@ export function ReceivePage() {
   const username = useAuthStore((state) => state.username);
   const { error, login, status } = useWalletAuth();
   const [copied, setCopied] = useState(false);
+  const qrCode = useMemo(
+    () => address ? <QRCodeSVG value={address} size={196} bgColor="#ffffff" fgColor="#000000" level="M" /> : null,
+    [address],
+  );
 
   async function copyAddress() {
     if (!address) return;
@@ -65,7 +69,7 @@ export function ReceivePage() {
         <strong className="receive-chain">World Chain</strong>
         {username ? <div className="receive-username">@{username}</div> : null}
         <div className="receive-qr" aria-label="Wallet address QR code">
-          <QRCodeSVG value={address} size={196} bgColor="#ffffff" fgColor="#000000" level="M" />
+          {qrCode}
         </div>
         <code className="receive-address">{address}</code>
       </section>

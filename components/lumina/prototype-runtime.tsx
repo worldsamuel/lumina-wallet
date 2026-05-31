@@ -39,6 +39,7 @@ declare global {
     __luminaRefreshImportedTokens?: () => void;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
+    __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
@@ -533,16 +534,69 @@ function installLegalSheet(host: HTMLDivElement) {
   });
 }
 
+function stableReceiveQr(address: string) {
+  let seed = 0;
+  for (let i = 0; i < address.length; i += 1) seed = (seed * 31 + address.charCodeAt(i)) >>> 0;
+  const size = 29;
+  const cell = 8;
+  const blocks: string[] = [];
+  const finder = (x: number, y: number) => {
+    blocks.push(`<rect x="${x * cell}" y="${y * cell}" width="${cell * 7}" height="${cell * 7}" fill="#000"/>`);
+    blocks.push(`<rect x="${(x + 1) * cell}" y="${(y + 1) * cell}" width="${cell * 5}" height="${cell * 5}" fill="#fff"/>`);
+    blocks.push(`<rect x="${(x + 2) * cell}" y="${(y + 2) * cell}" width="${cell * 3}" height="${cell * 3}" fill="#000"/>`);
+  };
+  finder(0, 0);
+  finder(size - 7, 0);
+  finder(0, size - 7);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const inFinder =
+        (x < 8 && y < 8) ||
+        (x >= size - 8 && y < 8) ||
+        (x < 8 && y >= size - 8);
+      if (inFinder) continue;
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      if (((seed >>> 29) ^ x ^ y) % 3 === 0) {
+        blocks.push(`<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}" fill="#000"/>`);
+      }
+    }
+  }
+  return `<svg viewBox="0 0 ${size * cell} ${size * cell}" aria-hidden="true">${blocks.join("")}</svg>`;
+}
+
+function renderPrototypeReceive(address?: string | null) {
+  const actual = address || window.__luminaUserAddress || "";
+  const qr = document.getElementById("qrBox");
+  if (qr && actual) {
+    const cachedKey = `lumina:qr:${actual.toLowerCase()}`;
+    let svg = "";
+    try { svg = localStorage.getItem(cachedKey) || ""; } catch(e) {}
+    if (!svg) {
+      svg = stableReceiveQr(actual);
+      try { localStorage.setItem(cachedKey, svg); } catch(e) {}
+    }
+    qr.innerHTML = svg;
+  }
+  const addr = document.querySelector<HTMLElement>(".recv-addr");
+  if (addr && actual) addr.textContent = actual;
+}
+
 /**
- * Sends receive entry points to the real React receive route instead of the old prototype view.
+ * Keeps receive inside the already-authenticated prototype so it opens instantly.
  */
 function wireRealReceiveLinks(host: HTMLDivElement) {
+  renderPrototypeReceive(window.__luminaUserAddress);
+  window.__luminaOpenReceive = () => {
+    renderPrototypeReceive(window.__luminaUserAddress);
+    window.go?.("receive");
+    window.setTabByName?.("Home");
+  };
   host
     .querySelectorAll<HTMLElement>("[onclick*=\"go('receive')\"], [onclick*='go(\"receive\")']")
     .forEach((el) => {
       el.onclick = (event) => {
         event.preventDefault();
-        window.location.href = `/receive${window.location.search}`;
+        window.__luminaOpenReceive?.();
       };
     });
 }
@@ -2369,15 +2423,17 @@ function enhancePrototypeDetail() {
         "ALL": [18,20,24,23,28,32,31,36,40,45,43,50,54,53,59,64,62,69,72,76,74,81,79,86]
       };
 
-      function chartSvg(range) {
+      function chartSvg(range, forceDown) {
         var values = seriesByRange[range] || seriesByRange["1D"];
         var width = 430;
         var height = 230;
         var min = Math.min.apply(null, values);
         var max = Math.max.apply(null, values);
         var span = Math.max(1, max - min);
+        var down = forceDown === true || values[values.length - 1] < values[0];
+        var color = down ? "#f87171" : "#4ade80";
         var points = values.map(function(v, i) {
-          var x = 18 + (i / (values.length - 1)) * (width - 36);
+          var x = 46 + (i / (values.length - 1)) * (width - 64);
           var y = 82 + ((max - v) / span) * 88;
           return [x, y];
         });
@@ -2385,15 +2441,19 @@ function enhancePrototypeDetail() {
           return (i ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1);
         }).join(" ");
         var last = points[points.length - 1];
-        var area = line + " L " + last[0].toFixed(1) + " 190 L 18 190 Z";
+        var area = line + " L " + last[0].toFixed(1) + " 190 L 46 190 Z";
+        var topLabel = "$" + (max / 100).toFixed(4);
+        var bottomLabel = "$" + (min / 100).toFixed(4);
         return '<svg viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none" aria-hidden="true">' +
           '<defs><linearGradient id="luminaDetailArea" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0%" stop-color="#4ade80" stop-opacity="0.46"/>' +
-          '<stop offset="100%" stop-color="#4ade80" stop-opacity="0"/>' +
+          '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.42"/>' +
+          '<stop offset="100%" stop-color="' + color + '" stop-opacity="0"/>' +
           '</linearGradient></defs>' +
+          '<text x="10" y="82" fill="#98a09a" font-size="12">' + topLabel + '</text>' +
+          '<text x="10" y="174" fill="#626862" font-size="12">' + bottomLabel + '</text>' +
           '<path d="'+area+'" fill="url(#luminaDetailArea)"/>' +
-          '<path d="'+line+'" fill="none" stroke="#4ade80" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="6" fill="#4ade80"/>' +
+          '<path d="'+line+'" fill="none" stroke="' + color + '" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>' +
+          '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="6" fill="' + color + '"/>' +
           '<text x="18" y="213" fill="#9da39d" font-size="15">00:00</text>' +
           '<text x="202" y="213" fill="#9da39d" font-size="15">12:00</text>' +
           '<text x="372" y="213" fill="#9da39d" font-size="15">24:00</text>' +
@@ -2449,12 +2509,12 @@ function enhancePrototypeDetail() {
                 renderMarketCard(asset);
               })
               .catch(function(){
-                chart.innerHTML = chartSvg("1D");
+                chart.innerHTML = chartSvg("1D", Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0);
                 updateRangeChange(null, "1D", asset);
               });
             return;
           }
-          chart.innerHTML = chartSvg("1D");
+          chart.innerHTML = chartSvg("1D", Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0);
           updateRangeChange(null, "1D", asset);
           return;
         }
@@ -2463,9 +2523,11 @@ function enhancePrototypeDetail() {
       function renderMarketChart(asset, range) {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
+        var fallbackDown = false;
+        try { fallbackDown = Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0; } catch(e) {}
         if (!chart) return;
         if (!market || !market.poolAddress) {
-          chart.innerHTML = chartSvg(range || "1D");
+          chart.innerHTML = chartSvg(range || "1D", fallbackDown);
           updateRangeChange(null, range || "1D", asset);
           return;
         }
@@ -2478,12 +2540,12 @@ function enhancePrototypeDetail() {
               chart.innerHTML = trendSvg(candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              chart.innerHTML = chartSvg(range || "1D");
+              chart.innerHTML = chartSvg(range || "1D", fallbackDown);
               updateRangeChange(null, range || "1D", asset);
             }
           })
           .catch(function(){
-            chart.innerHTML = chartSvg(range || "1D");
+            chart.innerHTML = chartSvg(range || "1D", fallbackDown);
             updateRangeChange(null, range || "1D", asset);
           });
       }
@@ -2520,7 +2582,7 @@ function enhancePrototypeDetail() {
       }
       function trendSvg(candles, range){
         if (!candles.length) return chartSvg(range || "1D");
-        var width = 420, height = 214, padX = 16, padY = 24;
+        var width = 420, height = 214, padX = 44, padY = 24;
         var closes = candles.map(function(c){ return Number(c.close || c[4] || 0); }).filter(function(v){ return Number.isFinite(v) && v > 0; });
         if (closes.length < 2) return chartSvg(range || "1D");
         var max = Math.max.apply(null, closes), min = Math.min.apply(null, closes);
@@ -2541,8 +2603,8 @@ function enhancePrototypeDetail() {
         var labelY = Math.max(16, Math.min(height - 42, last[1] - 32));
         return '<svg class="market-candles market-trend" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none">' +
           '<defs><linearGradient id="trendFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="' + color + '" stop-opacity="0.22"/><stop offset="100%" stop-color="' + color + '" stop-opacity="0"/></linearGradient></defs>' +
-          '<text x="' + (width - 12) + '" y="25" text-anchor="end" fill="#98a09a" font-size="13">' + formatChartPrice(max) + '</text>' +
-          '<text x="' + (width - 12) + '" y="' + (height - 16) + '" text-anchor="end" fill="#626862" font-size="13">' + formatChartPrice(min) + '</text>' +
+          '<text x="8" y="28" text-anchor="start" fill="#98a09a" font-size="12">' + formatChartPrice(max) + '</text>' +
+          '<text x="8" y="' + (height - 18) + '" text-anchor="start" fill="#626862" font-size="12">' + formatChartPrice(min) + '</text>' +
           '<path d="' + area + '" fill="url(#trendFade)"/>' +
           '<path d="' + line + '" fill="none" stroke="' + color + '" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>' +
           '<rect x="' + labelX.toFixed(1) + '" y="' + labelY.toFixed(1) + '" width="82" height="26" rx="13" fill="rgba(4,7,4,0.84)" stroke="' + color + '" stroke-opacity="0.28"/>' +
@@ -2600,9 +2662,9 @@ function enhancePrototypeDetail() {
             '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
-            '<button class="btn-ghost detail-action-receive" onclick="window.location.href=\\'/receive\\'"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
-            '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
+            '<button class="btn-ghost detail-action-receive" onclick="window.__luminaOpenReceive && window.__luminaOpenReceive()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
             '<button class="btn-ghost detail-action-swap" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
+            '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
           '</div>' +
           '<section class="detail-v2-menu">' +
             '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +

@@ -230,7 +230,11 @@
   .gainer .ic .lumina-token-mark,
   .gainer .ic .lumina-token-img,
   .detail-v2-token-icon .lumina-token-mark,
-  .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; }
+  .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; margin: auto; }
+  .coin.eth .lumina-token-img,
+  .detail-v2-token-icon.eth .lumina-token-img,
+  .swap-panel .tk .dot2.eth .lumina-token-img,
+  .tk-row .ic.eth .lumina-token-img { width: 64%; height: 64%; transform: translateY(-1px); }
   .coin.eth { background: #1c2536; color: #8aa3d8; } .coin.btc { background: #f7931a; color: #fff; } .coin.pij { background: #0d150d; border: 1.5px solid var(--green); color: var(--green); font-size: 13px; }
   .coin.custom, .token-initial { background: linear-gradient(135deg,#202820,#324036); color: var(--green); border: 1px solid rgba(74,222,128,0.28); font-size: 12px; letter-spacing: 0; }
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
@@ -390,11 +394,12 @@
   .detail-v2-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 0; }
   .detail-v2-actions button { width: 100%; min-width: 0; min-height: 52px; padding: 0 6px; border-radius: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; white-space: nowrap; }
   .detail-v2-actions button svg { width: 17px; height: 17px; flex: 0 0 auto; }
-  .detail-v2-actions .detail-action-receive { background: #101312; color: #f2f5f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025); }
+  .detail-v2-actions .detail-action-receive,
+  .detail-v2-actions .detail-action-send { background: #101312; color: #f2f5f2; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025); }
   .detail-v2-actions .detail-action-receive svg { color: var(--green); }
-  .detail-v2-actions .detail-action-send { background: var(--green); color: #073719; }
-  .detail-v2-actions .detail-action-swap { background: rgba(76,112,255,0.16); color: #dbe4ff; box-shadow: inset 0 0 0 1px rgba(120,150,255,0.22); }
-  .detail-v2-actions .detail-action-swap svg { color: #8ea4ff; }
+  .detail-v2-actions .detail-action-send svg { color: var(--green); }
+  .detail-v2-actions .detail-action-swap { background: var(--green); color: #073719; box-shadow: none; }
+  .detail-v2-actions .detail-action-swap svg { color: #073719; }
   .detail-v2-menu { margin-top: 24px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden; }
   .detail-v2-menu a,
   .detail-v2-menu button { width: 100%; min-height: 66px; padding: 0 20px; display: flex; align-items: center; gap: 18px; background: transparent; border: none; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; cursor: pointer; }
