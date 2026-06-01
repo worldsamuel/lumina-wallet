@@ -13,6 +13,7 @@ export type EarnProductConfig = {
   assetDecimals: number;
   riskLevel: MorphoVault["riskLevel"];
   enabled: boolean;
+  imageUrl?: string | null;
   apyOverride: string | null;
   description: MorphoVault["description"];
   sortOrder: number;
@@ -53,6 +54,7 @@ function parseConfigs(value: unknown): EarnProductConfig[] {
       assetDecimals: Number(product.assetDecimals ?? 18),
       riskLevel: product.riskLevel || "medium",
       enabled: product.enabled !== false,
+      imageUrl: typeof product.imageUrl === "string" ? product.imageUrl : null,
       apyOverride: product.apyOverride ?? null,
       description: product.description || { en: "", "zh-CN": "" },
       sortOrder: Number(product.sortOrder ?? byAddress.size + 1),
@@ -95,6 +97,7 @@ export async function upsertEarnProduct(input: Partial<EarnProductConfig> & { ad
     assetDecimals: Number(input.assetDecimals ?? existing?.assetDecimals ?? 18),
     riskLevel: input.riskLevel || existing?.riskLevel || "medium",
     enabled: input.enabled ?? existing?.enabled ?? true,
+    imageUrl: input.imageUrl === undefined ? existing?.imageUrl ?? null : input.imageUrl,
     apyOverride: input.apyOverride === undefined ? existing?.apyOverride ?? null : input.apyOverride,
     description: input.description || existing?.description || { en: "", "zh-CN": "" },
     sortOrder: Number(input.sortOrder ?? existing?.sortOrder ?? products.length + 1),
@@ -120,6 +123,7 @@ export function productToVault(product: EarnProductConfig): MorphoVault {
     },
     riskLevel: product.riskLevel,
     enabled: product.enabled,
+    imageUrl: product.imageUrl ?? null,
     description: product.description,
   };
 }

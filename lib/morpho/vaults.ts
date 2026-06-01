@@ -19,6 +19,8 @@ export interface MorphoVault {
   riskLevel: RiskLevel;
   /** Disabled vaults are hidden from the frontend. */
   enabled: boolean;
+  /** Optional admin-uploaded image shown in Earn product cards. */
+  imageUrl?: string | null;
   /** Localized description copy. */
   description: {
     "zh-CN": string;

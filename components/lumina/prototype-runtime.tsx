@@ -832,6 +832,7 @@ function enhancePrototypeEarn() {
         }) || null;
       }
       function vaultIcon(vault){
+        if (vault && vault.imageUrl) return '<img src="' + escapeHtml(vault.imageUrl) + '" alt="">';
         var sym = vault && vault.asset ? vault.asset.symbol : "?";
         var fallback = sym ? sym.charAt(0).toUpperCase() : "?";
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(sym, fallback);
