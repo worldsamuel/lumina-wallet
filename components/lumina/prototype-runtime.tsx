@@ -647,7 +647,10 @@ function enhancePrototypeBuiltinTokenLogos() {
         WLD: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
         USDC: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
         USDT: "0x102d758f688a4c1c5a80b116bd945d4455460282",
-        ETH: "0x4200000000000000000000000000000000000006"
+        ETH: "0x4200000000000000000000000000000000000006",
+        WETH: "0x4200000000000000000000000000000000000006",
+        WBTC: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
+        EURC: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B"
       };
       var logoUrlsBySymbol = {};
       function htmlEscape(value){
@@ -684,8 +687,10 @@ function enhancePrototypeBuiltinTokenLogos() {
           USDT: "https://cryptologos.cc/logos/tether-usdt-logo.svg",
           USDC: "https://cryptologos.cc/logos/usd-coin-usdc-logo.svg",
           ETH: "https://cryptologos.cc/logos/ethereum-eth-logo.svg",
+          WETH: "https://cryptologos.cc/logos/ethereum-eth-logo.svg",
           BTC: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg",
-          WBTC: "https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.svg"
+          WBTC: "https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.svg",
+          EURC: "https://cryptologos.cc/logos/euro-coin-euroc-logo.svg"
         };
         if (cryptologos[sym]) return logoImg(sym, cryptologos[sym], "");
         return "";
@@ -726,6 +731,9 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.USDT = window.__luminaTokenLogoHtml("USDT", "");
         tokenLogo.ETH = window.__luminaTokenLogoHtml("ETH", "");
         tokenLogo.BTC = window.__luminaTokenLogoHtml("BTC", "");
+        tokenLogo.WETH = window.__luminaTokenLogoHtml("WETH", tokenLogo.ETH || "");
+        tokenLogo.WBTC = window.__luminaTokenLogoHtml("WBTC", "");
+        tokenLogo.EURC = window.__luminaTokenLogoHtml("EURC", "");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -2283,7 +2291,7 @@ function enhancePrototypeSend() {
         if (token.symbol === "ETH") max = Math.max(0, max - 0.001);
         amountInput.value = max > 0 ? String(Number(max.toFixed(token.decimals === 6 ? 6 : 8))) : "";
         validation();
-        toast("Max available balance filled");
+        toast("Max filled", "success");
       }
       function confirmSendAction(state){
         return new Promise(function(resolve){
@@ -2615,6 +2623,30 @@ function enhancePrototypeMe() {
           btn.textContent = meCopy().send;
         }
       };
+      window.copyMeAddress = function(event){
+        if (event) event.stopPropagation();
+        var address = window.__luminaUserAddress || "";
+        if (!address) {
+          toast("No address connected");
+          return;
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(address);
+          } else {
+            var input = document.createElement("textarea");
+            input.value = address;
+            input.setAttribute("readonly", "readonly");
+            input.style.position = "fixed";
+            input.style.left = "-9999px";
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand("copy");
+            input.remove();
+          }
+        } catch(e) {}
+        toast("Address copied", "success");
+      };
       function renderMe(){
         var c = meCopy();
         var view = document.getElementById("view-me");
@@ -2627,7 +2659,7 @@ function enhancePrototypeMe() {
         var currencyValue = '<span id="currencyVal">' + (typeof currentCurrency !== "undefined" ? currentCurrency : "USD") + '</span>';
         view.innerHTML =
           '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
-          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr">' + short + '</div><span class="me-orb">' + c.connected + '</span></div></div>' +
+          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>' + short + '</span>' + (address ? '<button type="button" class="me-copy-btn" onclick="copyMeAddress(event)" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '') + '</div><span class="me-orb">' + c.connected + '</span></div></div>' +
           '<div class="me-group-label">' + c.support + '</div><div class="me-group">' +
             row("feedback", c.feedback, "", "openFeedback()") +
           '</div>' +
