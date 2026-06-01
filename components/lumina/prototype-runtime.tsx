@@ -770,11 +770,11 @@ function enhancePrototypeBuiltinTokenLogos() {
             if (!filter) return true;
             return sym.toLowerCase().indexOf(filter) >= 0 || (tokenFull[sym]||"").toLowerCase().indexOf(filter) >= 0;
           }).map(function(sym){
-            var badge = customTokens[sym] ? '<span class="custom-badge">已导入</span>' : '';
+            var badge = customTokens[sym] ? '<span class="custom-badge">Community</span>' : '<span class="custom-badge verified">✓</span>';
             var color = sym === "WLD" ? "#000" : "#fff";
             return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic coin ' + String(sym).toLowerCase() + '" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
           }).join('');
-          document.getElementById("tokenModalList").innerHTML = rows || '<div class="import-load">没有匹配的代币</div>';
+          document.getElementById("tokenModalList").innerHTML = rows || '<div class="import-load">No matching tokens. Paste a contract address to run safety checks.</div>';
         };
       }
     })();
@@ -1461,16 +1461,39 @@ function enhancePrototypeTokens() {
       showImportPreview = async function(addr){
         var owner = window.__luminaUserAddress || "";
         var preview = document.getElementById("importPreview");
-        preview.innerHTML = '<div class="import-load">Reading token contract...</div>';
+        preview.innerHTML = '<div class="import-load">Running token safety checks...</div>';
         try {
-          var res = await fetch("/api/token-info?address=" + encodeURIComponent(addr) + "&owner=" + encodeURIComponent(owner), { cache: "no-store" });
-          var token = await res.json();
-          if (!res.ok) throw new Error(token.error || "Unable to read token");
-          var score = token.risk && token.risk.score ? token.risk.score : "mid";
-          var needAck = score !== "low";
+          var safetyRes = await fetch("/api/swap/token-check?address=" + encodeURIComponent(addr), { cache: "no-store" });
+          var safety = await safetyRes.json();
+          if (!safetyRes.ok && safety.status !== "rejected") throw new Error(safety.error || "Invalid token contract");
+          if (safety.status === "rejected") {
+            preview.innerHTML =
+              '<div class="import-card rejected">' +
+                '<div class="hd"><div class="ic token-initial">!</div><div class="mid"><div class="s">Rejected</div><div class="f">' + (safety.metadata ? safety.metadata.symbol : "Invalid token contract") + '</div></div></div>' +
+                '<div class="addr">' + addr + '</div>' +
+                '<div class="risk-score high"><span class="big">Blocked</span><span class="txt">' + ((safety.reasons || [safety.error || "safety_check_failed"]).join(", ")) + '</span></div>' +
+              '</div>';
+            return;
+          }
+          var info = null;
+          try {
+            var infoRes = await fetch("/api/token-info?address=" + encodeURIComponent(addr) + "&owner=" + encodeURIComponent(owner), { cache: "no-store" });
+            info = await infoRes.json();
+          } catch(e) {}
+          var token = Object.assign({}, info || {}, safety.metadata || {});
+          token.risk = { score: safety.status === "community" ? "mid" : "low", checks: [
+            { key: "Metadata", value: "Valid", level: "pass" },
+            { key: "Liquidity", value: "$" + Math.round((safety.liquidity && safety.liquidity.tvlUsd) || 0).toLocaleString() + " TVL", level: ((safety.liquidity && safety.liquidity.tvlUsd) || 0) < 5000 ? "warn" : "pass" },
+            { key: "Honeypot", value: safety.safety && safety.safety.passedHoneypot ? "Basic sellback passed" : "Failed", level: safety.safety && safety.safety.passedHoneypot ? "pass" : "danger" }
+          ] };
+          token.safety = safety;
+          token.formatted = token.formatted || "0";
+          token.verified = safety.status === "verified";
+          var score = safety.status === "community" ? "mid" : "low";
+          var needAck = safety.status === "community";
           var btnAttr = needAck ? ' disabled id="impBtn"' : ' id="impBtn"';
           var ackHtml = needAck
-            ? '<div class="ack" id="impAck" onclick="toggleImpAck()"><span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#042" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>This token is not verified. Importing it may expose you to honeypot, high-tax, fake-token, or no-liquidity risk.</span></div>'
+            ? '<div class="ack" id="impAck" onclick="toggleImpAck()"><span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#042" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span><span>Community token. I understand this token is not audited by Lumina and will test with a small amount first.</span></div>'
             : "";
           preview.innerHTML =
             '<div class="import-card">' +
@@ -1480,9 +1503,9 @@ function enhancePrototypeTokens() {
               '</div>' +
               '<div class="addr">' + token.address + '</div>' +
               '<div class="scan-rows">' + renderScanRows(token.risk) + '</div>' +
-              '<div class="risk-score ' + riskClass(score) + '"><span class="big">' + riskLabel(score) + '</span><span class="txt">Risk affects display and swap/send protection. High-risk tokens are hidden from Home and shown in View All.</span></div>' +
+              '<div class="risk-score ' + riskClass(score) + '"><span class="big">' + (safety.status === "community" ? "Community" : riskLabel(score)) + '</span><span class="txt">Automated checks cache for 5 minutes. Community tokens require risk acknowledgement before swap.</span></div>' +
               ackHtml +
-              '<button class="btn"' + btnAttr + ' onclick="doImportFromInfo()">' + (needAck ? "Import anyway" : "Import") + ' ' + token.symbol + '</button>' +
+              '<button class="btn"' + btnAttr + ' onclick="doImportFromInfo()">' + (needAck ? "Import community token" : "Select") + ' ' + token.symbol + '</button>' +
             '</div>';
           window.__luminaImportCandidate = token;
         } catch(e) {
@@ -1507,8 +1530,13 @@ function enhancePrototypeTokens() {
         if (typeof closeTokenModal === "function") closeTokenModal();
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderAllAssets === "function") renderAllAssets();
-        go("home");
-        setTabByName("Home");
+        if (swapState && (swapState.target === "sell" || swapState.target === "buy")) {
+          go("swap");
+          setTabByName("Swap");
+        } else {
+          go("home");
+          setTabByName("Home");
+        }
       };
 
       doImport = function(sym, addr, score){
@@ -2000,8 +2028,12 @@ function enhancePrototypeSwapQuote() {
         btn.disabled = false;
         btn.setAttribute("aria-disabled", "true");
         var span = btn.querySelector("span");
-        if (span) span.textContent = "Swap 即将上线";
-        btn.onclick = function(){ toast("兑换功能即将上线"); };
+        if (span) span.textContent = "Swap coming soon";
+        btn.onclick = function(){ toast("Swap is coming soon"); };
+      }
+      function tokenInputForQuote(symbol){
+        var meta = customTokens && customTokens[symbol] ? customTokens[symbol] : null;
+        return meta && meta.address ? meta.address : symbol;
       }
       function tokenLogoForSwap(symbol){
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : symbol);
@@ -2049,16 +2081,24 @@ function enhancePrototypeSwapQuote() {
         rows.innerHTML =
           referenceRow("Uniswap V3", refs.uniswapV3) +
           referenceRow("Uniswap V4", refs.uniswapV4) +
-          referenceRow("Chainlink", Object.assign({ available: !!(refs.chainlink && refs.chainlink.rate) }, refs.chainlink || {}), ' <span class="quote-muted">(参考)</span>') +
-          referenceRow("CoinGecko", Object.assign({ available: !!(refs.coingecko && refs.coingecko.rate) }, refs.coingecko || {}), ' <span class="quote-muted">(参考)</span>');
+          referenceRow("Chainlink", Object.assign({ available: !!(refs.chainlink && refs.chainlink.rate) }, refs.chainlink || {}), ' <span class="quote-muted">(reference)</span>') +
+          referenceRow("CoinGecko", Object.assign({ available: !!(refs.coingecko && refs.coingecko.rate) }, refs.coingecko || {}), ' <span class="quote-muted">(reference)</span>');
       }
       function renderWarning(data){
         var warn = document.getElementById("quoteWarning");
         if (!warn) return;
         var text = "";
-        if (data.blocked) text = data.blockReason || "报价风险过高,暂不允许兑换";
-        else if (data.warnings && data.warnings.indexOf("price_anomaly") >= 0) text = "价格偏差较大,可能是低流动性导致,建议小额测试";
-        else if (data.warnings && data.warnings.indexOf("low_liquidity") >= 0) text = "当前池子流动性较低,大额兑换可能出现明显滑点";
+        if (data.blocked) text = data.blockReason || "Quote risk is too high. Swap is blocked.";
+        else if (data.warnings && data.warnings.indexOf("price_anomaly") >= 0) text = "Large price deviation detected. This may be caused by low liquidity.";
+        else if (data.warnings && data.warnings.indexOf("low_liquidity") >= 0) text = "Low liquidity. Large swaps may have significant slippage.";
+        var community = [data.tokens && data.tokens.from, data.tokens && data.tokens.to].filter(function(t){ return t && t.trust === "community"; });
+        if (community.length) {
+          var t = community[0];
+          var safety = t.safety || {};
+          var liq = safety.liquidity || {};
+          var reasons = safety.reasons || [];
+          text = "Community token risk: " + t.symbol + " is not audited by Lumina. Automated checks found TVL $" + Math.round(liq.tvlUsd || 0).toLocaleString() + (reasons.length ? " · " + reasons.join(", ") : " · basic checks passed") + ". Test with a small amount first.";
+        }
         warn.textContent = text;
         warn.classList.toggle("show", !!text);
       }
@@ -2090,10 +2130,6 @@ function enhancePrototypeSwapQuote() {
           setQuoteState("Enter an amount to get a quote");
           return;
         }
-        if (customTokens && (customTokens[swapState.sell] || customTokens[swapState.buy])) {
-          setQuoteState("No route yet. Imported tokens need verified liquidity and approval checks.", "impact-high");
-          return;
-        }
         var seq = ++quoteSeq;
         setQuoteState("Reading DEX route...");
         try {
@@ -2101,6 +2137,8 @@ function enhancePrototypeSwapQuote() {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
+              fromToken: tokenInputForQuote(swapState.sell),
+              toToken: tokenInputForQuote(swapState.buy),
               fromSymbol: swapState.sell,
               toSymbol: swapState.buy,
               fromAmount: amount,
@@ -2133,7 +2171,7 @@ function enhancePrototypeSwapQuote() {
         };
       }
       recalc = scheduleQuote;
-      confirmSwap = function(){ toast("兑换功能即将上线"); };
+      confirmSwap = function(){ toast("Swap is coming soon"); };
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });

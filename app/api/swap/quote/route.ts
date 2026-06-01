@@ -5,7 +5,10 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
 import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 import type { SwapQuoteResult, SwapQuoteSet } from "@/lib/swap/quote-types";
-import { resolveSwapToken, type SwapToken } from "@/lib/swap/tokens";
+import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
+import type { SwapToken } from "@/lib/swap/tokens";
+import { quoteBestV3 } from "@/lib/swap/v3-quoter";
+import { quoteBestV4 } from "@/lib/swap/v4-quoter";
 
 type QuoteBody = {
   fromSymbol?: string;
@@ -31,18 +34,20 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as QuoteBody | null;
-  const parsed = parseQuoteBody(body);
+  const parsed = await parseQuoteBody(body);
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: 400 });
 
-  const requestBody = JSON.stringify({
-    fromSymbol: parsed.from.symbol,
-    toSymbol: parsed.to.symbol,
-    fromAmount: parsed.amountText,
-  });
-  const headers = { "content-type": "application/json" };
+  const amountIn = parseUnits(parsed.amountText, parsed.from.decimals);
+  const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
-    fetchJson<SourceQuote>(req, "/api/swap/quote/v3", { method: "POST", headers, body: requestBody }).catch(() => null),
-    fetchJson<SourceQuote>(req, "/api/swap/quote/v4", { method: "POST", headers, body: requestBody }).catch(() => null),
+    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
+      .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
+      .catch(() => null),
+    hasCommunityToken
+      ? Promise.resolve(null)
+      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 6_000)
+          .then((quote) => ({ source: "uniswap-v4" as const, ...quote }))
+          .catch(() => null),
     fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null),
     fetchJson<MarketPricesResponse>(req, "/api/prices/market").catch(() => null),
     publicClient.getGasPrice().catch(() => 0n),
@@ -89,10 +94,14 @@ export async function POST(req: NextRequest) {
       priceImpactLevel: impactLevel(priceImpactPercent * 100),
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
+      tokens: {
+        from: tokenPayload(parsed.from),
+        to: tokenPayload(parsed.to),
+      },
       references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko, main.source),
       warnings,
       blocked,
-      blockReason: blocked ? "价格偏差超过 20%,为保护资金已阻止本次兑换。" : undefined,
+      blockReason: blocked ? "Price deviation is above 20%. Swap is blocked to protect funds." : undefined,
     },
     {
       headers: {
@@ -102,9 +111,9 @@ export async function POST(req: NextRequest) {
   );
 }
 
-function parseQuoteBody(body: QuoteBody | null) {
-  const from = resolveSwapToken(body?.fromSymbol ?? body?.fromToken);
-  const to = resolveSwapToken(body?.toSymbol ?? body?.toToken);
+async function parseQuoteBody(body: QuoteBody | null) {
+  const from = await resolveSafeSwapToken(body?.fromToken ?? body?.fromSymbol);
+  const to = await resolveSafeSwapToken(body?.toToken ?? body?.toSymbol);
   if (!from || !to) return { error: "Unsupported token." };
   if (from.address.toLowerCase() === to.address.toLowerCase()) return { error: "Choose two different tokens." };
 
@@ -116,6 +125,17 @@ function parseQuoteBody(body: QuoteBody | null) {
   } catch {
     return { error: "Invalid token amount." };
   }
+}
+
+function tokenPayload(token: SwapToken) {
+  return {
+    symbol: token.symbol,
+    name: token.name,
+    address: token.address,
+    decimals: token.decimals,
+    trust: token.trust ?? "core",
+    safety: token.safety ?? null,
+  };
 }
 
 function pickMainQuote(v3: SourceQuote | null, v4: SourceQuote | null) {
@@ -194,4 +214,13 @@ async function fetchJson<T>(req: NextRequest, path: string, init?: RequestInit):
   const response = await fetch(new URL(path, req.url), init);
   if (!response.ok) throw new Error(`${path} responded ${response.status}`);
   return (await response.json()) as T;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("quote_timeout")), timeoutMs);
+    }),
+  ]);
 }

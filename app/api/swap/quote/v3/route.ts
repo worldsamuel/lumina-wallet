@@ -3,7 +3,7 @@ import { parseUnits } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
-import { resolveSwapToken } from "@/lib/swap/tokens";
+import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 
 const CACHE_TTL_MS = 5_000;
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
@@ -11,6 +11,8 @@ const cache = new Map<string, { expiresAt: number; data: unknown }>();
 type QuoteBody = {
   fromSymbol?: string;
   toSymbol?: string;
+  fromToken?: string;
+  toToken?: string;
   fromAmount?: string;
 };
 
@@ -24,10 +26,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as QuoteBody | null;
-  const parsed = parseQuoteBody(body);
+  const parsed = await parseQuoteBody(body);
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: 400 });
 
-  const cacheKey = `${parsed.from.symbol}:${parsed.to.symbol}:${parsed.amountIn.toString()}`;
+  const cacheKey = `${parsed.from.address}:${parsed.to.address}:${parsed.amountIn.toString()}`;
   const cached = cache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return quoteResponse(cached.data);
 
@@ -39,9 +41,9 @@ export async function POST(req: NextRequest) {
   return quoteResponse(data);
 }
 
-function parseQuoteBody(body: QuoteBody | null) {
-  const from = resolveSwapToken(body?.fromSymbol);
-  const to = resolveSwapToken(body?.toSymbol);
+async function parseQuoteBody(body: QuoteBody | null) {
+  const from = await resolveSafeSwapToken(body?.fromToken ?? body?.fromSymbol);
+  const to = await resolveSafeSwapToken(body?.toToken ?? body?.toSymbol);
   if (!from || !to) return { error: "Unsupported token." };
   if (from.address.toLowerCase() === to.address.toLowerCase()) return { error: "Choose two different tokens." };
 

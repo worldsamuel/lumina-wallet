@@ -1,13 +1,16 @@
 import { isAddress, type Address } from "viem";
 
-export type SwapTokenSymbol = "WLD" | "USDC" | "ETH" | "WETH" | "WBTC";
+export type SwapTokenSymbol = "WLD" | "USDC" | "ETH" | "WETH" | "WBTC" | "EURC";
+export type SwapTokenTrust = "core" | "audited" | "community";
 
 export type SwapToken = {
-  symbol: SwapTokenSymbol;
+  symbol: string;
   priceSymbol: "WLD" | "USDC" | "ETH" | "BTC";
   name: string;
   address: Address;
   decimals: number;
+  trust?: SwapTokenTrust;
+  safety?: unknown;
 };
 
 export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
@@ -46,10 +49,29 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
     decimals: 8,
   },
+  EURC: {
+    symbol: "EURC",
+    priceSymbol: "USDC",
+    name: "EURC",
+    address: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
+    decimals: 6,
+  },
 };
 
-export function resolveSwapToken(value: unknown) {
+export const VERIFIED_SWAP_TOKENS: Record<string, SwapToken & { auditDate?: string; auditNotes?: string; riskLevel?: string }> = {};
+
+export function resolveSwapToken(value: unknown): SwapToken | null {
   const symbol = String(value ?? "").trim().toUpperCase();
   if (isAddress(symbol)) return null;
-  return SWAP_TOKENS[symbol as SwapTokenSymbol] ?? null;
+  const token = SWAP_TOKENS[symbol as SwapTokenSymbol] ?? VERIFIED_SWAP_TOKENS[symbol];
+  return token ? { ...token, trust: SWAP_TOKENS[symbol as SwapTokenSymbol] ? "core" : "audited" } : null;
+}
+
+export function resolveCoreSwapToken(value: unknown) {
+  return resolveSwapToken(value);
+}
+
+export function swapTokenInput(value: unknown) {
+  const text = String(value ?? "").trim();
+  return isAddress(text) ? (text as Address) : text.toUpperCase();
 }

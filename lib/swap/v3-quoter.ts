@@ -67,7 +67,7 @@ export async function quoteBestV3(fromToken: SwapToken, toToken: SwapToken, amou
   const allQuotes = await Promise.all(
     FEE_TIERS.map(async (fee) => {
       try {
-        return { ok: true as const, ...(await withTimeout(quoteV3(fromToken, toToken, amountIn, fee), 8_000)) };
+        return { ok: true as const, ...(await withTimeout(quoteV3(fromToken, toToken, amountIn, fee), 4_000)) };
       } catch (error) {
         return { ok: false as const, fee, error: error instanceof Error ? error.message : "quote_failed" };
       }
