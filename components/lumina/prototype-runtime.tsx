@@ -1871,12 +1871,29 @@ function enhancePrototypeSwapQuote() {
         var rows = document.querySelectorAll(".swap-detail .ln");
         return rows[3] ? rows[3].querySelector("span:last-child") : null;
       }
+      function ensureQuoteBox(){
+        var box = document.getElementById("quoteCompareBox");
+        if (box) return box;
+        var detail = document.querySelector(".swap-detail");
+        if (!detail) return null;
+        detail.insertAdjacentHTML("afterend",
+          '<div class="quote-warning" id="quoteWarning"></div>' +
+          '<div class="quote-compare" id="quoteCompareBox">' +
+            '<div class="quote-compare-title">报价来源对比</div>' +
+            '<div class="quote-compare-rows" id="quoteCompareRows"></div>' +
+          '</div>'
+        );
+        return document.getElementById("quoteCompareBox");
+      }
       function setSwapButtonPending(){
         var btn = document.getElementById("swapBtn");
         if (!btn) return;
         btn.classList.add("quote-only");
         btn.disabled = false;
-        btn.onclick = function(){ toast("Swap execution is not live yet. Quotes are read-only."); };
+        btn.setAttribute("aria-disabled", "true");
+        var span = btn.querySelector("span");
+        if (span) span.textContent = "Swap 即将上线";
+        btn.onclick = function(){ toast("兑换功能即将上线"); };
       }
       function tokenLogoForSwap(symbol){
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : symbol);
@@ -1891,32 +1908,71 @@ function enhancePrototypeSwapQuote() {
         el.style.color = symbol === "WLD" ? "#000" : "#fff";
       }
       function setQuoteState(message, impactClass){
+        ensureQuoteBox();
         var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
         var gas = feeEl();
+        var rows = document.getElementById("quoteCompareRows");
+        var warn = document.getElementById("quoteWarning");
         if (buy) buy.value = "—";
         if (rate) rate.textContent = message;
         if (impact) { impact.textContent = "—"; impact.className = impactClass || "impact-mid"; }
         if (gas) gas.textContent = "—";
+        if (rows) rows.innerHTML = "";
+        if (warn) { warn.classList.remove("show"); warn.textContent = ""; }
+      }
+      function formatRate(value){
+        var n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return "—";
+        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 8 : 6 });
+      }
+      function referenceRow(label, ref, suffix){
+        var available = ref && ref.available !== false && ref.rate;
+        var mark = ref && ref.selected ? ' <span class="quote-current">✓ 当前</span>' : "";
+        var right = available ? ("1 " + swapState.sell + " = " + formatRate(ref.rate) + " " + swapState.buy + mark) : "—";
+        return '<div class="quote-ref-row"><span>' + label + '</span><strong>' + right + (suffix || "") + '</strong></div>';
+      }
+      function renderReferences(data){
+        ensureQuoteBox();
+        var rows = document.getElementById("quoteCompareRows");
+        if (!rows) return;
+        var refs = data.references || {};
+        rows.innerHTML =
+          referenceRow("Uniswap V3", refs.uniswapV3) +
+          referenceRow("Uniswap V4", refs.uniswapV4) +
+          referenceRow("Chainlink", Object.assign({ available: !!(refs.chainlink && refs.chainlink.rate) }, refs.chainlink || {}), ' <span class="quote-muted">(参考)</span>') +
+          referenceRow("CoinGecko", Object.assign({ available: !!(refs.coingecko && refs.coingecko.rate) }, refs.coingecko || {}), ' <span class="quote-muted">(参考)</span>');
+      }
+      function renderWarning(data){
+        var warn = document.getElementById("quoteWarning");
+        if (!warn) return;
+        var text = "";
+        if (data.blocked) text = data.blockReason || "报价风险过高,暂不允许兑换";
+        else if (data.warnings && data.warnings.indexOf("price_anomaly") >= 0) text = "价格偏差较大,可能是低流动性导致,建议小额测试";
+        else if (data.warnings && data.warnings.indexOf("low_liquidity") >= 0) text = "当前池子流动性较低,大额兑换可能出现明显滑点";
+        warn.textContent = text;
+        warn.classList.toggle("show", !!text);
       }
       function applyQuote(data){
+        ensureQuoteBox();
         var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
         var gas = feeEl();
-        var amountIn = Number(data.fromAmount);
-        var amountOut = Number(data.toAmount);
-        if (buy) buy.value = shortAmount(data.toAmount);
-        if (rate && amountIn > 0 && amountOut > 0) {
-          rate.textContent = "1 " + data.fromToken + " ≈ " + shortAmount(amountOut / amountIn) + " " + data.toToken + " · " + data.route.join(" → ");
+        if (buy) buy.value = shortAmount(data.amountOut);
+        if (rate && data.rate) {
+          rate.textContent = "1 " + swapState.sell + " ≈ " + formatRate(data.rate) + " " + swapState.buy + " · " + data.source + " · " + (data.feeTier / 10000) + "%";
         }
         if (impact) {
-          var p = Number(data.priceImpact || 0);
+          var p = Number(data.priceImpactPercent || 0);
           impact.textContent = p < 0.01 ? "<0.01%" : p.toFixed(2) + "%";
-          impact.className = p < 1 ? "impact-low" : (p < 3 ? "impact-mid" : "impact-high");
+          impact.className = data.priceImpactLevel === "green" ? "impact-low" : (data.priceImpactLevel === "yellow" ? "impact-mid" : "impact-high");
         }
-        if (gas) gas.textContent = data.gasLabel || (data.gas ? "~" + Number(data.gas).toLocaleString() + " gas" : "—");
+        if (gas) gas.textContent = Number.isFinite(Number(data.gasEstimateUsd)) ? "Network fee: ~$" + Number(data.gasEstimateUsd).toFixed(2) : "Network fee: —";
+        renderReferences(data);
+        renderWarning(data);
+        setSwapButtonPending();
       }
       async function requestQuote(){
         setSwapButtonPending();
@@ -1937,8 +1993,8 @@ function enhancePrototypeSwapQuote() {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
-              fromToken: swapState.sell,
-              toToken: swapState.buy,
+              fromSymbol: swapState.sell,
+              toSymbol: swapState.buy,
               fromAmount: amount,
               slippageBps: slippageBps()
             })
@@ -1956,7 +2012,7 @@ function enhancePrototypeSwapQuote() {
       }
       function scheduleQuote(){
         clearTimeout(quoteTimer);
-        quoteTimer = setTimeout(requestQuote, 280);
+        quoteTimer = setTimeout(requestQuote, 500);
       }
       var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
       if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
@@ -1969,13 +2025,14 @@ function enhancePrototypeSwapQuote() {
         };
       }
       recalc = scheduleQuote;
-      confirmSwap = function(){ toast("Swap execution is not live yet. Quotes are read-only."); };
+      confirmSwap = function(){ toast("兑换功能即将上线"); };
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
       var customSlip = document.querySelector(".slip-custom");
       if (customSlip) customSlip.addEventListener("input", scheduleQuote);
       setSwapButtonPending();
+      ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
       setSwapPillLogo("buyDot", swapState.buy);
       scheduleQuote();

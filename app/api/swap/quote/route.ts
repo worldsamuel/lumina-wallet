@@ -1,92 +1,24 @@
 import { NextRequest } from "next/server";
-import { formatUnits, isAddress, parseUnits, zeroAddress, type Address } from "viem";
+import { parseUnits } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
-import { readOraclePrices } from "@/lib/oracle";
-import { isFinitePrice } from "@/lib/prices";
-import { TOKENS } from "@/lib/tokens";
-
-const UNISWAP_V3_FACTORY = "0x7a5028BDa40e7B173C278C5342087826455ea25a" as Address;
-const UNISWAP_V3_QUOTER_V2 = "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c" as Address;
-const WORLD_CHAIN_WETH = "0x4200000000000000000000000000000000000006" as Address;
-const BUNGEE_NATIVE_TOKEN = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-const BUNGEE_QUOTE_URL = "https://public-backend.bungee.exchange/api/v1/bungee/quote";
-const QUOTE_USER = "0x0000000000000000000000000000000000000001";
-const FEE_TIERS = [100, 500, 3000, 10000] as const;
-const DEFAULT_SLIPPAGE_BPS = 50n;
-
-const factoryAbi = [
-  {
-    type: "function",
-    name: "getPool",
-    stateMutability: "view",
-    inputs: [
-      { name: "tokenA", type: "address" },
-      { name: "tokenB", type: "address" },
-      { name: "fee", type: "uint24" },
-    ],
-    outputs: [{ name: "pool", type: "address" }],
-  },
-] as const;
-
-const poolAbi = [
-  {
-    type: "function",
-    name: "slot0",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [
-      { name: "sqrtPriceX96", type: "uint160" },
-      { name: "tick", type: "int24" },
-      { name: "observationIndex", type: "uint16" },
-      { name: "observationCardinality", type: "uint16" },
-      { name: "observationCardinalityNext", type: "uint16" },
-      { name: "feeProtocol", type: "uint8" },
-      { name: "unlocked", type: "bool" },
-    ],
-  },
-  {
-    type: "function",
-    name: "token0",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ name: "", type: "address" }],
-  },
-] as const;
-
-const quoterV2Abi = [
-  {
-    type: "function",
-    name: "quoteExactInputSingle",
-    stateMutability: "nonpayable",
-    inputs: [
-      {
-        name: "params",
-        type: "tuple",
-        components: [
-          { name: "tokenIn", type: "address" },
-          { name: "tokenOut", type: "address" },
-          { name: "amountIn", type: "uint256" },
-          { name: "fee", type: "uint24" },
-          { name: "sqrtPriceLimitX96", type: "uint160" },
-        ],
-      },
-    ],
-    outputs: [
-      { name: "amountOut", type: "uint256" },
-      { name: "sqrtPriceX96After", type: "uint160" },
-      { name: "initializedTicksCrossed", type: "uint32" },
-      { name: "gasEstimate", type: "uint256" },
-    ],
-  },
-] as const;
+import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
+import type { SwapQuoteResult, SwapQuoteSet } from "@/lib/swap/quote-types";
+import { resolveSwapToken, type SwapToken } from "@/lib/swap/tokens";
 
 type QuoteBody = {
+  fromSymbol?: string;
+  toSymbol?: string;
   fromToken?: string;
   toToken?: string;
   fromAmount?: string;
-  slippageBps?: number;
+};
+
+type SourceQuote = {
+  source: "uniswap-v3" | "uniswap-v4";
+  bestQuote: SwapQuoteResult | null;
+  allQuotes: SwapQuoteSet["allQuotes"];
 };
 
 export function OPTIONS() {
@@ -99,262 +31,167 @@ export async function POST(req: NextRequest) {
   }
 
   const body = (await req.json().catch(() => null)) as QuoteBody | null;
-  const from = resolveToken(body?.fromToken);
-  const to = resolveToken(body?.toToken);
-  if (!from || !to) return jsonResponse({ error: "Unsupported token." }, { status: 400 });
-  if (from.address.toLowerCase() === to.address.toLowerCase()) {
-    return jsonResponse({ error: "Choose two different tokens." }, { status: 400 });
+  const parsed = parseQuoteBody(body);
+  if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: 400 });
+
+  const requestBody = JSON.stringify({
+    fromSymbol: parsed.from.symbol,
+    toSymbol: parsed.to.symbol,
+    fromAmount: parsed.amountText,
+  });
+  const headers = { "content-type": "application/json" };
+  const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
+    fetchJson<SourceQuote>(req, "/api/swap/quote/v3", { method: "POST", headers, body: requestBody }).catch(() => null),
+    fetchJson<SourceQuote>(req, "/api/swap/quote/v4", { method: "POST", headers, body: requestBody }).catch(() => null),
+    fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null),
+    fetchJson<MarketPricesResponse>(req, "/api/prices/market").catch(() => null),
+    publicClient.getGasPrice().catch(() => 0n),
+  ]);
+
+  const amountInNumber = Number(parsed.amountText);
+  const main = pickMainQuote(v3, v4);
+  const chainlinkRate = referenceRate(parsed.from, parsed.to, chainlink);
+  const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
+
+  if (!main || !main.quote || Number(main.quote.amountOut) <= 0) {
+    return jsonResponse(
+      {
+        error: "No executable Uniswap route for this pair.",
+        references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko),
+        warnings: ["low_liquidity"],
+        blocked: true,
+        blockReason: "No executable Uniswap route for this pair.",
+      },
+      { status: 404 },
+    );
   }
+
+  const amountOutNumber = Number(main.quote.amountOut);
+  const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
+  const baselineRate = chainlinkRate ?? coingeckoRate;
+  const deviationValues = [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter(
+    (value): value is number => value !== null,
+  );
+  const maxDeviation = deviationValues.length ? Math.max(...deviationValues) : 0;
+  const priceImpactPercent = deviation(quoteRate, baselineRate) ?? 0;
+  const warnings: string[] = [];
+  if (maxDeviation > 0.05) warnings.push("price_anomaly");
+  if (priceImpactPercent > 0.1) warnings.push("low_liquidity");
+
+  const blocked = maxDeviation > 0.2;
+  return jsonResponse(
+    {
+      source: main.source,
+      amountIn: parsed.amountText,
+      amountOut: main.quote.amountOut,
+      rate: quoteRate,
+      priceImpactPercent: Number((priceImpactPercent * 100).toFixed(4)),
+      priceImpactLevel: impactLevel(priceImpactPercent * 100),
+      gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
+      feeTier: main.quote.fee,
+      references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko, main.source),
+      warnings,
+      blocked,
+      blockReason: blocked ? "价格偏差超过 20%,为保护资金已阻止本次兑换。" : undefined,
+    },
+    {
+      headers: {
+        "Cache-Control": "public, s-maxage=5, stale-while-revalidate=5",
+      },
+    },
+  );
+}
+
+function parseQuoteBody(body: QuoteBody | null) {
+  const from = resolveSwapToken(body?.fromSymbol ?? body?.fromToken);
+  const to = resolveSwapToken(body?.toSymbol ?? body?.toToken);
+  if (!from || !to) return { error: "Unsupported token." };
+  if (from.address.toLowerCase() === to.address.toLowerCase()) return { error: "Choose two different tokens." };
 
   const amountText = String(body?.fromAmount ?? "").replace(/,/g, "").trim();
-  if (!amountText || Number(amountText) <= 0) {
-    return jsonResponse({ error: "Enter a valid amount." }, { status: 400 });
-  }
-
-  let amountIn: bigint;
+  if (!amountText || Number(amountText) <= 0) return { error: "Enter a valid amount." };
   try {
-    amountIn = parseUnits(amountText, from.decimals);
+    parseUnits(amountText, from.decimals);
+    return { from, to, amountText };
   } catch {
-    return jsonResponse({ error: "Invalid token amount." }, { status: 400 });
+    return { error: "Invalid token amount." };
   }
-
-  const quotes = await Promise.all(
-    FEE_TIERS.map((fee) => withTimeout(quotePool(from, to, amountIn, fee), 3500).catch(() => null)),
-  );
-  const best = quotes
-    .filter((quote): quote is NonNullable<typeof quote> => Boolean(quote))
-    .sort((a, b) => (a.amountOut > b.amountOut ? -1 : a.amountOut < b.amountOut ? 1 : 0))[0];
-
-  if (!best) {
-    const bungee = await quoteBungee(from, to, amountIn, slippageBpsFromBody(body?.slippageBps)).catch((error) => {
-      console.error("Bungee quote failed", error);
-      return null;
-    });
-    if (bungee) return jsonResponse(bungee);
-    const fallback = await quoteFromOnchainPrices(from, to, amountText).catch((error) => {
-      console.error("Chainlink quote fallback failed", error);
-      return null;
-    });
-    if (fallback) return jsonResponse(fallback);
-    return jsonResponse({ error: "No Uniswap v3, Bungee, or Chainlink quote found for this pair." }, { status: 404 });
-  }
-
-  const slippageBps = slippageBpsFromBody(body?.slippageBps);
-  const minAmountOut = (best.amountOut * (10_000n - slippageBps)) / 10_000n;
-
-  return jsonResponse({
-    dex: "Uniswap V3",
-    fromToken: from.symbol,
-    toToken: to.symbol,
-    fromAmount: amountText,
-    toAmount: formatUnits(best.amountOut, to.decimals),
-    minToAmount: formatUnits(minAmountOut, to.decimals),
-    priceImpact: best.priceImpact,
-    route: [`${from.symbol}/${to.symbol} ${best.fee / 10000}%`],
-    gas: best.gasEstimate.toString(),
-    gasLabel: `~${best.gasEstimate.toLocaleString()} gas`,
-    pool: best.pool,
-    fee: best.fee,
-    note: "Read-only quote. No swap transaction, approve flow, or MiniKit.sendTransaction is executed.",
-  });
 }
 
-async function quoteFromOnchainPrices(
-  from: { symbol: string; decimals: number; address: Address },
-  to: { symbol: string; decimals: number; address: Address },
-  amountText: string,
+function pickMainQuote(v3: SourceQuote | null, v4: SourceQuote | null) {
+  const candidates = [
+    v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null,
+    v4?.bestQuote ? { source: "uniswap-v4" as const, quote: v4.bestQuote } : null,
+  ].filter((item): item is { source: "uniswap-v3" | "uniswap-v4"; quote: SwapQuoteResult } => Boolean(item));
+  return candidates.sort((a, b) => {
+    const left = BigInt(a.quote.amountOutRaw);
+    const right = BigInt(b.quote.amountOutRaw);
+    return left > right ? -1 : left < right ? 1 : 0;
+  })[0] ?? null;
+}
+
+function buildReferences(
+  from: SwapToken,
+  to: SwapToken,
+  amountIn: number,
+  v3: SourceQuote | null,
+  v4: SourceQuote | null,
+  chainlink: OnchainPricesResponse | null,
+  coingecko: MarketPricesResponse | null,
+  selected?: "uniswap-v3" | "uniswap-v4",
 ) {
-  const prices = await readOraclePrices();
-  const fromUsd = prices[from.symbol as keyof typeof prices];
-  const toUsd = prices[to.symbol as keyof typeof prices];
-  if (!isFinitePrice(fromUsd) || !isFinitePrice(toUsd)) return null;
-  const amountIn = Number(amountText);
-  if (!Number.isFinite(amountIn) || amountIn <= 0) return null;
-  const amountOut = (amountIn * fromUsd) / toUsd;
-
   return {
-    dex: "Chainlink fallback",
-    fromToken: from.symbol,
-    toToken: to.symbol,
-    fromAmount: amountText,
-    toAmount: amountOut.toString(),
-    minToAmount: null,
-    priceImpact: null,
-    route: [`${from.symbol}/USD`, `${to.symbol}/USD`],
-    gas: "0",
-    gasLabel: "—",
-    note: "Oracle fallback quote only. Uses Chainlink USD feeds for display and does not execute a swap.",
+    uniswapV3: quoteReference(v3, amountIn, selected === "uniswap-v3"),
+    uniswapV4: quoteReference(v4, amountIn, selected === "uniswap-v4"),
+    chainlink: { rate: referenceRate(from, to, chainlink), updatedAt: chainlink?.updatedAt ?? null },
+    coingecko: { rate: referenceRate(from, to, coingecko), updatedAt: coingecko?.updated_at ?? null },
   };
 }
 
-function slippageBpsFromBody(value: unknown) {
-  return typeof value === "number" && value >= 0 && value <= 500
-    ? BigInt(Math.round(value))
-    : DEFAULT_SLIPPAGE_BPS;
+function quoteReference(quote: SourceQuote | null, amountIn: number, selected: boolean) {
+  const amountOut = Number(quote?.bestQuote?.amountOut ?? 0);
+  return {
+    rate: amountIn > 0 && amountOut > 0 ? amountOut / amountIn : null,
+    available: Boolean(quote?.bestQuote && amountOut > 0),
+    selected,
+  };
 }
 
-function resolveToken(value?: string) {
-  const key = String(value ?? "").trim();
-  if (!key) return null;
-  if (key.toUpperCase() === "ETH") {
-    return { symbol: "ETH", decimals: 18, address: WORLD_CHAIN_WETH };
+function referenceRate(from: SwapToken, to: SwapToken, prices?: OnchainPricesResponse | MarketPricesResponse | null) {
+  const fromUsd = priceUsd(prices, from.priceSymbol);
+  const toUsd = priceUsd(prices, to.priceSymbol);
+  return fromUsd && toUsd ? fromUsd / toUsd : null;
+}
+
+function priceUsd(prices: OnchainPricesResponse | MarketPricesResponse | null | undefined, symbol: SwapToken["priceSymbol"]) {
+  const value = prices?.[symbol];
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "object" && value && "usd" in value && typeof value.usd === "number" && value.usd > 0) {
+    return value.usd;
   }
-  if (isAddress(key)) {
-    return null;
-  }
-  const token = TOKENS.find((item) => item.symbol.toUpperCase() === key.toUpperCase());
-  if (!token?.contractAddress) return null;
-  return {
-    symbol: token.symbol,
-    decimals: token.decimals,
-    address: token.contractAddress,
-  };
+  return null;
 }
 
-function bungeeTokenAddress(token: { symbol: string; address: Address }) {
-  return token.symbol === "ETH" ? BUNGEE_NATIVE_TOKEN : token.address;
+function deviation(value: number | null, reference: number | null) {
+  if (!value || !reference) return null;
+  return Math.abs(value - reference) / reference;
 }
 
-type BungeeQuoteResponse = {
-  success?: boolean;
-  result?: {
-    autoRoute?: BungeeRoute | null;
-    manualRoutes?: BungeeRoute[];
-  };
-  message?: string | null;
-};
-
-type BungeeRoute = {
-  output?: {
-    amount?: string;
-    minAmountOut?: string;
-  };
-  gasFee?: {
-    gasLimit?: string;
-    gasPrice?: string;
-    estimatedFee?: string;
-    feeInUsd?: number;
-  } | null;
-  routeDetails?: {
-    name?: string;
-  };
-};
-
-async function quoteBungee(
-  from: { symbol: string; decimals: number; address: Address },
-  to: { symbol: string; decimals: number; address: Address },
-  amountIn: bigint,
-  slippageBps: bigint,
-) {
-  const params = new URLSearchParams({
-    originChainId: "480",
-    destinationChainId: "480",
-    inputToken: bungeeTokenAddress(from),
-    outputToken: bungeeTokenAddress(to),
-    inputAmount: amountIn.toString(),
-    receiverAddress: QUOTE_USER,
-    userAddress: QUOTE_USER,
-    slippage: (Number(slippageBps) / 100).toString(),
-    enableManual: "true",
-    disableAuto: "true",
-  });
-
-  const response = await fetch(`${BUNGEE_QUOTE_URL}?${params}`, {
-    headers: { accept: "application/json" },
-    next: { revalidate: 10 },
-  });
-  if (!response.ok) throw new Error(`Bungee responded ${response.status}`);
-  const body = (await response.json()) as BungeeQuoteResponse;
-  const route = body.result?.manualRoutes?.[0] ?? body.result?.autoRoute;
-  const amountOut = route?.output?.amount;
-  if (!amountOut) return null;
-
-  const gasLimit = route.gasFee?.gasLimit ?? "0";
-
-  return {
-    dex: "Bungee",
-    fromToken: from.symbol,
-    toToken: to.symbol,
-    fromAmount: formatUnits(amountIn, from.decimals),
-    toAmount: formatUnits(BigInt(amountOut), to.decimals),
-    minToAmount: route.output?.minAmountOut ? formatUnits(BigInt(route.output.minAmountOut), to.decimals) : null,
-    priceImpact: null,
-    route: [route.routeDetails?.name ? `Bungee · ${route.routeDetails.name}` : "Bungee"],
-    gas: gasLimit,
-    gasLabel: gasLimit !== "0" ? `~${Number(gasLimit).toLocaleString()} gas` : "—",
-    gasFeeWei: route.gasFee?.estimatedFee ?? null,
-    gasFeeUsd: route.gasFee?.feeInUsd ?? null,
-    note: "Read-only quote. Bungee txData/approvalData is intentionally ignored; no transaction is executed.",
-  };
+function impactLevel(percent: number) {
+  if (percent < 0.5) return "green";
+  if (percent < 3) return "yellow";
+  if (percent < 10) return "orange";
+  return "red";
 }
 
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number) {
-  return Promise.race([
-    promise,
-    new Promise<null>((resolve) => {
-      setTimeout(() => resolve(null), timeoutMs);
-    }),
-  ]);
+function gasUsd(gasEstimate: string, gasPriceWei: bigint, ethUsd: unknown) {
+  const ethPrice = typeof ethUsd === "number" && Number.isFinite(ethUsd) ? ethUsd : 0;
+  if (!ethPrice || !gasPriceWei) return 0;
+  return Number(((BigInt(gasEstimate || "0") * gasPriceWei * BigInt(Math.round(ethPrice * 100))) / 10n ** 18n)) / 100;
 }
 
-async function quotePool(
-  from: { symbol: string; decimals: number; address: Address },
-  to: { symbol: string; decimals: number; address: Address },
-  amountIn: bigint,
-  fee: (typeof FEE_TIERS)[number],
-) {
-  const pool = await publicClient.readContract({
-    address: UNISWAP_V3_FACTORY,
-    abi: factoryAbi,
-    functionName: "getPool",
-    args: [from.address, to.address, fee],
-  });
-  if (pool === zeroAddress) return null;
-
-  const [token0, slot0, simulated] = await Promise.all([
-    publicClient.readContract({ address: pool, abi: poolAbi, functionName: "token0" }),
-    publicClient.readContract({ address: pool, abi: poolAbi, functionName: "slot0" }),
-    publicClient.simulateContract({
-      account: zeroAddress,
-      address: UNISWAP_V3_QUOTER_V2,
-      abi: quoterV2Abi,
-      functionName: "quoteExactInputSingle",
-      args: [
-        {
-          tokenIn: from.address,
-          tokenOut: to.address,
-          amountIn,
-          fee,
-          sqrtPriceLimitX96: 0n,
-        },
-      ],
-    }),
-  ]);
-
-  const [amountOut, sqrtPriceX96After, , gasEstimate] = simulated.result;
-  const currentPrice = priceFromSqrt(slot0[0], token0, from, to);
-  const nextPrice = priceFromSqrt(sqrtPriceX96After, token0, from, to);
-  const priceImpact = currentPrice > 0 ? Math.abs((nextPrice - currentPrice) / currentPrice) * 100 : 0;
-
-  return {
-    pool,
-    fee,
-    amountOut,
-    gasEstimate,
-    priceImpact: Number.isFinite(priceImpact) ? Number(priceImpact.toFixed(4)) : 0,
-  };
-}
-
-function priceFromSqrt(
-  sqrtPriceX96: bigint,
-  token0: Address,
-  from: { decimals: number; address: Address },
-  to: { decimals: number; address: Address },
-) {
-  const sqrt = Number(sqrtPriceX96) / 2 ** 96;
-  const token1PerToken0 = sqrt * sqrt;
-  if (token0.toLowerCase() === from.address.toLowerCase()) {
-    return token1PerToken0 * 10 ** (from.decimals - to.decimals);
-  }
-  return 1 / (token1PerToken0 * 10 ** (to.decimals - from.decimals));
+async function fetchJson<T>(req: NextRequest, path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(new URL(path, req.url), init);
+  if (!response.ok) throw new Error(`${path} responded ${response.status}`);
+  return (await response.json()) as T;
 }
