@@ -24,10 +24,51 @@ declare global {
 }
 
 const fetcher = async <T,>(url: string): Promise<T> => {
-  const res = await fetch(url);
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Failed to fetch ${url}`);
   return (await res.json()) as T;
 };
+
+function escapeAttr(value: string) {
+  return value.replace(/"/g, "&quot;");
+}
+
+function applySystemConfig(config: BackendSystemConfig) {
+  if (typeof document === "undefined") return;
+
+  if (config.faviconUrl) {
+    const favicon =
+      document.querySelector<HTMLLinkElement>("link[rel='icon']") || document.createElement("link");
+    favicon.rel = "icon";
+    favicon.href = config.faviconUrl;
+    if (!favicon.parentNode) document.head.appendChild(favicon);
+  }
+
+  if (config.adminLogoUrl) {
+    document
+      .querySelectorAll<HTMLElement>(".brand .logo, .lumina-legal-logo, .mini-auth-logo, .maintenance-logo")
+      .forEach((el) => {
+        el.innerHTML = `<img src="${escapeAttr(config.adminLogoUrl || "")}" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" />`;
+      });
+  }
+
+  const existing = document.getElementById("luminaMaintenanceOverlay");
+  if (!config.maintenance) {
+    existing?.remove();
+    return;
+  }
+  if (existing) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "luminaMaintenanceOverlay";
+  overlay.style.cssText =
+    "position:fixed;inset:0;z-index:2147483647;background:#030503;display:flex;align-items:center;justify-content:center;padding:28px;color:#fff;text-align:center;";
+  const mark = config.adminLogoUrl
+    ? `<img src="${escapeAttr(config.adminLogoUrl)}" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />`
+    : "L";
+  overlay.innerHTML = `<div style="max-width:320px;"><div class="maintenance-logo" style="width:74px;height:74px;margin:0 auto 22px;border-radius:50%;border:2px solid #6ee787;display:flex;align-items:center;justify-content:center;color:#6ee787;font-size:34px;font-weight:900;box-shadow:0 0 40px rgba(74,222,128,.22);overflow:hidden;">${mark}</div><h1 style="font-size:30px;line-height:1.05;margin:0 0 12px;font-weight:950;">Lumina is under maintenance</h1><p style="margin:0;color:#9ca39c;font-size:15px;line-height:1.55;">We are updating the service. Please check back shortly.</p></div>`;
+  document.body.appendChild(overlay);
+}
 
 function pickText(i18n: Record<string, string> | undefined, lang: string) {
   return i18n?.[lang] ?? i18n?.en ?? i18n?.["zh-CN"] ?? "";
@@ -133,6 +174,7 @@ export function useBackendConfigSync(enabled: boolean) {
     if (fees.data) window.localStorage.setItem("ww_fee_configs", JSON.stringify(fees.data));
     if (systemConfig.data) {
       window.localStorage.setItem("ww_system_config", JSON.stringify(systemConfig.data));
+      applySystemConfig(systemConfig.data);
       window.__luminaApplySystemConfig?.();
     }
   }, [

@@ -115,7 +115,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const [earnPendingAction, setEarnPendingAction] = useState<EarnPendingAction>("deposit");
   const { address, error, login, logout, status, username } = useWalletAuth();
   const { mutate } = useSWRConfig();
-  useBackendConfigSync(status === "authenticated" && dataSyncReady);
+  useBackendConfigSync(true);
   useChainBalanceSync(status === "authenticated" && prototypeReady && dataSyncReady, address);
 
   useEffect(() => {
