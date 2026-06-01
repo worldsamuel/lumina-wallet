@@ -1,4 +1,4 @@
-import type { Address } from "viem";
+import { encodeFunctionData, type Address, type Hex } from "viem";
 import type { MorphoVault } from "./vaults";
 
 const approveAbi = [
@@ -56,10 +56,8 @@ const redeemAbi = [
 ] as const;
 
 export type MiniKitTransaction = {
-  address: Address;
-  abi: readonly unknown[];
-  functionName: string;
-  args: string[];
+  to: Address;
+  data: Hex;
   value?: string;
 };
 
@@ -84,16 +82,20 @@ export function buildDepositTx(vault: MorphoVault, amount: bigint, userAddress: 
   return {
     transactions: [
       {
-        address: token,
-        abi: approveAbi,
-        functionName: "approve",
-        args: [vault.address, amount.toString()],
+        to: token,
+        data: encodeFunctionData({
+          abi: approveAbi,
+          functionName: "approve",
+          args: [vault.address, amount],
+        }),
       },
       {
-        address: vault.address,
-        abi: depositAbi,
-        functionName: "deposit",
-        args: [amount.toString(), userAddress],
+        to: vault.address,
+        data: encodeFunctionData({
+          abi: depositAbi,
+          functionName: "deposit",
+          args: [amount, userAddress],
+        }),
       },
     ],
     permit2: [],
@@ -102,18 +104,22 @@ export function buildDepositTx(vault: MorphoVault, amount: bigint, userAddress: 
 
 export function buildWithdrawTx(vault: MorphoVault, amount: bigint, userAddress: Address) {
   return {
-    address: vault.address,
-    abi: withdrawAbi,
-    functionName: "withdraw",
-    args: [amount.toString(), userAddress, userAddress],
+    to: vault.address,
+    data: encodeFunctionData({
+      abi: withdrawAbi,
+      functionName: "withdraw",
+      args: [amount, userAddress, userAddress],
+    }),
   };
 }
 
 export function buildRedeemTx(vault: MorphoVault, shares: bigint, userAddress: Address) {
   return {
-    address: vault.address,
-    abi: redeemAbi,
-    functionName: "redeem",
-    args: [shares.toString(), userAddress, userAddress],
+    to: vault.address,
+    data: encodeFunctionData({
+      abi: redeemAbi,
+      functionName: "redeem",
+      args: [shares, userAddress, userAddress],
+    }),
   };
 }

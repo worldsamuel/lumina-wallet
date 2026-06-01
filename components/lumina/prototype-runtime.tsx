@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MiniKit } from "@worldcoin/minikit-js";
 import { useSWRConfig } from "swr";
+import { EarnTransactionStatus } from "@/components/EarnTransactionStatus";
 import { prototypeMarkup } from "./prototype-markup";
 import { prototypeScript } from "./prototype-script";
 import { shortenAddress } from "@/lib/auth/store";
@@ -32,6 +33,7 @@ declare global {
       transactions: MiniKitCalldataTransaction[],
       permit2?: MiniKitPermit2[],
     ) => Promise<unknown>;
+    __luminaSetMorphoBusy?: (isBusy: boolean) => void;
     __luminaSendToken?: (params: SendParams) => Promise<SendResult>;
     __luminaFriendlySendError?: (error?: string) => string;
     __luminaRefreshWalletData?: () => void;
@@ -53,10 +55,8 @@ type EarnConfirmInput = {
 };
 
 type MiniKitCalldataTransaction = {
-  address: string;
-  abi: readonly unknown[];
-  functionName: string;
-  args: string[];
+  to: string;
+  data: `0x${string}`;
   value?: string;
 };
 
@@ -75,19 +75,9 @@ type MiniKitSendTransactionEnvelope = {
   data?: {
     status?: string;
     userOpHash?: string;
-    transactionHash?: string;
-    transaction_id?: string;
-    transactionId?: string;
     error_code?: string;
     message?: string;
   };
-  status?: string;
-  userOpHash?: string;
-  transactionHash?: string;
-  transaction_id?: string;
-  transactionId?: string;
-  error_code?: string;
-  message?: string;
 };
 
 const tabByView: Record<string, string> = {
@@ -116,6 +106,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [prototypeReady, setPrototypeReady] = useState(false);
   const [dataSyncReady, setDataSyncReady] = useState(false);
+  const [earnUserOpHash, setEarnUserOpHash] = useState("");
   const { address, error, login, logout, status, username } = useWalletAuth();
   const { mutate } = useSWRConfig();
   useBackendConfigSync(status === "authenticated" && dataSyncReady);
@@ -194,6 +185,29 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     if (hostRef.current) updatePrototypeAddress(hostRef.current, address);
   }, [address, status]);
 
+  useEffect(() => {
+    const handleEarnUserOp = (event: Event) => {
+      const detail = (event as CustomEvent<{ userOpHash?: string }>).detail;
+      if (detail?.userOpHash) setEarnUserOpHash(detail.userOpHash);
+    };
+    window.addEventListener("lumina:earn-userop", handleEarnUserOp);
+    return () => window.removeEventListener("lumina:earn-userop", handleEarnUserOp);
+  }, []);
+
+  const handleEarnReceiptSuccess = useCallback(() => {
+    window.__luminaSetMorphoBusy?.(false);
+    window.__luminaRefreshWalletData?.();
+    if (address) void mutate(`/api/morpho/position/${address}`);
+    setEarnUserOpHash("");
+    toastFromPrototype("存款成功!");
+  }, [address, mutate]);
+
+  const handleEarnReceiptError = useCallback((receiptError?: Error) => {
+    window.__luminaSetMorphoBusy?.(false);
+    setEarnUserOpHash("");
+    toastFromPrototype(`交易失败: ${receiptError?.message ?? "Transaction failed"}`);
+  }, []);
+
   if (status === "not-installed") {
     return <WorldAppPrompt />;
   }
@@ -206,7 +220,18 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     return <AuthError message={error ?? "Wallet authentication failed."} onRetry={login} />;
   }
 
-  return <div ref={hostRef} />;
+  return (
+    <>
+      <div ref={hostRef} />
+      {earnUserOpHash ? (
+        <EarnTransactionStatus
+          userOpHash={earnUserOpHash}
+          onSuccess={handleEarnReceiptSuccess}
+          onError={handleEarnReceiptError}
+        />
+      ) : null}
+    </>
+  );
 }
 
 function installMobileConsole() {
@@ -235,6 +260,11 @@ function installMobileConsole() {
   document.head.appendChild(script);
 }
 
+function toastFromPrototype(message: string) {
+  const toast = (window as unknown as { toast?: (text: string) => void }).toast;
+  if (toast) toast(message);
+}
+
 function exposeEarnWalletConfirm() {
   window.__luminaConfirmEarnAction = async ({ action, amount, product }) => {
     const message = `Lumina Earn ${action}: ${amount} into ${product}`;
@@ -260,15 +290,17 @@ function exposeEarnWalletConfirm() {
 
 function exposeMorphoTransactions() {
   window.__luminaSendMorphoTransactions = async (transactions, permit2) => {
+    void permit2;
     if (new URL(window.location.href).searchParams.get("mockWorld") === "1") {
-      return { userOpHash: `0xmock${Date.now().toString(16)}` };
+      const userOpHash = `0xmock${Date.now().toString(16)}`;
+      window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash } }));
+      return { data: { status: "success", userOpHash } };
     }
 
     const miniKit = MiniKit as unknown as {
       sendTransaction?: (input: {
-        chainId?: number;
+        chainId: number;
         transactions?: MiniKitCalldataTransaction[];
-        permit2?: MiniKitPermit2[];
       }) => Promise<unknown>;
     };
     if (!miniKit.sendTransaction) throw new Error("MiniKit sendTransaction is unavailable.");
@@ -282,36 +314,21 @@ function exposeMorphoTransactions() {
         {
           chainId: 480,
           transactions,
-          ...(permit2 && permit2.length ? { permit2 } : {}),
         },
         (_key, value) => (typeof value === "bigint" ? value.toString() : value),
       ),
     );
     const startTime = Date.now();
-    const txPromise = miniKit.sendTransaction({
-      chainId: 480,
-      transactions,
-      ...(permit2 && permit2.length ? { permit2 } : {}),
-    });
-    const timeoutPromise = new Promise<never>((_resolve, reject) =>
-      setTimeout(() => reject(new Error("EARN_TIMEOUT_20S")), 20000),
-    );
     let result: MiniKitSendTransactionEnvelope;
     try {
-      result = (await Promise.race([txPromise, timeoutPromise])) as MiniKitSendTransactionEnvelope;
-      const debugResult = result as MiniKitSendTransactionEnvelope & {
-        finalPayload?: {
-          status?: unknown;
-          error_code?: unknown;
-          transaction_id?: unknown;
-        };
-      };
+      result = (await miniKit.sendTransaction({
+        chainId: 480,
+        transactions,
+      })) as MiniKitSendTransactionEnvelope;
       console.log("[EARN A2] returned after", Date.now() - startTime, "ms");
       console.log("[EARN A2] result full:", JSON.stringify(result, null, 2));
-      console.log("[EARN A2] result.finalPayload:", debugResult?.finalPayload);
-      console.log("[EARN A2] result.finalPayload.status:", debugResult?.finalPayload?.status);
-      console.log("[EARN A2] result.finalPayload.error_code:", debugResult?.finalPayload?.error_code);
-      console.log("[EARN A2] result.finalPayload.transaction_id:", debugResult?.finalPayload?.transaction_id);
+      console.log("[EARN A2] result.data:", result?.data);
+      console.log("[EARN A2] result.data.userOpHash:", result?.data?.userOpHash);
       console.log("[EARN] result:", JSON.stringify(result));
     } catch (error) {
       const err = error as { name?: unknown; message?: unknown };
@@ -324,11 +341,16 @@ function exposeMorphoTransactions() {
       console.log("[EARN A4] finally");
     }
 
-    const payload = result?.data ?? result;
+    const payload = result?.data;
     if (payload?.status && payload.status !== "success") {
       throw new Error(payload.error_code || payload.message || "Transaction was not submitted.");
     }
     if (payload?.error_code) throw new Error(payload.error_code);
+    const userOpHash = payload?.userOpHash;
+    if (!userOpHash) {
+      throw new Error(`No userOpHash returned: ${JSON.stringify(result)}`);
+    }
+    window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash } }));
     return result;
   };
 }
@@ -866,6 +888,7 @@ function enhancePrototypeEarn() {
           btn.textContent = isBusy ? "Submitting..." : "Deposit";
         });
       }
+      window.__luminaSetMorphoBusy = setMorphoBusy;
 
       function confirmMorphoDeposit(message){
         return new Promise(function(resolve){
@@ -1025,6 +1048,7 @@ function enhancePrototypeEarn() {
         var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
         var confirmed = await confirmMorphoDeposit("您将存入 " + amount + " " + vault.asset.symbol + " 到 " + vault.displayName + " Vault,当前 APY " + apy);
         if (!confirmed) return;
+        var awaitingReceipt = false;
         try {
           setMorphoBusy(true);
           var res = await fetch("/api/morpho/tx", {
@@ -1036,17 +1060,18 @@ function enhancePrototypeEarn() {
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
           console.log("[EARN] built tx:", JSON.stringify(data));
           var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2);
-          var payload = result && (result.data || result);
-          var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
-          toast("Transaction submitted: " + String(hash).slice(0, 18));
-          pollMorphoPositions();
+          var payload = result && result.data;
+          var hash = payload && payload.userOpHash;
+          if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
+          awaitingReceipt = true;
+          toast("等待区块链确认: " + String(hash).slice(0, 18));
         } catch(e) {
           console.error("[EARN] error:", e);
           var msg = e && e.message ? e.message : "Deposit failed";
           if (/user_rejected/i.test(msg)) msg = "Cancelled in World App";
           toast("存款失败: " + msg);
         } finally {
-          setMorphoBusy(false);
+          if (!awaitingReceipt) setMorphoBusy(false);
         }
       };
 
@@ -1101,11 +1126,11 @@ function enhancePrototypeEarn() {
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
           var result = await window.__luminaSendMorphoTransactions(data.transactions);
-          var payload = result && (result.data || result);
-          var hash = (payload && (payload.userOpHash || payload.transactionHash || payload.transaction_id || payload.transactionId)) || "submitted";
+          var payload = result && result.data;
+          var hash = payload && payload.userOpHash;
+          if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           closeMorphoWithdrawModal();
-          toast("Transaction submitted: " + String(hash).slice(0, 18));
-          pollMorphoPositions();
+          toast("等待区块链确认: " + String(hash).slice(0, 18));
         } catch(e) {
           var msg = e && e.message ? e.message : "Withdraw failed";
           if (/liquid|withdraw/i.test(msg)) msg = "Vault 流动性暂时不足,请稍后再试或减少金额";

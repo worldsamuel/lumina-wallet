@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import {
   createPublicClient,
   createWalletClient,
-  encodeFunctionData,
   formatEther,
   formatUnits,
   http,
@@ -19,7 +18,6 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { ERC20_APPROVE_ABI, METAMORPHO_ABI } from "../lib/morpho/abi";
 import { buildDepositTx, buildRedeemTx } from "../lib/morpho/transactions";
-import type { MiniKitTransaction } from "../lib/morpho/transactions";
 import type { MorphoVault } from "../lib/morpho/vaults";
 
 const WORLD_CHAIN_ID = 480;
@@ -149,13 +147,13 @@ async function main() {
   const depositTxRequest = depositBundle.transactions[1];
   await sendAndRecord(
     "approve 1 USDC for Re7 USDC vault",
-    approveTxRequest.address,
-    encodeMiniKitTransaction(approveTxRequest),
+    approveTxRequest.to,
+    approveTxRequest.data,
   );
   const depositTx = await sendAndRecord(
     "deposit 1 USDC into Re7 USDC vault",
-    depositTxRequest.address,
-    encodeMiniKitTransaction(depositTxRequest),
+    depositTxRequest.to,
+    depositTxRequest.data,
   );
 
   const usdcBalanceAfterDeposit = await snapshot("USDC balance after deposit", () => readUsdcBalance());
@@ -175,8 +173,8 @@ async function main() {
   const redeemTxRequest = buildRedeemTx(vault, sharesAfterDeposit.value, account.address);
   const redeemTx = await sendAndRecord(
     "redeem all Re7 USDC vault shares",
-    redeemTxRequest.address,
-    encodeMiniKitTransaction(redeemTxRequest),
+    redeemTxRequest.to,
+    redeemTxRequest.data,
   );
 
   const usdcBalanceAfterRedeem = await snapshot("USDC balance after redeem", () => readUsdcBalance());
@@ -275,14 +273,6 @@ async function sendAndRecord(label: string, to: Address, data: Hex): Promise<TxR
     blockNumber: receipt.blockNumber,
     timestamp: block.timestamp,
   };
-}
-
-function encodeMiniKitTransaction(transaction: MiniKitTransaction): Hex {
-  return encodeFunctionData({
-    abi: transaction.abi,
-    functionName: transaction.functionName,
-    args: transaction.args,
-  });
 }
 
 async function tenderlySetBalance(address: Address, amount: bigint) {
