@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { db } from "@/lib/db";
+import { TOKENS } from "@/lib/tokens";
 
 export function OPTIONS() {
   return optionsResponse();
@@ -11,6 +12,7 @@ export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
+  await ensureCoreTokens();
   const tokens = await db.token.findMany({
     orderBy: { createdAt: "asc" },
   });
@@ -50,4 +52,37 @@ export async function POST(req: NextRequest) {
   });
   await auditLog(admin.id, "create_token", token.id, body);
   return jsonResponse(token);
+}
+
+async function ensureCoreTokens() {
+  const count = await db.token.count();
+  if (count > 0) return;
+
+  await Promise.all(
+    TOKENS.map((token) =>
+      db.token.upsert({
+        where: { symbol: token.symbol },
+        update: {
+          name: token.name,
+          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+          decimals: token.decimals,
+          status: "verified",
+          tier: "core",
+          canTransfer: true,
+          canSwap: true,
+        },
+        create: {
+          symbol: token.symbol,
+          name: token.name,
+          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+          decimals: token.decimals,
+          status: "verified",
+          tier: "core",
+          canTransfer: true,
+          canSwap: true,
+          onTopRanking: token.symbol === "WLD",
+        },
+      }),
+    ),
+  );
 }

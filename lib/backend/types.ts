@@ -43,4 +43,6 @@ export type BackendFeeConfig = {
 export type BackendSystemConfig = {
   maintenance: boolean;
   morphoDepositEnabled: boolean;
+  adminLogoUrl: string | null;
+  faviconUrl: string | null;
 };

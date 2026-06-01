@@ -1316,6 +1316,17 @@ function enhancePrototypeSystemConfig() {
       window.__luminaApplySystemConfig = function(){
         var existing = document.getElementById("luminaMaintenanceOverlay");
         var cfg = readConfig();
+        if (cfg.faviconUrl) {
+          var fav = document.querySelector("link[rel='icon']") || document.createElement("link");
+          fav.setAttribute("rel", "icon");
+          fav.setAttribute("href", cfg.faviconUrl);
+          if (!fav.parentNode) document.head.appendChild(fav);
+        }
+        if (cfg.adminLogoUrl) {
+          document.querySelectorAll(".brand .logo, .lumina-legal-logo, .mini-auth-logo, .maintenance-logo").forEach(function(el){
+            el.innerHTML = '<img src="' + String(cfg.adminLogoUrl).replace(/"/g, "&quot;") + '" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" />';
+          });
+        }
         if (!cfg.maintenance) {
           if (existing) existing.remove();
           return;
@@ -1324,7 +1335,10 @@ function enhancePrototypeSystemConfig() {
         var overlay = document.createElement("div");
         overlay.id = "luminaMaintenanceOverlay";
         overlay.style.cssText = "position:fixed;inset:0;z-index:9999;background:#030503;display:flex;align-items:center;justify-content:center;padding:28px;color:#fff;text-align:center;";
-        overlay.innerHTML = '<div style="max-width:320px;"><div style="width:74px;height:74px;margin:0 auto 22px;border-radius:50%;border:2px solid #6ee787;display:flex;align-items:center;justify-content:center;color:#6ee787;font-size:34px;font-weight:900;box-shadow:0 0 40px rgba(74,222,128,.22);">L</div><h1 style="font-size:30px;line-height:1.05;margin:0 0 12px;font-weight:950;">Lumina is under maintenance</h1><p style="margin:0;color:#9ca39c;font-size:15px;line-height:1.55;">We are updating the service. Please check back shortly.</p></div>';
+        var mark = cfg.adminLogoUrl
+          ? '<img src="' + String(cfg.adminLogoUrl).replace(/"/g, "&quot;") + '" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" />'
+          : "L";
+        overlay.innerHTML = '<div style="max-width:320px;"><div class="maintenance-logo" style="width:74px;height:74px;margin:0 auto 22px;border-radius:50%;border:2px solid #6ee787;display:flex;align-items:center;justify-content:center;color:#6ee787;font-size:34px;font-weight:900;box-shadow:0 0 40px rgba(74,222,128,.22);overflow:hidden;">' + mark + '</div><h1 style="font-size:30px;line-height:1.05;margin:0 0 12px;font-weight:950;">Lumina is under maintenance</h1><p style="margin:0;color:#9ca39c;font-size:15px;line-height:1.55;">We are updating the service. Please check back shortly.</p></div>';
         document.body.appendChild(overlay);
       };
       window.__luminaApplySystemConfig();

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getSystemConfig } from "@/lib/admin/system-config";
+import { DEFAULT_SYSTEM_CONFIG, getSystemConfig } from "@/lib/admin/system-config";
 
 export function OPTIONS() {
   return optionsResponse();
@@ -12,5 +12,10 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
 
-  return jsonResponse(await getSystemConfig());
+  try {
+    return jsonResponse(await getSystemConfig());
+  } catch (error) {
+    console.error("Failed to load system config, using fallback", error);
+    return jsonResponse(DEFAULT_SYSTEM_CONFIG);
+  }
 }
