@@ -3,8 +3,8 @@ import { formatUnits, isAddress, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
+import { getEnabledEarnVaults } from "@/lib/admin/earn-products";
 import { ERC20_APPROVE_ABI, METAMORPHO_ABI } from "@/lib/morpho/abi";
-import { getEnabledVaults } from "@/lib/morpho/vaults";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +26,7 @@ export async function GET(
   }
 
   try {
-    const vaults = getEnabledVaults();
+    const vaults = await getEnabledEarnVaults();
     const contracts = vaults.flatMap((vault) => [
       {
         address: vault.address as Address,

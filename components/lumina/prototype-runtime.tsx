@@ -34,6 +34,7 @@ declare global {
       permit2?: MiniKitPermit2[],
     ) => Promise<unknown>;
     __luminaSetMorphoBusy?: (isBusy: boolean) => void;
+    __luminaRefreshMorphoPositions?: () => Promise<void>;
     __luminaSendToken?: (params: SendParams) => Promise<SendResult>;
     __luminaFriendlySendError?: (error?: string) => string;
     __luminaRefreshWalletData?: () => void;
@@ -43,6 +44,7 @@ declare global {
     __luminaCloseLegal?: () => void;
     __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
+    __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -197,6 +199,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const handleEarnReceiptSuccess = useCallback(() => {
     window.__luminaSetMorphoBusy?.(false);
     window.__luminaRefreshWalletData?.();
+    void window.__luminaRefreshMorphoPositions?.();
     if (address) void mutate(`/api/morpho/position/${address}`);
     setEarnUserOpHash("");
     toastFromPrototype("存款成功!");
@@ -841,6 +844,48 @@ function enhancePrototypeEarn() {
           claim.onclick = function(){ loadMorphoData(true); };
         }
       }
+      function nonZeroPosition(pos){
+        return !!pos && String(pos.assets || pos.shares || "0") !== "0";
+      }
+      function renderHomeEarningPositions(){
+        var assetList = document.getElementById("assetList");
+        if (!assetList) return;
+        var existing = document.getElementById("homeEarningSection");
+        var positions = morphoPositions.filter(nonZeroPosition);
+        if (!positions.length) {
+          if (existing) existing.remove();
+          return;
+        }
+        if (!existing) {
+          var section = document.createElement("div");
+          section.id = "homeEarningSection";
+          section.innerHTML =
+            '<div class="section-head"><h2>Earning</h2><span class="link" onclick="go(\\'earn\\'); setTabByName(\\'Earn\\')">View</span></div>' +
+            '<div class="assets" id="homeEarningList"></div>';
+          assetList.insertAdjacentElement("afterend", section);
+          existing = section;
+        }
+        var box = document.getElementById("homeEarningList");
+        if (!box) return;
+        box.innerHTML = positions.map(function(pos){
+          var vault = morphoVaults.find(function(v){
+            return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
+          }) || pos;
+          var sym = pos.asset && pos.asset.symbol ? pos.asset.symbol : (vault.asset && vault.asset.symbol) || "";
+          var amount = fmtAmount(pos.assetsFormatted, 6);
+          var price = typeof prices !== "undefined" ? Number(prices[sym] || 0) : 0;
+          var usd = price ? " ≈ " + formatMoney(Number(pos.assetsFormatted || 0) * price) : "";
+          var apy = vault.liveData ? " · " + fmtPct(vault.liveData.netApy) + " APY" : "";
+          var idx = morphoVaults.findIndex(function(v){
+            return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
+          });
+          return '<div class="asset" onclick="openEarn(' + Math.max(idx, 0) + ')">' +
+            '<div class="coin morpho-vault-ic">' + vaultIcon(vault) + '</div>' +
+            '<div class="name"><div class="sym">' + amount + " " + sym + '</div><div class="full">in ' + (vault.displayName || pos.displayName || "Earn Vault") + usd + apy + '</div></div>' +
+            '<div class="vals"><div class="amt">Earn</div><div class="usd">' + (usd ? usd.replace(" ≈ ", "") : "—") + '</div></div>' +
+          '</div>';
+        }).join('');
+      }
 
       renderProducts = function(){
         var box = document.getElementById("prodList");
@@ -874,6 +919,7 @@ function enhancePrototypeEarn() {
             '</div></div>';
         }).join('');
         updateEarnHero();
+        renderHomeEarningPositions();
       };
 
       window.showMorphoApyInfo = function(){
@@ -960,6 +1006,11 @@ function enhancePrototypeEarn() {
         var cfg = systemConfig();
         var paused = !!vault.depositsPaused || cfg.morphoDepositEnabled === false;
         var wallet = pos ? fmtAmount(pos.walletBalanceFormatted, 6) + " " + token : "—";
+        console.log("[EARN] Detail vault:", vault);
+        console.log("[EARN] Detail position:", pos);
+        console.log("[EARN] My deposit assets:", pos ? pos.assets : "0");
+        console.log("[EARN] My deposit human:", pos ? pos.assetsFormatted : "0");
+        console.log("[EARN] Withdraw disabled:", !pos || Number(pos.shares || 0) <= 0);
         var annual = "—";
         var daily = "—";
         var amount = "";
@@ -1051,6 +1102,11 @@ function enhancePrototypeEarn() {
         var awaitingReceipt = false;
         try {
           setMorphoBusy(true);
+          console.log("[EARN] Selected vault:", vault);
+          console.log("[EARN] Asset address:", vault.asset && vault.asset.address);
+          console.log("[EARN] Asset decimals:", vault.asset && vault.asset.decimals);
+          console.log("[EARN] Vault address:", vault.address);
+          console.log("[EARN] Amount human:", amount);
           var res = await fetch("/api/morpho/tx", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -1058,6 +1114,7 @@ function enhancePrototypeEarn() {
           });
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          console.log("[EARN] Amount wei:", data.debug && data.debug.amountWei);
           console.log("[EARN] built tx:", JSON.stringify(data));
           var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2);
           var payload = result && result.data;
@@ -1155,7 +1212,17 @@ function enhancePrototypeEarn() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
         morphoPositions = Array.isArray(data.positions) ? data.positions : [];
+        console.log("[EARN] Positions address:", address);
+        console.log("[EARN] Positions response:", data);
       }
+      window.__luminaRefreshMorphoPositions = async function(){
+        await loadMorphoPositions();
+        renderProducts();
+        renderHomeEarningPositions();
+        if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+          openEarn(activeEarnIndex);
+        }
+      };
       async function loadMorphoData(force){
         morphoStarted = true;
         morphoLoading = true;
@@ -1169,6 +1236,7 @@ function enhancePrototypeEarn() {
         } finally {
           morphoLoading = false;
           renderProducts();
+          renderHomeEarningPositions();
           if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
             openEarn(activeEarnIndex);
           }
@@ -1180,12 +1248,19 @@ function enhancePrototypeEarn() {
         var timer = setInterval(async function(){
           tries += 1;
           try {
-            await loadMorphoPositions();
-            renderProducts();
-            if (document.getElementById("view-earn-detail").classList.contains("active")) openEarn(activeEarnIndex);
+            await window.__luminaRefreshMorphoPositions();
           } catch(e) {}
           if (tries >= 6) clearInterval(timer);
         }, 5000);
+      }
+      if (!window.__luminaMorphoRefreshTimer) {
+        window.__luminaMorphoRefreshTimer = setInterval(function(){
+          if (!window.__luminaUserAddress) return;
+          if (!morphoStarted) return;
+          window.__luminaRefreshMorphoPositions().catch(function(e){
+            console.log("[EARN] Periodic position refresh failed:", e);
+          });
+        }, 20000);
       }
 
       openClaimModal = function(){
@@ -1207,8 +1282,7 @@ function enhancePrototypeEarn() {
       if ((earnView && earnView.classList.contains("active")) || (earnDetailView && earnDetailView.classList.contains("active"))) {
         loadMorphoData(false);
       } else {
-        morphoLoading = false;
-        updateEarnHero();
+        setTimeout(function(){ loadMorphoData(false); }, 800);
       }
     })();
   `;
