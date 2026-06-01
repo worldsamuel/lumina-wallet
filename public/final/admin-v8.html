@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lumina · 运营后台</title>
+<style>
+  :root {
+    /* 浅色专业风 - Stripe / Notion 风格 */
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f7f7f8;
+    --surface-3: #f0f0f1;
+    --hover: #f4f4f5;
+    
+    --border: #e5e7eb;
+    --border-2: #d4d4d8;
+    --border-strong: #a1a1aa;
+    
+    --text: #09090b;
+    --text-2: #52525b;
+    --text-3: #71717a;
+    --text-4: #a1a1aa;
+    
+    --brand: #16a34a;
+    --brand-bg: #f0fdf4;
+    --brand-border: #bbf7d0;
+    
+    --info: #2563eb;
+    --info-bg: #eff6ff;
+    --info-border: #bfdbfe;
+    
+    --warn: #d97706;
+    --warn-bg: #fffbeb;
+    --warn-border: #fde68a;
+    
+    --danger: #dc2626;
+    --danger-bg: #fef2f2;
+    --danger-border: #fecaca;
+    
+    --success: #16a34a;
+    --success-bg: #f0fdf4;
+    
+    --r: 6px;
+    --r-md: 8px;
+    --r-lg: 12px;
+    
+    --sidebar: 232px;
+    
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  html, body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "PingFang SC", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  
+  button { font-family: inherit; cursor: pointer; }
+  input, select, textarea { font-family: inherit; }
+  
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #d4d4d8; border-radius: 6px; border: 2px solid var(--bg); }
+  ::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  
+  /* ============ LAYOUT ============ */
+  .layout {
+    display: flex;
+    min-height: 100vh;
+  }
+  
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    width: var(--sidebar);
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 18px 12px;
+    position: fixed;
+    height: 100vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 18px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .brand .logo {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #4ade80, #16a34a);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+  }
+  .brand .nm { font-size: 14px; font-weight: 600; line-height: 1.2; color: var(--text); }
+  .brand .nm small { display: block; color: var(--text-3); font-size: 11px; font-weight: 500; margin-top: 2px; }
+  
+  .nav-group {
+    color: var(--text-4);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+    padding: 14px 10px 4px;
+  }
+  
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--r);
+    color: var(--text-2);
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all 0.12s;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .nav-item:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .nav-item.active {
+    background: var(--text);
+    color: #fff;
+  }
+  .nav-item.active .ic { color: #fff; }
+  .nav-item .ic {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-3);
+  }
+  .nav-item.active .ic { color: #fff; }
+  .nav-item .badge {
+    margin-left: auto;
+    background: var(--danger);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 999px;
+    min-width: 18px;
+    text-align: center;
+  }
+  .nav-item.active .badge { background: #fff; color: var(--text); }
+  
+  .sidebar-foot {
+    margin-top: auto;
+    padding: 12px 8px 4px;
+    border-top: 1px solid var(--border);
+  }
+  .sidebar-foot .user {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px;
+  }
+  .sidebar-foot .av {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    display: grid;
+    place-items: center;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .sidebar-foot .info { font-size: 12px; }
+  .sidebar-foot .info .nm { color: var(--text); font-weight: 500; }
+  .sidebar-foot .info .role { color: var(--text-3); font-size: 11px; }
+  
+  /* ============ MAIN ============ */
+  .main {
+    margin-left: var(--sidebar);
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 26px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topbar h1 {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .topbar .env {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--warn-bg);
+    color: var(--warn);
+    font-weight: 600;
+    border: 1px solid var(--warn-border);
+  }
+  .topbar .env::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--warn);
+  }
+  .topbar .env.live {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: var(--brand-border);
+  }
+  .topbar .env.live::before { background: var(--success); }
+  .topbar .spacer { flex: 1; }
+  
+  .search {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 7px 12px 7px 32px;
+    color: var(--text);
+    font-size: 13px;
+    width: 260px;
+    outline: none;
+    transition: all 0.12s;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.3-4.3'/></svg>");
+    background-position: 11px center;
+    background-repeat: no-repeat;
+  }
+  .search:focus {
+    border-color: var(--brand-border);
+    background-color: var(--surface);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+  }
+  
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r-md);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    color: var(--text-2);
+    position: relative;
+    transition: all 0.12s;
+  }
+  .icon-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  .icon-btn .dot {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--danger);
+    border: 1.5px solid var(--surface);
+  }
+  
+  .admin-chip {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 5px 12px 5px 5px;
+    font-size: 13px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .admin-chip:hover { background: var(--surface-2); }
+  .admin-chip .av {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #818cf8, #6366f1);
+    color: #fff;
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  
+  /* ============ CONTENT ============ */
+  .content {
+    padding: 24px 26px 60px;
+  }
+  .page { display: none; }
+  .page.active { display: block; animation: fade 0.18s ease; }
+  @keyframes fade {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+  
+  .page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .page-head .title { font-size: 22px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+  .page-head .sub { color: var(--text-3); font-size: 13px; }
+  .page-head .actions { display: flex; gap: 8px; }
+  
+  /* ============ KPI ============ */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 16px 18px;
+    transition: all 0.15s;
+  }
+  .kpi:hover {
+    border-color: var(--border-2);
+    box-shadow: var(--shadow-sm);
+  }
+  .kpi .k {
+    color: var(--text-3);
+    font-size: 12.5px;
+    font-weight: 500;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .kpi .k .ic { color: var(--text-4); display: inline-flex; }
+  .kpi .v {
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.4px;
+    line-height: 1.1;
+    margin-bottom: 6px;
+  }
+  .kpi .v .suf { font-size: 14px; font-weight: 500; color: var(--text-3); margin-left: 3px; }
+  .kpi .d {
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .kpi .d.up { color: var(--success); }
+  .kpi .d.down { color: var(--danger); }
+  .kpi .d span { color: var(--text-4); font-weight: 500; margin-left: 3px; }
+  
+  /* ============ GRID ============ */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1.6fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 14px;
+    margin-bottom: 14px;
+  }
+  
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    padding: 18px 20px;
+  }
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .card-head h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .card-head .sub {
+    font-size: 12px;
+    color: var(--text-3);
+    margin-top: 2px;
+  }
+  .card-head .link {
+    color: var(--text-2);
+    font-size: 12.5px;
+    cursor: pointer;
+    font-weight: 500;
+    padding: 3px 8px;
+    border-radius: var(--r);
+    transition: all 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .card-head .link:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+  
+  /* ============ CHART ============ */
+  .chart { height: 220px; }
+  .chart svg { width: 100%; height: 100%; }
+  
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
+  .legend .row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+  }
+  .legend .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 2px;
+  }
+  .legend .nm { color: var(--text); font-weight: 500; flex: 1; }
+  .legend .pct { color: var(--text-3); font-size: 12.5px; }
+  .legend .val { color: var(--text); font-weight: 600; min-width: 70px; text-align: right; }
+  
+  /* ============ TABLE ============ */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  thead th {
+    text-align: left;
+    color: var(--text-3);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    color: var(--text);
+    vertical-align: middle;
+  }
+  tbody tr:hover { background: var(--surface-2); }
+  tbody tr:last-child td { border-bottom: none; }
+  
+  .empty {
+    text-align: center;
+    color: var(--text-3);
+    padding: 40px;
+    font-size: 13px;
+  }
+  
+  .tk-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .tk-ic {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 600;
+    font-size: 11px;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .tk-nm { color: var(--text); font-weight: 500; font-size: 13.5px; }
+  .tk-sub { color: var(--text-3); font-size: 11.5px; margin-top: 1px; }
+  
+  .mono {
+    font-family: "SF Mono", Menlo, ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--text-3);
+  }
+  
+  /* ============ PILL ============ */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+  }
+  .pill.green {
+    background: var(--success-bg);
+    color: var(--success);
+    border-color: var(--brand-border);
+  }
+  .pill.amber {
+    background: var(--warn-bg);
+    color: var(--warn);
+    border-color: var(--warn-border);
+  }
+  .pill.red {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border-color: var(--danger-border);
+  }
+  .pill.blue {
+    background: var(--info-bg);
+    color: var(--info);
+    border-color: var(--info-border);
+  }
+  .pill.gray {
+    background: var(--surface-3);
+    color: var(--text-2);
+    border-color: var(--border);
+  }
+  .pill .d {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  
+  /* ============ BTN ============ */
+  .btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: var(--r-md);
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.12s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:hover {
+    background: var(--surface-2);
+    border-color: var(--border-2);
+  }
+  .btn.primary {
+    background: var(--text);
+    color: #fff;
+    border-color: var(--text);
+  }
+  .btn.primary:hover {
+    background: #18181b;
+    border-color: #18181b;
+  }
+  .btn.brand {
+    background: var(--brand);
+    color: #fff;
+    border-color: var(--brand);
+  }
+  .btn.brand:hover {
+    background: #15803d;
+    border-color: #15803d;
+  }
+  .btn.danger {
+    color: var(--danger);
+    border-color: var(--danger-border);
+    background: var(--danger-bg);
+  }
+  .btn.danger:hover {
+    background: #fee2e2;
+  }
+  .btn.sm {
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+  .btn.lg {
+    padding: 9px 16px;
+    font-size: 14px;
+  }
+  .btn .ic { display: inline-flex; }
+  
+  /* ============ TOOLBAR ============ */
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .toolbar .spacer { flex: 1; }
+  
+  .filter-tabs {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 3px;
+    gap: 2px;
+  }
+  .ftab {
+    padding: 5px 12px;
+    border-radius: 5px;
+    font-size: 13px;
+    color: var(--text-2);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all 0.12s;
+  }
+  .ftab:hover { color: var(--text); }
+  .ftab.active {
+    color: var(--text);
+    background: var(--surface-2);
+    font-weight: 600;
+  }
+  
+  /* ============ TOGGLE ============ */
+  .toggle {
+    width: 36px;
+    height: 20px;
+    border-radius: 999px;
+    background: #d4d4d8;
+    position: relative;
+    transition: 0.2s;
+    flex-shrink: 0;
+    display: inline-block;
+    vertical-align: middle;
+    cursor: pointer;
+    border: none;
+  }
+  .toggle.on { background: var(--brand); }
+  .toggle::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .toggle.on::after { transform: translateX(16px); }
+  
+  /* ============ RISK ============ */
+  .alert-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 11px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-row:first-child { padding-top: 0; }
+  .alert-ic {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--r-md);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .alert-ic.red { background: var(--danger-bg); color: var(--danger); }
+  .alert-ic.amber { background: var(--warn-bg); color: var(--warn); }
+  .alert-ic.green { background: var(--success-bg); color: var(--success); }
+  .alert-row .body { flex: 1; min-width: 0; }
+  .alert-row .t { font-size: 13px; font-weight: 600; color: var(--text); }
+  .alert-row .s { color: var(--text-3); font-size: 12px; margin-top: 2px; }
+  .alert-row .time { color: var(--text-4); font-size: 11.5px; white-space: nowrap; margin-top: 2px; }
+  
+  /* ============ FORM ============ */
+  .field {
+    margin-bottom: 14px;
+  }
+  .field label {
+    display: block;
+    color: var(--text-2);
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .field .hint {
+    color: var(--text-3);
+    font-size: 12px;
+    margin-top: 5px;
+  }
+  .input, .select, .textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 13.5px;
+    outline: none;
+    transition: all 0.12s;
+  }
+  .input:hover, .select:hover { border-color: var(--border-2); }
+  .input:focus, .select:focus, .textarea:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1);
+  }
+  .input-row {
+    display: flex;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+  .input-row .input {
+    border: none;
+    background: transparent;
+    flex: 1;
+  }
+  .input-row .suf {
+    padding: 8px 12px;
+    background: var(--surface-2);
+    color: var(--text-3);
+    font-size: 13px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+  }
+  
+  /* ============ MODAL ============ */
+  .mask {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 80;
+    backdrop-filter: blur(2px);
+  }
+  .mask.open {
+    display: flex;
+    animation: fade 0.15s ease;
+  }
+  .modal {
+    width: 480px;
+    max-width: 92vw;
+    background: var(--surface);
+    border-radius: var(--r-lg);
+    padding: 22px 24px;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+  }
+  .modal h2 {
+    font-size: 17px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .modal .sub {
+    color: var(--text-3);
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 20px;
+    justify-content: flex-end;
+  }
+  
+  /* ============ TOAST ============ */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--text);
+    color: #fff;
+    padding: 11px 16px;
+    border-radius: var(--r-md);
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: 0.25s;
+    pointer-events: none;
+    z-index: 99;
+    box-shadow: 0 10px 15px -3px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  
+  /* ============ MISC ============ */
+  .up { color: var(--success); }
+  .down { color: var(--danger); }
+  .text-2 { color: var(--text-2); }
+  .text-3 { color: var(--text-3); }
+  
+  .bar {
+    height: 6px;
+    background: var(--surface-3);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    background: var(--brand);
+    border-radius: 999px;
+    transition: width 0.3s;
+  }
+  
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+  }
+  .stat {
+    padding: 14px 16px;
+    background: var(--surface-2);
+    border-radius: var(--r-md);
+  }
+  .stat .k {
+    color: var(--text-3);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .stat .v {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 600;
+  }
+  
+  .check {
+    width: 16px;
+    height: 16px;
+    border: 1.5px solid var(--border-2);
+    border-radius: 4px;
+    background: var(--surface);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.12s;
+  }
+  .check.on {
+    background: var(--brand);
+    border-color: var(--brand);
+  }
+  .check svg { opacity: 0; }
+  .check.on svg { opacity: 1; }
+  
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0;
+  }
+  
+  .audit-trail {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    color: var(--text-3);
+    padding: 4px 0;
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo">L</div>
+      <div class="nm">Lumina<small>运营后台</small></div>
+    </div>
+    
+    <div class="nav-group">概览</div>
+    <a class="nav-item active" data-page="dashboard" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+      数据看板
+    </a>
+    
+    <div class="nav-group">业务</div>
+    <a class="nav-item" data-page="earn" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
+      理财产品
+    </a>
+    <a class="nav-item" data-page="tokens" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg></span>
+      代币白名单
+    </a>
+    <a class="nav-item" data-page="risk" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-12V5l-8-3-8 3v5c0 8 8 12 8 12z"/></svg></span>
+      风控审核
+      <span class="badge" id="riskBadge">3</span>
+    </a>
+    
+    <div class="nav-group">数据</div>
+    <a class="nav-item" data-page="users" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></span>
+      用户管理
+    </a>
+    <a class="nav-item" data-page="txns" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+      交易记录
+    </a>
+    
+    <div class="nav-group">系统</div>
+    <a class="nav-item" data-page="fees" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h12"/></svg></span>
+      手续费设置
+    </a>
+    <a class="nav-item" data-page="announce" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg></span>
+      公告管理
+    </a>
+    <a class="nav-item" data-page="content" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+      内容页管理
+    </a>
+    <a class="nav-item" data-page="currency" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
+      货币与汇率
+    </a>
+    <a class="nav-item" data-page="settings" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.07 7.07l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.07-7.07l4.24-4.24"/></svg></span>
+      系统设置
+    </a>
+    
+    <div class="sidebar-foot">
+      <div class="user">
+        <div class="av">SA</div>
+        <div class="info">
+          <div class="nm">Super Admin</div>
+          <div class="role">系统管理员</div>
+        </div>
+      </div>
+    </div>
+  </aside>
+  
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    
+    <!-- ============ TOPBAR ============ -->
+    <div class="topbar">
+      <h1 id="pageTitle">数据看板</h1>
+      <div class="env live">Production</div>
+      <div class="spacer"></div>
+      <input class="search" placeholder="搜索用户 / 交易 / 代币..." />
+      <button class="icon-btn" title="通知">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg>
+        <span class="dot"></span>
+      </button>
+      <div class="admin-chip">
+        <div class="av">SA</div>
+        <span>Super Admin</span>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+    </div>
+    
+    <div class="content">
+      
+      <!-- ============ DASHBOARD ============ -->
+      <section class="page active" id="page-dashboard">
+        <div class="page-head">
+          <div>
+            <div class="title">数据看板</div>
+            <div class="sub">实时业务数据 · 最后更新 2 秒前</div>
+          </div>
+          <div class="actions">
+            <button class="btn sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
+              过去 7 天
+            </button>
+            <button class="btn sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+              导出
+            </button>
+            <button class="btn primary sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              刷新
+            </button>
+          </div>
+        </div>
+        
+        <!-- KPI -->
+        <div class="kpis">
+          <div class="kpi">
+            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="4"/><path d="M22 22l-2-2m-2-4a4 4 0 11-8 0 4 4 0 018 0z"/></svg></span>总用户数</div>
+            <div class="v">12,847</div>
+            <div class="d up">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              12.5% <span>· vs 上周</span>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>总锁定价值 (TVL)</div>
+            <div class="v">$1.24<span class="suf">M</span></div>
+            <div class="d up">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              3.8% <span>· vs 上周</span>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg></span>24h 交易笔数</div>
+            <div class="v">3,421</div>
+            <div class="d down">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              4.2% <span>· vs 昨日</span>
+            </div>
+          </div>
+          <div class="kpi">
+            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>24h 平台收益</div>
+            <div class="v">$842<span class="suf">.30</span></div>
+            <div class="d up">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              18.2% <span>· vs 昨日</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ROW 1: CHART + PIE -->
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>TVL 趋势</h3>
+                <div class="sub">过去 30 天总锁定价值变化</div>
+              </div>
+              <div class="filter-tabs">
+                <button class="ftab">7D</button>
+                <button class="ftab active">30D</button>
+                <button class="ftab">90D</button>
+              </div>
+            </div>
+            <div class="chart">
+              <svg viewBox="0 0 600 220" preserveAspectRatio="none">
+                <defs>
+                  <linearGradient id="gradTvl" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#16a34a" stop-opacity="0.18"/>
+                    <stop offset="100%" stop-color="#16a34a" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <!-- grid -->
+                <line x1="0" y1="40" x2="600" y2="40" stroke="#f0f0f1" stroke-width="1"/>
+                <line x1="0" y1="90" x2="600" y2="90" stroke="#f0f0f1" stroke-width="1"/>
+                <line x1="0" y1="140" x2="600" y2="140" stroke="#f0f0f1" stroke-width="1"/>
+                <line x1="0" y1="190" x2="600" y2="190" stroke="#f0f0f1" stroke-width="1"/>
+                <!-- fill area -->
+                <path d="M0,170 L50,160 L100,150 L150,140 L200,130 L250,120 L300,100 L350,85 L400,70 L450,55 L500,45 L550,35 L600,30 L600,220 L0,220 Z" fill="url(#gradTvl)"/>
+                <!-- line -->
+                <path d="M0,170 L50,160 L100,150 L150,140 L200,130 L250,120 L300,100 L350,85 L400,70 L450,55 L500,45 L550,35 L600,30" stroke="#16a34a" stroke-width="2" fill="none"/>
+                <!-- dot -->
+                <circle cx="600" cy="30" r="4" fill="#16a34a" stroke="#fff" stroke-width="2"/>
+                <!-- y axis labels -->
+                <text x="8" y="44" fill="#a1a1aa" font-size="10">$1.5M</text>
+                <text x="8" y="94" fill="#a1a1aa" font-size="10">$1.0M</text>
+                <text x="8" y="144" fill="#a1a1aa" font-size="10">$500K</text>
+                <text x="8" y="194" fill="#a1a1aa" font-size="10">$0</text>
+              </svg>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>资金分布</h3>
+                <div class="sub">各 vault TVL 占比</div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: center; padding: 8px 0 12px;">
+              <svg width="140" height="140" viewBox="0 0 100 100">
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#f0f0f1" stroke-width="14"/>
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#2775ca" stroke-width="14"
+                        stroke-dasharray="113 251" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#16a34a" stroke-width="14"
+                        stroke-dasharray="75 251" stroke-dashoffset="-113" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" stroke-width="14"
+                        stroke-dasharray="40 251" stroke-dashoffset="-188" transform="rotate(-90 50 50)"/>
+                <circle cx="50" cy="50" r="40" fill="none" stroke="#a855f7" stroke-width="14"
+                        stroke-dasharray="23 251" stroke-dashoffset="-228" transform="rotate(-90 50 50)"/>
+              </svg>
+            </div>
+            <div class="legend">
+              <div class="row">
+                <div class="dot" style="background:#2775ca"></div>
+                <span class="nm">Re7 USDC</span>
+                <span class="pct">45%</span>
+                <span class="val">$558.0K</span>
+              </div>
+              <div class="row">
+                <div class="dot" style="background:#16a34a"></div>
+                <span class="nm">Re7 WLD</span>
+                <span class="pct">30%</span>
+                <span class="val">$372.0K</span>
+              </div>
+              <div class="row">
+                <div class="dot" style="background:#f59e0b"></div>
+                <span class="nm">Re7 WETH</span>
+                <span class="pct">16%</span>
+                <span class="val">$198.4K</span>
+              </div>
+              <div class="row">
+                <div class="dot" style="background:#a855f7"></div>
+                <span class="nm">Re7 WBTC</span>
+                <span class="pct">9%</span>
+                <span class="val">$111.6K</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- ROW 2: ACTIVITY + ALERTS -->
+        <div class="grid-2">
+          <div class="card" style="padding:0;">
+            <div class="card-head" style="padding:18px 20px 14px;">
+              <div>
+                <h3>最近交易</h3>
+                <div class="sub">实时链上交易流</div>
+              </div>
+              <span class="link">查看全部 →</span>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>金额</th>
+                  <th>用户</th>
+                  <th style="text-align:right;">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="text-3">2 分钟前</td>
+                  <td><span class="pill blue"><span class="d"></span>存款</span></td>
+                  <td><strong>0.5 USDC</strong> <span class="text-3">→ Re7 USDC</span></td>
+                  <td class="mono">0x0f3b...b2b26</td>
+                  <td style="text-align:right;"><span class="pill green">成功</span></td>
+                </tr>
+                <tr>
+                  <td class="text-3">5 分钟前</td>
+                  <td><span class="pill gray"><span class="d"></span>转账</span></td>
+                  <td><strong>1.0 WLD</strong> <span class="text-3">→ ...4Ab9f</span></td>
+                  <td class="mono">0x4df8...26511e</td>
+                  <td style="text-align:right;"><span class="pill green">成功</span></td>
+                </tr>
+                <tr>
+                  <td class="text-3">12 分钟前</td>
+                  <td><span class="pill amber"><span class="d"></span>提现</span></td>
+                  <td><strong>0.1 WLD</strong> <span class="text-3">← Re7 WLD</span></td>
+                  <td class="mono">0x0f3b...b2b26</td>
+                  <td style="text-align:right;"><span class="pill green">成功</span></td>
+                </tr>
+                <tr>
+                  <td class="text-3">18 分钟前</td>
+                  <td><span class="pill blue"><span class="d"></span>存款</span></td>
+                  <td><strong>2.5 WLD</strong> <span class="text-3">→ Re7 WLD</span></td>
+                  <td class="mono">0x9a1c...8e2f4</td>
+                  <td style="text-align:right;"><span class="pill green">成功</span></td>
+                </tr>
+                <tr>
+                  <td class="text-3">25 分钟前</td>
+                  <td><span class="pill gray"><span class="d"></span>转账</span></td>
+                  <td><strong>0.01 STO</strong> <span class="text-3">→ ...26511e</span></td>
+                  <td class="mono">0x0f3b...b2b26</td>
+                  <td style="text-align:right;"><span class="pill red">失败</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>风控告警</h3>
+                <div class="sub">需要人工处理</div>
+              </div>
+              <span class="link">3 待处理</span>
+            </div>
+            <div>
+              <div class="alert-row">
+                <div class="alert-ic red">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div class="body">
+                  <div class="t">大额转账触发</div>
+                  <div class="s">用户 0x9a1c... 单笔转账 5,000 USDC</div>
+                </div>
+                <div class="time">3 分钟前</div>
+              </div>
+              <div class="alert-row">
+                <div class="alert-ic amber">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div class="body">
+                  <div class="t">新代币申请审核</div>
+                  <div class="s">3 个代币等待白名单审核</div>
+                </div>
+                <div class="time">1 小时前</div>
+              </div>
+              <div class="alert-row">
+                <div class="alert-ic amber">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <div class="body">
+                  <div class="t">异常登录</div>
+                  <div class="s">用户在 24h 内从 3 个国家登录</div>
+                </div>
+                <div class="time">2 小时前</div>
+              </div>
+              <div class="alert-row">
+                <div class="alert-ic green">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div class="body">
+                  <div class="t">系统健康检查</div>
+                  <div class="s">所有 RPC 节点正常</div>
+                </div>
+                <div class="time">5 小时前</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ============ EARN PRODUCTS ============ -->
+      <section class="page" id="page-earn">
+        <div class="page-head">
+          <div>
+            <div class="title">理财产品</div>
+            <div class="sub">管理 Morpho 集成的 vault</div>
+          </div>
+          <div class="actions">
+            <button class="btn sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+              同步链上数据
+            </button>
+            <button class="btn primary sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加 Vault
+            </button>
+          </div>
+        </div>
+        
+        <div class="toolbar">
+          <div class="filter-tabs">
+            <button class="ftab active">全部 (5)</button>
+            <button class="ftab">运行中 (5)</button>
+            <button class="ftab">已暂停 (0)</button>
+            <button class="ftab">已下架 (0)</button>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn sm">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            筛选
+          </button>
+        </div>
+        
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Vault</th>
+                <th>合约地址</th>
+                <th>TVL</th>
+                <th>APY</th>
+                <th>用户数</th>
+                <th>状态</th>
+                <th style="text-align:right;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#2775ca">U</div>
+                    <div>
+                      <div class="tk-nm">Re7 USDC</div>
+                      <div class="tk-sub">Re7 Labs · USDC 借贷</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0xb1E80387...045B</td>
+                <td><strong>$558.0K</strong></td>
+                <td><span class="pill green">7.53%</span></td>
+                <td>342</td>
+                <td><span class="pill green"><span class="d"></span>运行中</span></td>
+                <td style="text-align:right;">
+                  <button class="btn sm">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    编辑
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#16a34a">W</div>
+                    <div>
+                      <div class="tk-nm">Re7 WLD</div>
+                      <div class="tk-sub">Re7 Labs · WLD 借贷</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x348831b4...Ab9f</td>
+                <td><strong>$372.0K</strong></td>
+                <td><span class="pill green">2.09%</span></td>
+                <td>198</td>
+                <td><span class="pill green"><span class="d"></span>运行中</span></td>
+                <td style="text-align:right;">
+                  <button class="btn sm">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    编辑
+                  </button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#627eea">E</div>
+                    <div>
+                      <div class="tk-nm">Re7 WETH</div>
+                      <div class="tk-sub">Re7 Labs · WETH 借贷</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x0Db7E405...c1571</td>
+                <td><strong>$198.4K</strong></td>
+                <td><span class="pill green">4.21%</span></td>
+                <td>87</td>
+                <td><span class="pill green"><span class="d"></span>运行中</span></td>
+                <td style="text-align:right;">
+                  <button class="btn sm">编辑</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#f7931a">B</div>
+                    <div>
+                      <div class="tk-nm">Re7 WBTC</div>
+                      <div class="tk-sub">Re7 Labs · WBTC 借贷</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0xBC8C3746...BECF61</td>
+                <td><strong>$111.6K</strong></td>
+                <td><span class="pill green">1.85%</span></td>
+                <td>34</td>
+                <td><span class="pill green"><span class="d"></span>运行中</span></td>
+                <td style="text-align:right;">
+                  <button class="btn sm">编辑</button>
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#003399">€</div>
+                    <div>
+                      <div class="tk-nm">Re7 EURC</div>
+                      <div class="tk-sub">Re7 Labs · EURC 借贷</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0xDaa79e06...1b37</td>
+                <td><strong>$0</strong></td>
+                <td><span class="pill green">5.12%</span></td>
+                <td>0</td>
+                <td><span class="pill amber"><span class="d"></span>新上线</span></td>
+                <td style="text-align:right;">
+                  <button class="btn sm">编辑</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="grid-2" style="margin-top:14px;">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>展示设置</h3>
+                <div class="sub">控制用户端 Earn 页表现</div>
+              </div>
+            </div>
+            <div class="field">
+              <label>首页推荐排序</label>
+              <select class="select">
+                <option>按 APY 高到低</option>
+                <option>按 TVL 高到低</option>
+                <option>按上线时间</option>
+                <option>自定义顺序</option>
+              </select>
+              <div class="hint">影响用户在 Earn 页看到 vault 的顺序</div>
+            </div>
+            <div class="field">
+              <label>默认显示币种</label>
+              <select class="select">
+                <option>USD</option>
+                <option>WLD</option>
+                <option>EUR</option>
+              </select>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
+              <div>
+                <div style="font-weight:500; font-size:13.5px;">显示 "新上线" 标签</div>
+                <div class="hint" style="margin-top:2px;">vault 上线 7 天内自动标记</div>
+              </div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0;">
+              <div>
+                <div style="font-weight:500; font-size:13.5px;">显示 APY 历史走势</div>
+                <div class="hint" style="margin-top:2px;">vault 详情页显示 30 天 APY 曲线</div>
+              </div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>运营数据</h3>
+                <div class="sub">本月理财业务关键指标</div>
+              </div>
+            </div>
+            <div class="stat-grid">
+              <div class="stat">
+                <div class="k">新增存款</div>
+                <div class="v">$184K</div>
+              </div>
+              <div class="stat">
+                <div class="k">总赎回</div>
+                <div class="v">$42K</div>
+              </div>
+              <div class="stat">
+                <div class="k">净流入</div>
+                <div class="v up">+$142K</div>
+              </div>
+              <div class="stat">
+                <div class="k">平均存款</div>
+                <div class="v">$285</div>
+              </div>
+              <div class="stat">
+                <div class="k">活跃存款用户</div>
+                <div class="v">661</div>
+              </div>
+              <div class="stat">
+                <div class="k">复购率</div>
+                <div class="v">34%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <!-- ============ TOKENS ============ -->
+      <section class="page" id="page-tokens">
+        <div class="page-head">
+          <div>
+            <div class="title">代币白名单</div>
+            <div class="sub">管理可在 Lumina 内转账与 swap 的代币</div>
+          </div>
+          <div class="actions">
+            <button class="btn sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/></svg>
+              批量导入
+            </button>
+            <button class="btn primary sm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              添加代币
+            </button>
+          </div>
+        </div>
+        
+        <div class="kpis" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="kpi">
+            <div class="k">核心代币</div>
+            <div class="v">5</div>
+            <div class="d" style="color:var(--text-3); font-weight:500;">官方支持</div>
+          </div>
+          <div class="kpi">
+            <div class="k">已审核</div>
+            <div class="v">23</div>
+            <div class="d up">↑ 2 本周新增</div>
+          </div>
+          <div class="kpi">
+            <div class="k">社区代币</div>
+            <div class="v">47</div>
+            <div class="d" style="color:var(--text-3); font-weight:500;">自动发现</div>
+          </div>
+          <div class="kpi">
+            <div class="k">待审核</div>
+            <div class="v" style="color:var(--warn);">8</div>
+            <div class="d down">需要处理</div>
+          </div>
+        </div>
+        
+        <div class="toolbar">
+          <div class="filter-tabs">
+            <button class="ftab active">全部 (75)</button>
+            <button class="ftab">核心 (5)</button>
+            <button class="ftab">已审核 (23)</button>
+            <button class="ftab">社区 (47)</button>
+            <button class="ftab">待审核 (8)</button>
+            <button class="ftab">已禁用 (3)</button>
+          </div>
+          <div class="spacer"></div>
+          <input class="input" placeholder="搜索 symbol 或地址..." style="width:220px;" />
+        </div>
+        
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:40px;"><span class="check"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></th>
+                <th>代币</th>
+                <th>合约地址</th>
+                <th>流动性</th>
+                <th>24h 量</th>
+                <th>等级</th>
+                <th>可转账</th>
+                <th>可 Swap</th>
+                <th style="text-align:right;">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="check on" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#2775ca">U</div>
+                    <div>
+                      <div class="tk-nm">USDC</div>
+                      <div class="tk-sub">USD Coin · Circle</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x79A02482...d24d1</td>
+                <td><strong>$1.2M</strong></td>
+                <td>$485K</td>
+                <td><span class="pill green">✓ 核心</span></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm">详情</button></td>
+              </tr>
+              <tr>
+                <td><span class="check on" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#16a34a">W</div>
+                    <div>
+                      <div class="tk-nm">WLD</div>
+                      <div class="tk-sub">Worldcoin</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x2cFc85d8...63003</td>
+                <td><strong>$3.8M</strong></td>
+                <td>$1.2M</td>
+                <td><span class="pill green">✓ 核心</span></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm">详情</button></td>
+              </tr>
+              <tr>
+                <td><span class="check" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#627eea">E</div>
+                    <div>
+                      <div class="tk-nm">WETH</div>
+                      <div class="tk-sub">Wrapped Ether</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x42000000...006</td>
+                <td><strong>$890K</strong></td>
+                <td>$320K</td>
+                <td><span class="pill green">✓ 核心</span></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm">详情</button></td>
+              </tr>
+              <tr>
+                <td><span class="check" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#a855f7">S</div>
+                    <div>
+                      <div class="tk-nm">STO</div>
+                      <div class="tk-sub">StakeStone</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x30aee7cd...5d56e</td>
+                <td><strong>$45K</strong></td>
+                <td>$8.2K</td>
+                <td><span class="pill blue">已审核</span></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm">详情</button></td>
+              </tr>
+              <tr>
+                <td><span class="check" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#888780">A</div>
+                    <div>
+                      <div class="tk-nm">AION</div>
+                      <div class="tk-sub">未审核</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0x4df80372...26511e</td>
+                <td><strong>$12K</strong></td>
+                <td>$2.1K</td>
+                <td><span class="pill amber">社区</span></td>
+                <td><button class="toggle" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle on" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm">详情</button></td>
+              </tr>
+              <tr>
+                <td><span class="check" onclick="this.classList.toggle('on')"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span></td>
+                <td>
+                  <div class="tk-cell">
+                    <div class="tk-ic" style="background:#71717a">?</div>
+                    <div>
+                      <div class="tk-nm">SCAM</div>
+                      <div class="tk-sub">疑似 honeypot</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="mono">0xabcd1234...5678</td>
+                <td><strong>$120</strong></td>
+                <td>$50</td>
+                <td><span class="pill red">已禁用</span></td>
+                <td><button class="toggle" onclick="this.classList.toggle('on')"></button></td>
+                <td><button class="toggle" onclick="this.classList.toggle('on')"></button></td>
+                <td style="text-align:right;"><button class="btn sm danger">查看原因</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+      <!-- ============ FEES ============ -->
+      <section class="page" id="page-fees">
+        <div class="page-head">
+          <div>
+            <div class="title">手续费设置</div>
+            <div class="sub">控制 Swap / Earn 等业务的费率</div>
+          </div>
+          <div class="actions">
+            <button class="btn primary sm">保存修改</button>
+          </div>
+        </div>
+        
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>Swap 手续费</h3>
+                <div class="sub">在用户兑换时收取的平台费</div>
+              </div>
+              <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+            </div>
+            
+            <div class="field">
+              <label>基础费率</label>
+              <div class="input-row">
+                <input type="number" class="input" value="0.25" step="0.01" />
+                <div class="suf">%</div>
+              </div>
+              <div class="hint">推荐 0.1% - 0.3%, 行业标准</div>
+            </div>
+            
+            <div class="field">
+              <label>收款地址</label>
+              <input class="input mono" value="0x4df8037293c4af4a0f87fe726819d4ff9a26511e" />
+              <div class="hint">Lumina 平台金库,接收 Swap 手续费</div>
+            </div>
+            
+            <div class="field">
+              <label>大额优惠</label>
+              <select class="select">
+                <option>关闭</option>
+                <option>≥$10,000 减半 (0.125%)</option>
+                <option>≥$50,000 全免</option>
+              </select>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="stat-grid">
+              <div class="stat">
+                <div class="k">本月手续费</div>
+                <div class="v">$487.30</div>
+              </div>
+              <div class="stat">
+                <div class="k">本月 Swap 量</div>
+                <div class="v">$194K</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <div class="card-head">
+              <div>
+                <h3>Earn 推荐费</h3>
+                <div class="sub">Morpho 协议返佣分成</div>
+              </div>
+              <button class="toggle" onclick="this.classList.toggle('on')"></button>
+            </div>
+            
+            <div style="background:var(--surface-2); padding:14px; border-radius:var(--r-md); margin-bottom:14px; display:flex; gap:10px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--info)" stroke-width="2" style="flex-shrink:0; margin-top:2px;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              <div style="font-size:12.5px; color:var(--text-2); line-height:1.5;">
+                <strong style="color:var(--text);">需要先与 Morpho team 协商。</strong>
+                建议 TVL 达到 $10k+ 后申请 referral program。
+              </div>
+            </div>
+            
+            <div class="field">
+              <label>预期分成比例</label>
+              <div class="input-row">
+                <input type="number" class="input" value="20" disabled />
+                <div class="suf">% of management fee</div>
+              </div>
+            </div>
+            
+            <button class="btn brand" style="width:100%; justify-content:center;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              申请 Morpho Referral Program
+            </button>
+          </div>
+        </div>
+        
+        <div class="card" style="margin-top:14px;">
+          <div class="card-head">
+            <div>
+              <h3>修改历史</h3>
+              <div class="sub">最近 5 次费率变更记录</div>
+            </div>
+          </div>
+          <table style="margin:-8px;">
+            <thead>
+              <tr>
+                <th style="padding-left:8px;">时间</th>
+                <th>操作人</th>
+                <th>项目</th>
+                <th>变更</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding-left:8px;" class="text-3">2026-05-31 14:23</td>
+                <td>Super Admin</td>
+                <td>Swap 手续费</td>
+                <td class="audit-trail">0.3% → 0.25%</td>
+              </tr>
+              <tr>
+                <td style="padding-left:8px;" class="text-3">2026-05-28 10:15</td>
+                <td>Super Admin</td>
+                <td>Swap 手续费状态</td>
+                <td class="audit-trail">禁用 → 启用</td>
+              </tr>
+              <tr>
+                <td style="padding-left:8px;" class="text-3">2026-05-15 16:08</td>
+                <td>Super Admin</td>
+                <td>收款地址</td>
+                <td class="audit-trail">0x... → 0x4df8...11e</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      
+      <!-- ============ PLACEHOLDER PAGES ============ -->
+      <section class="page" id="page-risk">
+        <div class="page-head">
+          <div><div class="title">风控审核</div><div class="sub">3 个待处理事项</div></div>
+        </div>
+        <div class="card empty">风控审核模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-users">
+        <div class="page-head">
+          <div><div class="title">用户管理</div><div class="sub">12,847 个用户</div></div>
+        </div>
+        <div class="card empty">用户管理模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-txns">
+        <div class="page-head">
+          <div><div class="title">交易记录</div><div class="sub">实时链上交易</div></div>
+        </div>
+        <div class="card empty">交易记录模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-announce">
+        <div class="page-head">
+          <div><div class="title">公告管理</div><div class="sub">向用户推送通知</div></div>
+        </div>
+        <div class="card empty">公告管理模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-content">
+        <div class="page-head">
+          <div><div class="title">内容页管理</div><div class="sub">隐私政策 / 服务条款 / 帮助中心</div></div>
+        </div>
+        <div class="card empty">内容页管理模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-currency">
+        <div class="page-head">
+          <div><div class="title">货币与汇率</div><div class="sub">配置法币显示</div></div>
+        </div>
+        <div class="card empty">货币模块开发中</div>
+      </section>
+      
+      <section class="page" id="page-settings">
+        <div class="page-head">
+          <div><div class="title">系统设置</div><div class="sub">RPC / API / 安全策略</div></div>
+        </div>
+        <div class="card empty">系统设置模块开发中</div>
+      </section>
+      
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+  <span id="toastMsg">操作成功</span>
+</div>
+
+<script>
+  var pageTitles = {
+    dashboard: "数据看板",
+    earn: "理财产品",
+    tokens: "代币白名单",
+    risk: "风控审核",
+    users: "用户管理",
+    txns: "交易记录",
+    fees: "手续费设置",
+    announce: "公告管理",
+    content: "内容页管理",
+    currency: "货币与汇率",
+    settings: "系统设置"
+  };
+  
+  function nav(el) {
+    var page = el.dataset.page;
+    document.querySelectorAll(".nav-item").forEach(function(n) { n.classList.remove("active"); });
+    el.classList.add("active");
+    document.querySelectorAll(".page").forEach(function(p) { p.classList.remove("active"); });
+    var target = document.getElementById("page-" + page);
+    if (target) target.classList.add("active");
+    document.getElementById("pageTitle").textContent = pageTitles[page] || "Lumina";
+  }
+  
+  // filter tabs
+  document.querySelectorAll(".filter-tabs").forEach(function(tabs) {
+    tabs.querySelectorAll(".ftab").forEach(function(t) {
+      t.addEventListener("click", function() {
+        tabs.querySelectorAll(".ftab").forEach(function(x) { x.classList.remove("active"); });
+        t.classList.add("active");
+      });
+    });
+  });
+  
+  function showToast(msg) {
+    var el = document.getElementById("toast");
+    document.getElementById("toastMsg").textContent = msg || "操作成功";
+    el.classList.add("show");
+    setTimeout(function() { el.classList.remove("show"); }, 2200);
+  }
+</script>
+<style>
+  .admin-login-mask{position:fixed;inset:0;z-index:9999;background:rgba(250,250,250,.92);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px}
+  .admin-login-mask.open{display:flex}
+  .admin-login-card{width:min(420px,100%);background:#fff;border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(15,23,42,.12);padding:28px}
+  .admin-login-card h2{font-size:22px;margin-bottom:6px}.admin-login-card p{color:var(--text-3);font-size:13px;margin-bottom:20px}
+  .admin-login-card label,.admin-modal label{display:block;color:var(--text-2);font-size:12px;font-weight:600;margin:12px 0 6px}
+  .admin-modal-mask{position:fixed;inset:0;z-index:9998;background:rgba(9,9,11,.36);display:none;align-items:center;justify-content:center;padding:20px}
+  .admin-modal-mask.open{display:flex}.admin-modal{width:min(560px,100%);max-height:88vh;overflow:auto;background:#fff;border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.18);padding:22px}
+  .admin-modal h2{font-size:18px;margin-bottom:10px}.admin-modal textarea{min-height:180px;resize:vertical}
+  .bridge-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.bridge-muted{color:var(--text-3);font-size:12px}.bridge-loader{padding:28px;color:var(--text-3);text-align:center}
+  .bridge-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.bridge-form-grid .wide{grid-column:1/-1}
+</style>
+<div class="admin-login-mask" id="adminLoginMask">
+  <div class="admin-login-card">
+    <div class="brand" style="border:0;margin:0 0 14px;padding:0">
+      <div class="logo">L</div><div class="nm">Lumina<small>数据库后台登录</small></div>
+    </div>
+    <h2>登录运营后台</h2>
+    <p>登录后所有修改会写入数据库,用户端会通过公开 API 自动同步。</p>
+    <label>用户名</label><input class="input" id="adminLoginUser" autocomplete="username" placeholder="admin">
+    <label>密码</label><input class="input" id="adminLoginPass" type="password" autocomplete="current-password" placeholder="请输入后台密码">
+    <button class="btn primary" style="width:100%;justify-content:center;margin-top:18px" onclick="LuminaAdmin.login()">登录</button>
+    <div class="bridge-muted" id="adminLoginError" style="color:var(--danger);margin-top:12px"></div>
+  </div>
+</div>
+<div class="admin-modal-mask" id="adminModalMask" onclick="if(event.target===this)LuminaAdmin.closeModal()"><div class="admin-modal" id="adminModalBox"></div></div>
+<script>
+(function(){
+  var state={me:null,dashboard:null,earn:[],tokens:[],fees:[],ann:[],users:[],txns:[],rates:[],config:null,contentKey:"help",content:{}};
+  function $(s,r){return (r||document).querySelector(s)}
+  function $all(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
+  function html(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]})}
+  function attr(s){return html(s).replace(/'/g,"&#39;")}
+  function short(v){v=String(v||"");return v.length>14?v.slice(0,6)+"..."+v.slice(-5):v}
+  function pct(v){var n=Number(v);return Number.isFinite(n)?(n*100).toFixed(2).replace(/\.00$/,"")+"%":"—"}
+  function money(v){var n=Number(v||0);if(!Number.isFinite(n))return"—";return "$"+n.toLocaleString(undefined,{maximumFractionDigits:n>=1000?0:2})}
+  function toast(msg){ if(window.showToast) window.showToast(msg); else alert(msg); }
+  function modal(markup){$("#adminModalBox").innerHTML=markup;$("#adminModalMask").classList.add("open")}
+  function closeModal(){$("#adminModalMask").classList.remove("open")}
+  function api(url,opt){
+    opt=opt||{};
+    opt.headers=Object.assign({"content-type":"application/json"},opt.headers||{});
+    return fetch(url,opt).then(function(res){return res.text().then(function(text){var data=text?JSON.parse(text):{}; if(!res.ok){var e=new Error(data.error||("HTTP "+res.status)); e.status=res.status; throw e;} return data;});});
+  }
+  function setAdminName(){
+    $all(".admin-chip span").forEach(function(el){el.textContent=state.me?state.me.username:"Super Admin"});
+    $all(".sidebar-foot .info .nm").forEach(function(el){el.textContent=state.me?state.me.username:"Super Admin"});
+    $all(".sidebar-foot .info .role").forEach(function(el){el.textContent=state.me?state.me.role:"系统管理员"});
+    var chip=$(".admin-chip"); if(chip) chip.onclick=function(){logout()};
+  }
+  function ensureLoggedIn(){
+    return api("/api/admin/me").then(function(me){state.me=me;$("#adminLoginMask").classList.remove("open");setAdminName();return true;})
+      .catch(function(){ $("#adminLoginMask").classList.add("open"); return false;});
+  }
+  function login(){
+    $("#adminLoginError").textContent="";
+    api("/api/admin/login",{method:"POST",body:JSON.stringify({username:$("#adminLoginUser").value.trim(),password:$("#adminLoginPass").value})})
+      .then(function(me){state.me=me;$("#adminLoginMask").classList.remove("open");setAdminName();toast("登录成功");loadAll();})
+      .catch(function(e){$("#adminLoginError").textContent=e.message||"登录失败"});
+  }
+  function logout(){api("/api/admin/logout",{method:"POST"}).finally(function(){location.reload()})}
+  function replacePage(page,markup){var el=$("#page-"+page); if(el) el.innerHTML=markup}
+  function renderShells(){
+    replacePage("earn",'<div class="page-head"><div><div class="title">理财产品</div><div class="sub">与数据库 earn_products 配置互通,用户端 Earn 页实时读取</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.openEarn()">+ 新建产品</button></div></div><div class="table-wrap"><table><thead><tr><th>产品</th><th>Vault</th><th>资产</th><th>APY</th><th>风险</th><th>TVL</th><th>状态</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeEarnRows"><tr><td colspan="8" class="bridge-loader">Loading...</td></tr></tbody></table></div>');
+    replacePage("tokens",'<div class="page-head"><div><div class="title">代币白名单</div><div class="sub">数据库 Token 表,用户端 Swap / Token List 通过 /api/tokens 同步</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.openToken()">+ 添加代币</button></div></div><div class="toolbar"><input class="input" id="bridgeTokenSearch" oninput="LuminaAdmin.renderTokens()" placeholder="搜索 symbol / 名称 / 地址" style="width:260px"><div class="spacer"></div><button class="btn sm" onclick="LuminaAdmin.loadTokens()">刷新</button></div><div class="table-wrap"><table><thead><tr><th>代币</th><th>合约地址</th><th>Decimals</th><th>状态</th><th>Top 排行</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeTokenRows"></tbody></table></div>');
+    replacePage("fees",'<div class="page-head"><div><div class="title">手续费设置</div><div class="sub">数据库 FeeConfig 表,用户端通过 /api/fees 读取</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.saveFees()">保存修改</button></div></div><div class="grid-2" id="bridgeFeeCards"></div>');
+    replacePage("announce",'<div class="page-head"><div><div class="title">公告管理</div><div class="sub">发布后用户端铃铛通过 /api/announcements 拉取</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.openAnnouncement()">+ 发布公告</button></div></div><div class="table-wrap"><table><thead><tr><th>类型</th><th>标题</th><th>内容</th><th>时间</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeAnnRows"></tbody></table></div>');
+    replacePage("content",'<div class="page-head"><div><div class="title">内容页管理</div><div class="sub">帮助中心 / 关于页写入 ContentPage,用户端 Me 页读取</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.saveContent()">保存并发布</button></div></div><div class="card"><div class="filter-tabs" style="margin-bottom:14px"><button class="ftab active" id="contentTabHelp" onclick="LuminaAdmin.switchContent(\'help\')">帮助中心</button><button class="ftab" id="contentTabAbout" onclick="LuminaAdmin.switchContent(\'about\')">关于</button></div><label>中文内容</label><textarea class="input" id="bridgeContentZh"></textarea><label>英文内容</label><textarea class="input" id="bridgeContentEn"></textarea><div class="bridge-muted" id="bridgeContentSaved" style="margin-top:10px"></div></div>');
+    replacePage("currency",'<div class="page-head"><div><div class="title">货币与汇率</div><div class="sub">数据库 CurrencyRate 表,用户端本币显示通过 /api/currency-rates 同步</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.syncRates()">从默认行情同步</button><button class="btn primary sm" onclick="LuminaAdmin.saveRates()">保存汇率</button></div></div><div class="table-wrap"><table><thead><tr><th>代码</th><th>名称</th><th>符号</th><th>汇率</th></tr></thead><tbody id="bridgeRateRows"></tbody></table></div>');
+    replacePage("users",'<div class="page-head"><div><div class="title">用户管理</div><div class="sub">数据库 User 表</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadUsers()">刷新</button></div></div><div class="table-wrap"><table><thead><tr><th>地址</th><th>World ID</th><th>创建时间</th><th>最后登录</th></tr></thead><tbody id="bridgeUserRows"></tbody></table></div>');
+    replacePage("txns",'<div class="page-head"><div><div class="title">交易记录</div><div class="sub">最近登录用户链上活动解析</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadTxns()">刷新</button></div></div><div class="table-wrap"><table><thead><tr><th>类型</th><th>用户</th><th>金额</th><th>哈希</th><th>区块</th><th>状态</th></tr></thead><tbody id="bridgeTxnRows"></tbody></table></div>');
+    replacePage("settings",'<div class="page-head"><div><div class="title">系统设置</div><div class="sub">数据库 system_config,用户端启动时同步</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.saveConfig()">保存设置</button></div></div><div class="card" style="max-width:760px"><div id="bridgeSettings"></div></div>');
+    replacePage("risk",'<div class="page-head"><div><div class="title">风控审核</div><div class="sub">待审核代币来自数据库 Token.status=pending</div></div></div><div class="table-wrap"><table><thead><tr><th>对象</th><th>合约</th><th>风险</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeRiskRows"></tbody></table></div>');
+  }
+  function renderDashboard(){
+    var d=state.dashboard||{};
+    var page=$("#page-dashboard"); if(!page)return;
+    var k=page.querySelectorAll(".kpi .v");
+    if(k[0])k[0].textContent=Number(d.totalUsers||0).toLocaleString();
+    if(k[1])k[1].innerHTML=html(d.transferVolumeLabel||"0");
+    if(k[2])k[2].textContent=Number(d.transactions||0).toLocaleString();
+    if(k[3])k[3].innerHTML=(Number(d.feeNative||0)).toFixed(6)+'<span class="suf"> ETH</span>';
+    var sub=page.querySelector(".page-head .sub"); if(sub)sub.textContent="数据库实时数据 · 今日新增用户 "+Number(d.todayUsers||0)+" · 今日交易 "+Number(d.todayTransactions||0);
+  }
+  function loadDashboard(){return api("/api/admin/dashboard").then(function(d){state.dashboard=d;renderDashboard()}).catch(function(){})}
+  function loadEarn(){return api("/api/admin/earn-products").then(function(x){state.earn=x;renderEarn()})}
+  function renderEarn(){
+    var tb=$("#bridgeEarnRows"); if(!tb)return;
+    tb.innerHTML=state.earn.map(function(p){return '<tr><td><div class="tk-cell"><div class="tk-ic">'+html((p.assetSymbol||"?")[0])+'</div><div><div class="tk-nm">'+html(p.displayName)+'</div><div class="tk-sub">'+html(p.assetSymbol)+'</div></div></div></td><td class="mono">'+short(p.address)+'</td><td>'+html(p.assetSymbol)+'</td><td><strong>'+html(p.apyOverride||pct(p.liveData&&p.liveData.netApy))+'</strong></td><td><span class="pill '+(p.riskLevel==="low"?"green":p.riskLevel==="high"?"red":"amber")+'">'+html(p.riskLevel)+'</span></td><td>'+money(p.liveData&&p.liveData.totalAssetsUsd)+'</td><td><button class="toggle '+(p.enabled?"on":"")+'" onclick="LuminaAdmin.toggleEarn(\''+attr(p.address)+'\')"></button></td><td style="text-align:right"><button class="btn sm" onclick="LuminaAdmin.openEarn(\''+attr(p.address)+'\')">编辑</button> <button class="btn sm danger" onclick="LuminaAdmin.deleteEarn(\''+attr(p.address)+'\')">删除</button></td></tr>'}).join("")||'<tr><td colspan="8" class="bridge-loader">暂无产品</td></tr>';
+  }
+  function openEarn(address){
+    var p=state.earn.find(function(x){return x.address===address})||{address:"",displayName:"",assetAddress:"",assetSymbol:"USDC",assetDecimals:6,riskLevel:"low",enabled:true,apyOverride:"",sortOrder:state.earn.length+1,description:{"zh-CN":"","en":""}};
+    modal('<h2>'+(address?"编辑":"新建")+'理财产品</h2><div class="bridge-form-grid"><div class="wide"><label>Vault 地址</label><input class="input mono" id="earnAddress" value="'+attr(p.address)+'"></div><div><label>名称</label><input class="input" id="earnName" value="'+attr(p.displayName)+'"></div><div><label>资产符号</label><input class="input" id="earnSymbol" value="'+attr(p.assetSymbol)+'"></div><div class="wide"><label>资产地址</label><input class="input mono" id="earnAssetAddress" value="'+attr(p.assetAddress)+'"></div><div><label>资产 Decimals</label><input class="input" id="earnDecimals" type="number" value="'+attr(p.assetDecimals)+'"></div><div><label>风险</label><select class="select" id="earnRisk"><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></div><div><label>APY 覆盖</label><input class="input" id="earnApy" value="'+attr(p.apyOverride||"")+'" placeholder="留空使用实时 APY"></div><div><label>排序</label><input class="input" id="earnSort" type="number" value="'+attr(p.sortOrder||1)+'"></div><div class="wide"><label>中文描述</label><textarea class="input" id="earnDescZh">'+html((p.description&&p.description["zh-CN"])||"")+'</textarea></div></div><div class="bridge-actions"><button class="btn" onclick="LuminaAdmin.closeModal()">取消</button><button class="btn primary" onclick="LuminaAdmin.saveEarn(\''+attr(address||"")+'\')">保存</button></div>');
+    $("#earnRisk").value=p.riskLevel||"low";
+  }
+  function saveEarn(oldAddress){
+    var body={address:$("#earnAddress").value.trim(),displayName:$("#earnName").value.trim(),assetAddress:$("#earnAssetAddress").value.trim(),assetSymbol:$("#earnSymbol").value.trim().toUpperCase(),assetDecimals:Number($("#earnDecimals").value||18),riskLevel:$("#earnRisk").value,apyOverride:$("#earnApy").value.trim()||null,sortOrder:Number($("#earnSort").value||1),description:{"zh-CN":$("#earnDescZh").value,en:$("#earnDescZh").value},enabled:true};
+    api(oldAddress?"/api/admin/earn-products/"+encodeURIComponent(oldAddress):"/api/admin/earn-products",{method:oldAddress?"PATCH":"POST",body:JSON.stringify(body)}).then(function(){closeModal();toast("理财产品已保存");loadEarn()}).catch(function(e){toast(e.message)});
+  }
+  function toggleEarn(address){var p=state.earn.find(function(x){return x.address===address}); if(!p)return; api("/api/admin/earn-products/"+encodeURIComponent(address),{method:"PATCH",body:JSON.stringify({enabled:!p.enabled})}).then(loadEarn)}
+  function deleteEarn(address){if(!confirm("确定删除该产品?"))return; api("/api/admin/earn-products/"+encodeURIComponent(address),{method:"DELETE"}).then(function(){toast("已删除");loadEarn()})}
+  function loadTokens(){return api("/api/admin/tokens").then(function(x){state.tokens=x;renderTokens();renderRisk()})}
+  function renderTokens(){
+    var tb=$("#bridgeTokenRows"); if(!tb)return; var q=($("#bridgeTokenSearch")&&$("#bridgeTokenSearch").value||"").toLowerCase();
+    var rows=state.tokens.filter(function(t){return !q||String(t.symbol+" "+t.name+" "+t.contractAddr).toLowerCase().indexOf(q)>=0});
+    tb.innerHTML=rows.map(function(t){return '<tr><td><div class="tk-cell">'+(t.logoUrl?'<img class="tk-ic" src="'+attr(t.logoUrl)+'">':'<div class="tk-ic">'+html((t.symbol||"?")[0])+'</div>')+'<div><div class="tk-nm">'+html(t.symbol)+'</div><div class="tk-sub">'+html(t.name)+'</div></div></div></td><td class="mono">'+html(short(t.contractAddr||"native"))+'</td><td>'+html(t.decimals)+'</td><td><span class="pill '+(t.status==="verified"?"green":t.status==="disabled"?"red":"amber")+'">'+html(t.status)+'</span></td><td><button class="toggle '+(t.onTopRanking?"on":"")+'" onclick="LuminaAdmin.patchToken(\''+attr(t.id)+'\',{onTopRanking:'+(!t.onTopRanking)+'})"></button></td><td style="text-align:right"><button class="btn sm" onclick="LuminaAdmin.openToken(\''+attr(t.id)+'\')">编辑</button> <button class="btn sm danger" onclick="LuminaAdmin.deleteToken(\''+attr(t.id)+'\')">删除</button></td></tr>'}).join("")||'<tr><td colspan="6" class="bridge-loader">暂无代币</td></tr>';
+  }
+  function openToken(id){
+    var t=state.tokens.find(function(x){return x.id===id})||{symbol:"",name:"",contractAddr:"",decimals:18,logoUrl:"",status:"verified",onTopRanking:false};
+    modal('<h2>'+(id?"编辑":"添加")+'代币</h2><div class="bridge-form-grid"><div><label>Symbol</label><input class="input" id="tokSym" value="'+attr(t.symbol)+'"></div><div><label>Decimals</label><input class="input" id="tokDecimals" type="number" value="'+attr(t.decimals)+'"></div><div class="wide"><label>名称</label><input class="input" id="tokName" value="'+attr(t.name)+'"></div><div class="wide"><label>合约地址</label><input class="input mono" id="tokAddr" value="'+attr(t.contractAddr||"")+'"></div><div class="wide"><label>Logo URL</label><input class="input" id="tokLogo" value="'+attr(t.logoUrl||"")+'"></div><div><label>状态</label><select class="select" id="tokStatus"><option value="verified">verified</option><option value="pending">pending</option><option value="disabled">disabled</option></select></div></div><div class="bridge-actions"><button class="btn" onclick="LuminaAdmin.closeModal()">取消</button><button class="btn primary" onclick="LuminaAdmin.saveToken(\''+attr(id||"")+'\')">保存</button></div>');
+    $("#tokStatus").value=t.status||"verified";
+  }
+  function saveToken(id){var body={symbol:$("#tokSym").value.trim().toUpperCase(),name:$("#tokName").value.trim(),contractAddr:$("#tokAddr").value.trim()||null,decimals:Number($("#tokDecimals").value||18),logoUrl:$("#tokLogo").value.trim()||null,status:$("#tokStatus").value}; api(id?"/api/admin/tokens/"+encodeURIComponent(id):"/api/admin/tokens",{method:id?"PATCH":"POST",body:JSON.stringify(body)}).then(function(){closeModal();toast("代币已保存");loadTokens()}).catch(function(e){toast(e.message)})}
+  function patchToken(id,body){return api("/api/admin/tokens/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(body)}).then(loadTokens)}
+  function deleteToken(id){if(!confirm("确定删除该代币?"))return; api("/api/admin/tokens/"+encodeURIComponent(id),{method:"DELETE"}).then(function(){toast("已删除");loadTokens()})}
+  function renderRisk(){var tb=$("#bridgeRiskRows"); if(!tb)return; var rows=state.tokens.filter(function(t){return t.status==="pending"}); $("#riskBadge").textContent=rows.length; tb.innerHTML=rows.map(function(t){return '<tr><td>'+html(t.symbol)+' · '+html(t.name)+'</td><td class="mono">'+html(short(t.contractAddr))+'</td><td><span class="pill amber">待审核</span></td><td style="text-align:right"><button class="btn sm primary" onclick="LuminaAdmin.patchToken(\''+attr(t.id)+'\',{status:\'verified\'})">通过</button> <button class="btn sm danger" onclick="LuminaAdmin.patchToken(\''+attr(t.id)+'\',{status:\'disabled\'})">拒绝</button></td></tr>'}).join("")||'<tr><td colspan="4" class="bridge-loader">暂无待审核对象</td></tr>'}
+  function loadFees(){return api("/api/fees").then(function(x){state.fees=x;renderFees()})}
+  function renderFees(){var box=$("#bridgeFeeCards"); if(!box)return; var defaults=["swap","earn"]; var rows=state.fees.length?state.fees:defaults.map(function(x){return{businessType:x,percent:"0",recipient:""}}); box.innerHTML=rows.map(function(f){return '<div class="card"><div class="card-head"><div><h3>'+html(f.businessType)+' 手续费</h3><div class="sub">写入 FeeConfig.'+html(f.businessType)+'</div></div></div><div class="field"><label>费率</label><div class="input-row"><input class="input" id="feePct_'+attr(f.businessType)+'" type="number" step="0.01" value="'+(Number(f.percent||0)*100)+'"><div class="suf">%</div></div></div><div class="field"><label>收款地址</label><input class="input mono" id="feeRecipient_'+attr(f.businessType)+'" value="'+attr(f.recipient||"")+'" placeholder="0x..."></div></div>'}).join("")}
+  function saveFees(){Promise.all($all("[id^=feePct_]").map(function(input){var type=input.id.replace("feePct_",""); var recipient=document.getElementById("feeRecipient_"+type); return api("/api/admin/fees/"+encodeURIComponent(type),{method:"PATCH",body:JSON.stringify({percent:Number(input.value||0)/100,recipient:(recipient&&recipient.value)||null})})})).then(function(){toast("手续费已保存");loadFees()}).catch(function(e){toast(e.message)})}
+  function loadAnnouncements(){return api("/api/announcements").then(function(x){state.ann=x;renderAnnouncements()})}
+  function renderAnnouncements(){var tb=$("#bridgeAnnRows"); if(!tb)return; tb.innerHTML=state.ann.map(function(a){var title=(a.titleI18n&& (a.titleI18n["zh-CN"]||a.titleI18n.en))||"";var body=(a.bodyI18n&&(a.bodyI18n["zh-CN"]||a.bodyI18n.en))||"";return '<tr><td><span class="pill '+(a.tag==="urgent"?"red":a.tag==="warning"?"amber":"green")+'">'+html(a.tag)+'</span></td><td>'+html(title)+'</td><td class="text-3">'+html(body).slice(0,120)+'</td><td>'+new Date(a.publishedAt).toLocaleString()+'</td><td style="text-align:right"><button class="btn sm danger" onclick="LuminaAdmin.deleteAnnouncement('+a.id+')">删除</button></td></tr>'}).join("")||'<tr><td colspan="5" class="bridge-loader">暂无公告</td></tr>'}
+  function openAnnouncement(){modal('<h2>发布公告</h2><label>类型</label><select class="select" id="annTag"><option value="notice">notice</option><option value="warning">warning</option><option value="urgent">urgent</option></select><label>中文标题</label><input class="input" id="annTitleZh"><label>中文内容</label><textarea class="input" id="annBodyZh"></textarea><label>英文标题</label><input class="input" id="annTitleEn"><label>英文内容</label><textarea class="input" id="annBodyEn"></textarea><div class="bridge-actions"><button class="btn" onclick="LuminaAdmin.closeModal()">取消</button><button class="btn primary" onclick="LuminaAdmin.saveAnnouncement()">发布</button></div>')}
+  function saveAnnouncement(){var body={tag:$("#annTag").value,titleI18n:{"zh-CN":$("#annTitleZh").value,en:$("#annTitleEn").value||$("#annTitleZh").value},bodyI18n:{"zh-CN":$("#annBodyZh").value,en:$("#annBodyEn").value||$("#annBodyZh").value}}; api("/api/admin/announcements",{method:"POST",body:JSON.stringify(body)}).then(function(){closeModal();toast("公告已发布");loadAnnouncements()})}
+  function deleteAnnouncement(id){if(!confirm("确定删除公告?"))return; api("/api/admin/announcements/"+id,{method:"DELETE"}).then(function(){toast("已删除");loadAnnouncements()})}
+  function switchContent(key){state.contentKey=key; $("#contentTabHelp").classList.toggle("active",key==="help"); $("#contentTabAbout").classList.toggle("active",key==="about"); loadContent(key)}
+  function loadContent(key){key=key||state.contentKey;return api("/api/content/"+key).then(function(p){state.content[key]=p; var b=p.bodyI18n||{}; $("#bridgeContentZh").value=b["zh-CN"]||""; $("#bridgeContentEn").value=b.en||""; $("#bridgeContentSaved").textContent=p.updatedAt?"上次保存 "+new Date(p.updatedAt).toLocaleString():"尚未保存"})}
+  function saveContent(){var key=state.contentKey; api("/api/admin/content/"+key,{method:"PUT",body:JSON.stringify({bodyI18n:{"zh-CN":$("#bridgeContentZh").value,en:$("#bridgeContentEn").value}})}).then(function(){toast("内容已发布");loadContent(key)})}
+  function loadRates(){return api("/api/currency-rates").then(function(x){state.rates=x;renderRates()})}
+  function renderRates(){var tb=$("#bridgeRateRows"); if(!tb)return; tb.innerHTML=state.rates.map(function(r){return '<tr><td><strong>'+html(r.code)+'</strong></td><td><input class="input" id="rateName_'+attr(r.code)+'" value="'+attr(r.name)+'"></td><td><input class="input" id="rateSymbol_'+attr(r.code)+'" value="'+attr(r.symbol)+'"></td><td><input class="input" id="rateValue_'+attr(r.code)+'" type="number" step="0.000001" value="'+attr(r.rate)+'"></td></tr>'}).join("")||'<tr><td colspan="4" class="bridge-loader">暂无汇率,请先同步</td></tr>'}
+  function syncRates(){api("/api/admin/currency-rates/sync",{method:"POST"}).then(function(){toast("汇率已同步");loadRates()})}
+  function saveRates(){Promise.all(state.rates.map(function(r){return api("/api/admin/currency-rates/"+r.code,{method:"PATCH",body:JSON.stringify({name:document.getElementById("rateName_"+r.code).value,symbol:document.getElementById("rateSymbol_"+r.code).value,rate:document.getElementById("rateValue_"+r.code).value})})})).then(function(){toast("汇率已保存");loadRates()})}
+  function loadUsers(){return api("/api/admin/users").then(function(x){state.users=x;renderUsers()})}
+  function renderUsers(){var tb=$("#bridgeUserRows"); if(!tb)return; tb.innerHTML=state.users.map(function(u){return '<tr><td class="mono">'+html(u.address)+'</td><td>'+html(u.worldId||"—")+'</td><td>'+new Date(u.createdAt).toLocaleString()+'</td><td>'+(u.lastLoginAt?new Date(u.lastLoginAt).toLocaleString():"—")+'</td></tr>'}).join("")||'<tr><td colspan="4" class="bridge-loader">暂无用户</td></tr>'}
+  function loadTxns(){return api("/api/admin/txns").then(function(x){state.txns=x;renderTxns()})}
+  function renderTxns(){var tb=$("#bridgeTxnRows"); if(!tb)return; tb.innerHTML=state.txns.map(function(t){return '<tr><td><span class="pill '+(t.direction==="in"?"green":"blue")+'">'+html(t.typeT||t.type)+'</span></td><td class="mono">'+html(t.user)+'</td><td>'+html(t.amount)+'</td><td class="mono">'+html(short(t.hash))+'</td><td>'+html(t.time)+'</td><td><span class="pill green">'+html(t.statusT||t.status)+'</span></td></tr>'}).join("")||'<tr><td colspan="6" class="bridge-loader">暂无链上记录</td></tr>'}
+  function loadConfig(){return api("/api/admin/system-config").then(function(x){state.config=x;renderConfig()})}
+  function renderConfig(){var c=state.config||{}; var box=$("#bridgeSettings"); if(!box)return; box.innerHTML='<div style="display:grid;gap:16px"><label style="display:flex;align-items:center;justify-content:space-between">维护模式 <button id="cfgMaintenance" class="toggle '+(c.maintenance?"on":"")+'" onclick="this.classList.toggle(\'on\')"></button></label><label style="display:flex;align-items:center;justify-content:space-between">Earn 存款开关 <button id="cfgMorpho" class="toggle '+(c.morphoDepositEnabled?"on":"")+'" onclick="this.classList.toggle(\'on\')"></button></label><div><label>后台 Logo URL</label><input class="input" id="cfgLogo" value="'+attr(c.adminLogoUrl||"")+'"></div><div><label>Favicon URL</label><input class="input" id="cfgFavicon" value="'+attr(c.faviconUrl||"")+'"></div></div>'}
+  function saveConfig(){api("/api/admin/system-config",{method:"PATCH",body:JSON.stringify({maintenance:$("#cfgMaintenance").classList.contains("on"),morphoDepositEnabled:$("#cfgMorpho").classList.contains("on"),adminLogoUrl:$("#cfgLogo").value||null,faviconUrl:$("#cfgFavicon").value||null})}).then(function(){toast("系统设置已保存");loadConfig()})}
+  function loadAll(){renderShells();return Promise.all([loadDashboard(),loadEarn(),loadTokens(),loadFees(),loadAnnouncements(),loadContent("help"),loadRates(),loadUsers(),loadTxns(),loadConfig()].map(function(p){return p.catch(function(e){if(e.status===401)$("#adminLoginMask").classList.add("open");})}))}
+  window.LuminaAdmin={login:login,logout:logout,closeModal:closeModal,openEarn:openEarn,saveEarn:saveEarn,toggleEarn:toggleEarn,deleteEarn:deleteEarn,loadTokens:loadTokens,renderTokens:renderTokens,openToken:openToken,saveToken:saveToken,patchToken:patchToken,deleteToken:deleteToken,saveFees:saveFees,openAnnouncement:openAnnouncement,saveAnnouncement:saveAnnouncement,deleteAnnouncement:deleteAnnouncement,switchContent:switchContent,saveContent:saveContent,syncRates:syncRates,saveRates:saveRates,loadUsers:loadUsers,loadTxns:loadTxns,saveConfig:saveConfig,loadAll:loadAll};
+  document.addEventListener("DOMContentLoaded",function(){renderShells();ensureLoggedIn().then(function(ok){if(ok)loadAll();}); var p=new URLSearchParams(location.search).get("page"); if(p){var navItem=document.querySelector('.nav-item[data-page="'+p+'"]'); if(navItem&&window.nav) nav(navItem);}});
+})();
+</script>
+</body>
+</html>
