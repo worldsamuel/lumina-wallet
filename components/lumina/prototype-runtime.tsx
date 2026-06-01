@@ -32,6 +32,7 @@ declare global {
     __luminaSendMorphoTransactions?: (
       transactions: MiniKitCalldataTransaction[],
       permit2?: MiniKitPermit2[],
+      action?: EarnPendingAction,
     ) => Promise<unknown>;
     __luminaSetMorphoBusy?: (isBusy: boolean) => void;
     __luminaRefreshMorphoPositions?: () => Promise<void>;
@@ -55,6 +56,8 @@ type EarnConfirmInput = {
   amount: string;
   product: string;
 };
+
+type EarnPendingAction = "deposit" | "withdraw";
 
 type MiniKitCalldataTransaction = {
   to: string;
@@ -109,6 +112,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const [prototypeReady, setPrototypeReady] = useState(false);
   const [dataSyncReady, setDataSyncReady] = useState(false);
   const [earnUserOpHash, setEarnUserOpHash] = useState("");
+  const [earnPendingAction, setEarnPendingAction] = useState<EarnPendingAction>("deposit");
   const { address, error, login, logout, status, username } = useWalletAuth();
   const { mutate } = useSWRConfig();
   useBackendConfigSync(status === "authenticated" && dataSyncReady);
@@ -189,7 +193,8 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
   useEffect(() => {
     const handleEarnUserOp = (event: Event) => {
-      const detail = (event as CustomEvent<{ userOpHash?: string }>).detail;
+      const detail = (event as CustomEvent<{ userOpHash?: string; action?: EarnPendingAction }>).detail;
+      if (detail?.action) setEarnPendingAction(detail.action);
       if (detail?.userOpHash) setEarnUserOpHash(detail.userOpHash);
     };
     window.addEventListener("lumina:earn-userop", handleEarnUserOp);
@@ -202,14 +207,14 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     void window.__luminaRefreshMorphoPositions?.();
     if (address) void mutate(`/api/morpho/position/${address}`);
     setEarnUserOpHash("");
-    toastFromPrototype("存款成功!");
-  }, [address, mutate]);
+    toastFromPrototype(earnPendingAction === "withdraw" ? "Withdrawal successful" : "Deposit successful");
+  }, [address, earnPendingAction, mutate]);
 
   const handleEarnReceiptError = useCallback((receiptError?: Error) => {
     window.__luminaSetMorphoBusy?.(false);
     setEarnUserOpHash("");
-    toastFromPrototype(`交易失败: ${receiptError?.message ?? "Transaction failed"}`);
-  }, []);
+    toastFromPrototype(`${earnPendingAction === "withdraw" ? "Withdrawal" : "Deposit"} failed: ${receiptError?.message ?? "Transaction failed"}`);
+  }, [earnPendingAction]);
 
   if (status === "not-installed") {
     return <WorldAppPrompt />;
@@ -292,11 +297,11 @@ function exposeEarnWalletConfirm() {
 }
 
 function exposeMorphoTransactions() {
-  window.__luminaSendMorphoTransactions = async (transactions, permit2) => {
+  window.__luminaSendMorphoTransactions = async (transactions, permit2, action: EarnPendingAction = "deposit") => {
     void permit2;
     if (new URL(window.location.href).searchParams.get("mockWorld") === "1") {
       const userOpHash = `0xmock${Date.now().toString(16)}`;
-      window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash } }));
+      window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash, action } }));
       return { data: { status: "success", userOpHash } };
     }
 
@@ -353,7 +358,7 @@ function exposeMorphoTransactions() {
     if (!userOpHash) {
       throw new Error(`No userOpHash returned: ${JSON.stringify(result)}`);
     }
-    window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash } }));
+    window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash, action } }));
     return result;
   };
 }
@@ -923,7 +928,7 @@ function enhancePrototypeEarn() {
       };
 
       window.showMorphoApyInfo = function(){
-        toast("APY 含 Morpho 协议奖励,每日变动");
+        toast("APY includes Morpho rewards and updates daily");
       };
 
       function setMorphoBusy(isBusy){
@@ -944,9 +949,9 @@ function enhancePrototypeEarn() {
           mask.className = "modal-mask open morpho-confirm-modal";
           mask.id = "morphoConfirmMask";
           mask.innerHTML =
-            '<div class="modal"><div class="modal-grip"></div><h3>确认存款</h3>' +
+            '<div class="modal"><div class="modal-grip"></div><h3>Confirm deposit</h3>' +
             '<p class="morpho-confirm-body">' + message + '</p>' +
-            '<div class="earn-action-row"><button class="btn-ghost" id="morphoConfirmCancel">取消</button><button class="btn-primary" id="morphoConfirmOk">确认存入</button></div></div>';
+            '<div class="earn-action-row"><button class="btn-ghost" id="morphoConfirmCancel">Cancel</button><button class="btn-primary" id="morphoConfirmOk">Confirm deposit</button></div></div>';
           document.body.appendChild(mask);
           function done(value){
             mask.remove();
@@ -962,23 +967,7 @@ function enhancePrototypeEarn() {
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
         var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + token : "—";
-        var lang = window.currentLang || "en";
-        var copy = lang === "zh-CN" ? {
-          deposited: "已存入 ",
-          amount: "金额",
-          wallet: "钱包余额",
-          yearly: "预计年收益",
-          daily: "预计日收益",
-          fee: "费用",
-          provider: "服务提供方",
-          curator: "Re7 Labs (Vault 策展方)",
-          deposit: "存入",
-          withdraw: "提现",
-          pausedTitle: "存款已暂停",
-          pausedBody: "紧急暂停已开启。已有仓位仍可提现。",
-          aboutTitle: "ⓘ 关于本产品",
-          aboutBody: "本理财服务由 Morpho 协议(morpho.org)提供,Re7 Labs 担任策展方。Lumina 仅作为第三方钱包入口,不托管您的资产。您的资产存入 Morpho Vault 智能合约,通过借贷市场赚取利息。智能合约已经 Spearbit、OpenZeppelin 审计,但任何 DeFi 都存在技术风险(智能合约漏洞、价格预言机故障等)。APY 实时变动,不保证收益。您可随时提现,但 vault 流动性不足时需要等待。"
-        } : {
+        var copy = {
           deposited: "Deposited ",
           amount: "Amount",
           wallet: "Wallet balance",
@@ -1095,9 +1084,9 @@ function enhancePrototypeEarn() {
         var pos = vault ? positionFor(vault) : null;
         if (!vault || !Number.isFinite(n) || n <= 0) return toast("Enter an amount");
         if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
-        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("先获取 " + vault.asset.symbol);
+        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("Insufficient " + vault.asset.symbol + " balance");
         var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
-        var confirmed = await confirmMorphoDeposit("您将存入 " + amount + " " + vault.asset.symbol + " 到 " + vault.displayName + " Vault,当前 APY " + apy);
+        var confirmed = await confirmMorphoDeposit("You are depositing " + amount + " " + vault.asset.symbol + " into " + vault.displayName + " Vault. Current APY " + apy + ".");
         if (!confirmed) return;
         var awaitingReceipt = false;
         try {
@@ -1116,17 +1105,17 @@ function enhancePrototypeEarn() {
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
           console.log("[EARN] Amount wei:", data.debug && data.debug.amountWei);
           console.log("[EARN] built tx:", JSON.stringify(data));
-          var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2);
+          var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2, "deposit");
           var payload = result && result.data;
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           awaitingReceipt = true;
-          toast("等待区块链确认: " + String(hash).slice(0, 18));
+          toast("Waiting for confirmation: " + String(hash).slice(0, 18));
         } catch(e) {
           console.error("[EARN] error:", e);
           var msg = e && e.message ? e.message : "Deposit failed";
           if (/user_rejected/i.test(msg)) msg = "Cancelled in World App";
-          toast("存款失败: " + msg);
+          toast("Deposit failed: " + msg);
         } finally {
           if (!awaitingReceipt) setMorphoBusy(false);
         }
@@ -1145,13 +1134,33 @@ function enhancePrototypeEarn() {
         var mask = document.createElement("div");
         mask.className = "modal-mask open morpho-withdraw-modal";
         mask.id = "morphoWithdrawMask";
+        var available = fmtAmount(pos.maxWithdrawFormatted, 6);
+        var deposited = fmtAmount(pos.assetsFormatted, 6);
         mask.innerHTML =
-          '<div class="modal"><div class="grab"></div><h3>Withdraw ' + vault.displayName + '</h3>' +
-          '<p class="hint">Available: ' + fmtAmount(pos.maxWithdrawFormatted, 6) + " " + vault.asset.symbol + '</p>' +
-          '<div class="earn-amount-row"><input id="morphoWithdrawAmount" inputmode="decimal" placeholder="0.00" /><span>' + vault.asset.symbol + '</span></div>' +
-          '<div class="earn-action-row"><button class="btn-primary" onclick="submitMorphoWithdraw(false)">Withdraw amount</button><button class="btn-ghost" onclick="submitMorphoWithdraw(true)">Withdraw all</button></div>' +
-          '<button class="sheet-cancel" onclick="closeMorphoWithdrawModal()">Cancel</button></div>';
+          '<div class="modal">' +
+            '<div class="grab"></div>' +
+            '<div class="withdraw-sheet-head">' +
+              '<div><p>Withdraw</p><h3>' + vault.displayName + '</h3></div>' +
+              '<button type="button" class="withdraw-close" onclick="closeMorphoWithdrawModal()">×</button>' +
+            '</div>' +
+            '<div class="withdraw-summary">' +
+              '<div><span>Deposited</span><strong>' + deposited + " " + vault.asset.symbol + '</strong></div>' +
+              '<div><span>Available</span><strong>' + available + " " + vault.asset.symbol + '</strong></div>' +
+            '</div>' +
+            '<label class="withdraw-label">Amount</label>' +
+            '<div class="earn-amount-row withdraw-amount-row"><input id="morphoWithdrawAmount" inputmode="decimal" placeholder="0.00" /><span>' + vault.asset.symbol + '</span><button type="button" onclick="fillMorphoWithdrawMax()">MAX</button></div>' +
+            '<div class="withdraw-help">Funds return to your World Chain wallet after confirmation.</div>' +
+            '<div class="earn-action-row withdraw-action-row"><button class="btn-primary" onclick="submitMorphoWithdraw(false)">Withdraw amount</button><button class="btn-ghost" onclick="submitMorphoWithdraw(true)">Withdraw all</button></div>' +
+            '<button class="sheet-cancel withdraw-cancel" onclick="closeMorphoWithdrawModal()">Cancel</button>' +
+          '</div>';
         document.body.appendChild(mask);
+      };
+
+      window.fillMorphoWithdrawMax = function(){
+        var vault = morphoVaults[activeEarnIndex];
+        var pos = vault ? positionFor(vault) : null;
+        var input = document.getElementById("morphoWithdrawAmount");
+        if (input && pos) input.value = String(pos.maxWithdrawFormatted || "0");
       };
 
       window.closeMorphoWithdrawModal = function(){
@@ -1171,7 +1180,7 @@ function enhancePrototypeEarn() {
           var amount = input ? String(input.value || "").trim() : "";
           var n = Number(amount.replace(/,/g, ""));
           if (!Number.isFinite(n) || n <= 0) return toast("Enter an amount");
-          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast("Vault 流动性暂时不足,请稍后再试或减少金额");
+          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast("Vault liquidity is low. Try a smaller amount later.");
           body.amount = amount;
         }
         try {
@@ -1182,16 +1191,16 @@ function enhancePrototypeEarn() {
           });
           var data = await res.json();
           if (!res.ok) throw new Error(data.error || "Unable to build transaction");
-          var result = await window.__luminaSendMorphoTransactions(data.transactions);
+          var result = await window.__luminaSendMorphoTransactions(data.transactions, undefined, "withdraw");
           var payload = result && result.data;
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           closeMorphoWithdrawModal();
-          toast("等待区块链确认: " + String(hash).slice(0, 18));
+          toast("Waiting for confirmation: " + String(hash).slice(0, 18));
         } catch(e) {
           var msg = e && e.message ? e.message : "Withdraw failed";
-          if (/liquid|withdraw/i.test(msg)) msg = "Vault 流动性暂时不足,请稍后再试或减少金额";
-          toast(msg);
+          if (/liquid|withdraw/i.test(msg)) msg = "Vault liquidity is low. Try a smaller amount later.";
+          toast("Withdrawal failed: " + msg);
         }
       };
 
@@ -2205,7 +2214,7 @@ function enhancePrototypeSend() {
       function setButtonLoading(active){
         if (!submit) return;
         submit.classList.toggle("is-loading", active);
-        submit.innerHTML = active ? '<span class="send-spinner"></span><span>处理中...</span>' : '<span data-i18n="confirmSend">确认转账</span>';
+        submit.innerHTML = active ? '<span class="send-spinner"></span><span>Processing...</span>' : '<span data-i18n="confirmSend">Confirm transfer</span>';
       }
       function validation(){
         var token = selectedToken();
@@ -2215,11 +2224,11 @@ function enhancePrototypeSend() {
         var balance = token ? balanceNumber(token.symbol) : 0;
         var recipientMsg = "";
         var amountMsg = "";
-        if (!token) amountMsg = "请选择可发送的 World Chain 代币";
-        if (token && !token.native && !token.address) amountMsg = "缺少代币合约地址";
-        if (recipient && !isValidAddress(recipient)) recipientMsg = "收款地址格式不对";
-        if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = "请输入大于 0 的金额";
-        if (token && Number.isFinite(amount) && amount > balance) amountMsg = "余额不足";
+        if (!token) amountMsg = "Select a World Chain token";
+        if (token && !token.native && !token.address) amountMsg = "Missing token contract address";
+        if (recipient && !isValidAddress(recipient)) recipientMsg = "Invalid recipient address";
+        if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = "Enter an amount greater than 0";
+        if (token && Number.isFinite(amount) && amount > balance) amountMsg = "Insufficient balance";
         if (recipientError) recipientError.textContent = recipientMsg;
         if (amountError) amountError.textContent = amountMsg;
         var disabled = sending || !window.__luminaUserAddress || !token || !recipient || !isValidAddress(recipient) || !amountText || !Number.isFinite(amount) || amount <= 0 || amount > balance;
@@ -2236,7 +2245,7 @@ function enhancePrototypeSend() {
         if (token.symbol === "ETH") max = Math.max(0, max - 0.001);
         amountInput.value = max > 0 ? String(Number(max.toFixed(token.decimals === 6 ? 6 : 8))) : "";
         validation();
-        toast("已填入全部可用余额");
+        toast("Max available balance filled");
       }
       function confirmSendAction(state){
         return new Promise(function(resolve){
@@ -2248,9 +2257,9 @@ function enhancePrototypeSend() {
           modal.innerHTML =
             '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;min-height:300px;padding:24px 24px 22px;margin:0 auto 10px;border-radius:26px;">' +
               '<div class="modal-grip"></div>' +
-              '<h3>确认转账</h3>' +
-              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">转 ' + state.amountText + ' ' + state.token.symbol + '<br>到 ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
-              '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">取消</button><button class="btn-primary" id="sendConfirmOk">确认</button></div>' +
+              '<h3>Confirm transfer</h3>' +
+              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">Send ' + state.amountText + ' ' + state.token.symbol + '<br>to ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">Cancel</button><button class="btn-primary" id="sendConfirmOk">Confirm</button></div>' +
             '</div>';
           document.body.appendChild(modal);
           function done(value){
@@ -2299,12 +2308,12 @@ function enhancePrototypeSend() {
         var state = validation();
         if (sending) return;
         if (!state.ok) {
-          toast(state.error || "请先填写有效地址和金额");
+          toast(state.error || "Enter a valid address and amount");
           return;
         }
         var confirmed = await confirmSendAction(state);
         if (!confirmed) {
-          toast("已取消");
+          toast("Cancelled");
           return;
         }
         sending = true;
@@ -2329,15 +2338,15 @@ function enhancePrototypeSend() {
             recipientInput.value = "";
             amountInput.value = "";
           } else if (result.status === "user_rejected") {
-            toast("您取消了交易");
+            toast("You cancelled the transaction");
           } else {
-            var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "交易失败");
-            toast("转账失败: " + msg);
+            var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Transaction failed");
+            toast("Transfer failed: " + msg);
           }
         } catch(e) {
           var code = e && e.message ? e.message : "generic_error";
           var friendly = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(code) : code;
-          toast("转账失败: " + friendly);
+          toast("Transfer failed: " + friendly);
         } finally {
           console.log("[A7] finally — setSending false");
           sending = false;
@@ -2365,7 +2374,7 @@ function enhancePrototypeSend() {
       }
       if (maxBtn && !maxBtn.__luminaSendWired) {
         maxBtn.__luminaSendWired = true;
-        maxBtn.textContent = "全部";
+        maxBtn.textContent = "MAX";
         maxBtn.addEventListener("click", function(event){ event.preventDefault(); event.stopPropagation(); setMaxAmount(); });
       }
       if (submit && !submit.__luminaSendWired) {
@@ -2400,7 +2409,7 @@ function enhancePrototypeActivity() {
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
-        return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'交易已提交,等待链上确认\\')') + '" style="cursor:pointer;">' +
+        return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'Transaction submitted. Waiting for confirmation.\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
           '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + a.subtitle + '</div></div>' +
           '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + (a.status || "Completed") + '</div></div>' +

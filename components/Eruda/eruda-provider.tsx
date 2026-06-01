@@ -39,7 +39,7 @@ function installErudaFallbackButton() {
       "position:fixed",
       "right:10px",
       "bottom:82px",
-      "z-index:2147483647",
+      "z-index:70",
       "height:34px",
       "padding:0 12px",
       "border-radius:999px",
