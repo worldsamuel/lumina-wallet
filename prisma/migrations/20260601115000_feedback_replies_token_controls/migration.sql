@@ -1,0 +1,9 @@
+ALTER TABLE "Feedback"
+  ADD COLUMN "reply" TEXT,
+  ADD COLUMN "repliedAt" TIMESTAMP(3),
+  ADD COLUMN "repliedBy" TEXT;
+
+ALTER TABLE "Token"
+  ADD COLUMN "tier" TEXT NOT NULL DEFAULT 'community',
+  ADD COLUMN "canTransfer" BOOLEAN NOT NULL DEFAULT true,
+  ADD COLUMN "canSwap" BOOLEAN NOT NULL DEFAULT true;

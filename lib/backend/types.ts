@@ -28,6 +28,9 @@ export type BackendToken = {
   decimals: number;
   logoUrl: string | null;
   status: string;
+  tier?: string;
+  canTransfer?: boolean;
+  canSwap?: boolean;
   onTopRanking: boolean;
 };
 

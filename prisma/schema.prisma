@@ -22,6 +22,9 @@ model Token {
   decimals     Int      @default(18)
   logoUrl      String?
   status       String   @default("pending")
+  tier         String   @default("community")
+  canTransfer  Boolean  @default(true)
+  canSwap      Boolean  @default(true)
   onTopRanking Boolean  @default(false)
   createdAt    DateTime @default(now())
 }
@@ -80,5 +83,8 @@ model Feedback {
   contact   String?
   message   String
   status    String   @default("new")
+  reply     String?
+  repliedAt DateTime?
+  repliedBy String?
   createdAt DateTime @default(now())
 }

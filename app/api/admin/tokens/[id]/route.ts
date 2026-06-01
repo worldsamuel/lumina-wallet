@@ -26,6 +26,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       decimals: typeof body.decimals === "number" ? body.decimals : undefined,
       logoUrl: typeof body.logoUrl === "string" || body.logoUrl === null ? body.logoUrl : undefined,
       status: typeof body.status === "string" ? body.status : undefined,
+      tier: typeof body.tier === "string" ? body.tier : undefined,
+      canTransfer: typeof body.canTransfer === "boolean" ? body.canTransfer : undefined,
+      canSwap: typeof body.canSwap === "boolean" ? body.canSwap : undefined,
       onTopRanking: typeof body.onTopRanking === "boolean" ? body.onTopRanking : undefined,
     },
   });

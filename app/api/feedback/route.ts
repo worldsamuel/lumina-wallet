@@ -8,6 +8,30 @@ export function OPTIONS() {
   return optionsResponse();
 }
 
+export async function GET(req: NextRequest) {
+  if (!rateLimit(req, "public:feedback:get", 60).ok) {
+    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+  }
+
+  const address = clean(req.nextUrl.searchParams.get("address"), 64);
+  if (!isAddress(address)) return jsonResponse([]);
+
+  const feedback = await db.feedback.findMany({
+    where: { address },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+    select: {
+      id: true,
+      message: true,
+      status: true,
+      reply: true,
+      repliedAt: true,
+      createdAt: true,
+    },
+  });
+  return jsonResponse(feedback);
+}
+
 function clean(value: unknown, max: number) {
   return String(value ?? "").trim().slice(0, max);
 }

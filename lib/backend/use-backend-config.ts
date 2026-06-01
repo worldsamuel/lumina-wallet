@@ -51,8 +51,8 @@ function formatRelativeTime(value: string) {
  */
 export function useBackendConfigSync(enabled: boolean) {
   const swrOptions = {
-    dedupingInterval: 20_000,
-    refreshInterval: 60_000,
+    dedupingInterval: 2_000,
+    refreshInterval: 5_000,
     revalidateOnFocus: false,
   };
   const announcements = useSWR<BackendAnnouncement[]>(

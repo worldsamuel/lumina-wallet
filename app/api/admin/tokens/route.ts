@@ -28,6 +28,9 @@ export async function POST(req: NextRequest) {
     decimals?: number;
     logoUrl?: string | null;
     status?: string;
+    tier?: string;
+    canTransfer?: boolean;
+    canSwap?: boolean;
     onTopRanking?: boolean;
   };
 
@@ -39,6 +42,9 @@ export async function POST(req: NextRequest) {
       decimals: body.decimals ?? 18,
       logoUrl: body.logoUrl ?? null,
       status: body.status ?? "pending",
+      tier: body.tier ?? "community",
+      canTransfer: body.canTransfer ?? true,
+      canSwap: body.canSwap ?? true,
       onTopRanking: body.onTopRanking ?? false,
     },
   });
