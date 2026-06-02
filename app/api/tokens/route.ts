@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { TOKENS } from "@/lib/tokens";
 
@@ -43,6 +44,7 @@ export async function GET(req: NextRequest) {
 
 async function ensurePublicCoreTokens() {
   try {
+    await ensureTokenControlColumns();
     for (const token of TOKENS) {
       await db.token.upsert({
         where: { symbol: token.symbol },

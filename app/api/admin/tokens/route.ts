@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { TOKENS } from "@/lib/tokens";
 
@@ -13,6 +14,7 @@ export async function GET() {
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
   await ensureCoreTokens();
+  await ensureTokenControlColumns();
   const tokens = await db.token.findMany({
     orderBy: { createdAt: "asc" },
   });
@@ -55,6 +57,7 @@ export async function POST(req: NextRequest) {
 }
 
 async function ensureCoreTokens() {
+  await ensureTokenControlColumns();
   for (const token of TOKENS) {
     await db.token.upsert({
       where: { symbol: token.symbol },

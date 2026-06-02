@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
   const requestedMode = req.nextUrl.searchParams.get("mode");
   const mode: WorldChainMarketMode =
     requestedMode === "losers" || requestedMode === "new" || requestedMode === "all" ? requestedMode : "gainers";
+  await ensureTokenControlColumns().catch((error) => console.error("Failed to ensure token control columns", error));
   const [tokens, configured] = await Promise.all([
     getWorldChainMarkets(mode),
     db.token.findMany({ where: { status: "verified" } }).catch(() => []),
