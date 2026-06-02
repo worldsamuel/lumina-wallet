@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest) {
     morphoDepositEnabled?: boolean;
     adminLogoUrl?: string | null;
     faviconUrl?: string | null;
+    swapNetworkFeeLabel?: string | null;
   };
   const config = await updateSystemConfig({
     maintenance: typeof body.maintenance === "boolean" ? body.maintenance : undefined,
@@ -31,6 +32,10 @@ export async function PATCH(req: NextRequest) {
     adminLogoUrl:
       typeof body.adminLogoUrl === "string" || body.adminLogoUrl === null ? body.adminLogoUrl : undefined,
     faviconUrl: typeof body.faviconUrl === "string" || body.faviconUrl === null ? body.faviconUrl : undefined,
+    swapNetworkFeeLabel:
+      typeof body.swapNetworkFeeLabel === "string" || body.swapNetworkFeeLabel === null
+        ? body.swapNetworkFeeLabel
+        : undefined,
   });
   await auditLog(admin.id, "update_system_config", "system_config", body);
   return jsonResponse(config);

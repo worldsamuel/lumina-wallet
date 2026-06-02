@@ -5,6 +5,7 @@ export type SystemConfig = {
   morphoDepositEnabled: boolean;
   adminLogoUrl: string | null;
   faviconUrl: string | null;
+  swapNetworkFeeLabel: string | null;
 };
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
@@ -12,6 +13,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   morphoDepositEnabled: true,
   adminLogoUrl: null,
   faviconUrl: null,
+  swapNetworkFeeLabel: "~$0.00",
 };
 
 const SYSTEM_CONFIG_KEY = "system_config";
@@ -29,6 +31,10 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
         : DEFAULT_SYSTEM_CONFIG.morphoDepositEnabled,
     adminLogoUrl: typeof source.adminLogoUrl === "string" && source.adminLogoUrl ? source.adminLogoUrl : null,
     faviconUrl: typeof source.faviconUrl === "string" && source.faviconUrl ? source.faviconUrl : null,
+    swapNetworkFeeLabel:
+      typeof source.swapNetworkFeeLabel === "string" && source.swapNetworkFeeLabel.trim()
+        ? source.swapNetworkFeeLabel.trim()
+        : DEFAULT_SYSTEM_CONFIG.swapNetworkFeeLabel,
   };
 }
 

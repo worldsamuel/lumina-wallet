@@ -45,4 +45,5 @@ export type BackendSystemConfig = {
   morphoDepositEnabled: boolean;
   adminLogoUrl: string | null;
   faviconUrl: string | null;
+  swapNetworkFeeLabel: string | null;
 };

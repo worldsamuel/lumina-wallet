@@ -55,34 +55,30 @@ export async function POST(req: NextRequest) {
 }
 
 async function ensureCoreTokens() {
-  const count = await db.token.count();
-  if (count > 0) return;
-
-  await Promise.all(
-    TOKENS.map((token) =>
-      db.token.upsert({
-        where: { symbol: token.symbol },
-        update: {
-          name: token.name,
-          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
-          decimals: token.decimals,
-          status: "verified",
-          tier: "core",
-          canTransfer: true,
-          canSwap: true,
-        },
-        create: {
-          symbol: token.symbol,
-          name: token.name,
-          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
-          decimals: token.decimals,
-          status: "verified",
-          tier: "core",
-          canTransfer: true,
-          canSwap: true,
-          onTopRanking: token.symbol === "WLD",
-        },
-      }),
-    ),
-  );
+  for (const token of TOKENS) {
+    await db.token.upsert({
+      where: { symbol: token.symbol },
+      update: {
+        name: token.name,
+        contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+        decimals: token.decimals,
+        status: "verified",
+        tier: "core",
+        canTransfer: true,
+        canSwap: true,
+      },
+      create: {
+        symbol: token.symbol,
+        name: token.name,
+        contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+        decimals: token.decimals,
+        logoUrl: null,
+        status: "verified",
+        tier: "core",
+        canTransfer: true,
+        canSwap: true,
+        onTopRanking: token.symbol === "WLD",
+      },
+    });
+  }
 }

@@ -20,6 +20,7 @@ declare global {
     updateBellDot?: () => void;
     __luminaRefreshTokenLogos?: () => void;
     __luminaApplySystemConfig?: () => void;
+    __luminaApplySwapSystemConfig?: () => void;
   }
 }
 
@@ -176,6 +177,7 @@ export function useBackendConfigSync(enabled: boolean) {
       window.localStorage.setItem("ww_system_config", JSON.stringify(systemConfig.data));
       applySystemConfig(systemConfig.data);
       window.__luminaApplySystemConfig?.();
+      window.__luminaApplySwapSystemConfig?.();
     }
   }, [
     about.data,

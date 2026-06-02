@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
 
+  await ensurePublicCoreTokens();
   let tokens: Awaited<ReturnType<typeof db.token.findMany>> = [];
   try {
     tokens = await db.token.findMany({
@@ -38,4 +39,37 @@ export async function GET(req: NextRequest) {
     createdAt: new Date(0).toISOString(),
   }));
   return jsonResponse([...coreFallback, ...tokens]);
+}
+
+async function ensurePublicCoreTokens() {
+  try {
+    for (const token of TOKENS) {
+      await db.token.upsert({
+        where: { symbol: token.symbol },
+        update: {
+          name: token.name,
+          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+          decimals: token.decimals,
+          status: "verified",
+          tier: "core",
+          canTransfer: true,
+          canSwap: true,
+        },
+        create: {
+          symbol: token.symbol,
+          name: token.name,
+          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+          decimals: token.decimals,
+          logoUrl: null,
+          status: "verified",
+          tier: "core",
+          canTransfer: true,
+          canSwap: true,
+          onTopRanking: token.symbol === "WLD",
+        },
+      });
+    }
+  } catch (error) {
+    console.error("Failed to ensure public core tokens", error);
+  }
 }

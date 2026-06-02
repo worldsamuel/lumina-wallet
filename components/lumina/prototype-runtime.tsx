@@ -48,6 +48,7 @@ declare global {
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
+    __luminaApplyBalancePrivacy?: () => void;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
     __luminaOpenReceive?: () => void;
@@ -765,10 +766,10 @@ function enhancePrototypeBuiltinTokenLogos() {
       };
       window.__luminaTokenLogoHtml = function(symbol, fallback){
         var sym = String(symbol || "").toUpperCase();
-        var builtin = builtinLogo(sym);
-        if (builtin) return builtin;
         var configured = logoUrlsBySymbol[sym];
         if (configured) return logoImg(sym, configured, ethTrustLogoUrl(sym));
+        var builtin = builtinLogo(sym);
+        if (builtin) return builtin;
         var trusted = trustedLogoUrl(sym);
         if (trusted) return logoImg(sym, trusted, ethTrustLogoUrl(sym));
         var fb = String(fallback || "");
@@ -1707,6 +1708,28 @@ function enhancePrototypeHome() {
         return "";
       }
       function fixSignedMoney(){
+        window.__luminaApplyBalancePrivacy = function(){
+          var isHidden = typeof hidden !== "undefined" && !!hidden;
+          var balEl = document.getElementById("balAmt");
+          var changeEl = document.querySelector(".balance-change");
+          if (balEl && isHidden) balEl.textContent = "••••••";
+          if (changeEl) {
+            changeEl.style.visibility = isHidden ? "hidden" : "";
+            changeEl.setAttribute("aria-hidden", isHidden ? "true" : "false");
+          }
+        };
+        if (!window.__luminaHomePrivacyFix) {
+          window.__luminaHomePrivacyFix = true;
+          var eye = document.getElementById("eyeBtn");
+          if (eye) {
+            eye.onclick = function(){
+              hidden = !hidden;
+              var balEl = document.getElementById("balAmt");
+              if (balEl) balEl.textContent = hidden ? "••••••" : formatMoney(totalUsdNum);
+              window.__luminaApplyBalancePrivacy();
+            };
+          }
+        }
         if (!window.__luminaHomeMoneyFix && typeof formatMoney === "function") {
           window.__luminaHomeMoneyFix = true;
           var rawFormatMoney = formatMoney;
@@ -1726,6 +1749,7 @@ function enhancePrototypeHome() {
               var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
               subEl.textContent = sign + formatMoney(change24hUsdNum) + " (24h)";
             }
+            window.__luminaApplyBalancePrivacy();
           };
         }
       }
@@ -2102,6 +2126,55 @@ function enhancePrototypeSwapQuote() {
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
 	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
+	      var configuredNetworkFeeLabel = "";
+      function swapLang(){
+        return window.currentLang || "en";
+      }
+      function swapCopy(key){
+        var lang = swapLang();
+        var copy = {
+          confirmSwap: { en:"Confirm swap", "zh-CN":"确认兑换", "zh-TW":"確認兌換", fr:"Confirmer l'échange", de:"Swap bestätigen", es:"Confirmar intercambio", ja:"スワップを確認" },
+          cancel: { en:"Cancel", "zh-CN":"取消", "zh-TW":"取消", fr:"Annuler", de:"Abbrechen", es:"Cancelar", ja:"キャンセル" },
+          youPay: { en:"You pay", "zh-CN":"您要支付", "zh-TW":"您要支付", fr:"Vous payez", de:"Sie zahlen", es:"Pagas", ja:"支払う" },
+          youReceiveApprox: { en:"You receive about", "zh-CN":"您将收到约", "zh-TW":"您將收到約", fr:"Vous recevrez environ", de:"Sie erhalten etwa", es:"Recibirás aprox.", ja:"受取予定" },
+          minReceive: { en:"Minimum received (slippage protection)", "zh-CN":"最少收到 (滑点保护)", "zh-TW":"最少收到 (滑點保護)", fr:"Minimum reçu (protection slippage)", de:"Mindestens erhalten (Slippage-Schutz)", es:"Mínimo recibido (protección)", ja:"最低受取額 (スリッページ保護)" },
+          riskAck: { en:"Tap to acknowledge risk", "zh-CN":"点这里确认风险", "zh-TW":"點這裡確認風險", fr:"Touchez pour accepter le risque", de:"Risiko bestätigen", es:"Toca para aceptar el riesgo", ja:"リスクを確認" },
+          riskAcked: { en:"Risk acknowledged, you can continue", "zh-CN":"已确认风险,可以继续兑换", "zh-TW":"已確認風險,可以繼續兌換", fr:"Risque accepté, vous pouvez continuer", de:"Risiko bestätigt, Sie können fortfahren", es:"Riesgo aceptado, puedes continuar", ja:"リスク確認済み、続行できます" },
+          ackRiskFirst: { en:"Please acknowledge the risk first", "zh-CN":"请先确认高风险交易", "zh-TW":"請先確認高風險交易", fr:"Veuillez d'abord accepter le risque", de:"Bitte zuerst das Risiko bestätigen", es:"Primero acepta el riesgo", ja:"先にリスクを確認してください" },
+          submitted: { en:"Swap submitted", "zh-CN":"兑换已提交", "zh-TW":"兌換已提交", fr:"Échange envoyé", de:"Swap gesendet", es:"Intercambio enviado", ja:"スワップを送信しました" },
+          waiting: { en:"Waiting for on-chain confirmation. Expected receive about", "zh-CN":"等待区块链确认中。预计收到约", "zh-TW":"等待區塊鏈確認中。預計收到約", fr:"En attente de confirmation on-chain. Réception prévue environ", de:"Warten auf On-chain-Bestätigung. Erwartet etwa", es:"Esperando confirmación on-chain. Recibirás aprox.", ja:"オンチェーン確認待ち。受取予定" },
+          viewActivity: { en:"View Activity", "zh-CN":"查看 Activity", "zh-TW":"查看 Activity", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver actividad", ja:"Activity を見る" },
+          networkFee: { en:"Network fee", "zh-CN":"网络费", "zh-TW":"網絡費", fr:"Frais réseau", de:"Netzwerkgebühr", es:"Comisión de red", ja:"ネットワーク手数料" },
+          enterAmount: { en:"Enter an amount to get a quote", "zh-CN":"输入金额后获取报价", "zh-TW":"輸入金額後取得報價", fr:"Saisissez un montant pour obtenir un devis", de:"Betrag eingeben, um ein Angebot zu erhalten", es:"Ingresa un importe para cotizar", ja:"金額を入力して見積もり" },
+          readingRoute: { en:"Reading DEX route...", "zh-CN":"正在读取兑换路由...", "zh-TW":"正在讀取兌換路由...", fr:"Lecture de la route DEX...", de:"DEX-Route wird gelesen...", es:"Leyendo ruta DEX...", ja:"DEX ルートを読み込み中..." },
+          noRoute: { en:"No executable route for this pair. Top rankings are market discovery only.", "zh-CN":"当前交易对暂无可执行路由。涨幅榜仅用于行情发现。", "zh-TW":"當前交易對暫無可執行路由。漲幅榜僅用於行情發現。", fr:"Aucune route exécutable pour cette paire.", de:"Keine ausführbare Route für dieses Paar.", es:"No hay ruta ejecutable para este par.", ja:"このペアの実行可能ルートはありません。" },
+          signing: { en:"Signing...", "zh-CN":"签名中...", "zh-TW":"簽名中...", fr:"Signature...", de:"Signieren...", es:"Firmando...", ja:"署名中..." },
+          submitting: { en:"Submitting transaction...", "zh-CN":"提交交易...", "zh-TW":"提交交易...", fr:"Envoi de la transaction...", de:"Transaktion wird gesendet...", es:"Enviando transacción...", ja:"取引を送信中..." },
+          waitingChain: { en:"Waiting for confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation...", de:"Warten auf Bestätigung...", es:"Esperando confirmación...", ja:"確認待ち..." }
+        };
+        return (copy[key] && (copy[key][lang] || copy[key].en)) || (typeof t === "function" ? t(key) : key);
+      }
+      function readSwapSystemConfig(){
+        try {
+          var cfg = JSON.parse(localStorage.getItem("ww_system_config") || "{}");
+          configuredNetworkFeeLabel = String(cfg.swapNetworkFeeLabel || "").trim();
+        } catch(e) {
+          configuredNetworkFeeLabel = "";
+        }
+      }
+      function networkFeeText(fallbackUsd){
+        var value = configuredNetworkFeeLabel;
+        if (!value && Number.isFinite(Number(fallbackUsd))) value = "~$" + Number(fallbackUsd).toFixed(2);
+        if (!value) value = "—";
+        return /fee\\s*:/i.test(value) || /网络费[:：]|網絡費[:：]/.test(value) ? value : swapCopy("networkFee") + ": " + value;
+      }
+      window.__luminaApplySwapSystemConfig = function(){
+        readSwapSystemConfig();
+        var gas = feeEl();
+        if (gas) gas.textContent = networkFeeText(latestSwapQuote && latestSwapQuote.gasEstimateUsd);
+        setSwapButtonPending();
+      };
+      readSwapSystemConfig();
       function shortAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -2147,7 +2220,7 @@ function enhancePrototypeSwapQuote() {
 	          setSwapButtonState("单笔限额 $" + swapMaxUsd, true);
 	          return;
 	        }
-	        setSwapButtonState("确认兑换", false);
+	        setSwapButtonState(swapCopy("confirmSwap"), false);
 	      }
       function tokenInputForQuote(symbol){
         var meta = customTokens && customTokens[symbol] ? customTokens[symbol] : null;
@@ -2177,7 +2250,7 @@ function enhancePrototypeSwapQuote() {
         if (buy) buy.value = "—";
         if (rate) rate.textContent = message;
         if (impact) { impact.textContent = "—"; impact.className = impactClass || "impact-mid"; }
-        if (gas) gas.textContent = "—";
+        if (gas) gas.textContent = networkFeeText();
         if (warn) { warn.classList.remove("show"); warn.textContent = ""; }
       }
       function formatRate(value){
@@ -2221,7 +2294,7 @@ function enhancePrototypeSwapQuote() {
           impact.textContent = p < 0.01 ? "<0.01%" : p.toFixed(2) + "%";
           impact.className = data.priceImpactLevel === "green" ? "impact-low" : (data.priceImpactLevel === "yellow" ? "impact-mid" : "impact-high");
         }
-        if (gas) gas.textContent = Number.isFinite(Number(data.gasEstimateUsd)) ? "Network fee: ~$" + Number(data.gasEstimateUsd).toFixed(2) : "Network fee: —";
+        if (gas) gas.textContent = networkFeeText(data.gasEstimateUsd);
         renderReferences(data);
         renderWarning(data);
         setSwapButtonPending();
@@ -2231,11 +2304,11 @@ function enhancePrototypeSwapQuote() {
         var sell = document.getElementById("sellAmt");
         var amount = sell ? String(sell.value || "").trim() : "";
         if (!amount || Number(amount) <= 0) {
-          setQuoteState("Enter an amount to get a quote");
+          setQuoteState(swapCopy("enterAmount"));
           return;
         }
         var seq = ++quoteSeq;
-        setQuoteState("Reading DEX route...");
+        setQuoteState(swapCopy("readingRoute"));
         try {
           var res = await fetch("/api/swap/quote", {
             method: "POST",
@@ -2257,7 +2330,7 @@ function enhancePrototypeSwapQuote() {
         } catch(e) {
           if (seq !== quoteSeq) return;
           var msg = e && e.message ? e.message : "Quote failed";
-          if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = "No executable route for this pair. Top rankings are market discovery only.";
+          if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = swapCopy("noRoute");
           setQuoteState(msg, "impact-high");
         }
       }
@@ -2359,14 +2432,14 @@ function enhancePrototypeSwapQuote() {
 	          modal.id = "swapConfirmModal";
 	          modal.innerHTML =
 	            '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;padding:24px;border-radius:26px;">' +
-	              '<div class="modal-grip"></div><h3>确认兑换</h3>' +
+	              '<div class="modal-grip"></div><h3>' + swapCopy("confirmSwap") + '</h3>' +
 	              '<div class="swap-confirm-list">' +
-	                '<div class="ln"><span>您要支付</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
-	                '<div class="ln"><span>您将收到约</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
-	                '<div class="ln"><span>最少收到 (滑点保护)</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
+	                '<div class="ln"><span>' + swapCopy("youPay") + '</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
+	                '<div class="ln"><span>' + swapCopy("youReceiveApprox") + '</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
+	                '<div class="ln"><span>' + swapCopy("minReceive") + '</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	              '</div>' +
-	              (state.riskText ? '<button class="btn-primary" id="swapHighImpactAck" style="width:100%;margin-top:14px;padding:16px;border-radius:18px;line-height:1.55;font-size:17px;background:#ff6b7a;color:#fff;box-shadow:0 0 0 2px rgba(255,107,122,.25);">⚠ 点这里确认风险<br><span style="font-size:13px;font-weight:700;">' + state.riskText + '</span></button>' : '') +
-	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">取消</button><button class="btn-primary" id="swapConfirmOk">确认兑换</button></div>' +
+	              (state.riskText ? '<button class="btn-primary" id="swapHighImpactAck" style="width:100%;margin-top:14px;padding:16px;border-radius:18px;line-height:1.55;font-size:17px;background:#ff6b7a;color:#fff;box-shadow:0 0 0 2px rgba(255,107,122,.25);">' + swapCopy("riskAck") + '<br><span style="font-size:13px;font-weight:700;">' + state.riskText + '</span></button>' : '') +
+	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
 	          function done(value){
@@ -2379,15 +2452,15 @@ function enhancePrototypeSwapQuote() {
 	            var ok = document.getElementById("swapConfirmOk");
 	            if (label) label.textContent = left + "s";
 	            if (left <= 0) {
-	              if (ok) { ok.textContent = "确认兑换"; }
+	              if (ok) { ok.textContent = swapCopy("confirmSwap"); }
 	            }
 	          }, 1000);
 	          modal.onclick = function(event){ if (event.target === modal) done(false); };
 	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
 	          var high = document.getElementById("swapHighImpactAck");
-	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.style.background = "#48dc7c"; high.style.color = "#06220f"; high.textContent = "✓ 已确认风险,可以继续兑换"; };
+	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.style.background = "#48dc7c"; high.style.color = "#06220f"; high.textContent = swapCopy("riskAcked"); };
 	          document.getElementById("swapConfirmOk").onclick = function(){
-	            if (state.riskText && !highImpactAcknowledged) { toast("请先确认高风险交易"); return; }
+	            if (state.riskText && !highImpactAcknowledged) { toast(swapCopy("ackRiskFirst")); return; }
 	            done(true);
 	          };
 	        });
@@ -2401,8 +2474,8 @@ function enhancePrototypeSwapQuote() {
 	        modal.innerHTML =
 	          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;position:relative;">' +
 	            '<button id="swapSuccessClose" aria-label="关闭" style="position:absolute;right:16px;top:14px;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font-size:22px;line-height:1;">×</button>' +
-	            '<div class="modal-grip"></div><h3>兑换已提交</h3><p class="send-confirm-body">等待区块链确认中。预计收到约 ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
-	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">查看 Activity</button>' +
+	            '<div class="modal-grip"></div><h3>' + swapCopy("submitted") + '</h3><p class="send-confirm-body">' + swapCopy("waiting") + ' ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
+	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">' + swapCopy("viewActivity") + '</button>' +
 	          '</div>';
 	        document.body.appendChild(modal);
 	        document.getElementById("swapSuccessClose").onclick = function(){ modal.remove(); };
@@ -2423,12 +2496,12 @@ function enhancePrototypeSwapQuote() {
 	        var confirmed = await openSwapConfirm(state);
 	        if (!confirmed) { toast("Cancelled"); return; }
 	        swapSubmitting = true;
-	        setSwapButtonState("签名中...", true);
+	        setSwapButtonState(swapCopy("signing"), true);
 	        try {
 	          if (!window.__luminaExecuteSwap) throw new Error("Swap execution is unavailable.");
 	          var fromQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.from : null;
 	          var toQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.to : null;
-	          setSwapButtonState("签名中...", true);
+	          setSwapButtonState(swapCopy("signing"), true);
 	          var promise = window.__luminaExecuteSwap({
 	            fromToken: tokenMeta(swapState.sell, fromQuoted),
 	            toToken: tokenMeta(swapState.buy, toQuoted),
@@ -2437,9 +2510,9 @@ function enhancePrototypeSwapQuote() {
 	            userAddress: window.__luminaUserAddress,
 	            forceHighImpact: highImpactAcknowledged
 	          });
-	          setSwapButtonState("提交交易...", true);
+	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
-	          setSwapButtonState("等待区块链确认...", true);
+	          setSwapButtonState(swapCopy("waitingChain"), true);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
@@ -2447,7 +2520,7 @@ function enhancePrototypeSwapQuote() {
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(e) : (e && e.message ? e.message : "Swap failed");
 	          toast("Swap failed: " + msg);
-	          setSwapButtonState("确认兑换", false);
+	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	        } finally {
 	          swapSubmitting = false;
 	        }
@@ -2504,6 +2577,16 @@ function enhancePrototypeSwapQuote() {
         if (typeof refreshSwapLabels === "function") refreshSwapLabels();
         toast(typeof t === "function" ? t("tFlipped") : "已对调买卖方向");
       };
+      var swapGear = document.querySelector("#view-swap .swap-head .gear");
+      if (swapGear) swapGear.classList.add("is-floating");
+      toggleSlip = function(){
+        var panel = document.getElementById("slipPanel");
+        if (!panel) return;
+        panel.classList.toggle("open");
+        if (panel.classList.contains("open")) {
+          setTimeout(function(){ panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 30);
+        }
+      };
       recalc = scheduleQuote;
 	      confirmSwap = handleSwapClick;
       document.querySelectorAll(".slip-opt").forEach(function(el){
@@ -2515,6 +2598,7 @@ function enhancePrototypeSwapQuote() {
       ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
       setSwapPillLogo("buyDot", swapState.buy);
+      window.__luminaApplySwapSystemConfig();
       scheduleQuote();
     })();
   `;
@@ -2774,17 +2858,27 @@ function enhancePrototypeActivity() {
         var lang = window.currentLang || "en";
         var copy = {
           loading: { en:"Loading activity...", fr:"Chargement de l'activité...", de:"Aktivität wird geladen...", es:"Cargando actividad...", ja:"アクティビティを読み込み中...", "zh-CN":"正在读取活动...", "zh-TW":"正在讀取活動..." },
-          empty: { en:"No activity yet", fr:"Aucune activité pour le moment", de:"Noch keine Aktivität", es:"Aún no hay actividad", ja:"アクティビティはまだありません", "zh-CN":"暂无活动", "zh-TW":"暫無活動" }
+          empty: { en:"No activity yet", fr:"Aucune activité pour le moment", de:"Noch keine Aktivität", es:"Aún no hay actividad", ja:"アクティビティはまだありません", "zh-CN":"暂无活动", "zh-TW":"暫無活動" },
+          swapRoute: { en:"Swap", fr:"Échange", de:"Swap", es:"Intercambio", ja:"スワップ", "zh-CN":"兑换", "zh-TW":"兌換" },
+          completed: { en:"Completed", fr:"Terminé", de:"Abgeschlossen", es:"Completado", ja:"完了", "zh-CN":"已完成", "zh-TW":"已完成" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
+      }
+      function activitySubtitle(value){
+        if (/uniswap route/i.test(String(value || "")) || String(value || "") === "Swap") return activityCopy("swapRoute");
+        return value || "";
+      }
+      function activityStatus(value){
+        if (!value || /completed/i.test(String(value))) return activityCopy("completed");
+        return value;
       }
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
         return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'Transaction submitted. Waiting for confirmation.\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
-          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + a.subtitle + '</div></div>' +
-          '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + (a.status || "Completed") + '</div></div>' +
+          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + activitySubtitle(a.subtitle) + '</div></div>' +
+          '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + activityStatus(a.status) + '</div></div>' +
         '</div>';
       }
       renderActivity = function(){

@@ -148,7 +148,7 @@ function mergeSwapActivity<
         : outgoingIsVaultShare
           ? `Withdraw ${incoming.tokenText}`
           : `Swap ${outgoing.tokenText} → ${incoming.tokenText}`;
-      const subtitle = incomingIsVaultShare || outgoingIsVaultShare ? "Vault" : "Uniswap route";
+      const subtitle = incomingIsVaultShare || outgoingIsVaultShare ? "Vault" : "Swap";
       const type = incomingIsVaultShare ? "in" : outgoingIsVaultShare ? "out" : "swap";
       rows.push({
         hash: outgoing.hash,

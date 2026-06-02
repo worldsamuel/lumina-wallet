@@ -173,6 +173,7 @@ function syncBalancesToPrototype(
       document.querySelector(".balance-change").classList.toggle("down", ${JSON.stringify(weightedChangePct < 0)});
     }
     if (typeof renderMoney === "function") renderMoney();
+    if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
     if (typeof refreshSwapLabels === "function") refreshSwapLabels();
   `);
 }
