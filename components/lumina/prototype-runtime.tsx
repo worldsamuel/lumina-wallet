@@ -3333,6 +3333,20 @@ function enhancePrototypeDetail() {
         var sym = asset && asset.sym ? asset.sym : "token";
         return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data for ' + sym + (reason ? '<br><span>' + reason + '</span>' : '') + '</div>';
       }
+      function liveMarketSummary(asset, range, reason) {
+        var market = marketForAsset(asset);
+        if (!market || !market.priceUsd) return realChartUnavailable(asset, range, reason);
+        var change = Number(market.change24h || 0);
+        var changeClass = change >= 0 ? "up" : "down";
+        return '<div class="market-detail-state live-market-summary">' +
+          '<strong>Live market data</strong>' +
+          '<span>' + (reason || "No candle history from the pool yet.") + '</span>' +
+          '<div class="market-stat-row"><span>Price</span><b>' + formatChartPrice(market.priceUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>24h Change</span><b class="' + changeClass + '">' + (change >= 0 ? "+" : "") + change.toFixed(2) + '%</b></div>' +
+          '<div class="market-stat-row"><span>24h Volume</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>Liquidity</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
+          '</div>';
+      }
 
       function renderMarketCard(asset) {
         var market = marketForAsset(asset);
@@ -3374,13 +3388,13 @@ function enhancePrototypeDetail() {
                 chart.innerHTML = trendSvg(candles, range || "1D");
                 updateRangeChange(candles, range || "1D", asset);
               } else {
-                chart.innerHTML = realChartUnavailable(asset, range || "1D", reason || "No market history found.");
-                updateRangeChange(null, range || "1D", asset);
+                chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || "No market history found.");
+                updateRangeChangeFromMarket(asset, range || "1D");
               }
             })
             .catch(function(){
-              chart.innerHTML = realChartUnavailable(asset, range || "1D", reason || "Market history request failed.");
-              updateRangeChange(null, range || "1D", asset);
+              chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || "Market history request failed.");
+              updateRangeChangeFromMarket(asset, range || "1D");
             });
         }
         if (!market || !market.poolAddress) {
@@ -3424,6 +3438,24 @@ function enhancePrototypeDetail() {
         var up = Number(change) >= 0;
         pill.className = up ? "up" : "down";
         pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
+      }
+      function updateRangeChangeFromMarket(asset, range) {
+        var market = marketForAsset(asset);
+        var pill = document.getElementById("detChangePill");
+        var label = document.getElementById("detChangeLabel");
+        if (label) label.textContent = range || "1D";
+        if (!pill || !market || market.change24h === null || market.change24h === undefined) {
+          updateRangeChange(null, range || "1D", asset);
+          return;
+        }
+        var change = Number(market.change24h);
+        if (!Number.isFinite(change)) {
+          updateRangeChange(null, range || "1D", asset);
+          return;
+        }
+        var up = change >= 0;
+        pill.className = up ? "up" : "down";
+        pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + change.toFixed(1) + "% (24h)";
       }
       function formatChartPrice(value){
         var n = Number(value || 0);

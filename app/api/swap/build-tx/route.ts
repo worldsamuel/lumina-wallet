@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
-import { isAddress, parseUnits, type Address } from "viem";
+import { formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import type { OnchainPricesResponse } from "@/lib/prices";
 import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
 import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
+import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 
 const MAX_PRICE_IMPACT_PERCENT = 15;
@@ -42,7 +43,10 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ error: `Single swap limit is $${maxUsd}. Please reduce the amount.` }, { status: 400 });
   }
 
-  const quote = await quoteBestV3(parsed.from, parsed.to, parsed.fromAmount);
+  const platformFee = await getSwapPlatformFee(parsed.from, parsed.fromAmount);
+  const swapAmount = platformFee?.swapAmount ?? parsed.fromAmount;
+
+  const quote = await quoteBestV3(parsed.from, parsed.to, swapAmount);
   if (!quote.bestQuote || BigInt(quote.bestQuote.amountOutRaw) <= 0n) {
     return jsonResponse({ error: "No executable Uniswap V3 route for this pair." }, { status: 404 });
   }
@@ -50,7 +54,7 @@ export async function POST(req: NextRequest) {
   const tx = await buildSwapTransaction({
     fromToken: parsed.from,
     toToken: parsed.to,
-    fromAmount: parsed.fromAmount,
+    fromAmount: swapAmount,
     expectedAmountOut: BigInt(quote.bestQuote.amountOutRaw),
     feeTier: quote.bestQuote.fee,
     route: quote.bestQuote.route,
@@ -63,7 +67,9 @@ export async function POST(req: NextRequest) {
     tx,
     quote: {
       source: "uniswap-v3",
-      amountIn: parsed.amountText,
+      amountIn: formatUnits(swapAmount, parsed.from.decimals),
+      amountInRaw: swapAmount.toString(),
+      grossAmountIn: parsed.amountText,
       amountOut: quote.bestQuote.amountOut,
       amountOutRaw: quote.bestQuote.amountOutRaw,
       feeTier: quote.bestQuote.fee,
@@ -74,6 +80,7 @@ export async function POST(req: NextRequest) {
         to: parsed.to,
       },
     },
+    platformFee: platformFee?.payload ?? null,
     permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
     deadline: parsed.deadline,
   });

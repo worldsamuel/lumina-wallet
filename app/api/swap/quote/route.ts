@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { parseUnits } from "viem";
+import { formatUnits, parseUnits } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
@@ -9,6 +9,7 @@ import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
+import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
 
 type QuoteBody = {
   fromSymbol?: string;
@@ -37,7 +38,10 @@ export async function POST(req: NextRequest) {
   const parsed = await parseQuoteBody(body);
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: 400 });
 
-  const amountIn = parseUnits(parsed.amountText, parsed.from.decimals);
+  const grossAmountIn = parseUnits(parsed.amountText, parsed.from.decimals);
+  const platformFee = await getSwapPlatformFee(parsed.from, grossAmountIn);
+  const amountIn = platformFee?.swapAmount ?? grossAmountIn;
+  const amountText = formatUnits(amountIn, parsed.from.decimals);
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
     withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
@@ -53,7 +57,7 @@ export async function POST(req: NextRequest) {
     publicClient.getGasPrice().catch(() => 0n),
   ]);
 
-  const amountInNumber = Number(parsed.amountText);
+  const amountInNumber = Number(amountText);
   const main = pickMainQuote(v3, v4);
   const chainlinkRate = referenceRate(parsed.from, parsed.to, chainlink);
   const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
@@ -85,7 +89,9 @@ export async function POST(req: NextRequest) {
   return jsonResponse(
     {
       source: main.source,
-      amountIn: parsed.amountText,
+      amountIn: amountText,
+      amountInRaw: amountIn.toString(),
+      grossAmountIn: parsed.amountText,
       amountOut: main.quote.amountOut,
       amountOutRaw: main.quote.amountOutRaw,
       rate: quoteRate,
@@ -94,6 +100,7 @@ export async function POST(req: NextRequest) {
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
       route: main.quote.route,
+      platformFee: platformFee?.payload ?? null,
       tokens: {
         from: tokenPayload(parsed.from),
         to: tokenPayload(parsed.to),

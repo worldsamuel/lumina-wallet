@@ -22,6 +22,8 @@ export type ExecuteSwapParams = {
 type QuoteResponse = {
   source: string;
   amountIn: string;
+  amountInRaw?: string;
+  grossAmountIn?: string;
   amountOut: string;
   amountOutRaw: string;
   feeTier: number;
@@ -35,6 +37,15 @@ type QuoteResponse = {
   };
 };
 
+type PlatformFeePayload = {
+  businessType: "swap";
+  token: Address;
+  recipient: Address;
+  percent: string;
+  amountRaw: string;
+  amount: string;
+};
+
 type BuildTxResponse = {
   tx: {
     to: Address;
@@ -44,6 +55,7 @@ type BuildTxResponse = {
   quote: QuoteResponse & {
     gasEstimate?: string;
   };
+  platformFee?: PlatformFeePayload | null;
   deadline: number;
 };
 
@@ -85,6 +97,7 @@ export async function executeSwap(params: ExecuteSwapParams) {
   });
   const tx = built.tx;
   const executableQuote = built.quote;
+  const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
   // World App consumes this Permit2 allowance in the same sendTransaction batch.
   // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
@@ -96,10 +109,23 @@ export async function executeSwap(params: ExecuteSwapParams) {
       data: encodeFunctionData({
         abi: [permit2Abi[0]],
         functionName: "approve",
-        args: [freshQuote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(fromAmount), permit2Expiration],
+        args: [freshQuote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(executableAmount), permit2Expiration],
       }),
       value: "0x0",
     },
+    ...(built.platformFee && BigInt(built.platformFee.amountRaw) > 0n
+      ? [
+          {
+            to: built.platformFee.token,
+            data: encodeFunctionData({
+              abi: [erc20TransferAbi],
+              functionName: "transfer",
+              args: [built.platformFee.recipient, BigInt(built.platformFee.amountRaw)],
+            }),
+            value: "0x0",
+          },
+        ]
+      : []),
     tx,
   ];
 
@@ -129,6 +155,17 @@ export async function executeSwap(params: ExecuteSwapParams) {
     quote: executableQuote,
   };
 }
+
+const erc20TransferAbi = {
+  type: "function",
+  name: "transfer",
+  stateMutability: "nonpayable",
+  inputs: [
+    { name: "to", type: "address" },
+    { name: "amount", type: "uint256" },
+  ],
+  outputs: [{ name: "success", type: "bool" }],
+} as const;
 
 async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse> {
   const response = await fetch("/api/swap/quote", {

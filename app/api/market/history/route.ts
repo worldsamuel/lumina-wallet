@@ -23,6 +23,11 @@ type HistoryCandle = {
 };
 
 const cache = new Map<string, { expiresAt: number; candles: HistoryCandle[] }>();
+const SYMBOL_ALIASES: Record<string, string> = {
+  WETH: "ETH",
+  WBTC: "BTC",
+  BTC: "BTC",
+};
 
 export function OPTIONS() {
   return optionsResponse();
@@ -70,8 +75,9 @@ export async function GET(req: NextRequest) {
 }
 
 function coingeckoIdForSymbol(symbol: string) {
-  const token = TOKENS.find((item) => item.symbol.toUpperCase() === symbol);
-  return token?.coingeckoId ?? COINGECKO_IDS[symbol as keyof typeof COINGECKO_IDS] ?? null;
+  const normalized = SYMBOL_ALIASES[symbol] ?? symbol;
+  const token = TOKENS.find((item) => item.symbol.toUpperCase() === symbol || item.symbol.toUpperCase() === normalized);
+  return token?.coingeckoId ?? COINGECKO_IDS[normalized as keyof typeof COINGECKO_IDS] ?? COINGECKO_IDS[symbol as keyof typeof COINGECKO_IDS] ?? null;
 }
 
 function chartConfig(range: string) {
