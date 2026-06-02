@@ -2071,7 +2071,7 @@ function enhancePrototypeSwapQuote() {
 	      var swapSubmitting = false;
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
-	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "5") || 5)};
+	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "1000") || 1000)};
       function shortAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -2268,6 +2268,19 @@ function enhancePrototypeSwapQuote() {
 	        var n = Number(raw.replace(/,/g, ""));
 	        return Number.isFinite(n) ? n : 0;
 	      }
+	      function readableSwapError(error){
+	        if (!error) return { message:"Unknown swap error" };
+	        var out = {
+	          name: error.name,
+	          message: error.message,
+	          code: error.code,
+	          error_code: error.error_code,
+	          data: error.data,
+	          cause: error.cause && (error.cause.message || error.cause.data || error.cause.code || error.cause.error_code)
+	        };
+	        try { out.serialized = JSON.stringify(error); } catch(e) {}
+	        return out;
+	      }
 	      function minOutText(){
 	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
 	        var slip = slippageBps();
@@ -2355,11 +2368,13 @@ function enhancePrototypeSwapQuote() {
 	        modal.className = "modal-mask open";
 	        modal.id = "swapSuccessModal";
 	        modal.innerHTML =
-	          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;">' +
+	          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;position:relative;">' +
+	            '<button id="swapSuccessClose" aria-label="关闭" style="position:absolute;right:16px;top:14px;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font-size:22px;line-height:1;">×</button>' +
 	            '<div class="modal-grip"></div><h3>兑换已提交</h3><p class="send-confirm-body">等待区块链确认中。预计收到约 ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
 	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">查看 Activity</button>' +
 	          '</div>';
 	        document.body.appendChild(modal);
+	        document.getElementById("swapSuccessClose").onclick = function(){ modal.remove(); };
 	        document.getElementById("swapSuccessOk").onclick = function(){ modal.remove(); go("activity"); setTabByName("Activity"); };
 	      }
 	      async function handleSwapClick(){
@@ -2394,7 +2409,7 @@ function enhancePrototypeSwapQuote() {
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
-	          console.error("[SWAP] executeSwap failed", e);
+	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(e) : (e && e.message ? e.message : "Swap failed");
 	          toast("Swap failed: " + msg);
 	          setSwapButtonState("确认兑换", false);

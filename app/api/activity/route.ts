@@ -139,11 +139,22 @@ function mergeSwapActivity<
     const outgoing = group.find((item) => item.direction === "out");
     const incoming = group.find((item) => item.direction === "in");
     if (outgoing && incoming && group.length >= 2) {
+      const incomingSymbol = tokenSymbolFromText(incoming.tokenText);
+      const outgoingSymbol = tokenSymbolFromText(outgoing.tokenText);
+      const incomingIsVaultShare = isVaultShareSymbol(incomingSymbol);
+      const outgoingIsVaultShare = isVaultShareSymbol(outgoingSymbol);
+      const title = incomingIsVaultShare
+        ? `Deposit ${outgoing.tokenText}`
+        : outgoingIsVaultShare
+          ? `Withdraw ${incoming.tokenText}`
+          : `Swap ${outgoing.tokenText} → ${incoming.tokenText}`;
+      const subtitle = incomingIsVaultShare || outgoingIsVaultShare ? "Vault" : "Uniswap route";
+      const type = incomingIsVaultShare ? "in" : outgoingIsVaultShare ? "out" : "swap";
       rows.push({
         hash: outgoing.hash,
-        type: "swap",
-        title: `Swapped ${outgoing.tokenText} → ${incoming.tokenText}`,
-        subtitle: "Uniswap route",
+        type,
+        title,
+        subtitle,
         amount: `+${incoming.tokenText}`,
         status: "Completed",
         blockNumber: Math.max(...group.map((item) => item.blockNumber)),
@@ -154,4 +165,13 @@ function mergeSwapActivity<
     }
   }
   return rows;
+}
+
+function tokenSymbolFromText(tokenText: string) {
+  const parts = tokenText.trim().split(/\s+/);
+  return parts[parts.length - 1] ?? "";
+}
+
+function isVaultShareSymbol(symbol: string) {
+  return /^(re7|vault|morpho|moo)/i.test(symbol);
 }

@@ -1,7 +1,7 @@
 import { isAddress, type Address } from "viem";
 
-export type SwapTokenSymbol = "WLD" | "USDC" | "ETH" | "WETH" | "WBTC" | "EURC";
-export type SwapTokenTrust = "core" | "audited" | "community";
+export type SwapTokenSymbol = "WLD" | "USDC" | "USDT" | "ETH" | "WETH" | "BTC" | "WBTC" | "EURC";
+export type SwapTokenTrust = "core" | "alias" | "audited" | "community";
 
 export type SwapToken = {
   symbol: string;
@@ -28,6 +28,13 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
     decimals: 6,
   },
+  USDT: {
+    symbol: "USDT",
+    priceSymbol: "USDC",
+    name: "Tether USD",
+    address: "0x102d758f688a4C1C5a80b116bD945d4455460282",
+    decimals: 6,
+  },
   ETH: {
     symbol: "ETH",
     priceSymbol: "ETH",
@@ -49,6 +56,14 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
     decimals: 8,
   },
+  BTC: {
+    symbol: "WBTC",
+    priceSymbol: "BTC",
+    name: "Wrapped Bitcoin",
+    address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
+    decimals: 8,
+    trust: "alias",
+  },
   EURC: {
     symbol: "EURC",
     priceSymbol: "USDC",
@@ -64,7 +79,7 @@ export function resolveSwapToken(value: unknown): SwapToken | null {
   const symbol = String(value ?? "").trim().toUpperCase();
   if (isAddress(symbol)) return null;
   const token = SWAP_TOKENS[symbol as SwapTokenSymbol] ?? VERIFIED_SWAP_TOKENS[symbol];
-  return token ? { ...token, trust: SWAP_TOKENS[symbol as SwapTokenSymbol] ? "core" : "audited" } : null;
+  return token ? { ...token, trust: token.trust ?? (SWAP_TOKENS[symbol as SwapTokenSymbol] ? "core" : "audited") } : null;
 }
 
 export function resolveCoreSwapToken(value: unknown) {

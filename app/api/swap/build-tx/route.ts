@@ -133,6 +133,6 @@ async function fetchJson<T>(req: NextRequest, path: string): Promise<T> {
 }
 
 function getSwapMaxUsd() {
-  const value = Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "5");
-  return Number.isFinite(value) && value > 0 ? Math.min(value, 5) : 5;
+  const value = Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "1000");
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 1000) : 1000;
 }
