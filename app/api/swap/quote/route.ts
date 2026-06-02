@@ -73,17 +73,15 @@ export async function POST(req: NextRequest) {
 
   const amountOutNumber = Number(main.quote.amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
-  const baselineRate = chainlinkRate ?? coingeckoRate;
   const deviationValues = [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter(
     (value): value is number => value !== null,
   );
-  const maxDeviation = deviationValues.length ? Math.max(...deviationValues) : 0;
-  const priceImpactPercent = deviation(quoteRate, baselineRate) ?? 0;
+  const closestDeviation = deviationValues.length ? Math.min(...deviationValues) : 0;
+  const priceImpactPercent = closestDeviation;
   const warnings: string[] = [];
-  if (maxDeviation > 0.05) warnings.push("price_anomaly");
+  if (closestDeviation > 0.05) warnings.push("price_anomaly");
   if (priceImpactPercent > 0.1) warnings.push("low_liquidity");
 
-  const blocked = maxDeviation > 0.2;
   return jsonResponse(
     {
       source: main.source,
@@ -101,8 +99,8 @@ export async function POST(req: NextRequest) {
       },
       references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko, main.source),
       warnings,
-      blocked,
-      blockReason: blocked ? "Price deviation is above 20%. Swap is blocked to protect funds." : undefined,
+      blocked: false,
+      blockReason: undefined,
     },
     {
       headers: {
