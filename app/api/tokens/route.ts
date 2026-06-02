@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
+import { ensureCoreTokens } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { TOKENS } from "@/lib/tokens";
 
@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     id: `core-${token.symbol}`,
     symbol: token.symbol,
     name: token.name,
-    contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
+    contractAddr: token.native ? null : (token.contractAddress ?? token.wrappedAddress ?? null),
     decimals: token.decimals,
     logoUrl: null,
     status: "verified",
@@ -44,33 +44,7 @@ export async function GET(req: NextRequest) {
 
 async function ensurePublicCoreTokens() {
   try {
-    await ensureTokenControlColumns();
-    for (const token of TOKENS) {
-      await db.token.upsert({
-        where: { symbol: token.symbol },
-        update: {
-          name: token.name,
-          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
-          decimals: token.decimals,
-          status: "verified",
-          tier: "core",
-          canTransfer: true,
-          canSwap: true,
-        },
-        create: {
-          symbol: token.symbol,
-          name: token.name,
-          contractAddr: token.contractAddress ?? token.wrappedAddress ?? null,
-          decimals: token.decimals,
-          logoUrl: null,
-          status: "verified",
-          tier: "core",
-          canTransfer: true,
-          canSwap: true,
-          onTopRanking: token.symbol === "WLD",
-        },
-      });
-    }
+    await ensureCoreTokens();
   } catch (error) {
     console.error("Failed to ensure public core tokens", error);
   }
