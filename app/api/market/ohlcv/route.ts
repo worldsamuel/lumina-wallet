@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
         ? [{ timeframe: "hour", aggregate: "1", limit: "24" }]
         : range === "1W"
           ? [{ timeframe: "hour", aggregate: "4", limit: "42" }]
+          : range === "1M"
+            ? [{ timeframe: "day", aggregate: "1", limit: "30" }]
           : range === "1Y"
             ? [
                 { timeframe: "day", aggregate: "1", limit: "365" },

@@ -484,6 +484,8 @@
   /* 滑点设置面板 */
   .slip-panel { margin: 0 var(--pad-screen) 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; display: none; position: sticky; top: max(12px, env(safe-area-inset-top)); z-index: 30; box-shadow: 0 14px 38px rgba(0,0,0,0.28); }
   .slip-panel.open { display: block; animation: fade .2s ease; }
+  .slip-back { min-height: 32px; margin: 0 0 8px; padding: 0 2px; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: var(--text); font-size: 13px; font-weight: 800; cursor: pointer; }
+  .slip-back svg { color: var(--green); }
   .slip-panel .lbl { color: var(--text-dim); font-size: 12px; margin-bottom: 8px; }
   .slip-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(96px, 1.2fr); gap: 6px; align-items: center; }
   .slip-opt { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; text-align: center; font-size: 13px; font-weight: 600; cursor: pointer; }

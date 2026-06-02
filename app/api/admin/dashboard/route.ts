@@ -2,6 +2,7 @@ import { isAddress, type Address } from "viem";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { getRecentUserActivity } from "@/lib/admin/activity";
+import { ensureFeedbackSchema } from "@/lib/admin/ensure-feedback-schema";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -63,6 +64,7 @@ export async function GET() {
     };
   });
 
+  await ensureFeedbackSchema().catch((error) => console.error("Failed to ensure feedback schema", error));
   const [analytics, feedbackNew] = await Promise.all([
     db.contentPage.findUnique({ where: { key: "analytics_counters" } }),
     db.feedback.count({ where: { status: "new" } }),

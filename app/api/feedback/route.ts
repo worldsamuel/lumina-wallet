@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { isAddress } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { ensureFeedbackSchema } from "@/lib/admin/ensure-feedback-schema";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest) {
   const address = clean(req.nextUrl.searchParams.get("address"), 64);
   if (!isAddress(address)) return jsonResponse([]);
 
+  await ensureFeedbackSchema();
   const feedback = await db.feedback.findMany({
     where: { address },
     orderBy: { createdAt: "desc" },
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await ensureFeedbackSchema();
     const rawAddress = clean(body?.address, 64);
     const feedback = await db.feedback.create({
       data: {

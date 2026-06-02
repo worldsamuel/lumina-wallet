@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { ensureFeedbackSchema } from "@/lib/admin/ensure-feedback-schema";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -21,6 +22,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       : body.reply === null
         ? null
         : undefined;
+  await ensureFeedbackSchema();
   const feedback = await db.feedback.update({
     where: { id },
     data: {

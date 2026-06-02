@@ -1468,13 +1468,68 @@ function enhancePrototypeTokens() {
       }
       function importedList(){
         var list = readJson(importStoreKey, []);
-        return Array.isArray(list) ? list : [];
+        if (!Array.isArray(list)) return [];
+        var whitelist = whitelistedAddresses();
+        return list.filter(function(token){
+          var address = String(token && token.address || "").toLowerCase();
+          return !address || !whitelist.has(address);
+        });
+      }
+      function whitelistedAddresses(){
+        var out = new Set();
+        ["ww_tokens", "ww_swap_tokens", "ww_top_tokens"].forEach(function(key){
+          var list = readJson(key, []);
+          if (!Array.isArray(list)) return;
+          list.forEach(function(token){
+            var address = String(token && (token.contractAddr || token.address) || "").toLowerCase();
+            if (/^0x[a-f0-9]{40}$/.test(address)) out.add(address);
+          });
+        });
+        return out;
+      }
+      function swapWhitelistTokens(){
+        var source = readJson("ww_swap_tokens", []);
+        if (!Array.isArray(source) || !source.length) source = readJson("ww_tokens", []);
+        if (!Array.isArray(source) || !source.length) {
+          source = [
+            { symbol:"WLD", name:"Worldcoin", contractAddr:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals:18, logoUrl:null },
+            { symbol:"USDC", name:"USD Coin", contractAddr:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals:6, logoUrl:null },
+            { symbol:"USDT", name:"Tether USD", contractAddr:"0x102d758f688a4c1c5a80b116bd945d4455460282", decimals:6, logoUrl:null },
+            { symbol:"WETH", name:"WETH", contractAddr:"0x4200000000000000000000000000000000000006", decimals:18, logoUrl:null },
+            { symbol:"WBTC", name:"Wrapped Bitcoin", contractAddr:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals:8, logoUrl:null }
+          ];
+        }
+        var seen = new Set();
+        return source.filter(function(token){
+          var symbol = String(token && token.symbol || "").toUpperCase();
+          if (!symbol || symbol === "23") return false;
+          if (token.status && token.status !== "verified") return false;
+          if (token.canSwap === false) return false;
+          var address = String(token.contractAddr || token.address || "").toLowerCase();
+          var key = /^0x[a-f0-9]{40}$/.test(address) ? address : "native:" + symbol;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      }
+      function registerBackendToken(token){
+        var symbol = String(token.symbol || "").toUpperCase();
+        if (!symbol || symbol === "23") return "";
+        tokenFull[symbol] = token.name || tokenFull[symbol] || symbol;
+        if (token.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(symbol, token.logoUrl);
+        tokenLogo[symbol] = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, tokenLogo[symbol] || symbol) : (tokenLogo[symbol] || tokenInitial(symbol));
+        if (!dotColor[symbol]) dotColor[symbol] = "linear-gradient(135deg,#1b231e,#26362b)";
+        if (prices[symbol] === undefined) prices[symbol] = 0;
+        if (balances[symbol] === undefined) balances[symbol] = "0";
+        if (availMap[symbol] === undefined) availMap[symbol] = "0 " + symbol;
+        return symbol;
       }
       function hiddenSet(){
         var list = readJson(hiddenStoreKey, []);
         return new Set(Array.isArray(list) ? list.map(function(x){ return String(x).toLowerCase(); }) : []);
       }
       function saveImported(token){
+        if (whitelistedAddresses().has(String(token.address || "").toLowerCase())) return;
         var list = importedList().filter(function(item){
           return String(item.address).toLowerCase() !== String(token.address).toLowerCase();
         });
@@ -1488,6 +1543,7 @@ function enhancePrototypeTokens() {
         writeJson(importStoreKey, list);
       }
       function registerImportedToken(token){
+        if (whitelistedAddresses().has(String(token.address || "").toLowerCase())) return token.symbol;
         var key = Object.keys(customTokens || {}).find(function(sym){
           return customTokens[sym] && String(customTokens[sym].address).toLowerCase() === String(token.address).toLowerCase();
         }) || token.symbol;
@@ -1539,6 +1595,25 @@ function enhancePrototypeTokens() {
           return '<div class="scan-row ' + level + '"><span class="dot3"></span><span class="k">' + c.key + '</span><span class="v">' + c.value + '</span></div>';
         }).join("");
       }
+      renderTokenList = function(filter){
+        filter = String(filter || "").toLowerCase();
+        var rows = swapWhitelistTokens().map(function(token){ return registerBackendToken(token); }).filter(Boolean);
+        rows = rows.filter(function(sym){
+          if (!filter) return true;
+          return sym.toLowerCase().indexOf(filter) >= 0 || String(tokenFull[sym] || "").toLowerCase().indexOf(filter) >= 0;
+        });
+        document.getElementById("tokenModalList").innerHTML = rows.map(function(sym){
+          var color = sym === "WLD" ? "#000" : "#fff";
+          return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + (window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) : tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + '<span class="custom-badge">白名单</span></div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
+        }).join("") || '<div class="import-load">没有匹配的白名单代币</div>';
+      };
+      openTokenModal = function(target){
+        swapState.target = target;
+        document.getElementById("tkSearch").value = "";
+        document.getElementById("importPreview").innerHTML = "";
+        renderTokenList("");
+        document.getElementById("tokenModal").classList.add("open");
+      };
 
       showImportPreview = async function(addr){
         var owner = window.__luminaUserAddress || "";
@@ -2175,6 +2250,20 @@ function enhancePrototypeSwapQuote() {
         setSwapButtonPending();
       };
       readSwapSystemConfig();
+      function resetInitialSwapAmounts(){
+        var sell = document.getElementById("sellAmt");
+        var buy = document.getElementById("buyAmt");
+        if (sell && !sell.dataset.luminaClearedDefault) {
+          sell.dataset.luminaClearedDefault = "1";
+          if (String(sell.value || "") === "100") sell.value = "";
+          sell.setAttribute("placeholder", "0");
+        }
+        if (buy && !buy.dataset.luminaClearedDefault) {
+          buy.dataset.luminaClearedDefault = "1";
+          if (String(buy.value || "") === "543.20") buy.value = "";
+          buy.setAttribute("placeholder", "0");
+        }
+      }
       function shortAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -2579,9 +2668,15 @@ function enhancePrototypeSwapQuote() {
       };
       var swapGear = document.querySelector("#view-swap .swap-head .gear");
       if (swapGear) swapGear.classList.add("is-floating");
+      function ensureSlipBack(){
+        var panel = document.getElementById("slipPanel");
+        if (!panel || panel.querySelector(".slip-back")) return;
+        panel.insertAdjacentHTML("afterbegin", '<button type="button" class="slip-back" onclick="toggleSlip()" aria-label="Back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg><span>Back</span></button>');
+      }
       toggleSlip = function(){
         var panel = document.getElementById("slipPanel");
         if (!panel) return;
+        ensureSlipBack();
         panel.classList.toggle("open");
         if (panel.classList.contains("open")) {
           setTimeout(function(){ panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 30);
@@ -2594,6 +2689,8 @@ function enhancePrototypeSwapQuote() {
       });
       var customSlip = document.querySelector(".slip-custom");
       if (customSlip) customSlip.addEventListener("input", scheduleQuote);
+      ensureSlipBack();
+      resetInitialSwapAmounts();
       setSwapButtonPending();
       ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
@@ -3228,6 +3325,10 @@ function enhancePrototypeDetail() {
         var map = window.__luminaMarketBySymbol || {};
         return map[asset.sym] || null;
       }
+      function realChartUnavailable(asset, range, reason) {
+        var sym = asset && asset.sym ? asset.sym : "token";
+        return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data for ' + sym + (reason ? '<br><span>' + reason + '</span>' : '') + '</div>';
+      }
 
       function renderMarketCard(asset) {
         var market = marketForAsset(asset);
@@ -3244,12 +3345,12 @@ function enhancePrototypeDetail() {
                 renderMarketCard(asset);
               })
               .catch(function(){
-                chart.innerHTML = chartSvg("1D", Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0);
+                chart.innerHTML = realChartUnavailable(asset, "1D", "Market pool lookup failed.");
                 updateRangeChange(null, "1D", asset);
               });
             return;
           }
-          chart.innerHTML = chartSvg("1D", Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0);
+          chart.innerHTML = realChartUnavailable(asset, "1D", "No GeckoTerminal pool found.");
           updateRangeChange(null, "1D", asset);
           return;
         }
@@ -3258,11 +3359,9 @@ function enhancePrototypeDetail() {
       function renderMarketChart(asset, range) {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
-        var fallbackDown = false;
-        try { fallbackDown = Number(tokenChanges24h && tokenChanges24h[asset.sym]) < 0; } catch(e) {}
         if (!chart) return;
         if (!market || !market.poolAddress) {
-          chart.innerHTML = chartSvg(range || "1D", fallbackDown);
+          chart.innerHTML = realChartUnavailable(asset, range || "1D", "No GeckoTerminal pool found.");
           updateRangeChange(null, range || "1D", asset);
           return;
         }
@@ -3275,12 +3374,12 @@ function enhancePrototypeDetail() {
               chart.innerHTML = trendSvg(candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              chart.innerHTML = chartSvg(range || "1D", fallbackDown);
+              chart.innerHTML = realChartUnavailable(asset, range || "1D", "OHLCV returned empty.");
               updateRangeChange(null, range || "1D", asset);
             }
           })
           .catch(function(){
-            chart.innerHTML = chartSvg(range || "1D", fallbackDown);
+            chart.innerHTML = realChartUnavailable(asset, range || "1D", "OHLCV request failed.");
             updateRangeChange(null, range || "1D", asset);
           });
       }
@@ -3296,9 +3395,6 @@ function enhancePrototypeDetail() {
           var start = Number(first.open || first[1] || first.close || first[4] || 0);
           var end = Number(last.close || last[4] || 0);
           if (start > 0 && Number.isFinite(end)) change = ((end - start) / start) * 100;
-        }
-        if (change === null || !Number.isFinite(change)) {
-          try { change = tokenChanges24h && tokenChanges24h[asset.sym] !== undefined ? tokenChanges24h[asset.sym] : null; } catch(e) { change = null; }
         }
         if (change === null || change === undefined || !Number.isFinite(Number(change))) {
           pill.className = "none";
@@ -3317,7 +3413,7 @@ function enhancePrototypeDetail() {
         return "$" + n.toPrecision(5);
       }
       function trendSvg(candles, range){
-        if (!candles.length) return chartSvg(range || "1D");
+        if (!candles.length) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
         var width = 430, height = 230, padL = 54, padR = 48, padT = 26, chartH = 132, volY = 174, volH = 24;
         var rows = candles.map(function(c){
           return {
@@ -3329,11 +3425,11 @@ function enhancePrototypeDetail() {
             timestamp: Number(c.timestamp || c[0] || 0)
           };
         }).filter(function(c){ return c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0; });
-        if (rows.length < 2) return chartSvg(range || "1D");
+        if (rows.length < 2) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
         var highs = rows.map(function(c){ return c.high; });
         var lows = rows.map(function(c){ return c.low; });
         var max = Math.max.apply(null, highs), min = Math.min.apply(null, lows);
-        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return chartSvg(range || "1D");
+        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
         var maxVol = Math.max.apply(null, rows.map(function(c){ return c.volume || 0; }).concat([1]));
         function y(v){ return padT + (max - v) / (max - min) * chartH; }
         function x(i){ return padL + (i / Math.max(1, rows.length - 1)) * (width - padL - padR); }
@@ -3542,19 +3638,10 @@ function enhancePrototypeDetail() {
         document.getElementById("detName").textContent = asset.full || asset.sym;
         document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
         document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
-        var change = null;
-        try { change = tokenChanges24h && tokenChanges24h[asset.sym] !== undefined ? tokenChanges24h[asset.sym] : null; } catch(e) { change = null; }
         var pill = document.getElementById("detChangePill");
         renderMarketTables(asset);
-        if (change === null || change === undefined || !Number.isFinite(Number(change))) {
-          pill.className = "none";
-          pill.textContent = "No data";
-          renderMarketCard(asset);
-          return;
-        }
-        var up = change >= 0;
-        pill.className = up ? "up" : "down";
-        pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
+        pill.className = "none";
+        pill.textContent = "No data";
         renderMarketCard(asset);
       }
 

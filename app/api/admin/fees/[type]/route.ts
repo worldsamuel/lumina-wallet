@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { ensureFeeSchema } from "@/lib/admin/ensure-fee-schema";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -12,6 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { type: stri
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
   const body = (await req.json()) as { percent?: string | number; recipient?: string | null };
+  await ensureFeeSchema();
   const fee = await db.feeConfig.upsert({
     where: { businessType: params.type },
     update: {
