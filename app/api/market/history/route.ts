@@ -1,0 +1,100 @@
+import { NextRequest } from "next/server";
+import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { rateLimit } from "@/lib/api/rate-limit";
+import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
+import { TOKENS } from "@/lib/tokens";
+
+export const runtime = "edge";
+
+const COINGECKO_MARKET_CHART_URL = "https://api.coingecko.com/api/v3/coins";
+
+type CoinGeckoMarketChart = {
+  prices?: Array<[number, number]>;
+  total_volumes?: Array<[number, number]>;
+};
+
+type HistoryCandle = {
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+
+const cache = new Map<string, { expiresAt: number; candles: HistoryCandle[] }>();
+
+export function OPTIONS() {
+  return optionsResponse();
+}
+
+export async function GET(req: NextRequest) {
+  if (!rateLimit(req, "public:market-history", 120).ok) {
+    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+  }
+
+  const symbol = (req.nextUrl.searchParams.get("symbol") ?? "").toUpperCase();
+  const range = (req.nextUrl.searchParams.get("range") ?? "1D").toUpperCase();
+  const id = coingeckoIdForSymbol(symbol);
+  if (!id) return jsonResponse({ symbol, range, candles: [] });
+
+  const key = `${id}:${range}`;
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return jsonResponse({ symbol, range, source: "coingecko", candles: cached.candles });
+
+  try {
+    const { days, interval } = chartConfig(range);
+    const params = new URLSearchParams({
+      vs_currency: "usd",
+      days,
+      interval,
+    });
+    const headers: HeadersInit = { accept: "application/json" };
+    if (process.env.COINGECKO_DEMO_API_KEY) headers["x-cg-demo-api-key"] = process.env.COINGECKO_DEMO_API_KEY;
+
+    const response = await fetch(`${COINGECKO_MARKET_CHART_URL}/${id}/market_chart?${params}`, {
+      headers,
+      next: { revalidate: 180 },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error(`CoinGecko market_chart responded ${response.status}`);
+
+    const body = (await response.json()) as CoinGeckoMarketChart;
+    const candles = pricePointsToCandles(body.prices ?? [], body.total_volumes ?? []);
+    cache.set(key, { candles, expiresAt: Date.now() + 180_000 });
+    return jsonResponse({ symbol, range, source: "coingecko", candles });
+  } catch (error) {
+    console.error("Failed to fetch CoinGecko market history", error);
+    return jsonResponse({ symbol, range, candles: [] });
+  }
+}
+
+function coingeckoIdForSymbol(symbol: string) {
+  const token = TOKENS.find((item) => item.symbol.toUpperCase() === symbol);
+  return token?.coingeckoId ?? COINGECKO_IDS[symbol as keyof typeof COINGECKO_IDS] ?? null;
+}
+
+function chartConfig(range: string) {
+  if (range === "1H") return { days: "1", interval: "hourly" };
+  if (range === "1W") return { days: "7", interval: "hourly" };
+  if (range === "1Y") return { days: "365", interval: "daily" };
+  if (range === "ALL") return { days: "max", interval: "daily" };
+  return { days: "1", interval: "hourly" };
+}
+
+function pricePointsToCandles(prices: Array<[number, number]>, volumes: Array<[number, number]>) {
+  const volumeByTime = new Map(volumes.map(([timestamp, volume]) => [timestamp, volume]));
+  return prices
+    .filter((point): point is [number, number] => Array.isArray(point) && Number.isFinite(point[0]) && Number.isFinite(point[1]) && point[1] > 0)
+    .map(([timestamp, close], index, list) => {
+      const previous = index > 0 ? list[index - 1][1] : close;
+      return {
+        timestamp: Math.floor(timestamp / 1000),
+        open: previous,
+        high: Math.max(previous, close),
+        low: Math.min(previous, close),
+        close,
+        volume: volumeByTime.get(timestamp) ?? 0,
+      };
+    });
+}

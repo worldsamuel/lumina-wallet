@@ -3364,9 +3364,27 @@ function enhancePrototypeDetail() {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
         if (!chart) return;
+        function renderHistory(reason){
+          chart.innerHTML = '<div class="market-detail-state">Loading market history...</div>';
+          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
+            .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
+            .then(function(data){
+              var candles = Array.isArray(data.candles) ? data.candles : [];
+              if (candles.length) {
+                chart.innerHTML = trendSvg(candles, range || "1D");
+                updateRangeChange(candles, range || "1D", asset);
+              } else {
+                chart.innerHTML = realChartUnavailable(asset, range || "1D", reason || "No market history found.");
+                updateRangeChange(null, range || "1D", asset);
+              }
+            })
+            .catch(function(){
+              chart.innerHTML = realChartUnavailable(asset, range || "1D", reason || "Market history request failed.");
+              updateRangeChange(null, range || "1D", asset);
+            });
+        }
         if (!market || !market.poolAddress) {
-          chart.innerHTML = realChartUnavailable(asset, range || "1D", "No GeckoTerminal pool found.");
-          updateRangeChange(null, range || "1D", asset);
+          renderHistory("No DEX pool found; CoinGecko history unavailable.");
           return;
         }
         chart.innerHTML = '<div class="market-detail-state">Loading chart...</div>';
@@ -3378,13 +3396,11 @@ function enhancePrototypeDetail() {
               chart.innerHTML = trendSvg(candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              chart.innerHTML = realChartUnavailable(asset, range || "1D", "OHLCV returned empty.");
-              updateRangeChange(null, range || "1D", asset);
+              renderHistory("DEX OHLCV returned empty.");
             }
           })
           .catch(function(){
-            chart.innerHTML = realChartUnavailable(asset, range || "1D", "OHLCV request failed.");
-            updateRangeChange(null, range || "1D", asset);
+            renderHistory("DEX OHLCV request failed.");
           });
       }
       function updateRangeChange(candles, range, asset){
