@@ -2394,6 +2394,7 @@ function enhancePrototypeSwapQuote() {
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
+	          console.error("[SWAP] executeSwap failed", e);
 	          var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(e) : (e && e.message ? e.message : "Swap failed");
 	          toast("Swap failed: " + msg);
 	          setSwapButtonState("确认兑换", false);
