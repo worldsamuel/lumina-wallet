@@ -11,6 +11,7 @@ import { useWalletAuth } from "@/lib/auth/use-wallet-auth";
 import { useBackendConfigSync } from "@/lib/backend/use-backend-config";
 import { useChainBalanceSync } from "@/lib/chain/use-chain-balance-sync";
 import { legalContent, type LegalPageKind } from "@/lib/legal-content";
+import { executeSwap, friendlySwapError, type ExecuteSwapParams } from "@/lib/swap/execute-swap";
 import { sendToken, friendlySendError, type SendParams, type SendResult } from "@/lib/transfer/sendToken";
 import { TOKENS } from "@/lib/tokens";
 
@@ -38,6 +39,12 @@ declare global {
     __luminaRefreshMorphoPositions?: () => Promise<void>;
     __luminaSendToken?: (params: SendParams) => Promise<SendResult>;
     __luminaFriendlySendError?: (error?: string) => string;
+    __luminaExecuteSwap?: (params: ExecuteSwapParams) => Promise<{
+      userOpHash: string;
+      expectedOut: string;
+      minOut: string;
+    }>;
+    __luminaFriendlySwapError?: (error?: unknown) => string;
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
@@ -112,6 +119,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const [prototypeReady, setPrototypeReady] = useState(false);
   const [dataSyncReady, setDataSyncReady] = useState(false);
   const [earnUserOpHash, setEarnUserOpHash] = useState("");
+  const [swapUserOpHash, setSwapUserOpHash] = useState("");
   const [earnPendingAction, setEarnPendingAction] = useState<EarnPendingAction>("deposit");
   const { address, error, login, logout, status, username } = useWalletAuth();
   const { mutate } = useSWRConfig();
@@ -197,8 +205,16 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       if (detail?.action) setEarnPendingAction(detail.action);
       if (detail?.userOpHash) setEarnUserOpHash(detail.userOpHash);
     };
+    const handleSwapUserOp = (event: Event) => {
+      const detail = (event as CustomEvent<{ userOpHash?: string }>).detail;
+      if (detail?.userOpHash) setSwapUserOpHash(detail.userOpHash);
+    };
     window.addEventListener("lumina:earn-userop", handleEarnUserOp);
-    return () => window.removeEventListener("lumina:earn-userop", handleEarnUserOp);
+    window.addEventListener("lumina:swap-userop", handleSwapUserOp);
+    return () => {
+      window.removeEventListener("lumina:earn-userop", handleEarnUserOp);
+      window.removeEventListener("lumina:swap-userop", handleSwapUserOp);
+    };
   }, []);
 
   const handleEarnReceiptSuccess = useCallback(() => {
@@ -215,6 +231,19 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     setEarnUserOpHash("");
     toastFromPrototype(`${earnPendingAction === "withdraw" ? "Withdrawal" : "Deposit"} failed: ${receiptError?.message ?? "Transaction failed"}`);
   }, [earnPendingAction]);
+
+  const handleSwapReceiptSuccess = useCallback(() => {
+    setSwapUserOpHash("");
+    window.__luminaRefreshWalletData?.();
+    toastFromPrototype("Swap successful");
+    window.dispatchEvent(new CustomEvent("lumina:swap-confirmed"));
+  }, []);
+
+  const handleSwapReceiptError = useCallback((receiptError?: Error) => {
+    setSwapUserOpHash("");
+    toastFromPrototype(`Swap failed: ${receiptError?.message ?? "Transaction failed"}`);
+    window.dispatchEvent(new CustomEvent("lumina:swap-failed", { detail: { message: receiptError?.message } }));
+  }, []);
 
   if (status === "not-installed") {
     return <WorldAppPrompt />;
@@ -236,6 +265,24 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
           userOpHash={earnUserOpHash}
           onSuccess={handleEarnReceiptSuccess}
           onError={handleEarnReceiptError}
+        />
+      ) : null}
+      {swapUserOpHash ? (
+        <EarnTransactionStatus
+          userOpHash={swapUserOpHash}
+          onSuccess={handleSwapReceiptSuccess}
+          onError={handleSwapReceiptError}
+          timeoutMs={5 * 60 * 1000}
+          onTimeout={() => {
+            window.__luminaRefreshActivity?.();
+          }}
+          labels={{
+            success: "兑换成功",
+            errorPrefix: "兑换失败",
+            loading: "等待区块链确认...",
+            submitted: "兑换交易已提交",
+            timeout: "交易仍在进行,请稍后到 Activity 查看",
+          }}
         />
       ) : null}
     </>
@@ -369,6 +416,8 @@ function exposeTokenTransfer(
 ) {
   window.__luminaFriendlySendError = friendlySendError;
   window.__luminaSendToken = async (params) => sendToken(params);
+  window.__luminaFriendlySwapError = friendlySwapError;
+  window.__luminaExecuteSwap = async (params) => executeSwap(params);
   window.__luminaRefreshWalletData = () => {
     if (address) void mutate(`/api/balances?address=${address}`);
     void mutate("/api/prices/market");
@@ -2013,9 +2062,16 @@ function enhancePrototypeMarket() {
  */
 function enhancePrototypeSwapQuote() {
   const source = `
-    (function(){
-      var quoteTimer = null;
-      var quoteSeq = 0;
+	    (function(){
+	      var quoteTimer = null;
+	      var quoteSeq = 0;
+	      var latestSwapQuote = null;
+	      var latestQuoteAt = 0;
+	      var quoteCountdownTimer = null;
+	      var swapSubmitting = false;
+	      var highImpactAcknowledged = false;
+	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
+	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "5") || 5)};
       function shortAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -2044,16 +2100,29 @@ function enhancePrototypeSwapQuote() {
         );
         return document.getElementById("quoteCompareBox");
       }
-      function setSwapButtonPending(){
-        var btn = document.getElementById("swapBtn");
-        if (!btn) return;
-        btn.classList.add("quote-only");
-        btn.disabled = false;
-        btn.setAttribute("aria-disabled", "true");
-        var span = btn.querySelector("span");
-        if (span) span.textContent = "Swap coming soon";
-        btn.onclick = function(){ toast("Swap is coming soon"); };
-      }
+	      function setSwapButtonState(label, disabled){
+	        var btn = document.getElementById("swapBtn");
+	        if (!btn) return;
+	        btn.classList.remove("quote-only");
+	        btn.disabled = !!disabled;
+	        btn.setAttribute("aria-disabled", disabled ? "true" : "false");
+	        var span = btn.querySelector("span");
+	        if (span) span.textContent = label;
+	      }
+	      function setSwapButtonPending(){
+	        if (!swapExecutionEnabled) {
+	          setSwapButtonState("Swap disabled for Tenderly verification", true);
+	          return;
+	        }
+	        var sell = document.getElementById("sellAmt");
+	        var amount = sell ? Number(String(sell.value || "").replace(/,/g, "")) : 0;
+	        var price = tokenMeta(swapState.sell, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
+	        if (Number.isFinite(amount) && amount > 0 && Number.isFinite(Number(price)) && amount * Number(price) > swapMaxUsd) {
+	          setSwapButtonState("单笔限额 $" + swapMaxUsd, true);
+	          return;
+	        }
+	        setSwapButtonState("确认兑换", false);
+	      }
       function tokenInputForQuote(symbol){
         var meta = customTokens && customTokens[symbol] ? customTokens[symbol] : null;
         return meta && meta.address ? meta.address : symbol;
@@ -2070,8 +2139,10 @@ function enhancePrototypeSwapQuote() {
         el.style.background = symbol === "WLD" ? "#fff" : (dotColor && dotColor[symbol] ? dotColor[symbol] : "linear-gradient(135deg,#1b231e,#26362b)");
         el.style.color = symbol === "WLD" ? "#000" : "#fff";
       }
-      function setQuoteState(message, impactClass){
-        ensureQuoteBox();
+	      function setQuoteState(message, impactClass){
+	        ensureQuoteBox();
+	        latestSwapQuote = null;
+	        latestQuoteAt = 0;
         var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
@@ -2125,9 +2196,12 @@ function enhancePrototypeSwapQuote() {
         warn.textContent = text;
         warn.classList.toggle("show", !!text);
       }
-      function applyQuote(data){
-        ensureQuoteBox();
-        var buy = document.getElementById("buyAmt");
+	      function applyQuote(data){
+	        ensureQuoteBox();
+	        latestSwapQuote = data;
+	        latestQuoteAt = Date.now();
+	        highImpactAcknowledged = false;
+	        var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
         var gas = feeEl();
@@ -2179,11 +2253,176 @@ function enhancePrototypeSwapQuote() {
           setQuoteState(msg, "impact-high");
         }
       }
-      function scheduleQuote(){
-        clearTimeout(quoteTimer);
-        quoteTimer = setTimeout(requestQuote, 500);
-      }
-      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
+	      function scheduleQuote(){
+	        clearTimeout(quoteTimer);
+	        quoteTimer = setTimeout(requestQuote, 500);
+	      }
+	      function tokenMeta(symbol, quoted){
+	        var meta = quoted || (customTokens && customTokens[symbol] ? customTokens[symbol] : null);
+	        var known = (typeof tokens !== "undefined" && tokens.find) ? tokens.find(function(t){ return t.sym === symbol || t.symbol === symbol; }) : null;
+	        var price = null;
+	        try {
+	          price = prices && prices[symbol] ? Number(prices[symbol]) : null;
+	          if ((!price || !Number.isFinite(price)) && window.__luminaMarketPrices) {
+	            var market = window.__luminaMarketPrices.find(function(item){ return item.symbol === symbol; });
+	            price = market ? Number(market.priceUsd || market.usd) : price;
+	          }
+	        } catch(e) {}
+	        return {
+	          symbol: symbol,
+	          name: (meta && meta.name) || (known && (known.name || known.full)) || symbol,
+	          address: meta && meta.address ? meta.address : tokenInputForQuote(symbol),
+	          decimals: Number((meta && meta.decimals) || (known && known.decimals) || (symbol === "USDC" || symbol === "EURC" ? 6 : 18)),
+	          priceUsd: Number.isFinite(price) ? price : undefined
+	        };
+	      }
+	      function balanceNumber(symbol){
+	        var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
+	        var n = Number(raw.replace(/,/g, ""));
+	        return Number.isFinite(n) ? n : 0;
+	      }
+	      function minOutText(){
+	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
+	        var slip = slippageBps();
+	        return out > 0 ? shortAmount(out * (10000 - slip) / 10000) : "—";
+	      }
+	      function quoteAgeSeconds(){
+	        return latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : 999;
+	      }
+	      function quoteSecondsLeft(){
+	        return Math.max(0, 30 - quoteAgeSeconds());
+	      }
+	      function impactClassFor(percent){
+	        if (percent > 5) return "impact-high";
+	        if (percent >= 3) return "impact-mid";
+	        return "impact-low";
+	      }
+	      function validateSwapSafety(){
+	        var sell = document.getElementById("sellAmt");
+	        var amountText = sell ? String(sell.value || "").replace(/,/g, "").trim() : "";
+	        var amount = Number(amountText);
+	        var slip = slippageBps();
+	        var impact = latestSwapQuote ? Number(latestSwapQuote.priceImpactPercent || 0) : 0;
+	        var sellPrice = tokenMeta(swapState.sell, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
+	        var amountUsd = Number.isFinite(Number(sellPrice)) ? amount * Number(sellPrice) : null;
+	        if (!swapExecutionEnabled) return { ok:false, error:"Swap mainnet execution is disabled until Tenderly verification is approved." };
+	        if (!window.__luminaUserAddress) return { ok:false, error:"Connect wallet before swapping." };
+	        if (!amount || !Number.isFinite(amount) || amount <= 0) return { ok:false, error:"Enter an amount greater than 0." };
+	        if (amount > balanceNumber(swapState.sell)) return { ok:false, error:"余额不足" };
+	        if (slip <= 0) return { ok:false, error:"滑点不能设为 0,请至少选择 0.1%。" };
+	        if (!latestSwapQuote) return { ok:false, error:"请先获取报价。" };
+	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"Phase 2 只允许 Uniswap V3 路由执行,请切换交易对或等待下一阶段。" };
+	        if (quoteAgeSeconds() > 30) return { ok:false, error:"报价已超过 30 秒,请刷新报价。" };
+	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:"单笔限额 $" + swapMaxUsd + ",请降低金额。" };
+	        if (impact > 15) return { ok:false, error:"价格冲击超过 15%,为保护资金已拒绝执行。" };
+	        if (impact > 5 && !highImpactAcknowledged) return { ok:false, highImpact:true, error:"价格冲击超过 5%,需要再次确认。" };
+	        return { ok:true, amountText:amountText, impact:impact };
+	      }
+	      function openSwapConfirm(state){
+	        return new Promise(function(resolve){
+	          var old = document.getElementById("swapConfirmModal");
+	          if (old) old.remove();
+	          if (quoteCountdownTimer) { clearInterval(quoteCountdownTimer); quoteCountdownTimer = null; }
+	          var modal = document.createElement("div");
+	          modal.className = "modal-mask open";
+	          modal.id = "swapConfirmModal";
+	          var feePct = latestSwapQuote ? (Number(latestSwapQuote.feeTier || 0) / 10000) : 0.3;
+	          var impact = latestSwapQuote ? Number(latestSwapQuote.priceImpactPercent || 0) : 0;
+	          var impactClass = impactClassFor(impact);
+	          modal.innerHTML =
+	            '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;padding:24px;border-radius:26px;">' +
+	              '<div class="modal-grip"></div><h3>确认兑换</h3>' +
+	              '<div class="swap-confirm-list">' +
+	                '<div class="ln"><span>您要支付</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
+	                '<div class="ln"><span>您将收到约</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
+	                '<div class="ln"><span>最少收到 (滑点保护)</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
+	                '<div class="ln"><span>价格冲击</span><b class="' + impactClass + '">' + (impact < 0.01 ? "<0.01%" : impact.toFixed(2) + "%") + '</b></div>' +
+	                '<div class="ln"><span>网络费用</span><b>~$' + Number(latestSwapQuote.gasEstimateUsd || 0.02).toFixed(2) + '</b></div>' +
+	                '<div class="ln"><span>滑点容忍</span><b>' + (slippageBps() / 100).toFixed(2).replace(/\\.00$/, "") + '%</b></div>' +
+	                '<div class="ln"><span>兑换路径</span><b>' + swapState.sell + ' → ' + swapState.buy + ' (Uniswap V3 ' + feePct + '% pool)</b></div>' +
+	                '<div class="ln"><span>报价过期倒计时</span><b id="swapQuoteCountdown">' + quoteSecondsLeft() + 's</b></div>' +
+	              '</div>' +
+	              (state.impact > 5 ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">价格冲击超过 5%,我确认继续</button>' : '') +
+	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">取消</button><button class="btn-primary" id="swapConfirmOk">确认兑换</button></div>' +
+	            '</div>';
+	          document.body.appendChild(modal);
+	          function done(value){
+	            if (quoteCountdownTimer) { clearInterval(quoteCountdownTimer); quoteCountdownTimer = null; }
+	            modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); resolve(value);
+	          }
+	          quoteCountdownTimer = setInterval(function(){
+	            var left = quoteSecondsLeft();
+	            var label = document.getElementById("swapQuoteCountdown");
+	            var ok = document.getElementById("swapConfirmOk");
+	            if (label) label.textContent = left + "s";
+	            if (left <= 0) {
+	              if (ok) { ok.setAttribute("disabled", "true"); ok.textContent = "报价已过期,请刷新"; }
+	            }
+	          }, 1000);
+	          modal.onclick = function(event){ if (event.target === modal) done(false); };
+	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
+	          var high = document.getElementById("swapHighImpactAck");
+	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.textContent = "已确认高价格冲击"; };
+	          document.getElementById("swapConfirmOk").onclick = function(){
+	            if (state.impact > 5 && !highImpactAcknowledged) { toast("请先确认高价格冲击风险"); return; }
+	            done(true);
+	          };
+	        });
+	      }
+	      function showSwapSuccess(result){
+	        var old = document.getElementById("swapSuccessModal");
+	        if (old) old.remove();
+	        var modal = document.createElement("div");
+	        modal.className = "modal-mask open";
+	        modal.id = "swapSuccessModal";
+	        modal.innerHTML =
+	          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;">' +
+	            '<div class="modal-grip"></div><h3>兑换已提交</h3><p class="send-confirm-body">等待区块链确认中。预计收到约 ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
+	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">查看 Activity</button>' +
+	          '</div>';
+	        document.body.appendChild(modal);
+	        document.getElementById("swapSuccessOk").onclick = function(){ modal.remove(); go("activity"); setTabByName("Activity"); };
+	      }
+	      async function handleSwapClick(){
+	        if (swapSubmitting) return;
+	        var state = validateSwapSafety();
+	        if (!state.ok) {
+	          if (/刷新报价/.test(state.error)) scheduleQuote();
+	          toast(state.error);
+	          return;
+	        }
+	        var confirmed = await openSwapConfirm(state);
+	        if (!confirmed) { toast("Cancelled"); return; }
+	        swapSubmitting = true;
+	        setSwapButtonState("签名中...", true);
+	        try {
+	          if (!window.__luminaExecuteSwap) throw new Error("Swap execution is unavailable.");
+	          var fromQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.from : null;
+	          var toQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.to : null;
+	          setSwapButtonState("签名中...", true);
+	          var promise = window.__luminaExecuteSwap({
+	            fromToken: tokenMeta(swapState.sell, fromQuoted),
+	            toToken: tokenMeta(swapState.buy, toQuoted),
+	            fromAmountHuman: state.amountText,
+	            slippageBps: slippageBps(),
+	            userAddress: window.__luminaUserAddress,
+	            forceHighImpact: highImpactAcknowledged
+	          });
+	          setSwapButtonState("提交交易...", true);
+	          var result = await promise;
+	          setSwapButtonState("等待区块链确认...", true);
+	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
+	          showSwapSuccess(result);
+	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+	        } catch(e) {
+	          var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(e) : (e && e.message ? e.message : "Swap failed");
+	          toast("Swap failed: " + msg);
+	          setSwapButtonState("确认兑换", false);
+	        } finally {
+	          swapSubmitting = false;
+	        }
+	      }
+	      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
       if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
         window.__luminaQuoteRefreshWrapped = true;
         refreshSwapLabels = function(){
@@ -2194,7 +2433,7 @@ function enhancePrototypeSwapQuote() {
         };
       }
       recalc = scheduleQuote;
-      confirmSwap = function(){ toast("Swap is coming soon"); };
+	      confirmSwap = handleSwapClick;
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
@@ -2593,16 +2832,33 @@ function enhancePrototypeMe() {
           '<p class="feedback-hint"></p>' +
           '<textarea id="feedbackText" maxlength="1200"></textarea>' +
           '<input id="feedbackContact" maxlength="120" />' +
-          '<button id="feedbackSendBtn" onclick="sendFeedback()"></button></div>';
+          '<button id="feedbackSendBtn" onclick="sendFeedback()"></button>' +
+          '<div id="feedbackReplies" style="margin-top:14px;"></div></div>';
         document.body.appendChild(modal);
         updateFeedbackCopy();
       }
+      window.loadFeedbackReplies = async function(){
+        var box = document.getElementById("feedbackReplies");
+        if (!box || !window.__luminaUserAddress) return;
+        try {
+          var res = await fetch("/api/feedback?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
+          var rows = await res.json().catch(function(){ return []; });
+          if (!res.ok || !Array.isArray(rows) || !rows.length) { box.innerHTML = ""; return; }
+          box.innerHTML = '<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px;">Team replies</div>' + rows.map(function(item){
+            var reply = item.reply ? '<div style="margin-top:8px;padding:10px;border-radius:12px;background:rgba(74,222,128,.12);color:var(--text);"><strong>Lumina:</strong> ' + escapeHtml(item.reply) + '</div>' : '';
+            return '<div style="border-top:1px solid var(--line);padding:10px 0;font-size:13px;line-height:1.5;"><div style="color:var(--text-dim);">' + escapeHtml(item.message) + '</div>' + reply + '</div>';
+          }).join('');
+        } catch(e) {
+          box.innerHTML = "";
+        }
+      };
       window.openFeedback = function(){
         ensureFeedbackModal();
         updateFeedbackCopy();
         document.getElementById("feedbackText").value = "";
         document.getElementById("feedbackContact").value = "";
         document.getElementById("feedbackModal").classList.add("open");
+        if (typeof loadFeedbackReplies === "function") loadFeedbackReplies();
       };
       window.closeFeedback = function(){
         var modal = document.getElementById("feedbackModal");
@@ -2629,6 +2885,7 @@ function enhancePrototypeMe() {
           });
           var data = await res.json().catch(function(){ return null; });
           if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || c.failed);
+          if (typeof loadFeedbackReplies === "function") loadFeedbackReplies();
           closeFeedback();
           toast(c.sent);
         } catch(e) {

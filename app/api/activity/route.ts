@@ -86,14 +86,17 @@ export async function GET(req: NextRequest) {
           const from = String(log.args.from ?? "");
           const to = String(log.args.to ?? "");
           const incomingTx = to.toLowerCase() === lower;
+          const direction: "in" | "out" = incomingTx ? "in" : "out";
           const value = log.args.value ?? 0n;
           const meta = await getTokenMeta(log.address);
           return {
             hash: log.transactionHash,
-            type: incomingTx ? "in" : "out",
+            type: direction,
             title: incomingTx ? `Received ${meta.symbol}` : `Sent ${meta.symbol}`,
             subtitle: incomingTx ? `From ${shortAddress(from)}` : `To ${shortAddress(to)}`,
             amount: `${incomingTx ? "+" : "-"}${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
+            tokenText: `${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
+            direction,
             status: "Completed",
             blockNumber: Number(log.blockNumber),
             logIndex: log.logIndex,
@@ -101,10 +104,54 @@ export async function GET(req: NextRequest) {
         }),
     );
 
-    logs.sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
-    return jsonResponse(logs.slice(0, 30));
+    const merged = mergeSwapActivity(logs);
+    merged.sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
+    return jsonResponse(merged.slice(0, 30));
   } catch (error) {
     console.error("Failed to fetch real activity", error);
     return jsonResponse([]);
   }
+}
+
+function mergeSwapActivity<
+  T extends {
+    hash: `0x${string}`;
+    type: string;
+    title: string;
+    subtitle: string;
+    amount: string;
+    tokenText: string;
+    direction: "in" | "out";
+    status: string;
+    blockNumber: number;
+    logIndex: number;
+  },
+>(logs: T[]) {
+  const byHash = new Map<string, T[]>();
+  for (const log of logs) {
+    const rows = byHash.get(log.hash) ?? [];
+    rows.push(log);
+    byHash.set(log.hash, rows);
+  }
+
+  const rows: Array<Omit<T, "direction" | "tokenText">> = [];
+  for (const group of byHash.values()) {
+    const outgoing = group.find((item) => item.direction === "out");
+    const incoming = group.find((item) => item.direction === "in");
+    if (outgoing && incoming && group.length >= 2) {
+      rows.push({
+        hash: outgoing.hash,
+        type: "swap",
+        title: `Swapped ${outgoing.tokenText} → ${incoming.tokenText}`,
+        subtitle: "Uniswap route",
+        amount: `+${incoming.tokenText}`,
+        status: "Completed",
+        blockNumber: Math.max(...group.map((item) => item.blockNumber)),
+        logIndex: Math.max(...group.map((item) => item.logIndex)),
+      } as Omit<T, "direction" | "tokenText">);
+    } else {
+      rows.push(...group.map(({ direction: _direction, tokenText: _tokenText, ...item }) => item));
+    }
+  }
+  return rows;
 }

@@ -8,7 +8,7 @@ export const worldChain = defineChain({
   name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: ["https://worldchain-mainnet.g.alchemy.com/public"] },
+    default: { http: [process.env.TENDERLY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public"] },
   },
   blockExplorers: {
     default: { name: "Worldscan", url: "https://worldscan.org" },
@@ -25,5 +25,5 @@ export const worldChain = defineChain({
  */
 export const publicClient = createPublicClient({
   chain: worldChain,
-  transport: http(),
+  transport: http(process.env.TENDERLY_RPC_URL || undefined),
 });

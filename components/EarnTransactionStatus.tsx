@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWaitForUserOperationReceipt } from "@worldcoin/minikit-react";
 import { createPublicClient, http } from "viem";
 import { worldchain } from "viem/chains";
@@ -14,28 +14,50 @@ type EarnTransactionStatusProps = {
   userOpHash: string;
   onSuccess?: () => void;
   onError?: (error?: Error) => void;
+  timeoutMs?: number;
+  onTimeout?: () => void;
+  labels?: {
+    success?: string;
+    errorPrefix?: string;
+    loading?: string;
+    submitted?: string;
+    timeout?: string;
+  };
 };
 
-export function EarnTransactionStatus({ userOpHash, onSuccess, onError }: EarnTransactionStatusProps) {
+export function EarnTransactionStatus({ userOpHash, onSuccess, onError, onTimeout, timeoutMs, labels }: EarnTransactionStatusProps) {
   const { isLoading, isSuccess, isError, error } = useWaitForUserOperationReceipt({
     client,
     userOpHash,
   });
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (isSuccess) onSuccess?.();
     if (isError) onError?.(error);
   }, [error, isError, isSuccess, onError, onSuccess]);
 
+  useEffect(() => {
+    setTimedOut(false);
+    if (!userOpHash || !timeoutMs) return;
+    const timer = window.setTimeout(() => {
+      setTimedOut(true);
+      onTimeout?.();
+    }, timeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [onTimeout, timeoutMs, userOpHash]);
+
   if (!userOpHash) return null;
 
   const label = isSuccess
-    ? "存款成功"
+    ? (labels?.success ?? "存款成功")
     : isError
-      ? `失败: ${error?.message ?? "Transaction failed"}`
+      ? `${labels?.errorPrefix ?? "失败"}: ${error?.message ?? "Transaction failed"}`
+      : timedOut
+        ? (labels?.timeout ?? "交易仍在进行,请稍后到 Activity 查看")
       : isLoading
-        ? "等待区块链确认..."
-        : "交易已提交";
+        ? (labels?.loading ?? "等待区块链确认...")
+        : (labels?.submitted ?? "交易已提交");
 
   return (
     <div

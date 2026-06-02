@@ -89,6 +89,7 @@ export async function POST(req: NextRequest) {
       source: main.source,
       amountIn: parsed.amountText,
       amountOut: main.quote.amountOut,
+      amountOutRaw: main.quote.amountOutRaw,
       rate: quoteRate,
       priceImpactPercent: Number((priceImpactPercent * 100).toFixed(4)),
       priceImpactLevel: impactLevel(priceImpactPercent * 100),
