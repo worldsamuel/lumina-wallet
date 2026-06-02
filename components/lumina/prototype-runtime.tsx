@@ -2087,18 +2087,14 @@ function enhancePrototypeSwapQuote() {
         return rows[3] ? rows[3].querySelector("span:last-child") : null;
       }
       function ensureQuoteBox(){
-        var box = document.getElementById("quoteCompareBox");
-        if (box) return box;
+        var oldCompare = document.getElementById("quoteCompareBox");
+        if (oldCompare) oldCompare.remove();
+        var warnBox = document.getElementById("quoteWarning");
+        if (warnBox) return warnBox;
         var detail = document.querySelector(".swap-detail");
         if (!detail) return null;
-        detail.insertAdjacentHTML("afterend",
-          '<div class="quote-warning" id="quoteWarning"></div>' +
-          '<div class="quote-compare" id="quoteCompareBox">' +
-            '<div class="quote-compare-title">报价来源对比</div>' +
-            '<div class="quote-compare-rows" id="quoteCompareRows"></div>' +
-          '</div>'
-        );
-        return document.getElementById("quoteCompareBox");
+        detail.insertAdjacentHTML("afterend", '<div class="quote-warning" id="quoteWarning"></div>');
+        return document.getElementById("quoteWarning");
       }
 	      function setSwapButtonState(label, disabled){
 	        var btn = document.getElementById("swapBtn");
@@ -2147,13 +2143,11 @@ function enhancePrototypeSwapQuote() {
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
         var gas = feeEl();
-        var rows = document.getElementById("quoteCompareRows");
         var warn = document.getElementById("quoteWarning");
         if (buy) buy.value = "—";
         if (rate) rate.textContent = message;
         if (impact) { impact.textContent = "—"; impact.className = impactClass || "impact-mid"; }
         if (gas) gas.textContent = "—";
-        if (rows) rows.innerHTML = "";
         if (warn) { warn.classList.remove("show"); warn.textContent = ""; }
       }
       function formatRate(value){
@@ -2168,15 +2162,8 @@ function enhancePrototypeSwapQuote() {
         return '<div class="quote-ref-row"><span>' + label + '</span><strong>' + right + (suffix || "") + '</strong></div>';
       }
       function renderReferences(data){
-        ensureQuoteBox();
-        var rows = document.getElementById("quoteCompareRows");
-        if (!rows) return;
-        var refs = data.references || {};
-        rows.innerHTML =
-          referenceRow("Uniswap V3", refs.uniswapV3) +
-          referenceRow("Uniswap V4", refs.uniswapV4) +
-          referenceRow("Chainlink", Object.assign({ available: !!(refs.chainlink && refs.chainlink.rate) }, refs.chainlink || {}), ' <span class="quote-muted">(reference)</span>') +
-          referenceRow("CoinGecko", Object.assign({ available: !!(refs.coingecko && refs.coingecko.rate) }, refs.coingecko || {}), ' <span class="quote-muted">(reference)</span>');
+        var oldCompare = document.getElementById("quoteCompareBox");
+        if (oldCompare) oldCompare.remove();
       }
       function renderWarning(data){
         var warn = document.getElementById("quoteWarning");
@@ -2326,9 +2313,6 @@ function enhancePrototypeSwapQuote() {
 	          var modal = document.createElement("div");
 	          modal.className = "modal-mask open";
 	          modal.id = "swapConfirmModal";
-	          var feePct = latestSwapQuote ? (Number(latestSwapQuote.feeTier || 0) / 10000) : 0.3;
-	          var impact = latestSwapQuote ? Number(latestSwapQuote.priceImpactPercent || 0) : 0;
-	          var impactClass = impactClassFor(impact);
 	          modal.innerHTML =
 	            '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;padding:24px;border-radius:26px;">' +
 	              '<div class="modal-grip"></div><h3>确认兑换</h3>' +
@@ -2336,12 +2320,6 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>您要支付</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
 	                '<div class="ln"><span>您将收到约</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>最少收到 (滑点保护)</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
-	                '<div class="ln"><span>价格冲击</span><b class="' + impactClass + '">' + (impact < 0.01 ? "<0.01%" : impact.toFixed(2) + "%") + '</b></div>' +
-	                '<div class="ln"><span>网络费用</span><b>~$' + Number(latestSwapQuote.gasEstimateUsd || 0.02).toFixed(2) + '</b></div>' +
-	                '<div class="ln"><span>滑点容忍</span><b>' + (slippageBps() / 100).toFixed(2).replace(/\\.00$/, "") + '%</b></div>' +
-	                '<div class="ln"><span>兑换路径</span><b>' + swapState.sell + ' → ' + swapState.buy + ' (Uniswap V3 ' + feePct + '% pool)</b></div>' +
-	                '<div class="ln"><span>签名次数</span><b>需要 1 次 World App 确认</b></div>' +
-	                '<div class="ln"><span>报价过期倒计时</span><b id="swapQuoteCountdown">' + quoteSecondsLeft() + 's</b></div>' +
 	              '</div>' +
 	              (state.impact > 5 ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">价格冲击超过 5%,我确认继续</button>' : '') +
 	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">取消</button><button class="btn-primary" id="swapConfirmOk">确认兑换</button></div>' +
