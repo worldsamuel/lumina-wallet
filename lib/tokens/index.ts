@@ -2,7 +2,7 @@ import type { Address } from "viem";
 import { COINGECKO_IDS, type CoinGeckoSymbol } from "./coingecko-ids";
 
 export type TokenConfig = {
-  symbol: CoinGeckoSymbol | "USDT";
+  symbol: CoinGeckoSymbol | "USDT" | "WETH" | "WBTC";
   name: string;
   decimals: number;
   logo: string;
@@ -43,6 +43,51 @@ export const TOKENS: readonly TokenConfig[] = [
     className: "usdt",
     contractAddress: "0x102d758f688a4c1c5a80b116bd945d4455460282" as Address,
     coingeckoId: COINGECKO_IDS.USDT,
+  },
+  {
+    symbol: "WETH",
+    name: "Wrapped Ether",
+    decimals: 18,
+    logo: "E",
+    className: "eth",
+    contractAddress: "0x4200000000000000000000000000000000000006" as Address,
+    coingeckoId: COINGECKO_IDS.ETH,
+  },
+  {
+    symbol: "WBTC",
+    name: "Wrapped Bitcoin",
+    decimals: 8,
+    logo: "B",
+    className: "btc",
+    contractAddress: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" as Address,
+    coingeckoId: COINGECKO_IDS.BTC,
+  },
+  {
+    symbol: "EURC",
+    name: "EURC",
+    decimals: 6,
+    logo: "E",
+    className: "eurc",
+    contractAddress: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B" as Address,
+    coingeckoId: COINGECKO_IDS.EURC,
+  },
+  {
+    symbol: "ORO",
+    name: "ORO",
+    decimals: 18,
+    logo: "O",
+    className: "custom",
+    contractAddress: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63" as Address,
+    coingeckoId: COINGECKO_IDS.ORO,
+  },
+  {
+    symbol: "ORB",
+    name: "Orb",
+    decimals: 18,
+    logo: "O",
+    className: "custom",
+    contractAddress: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB" as Address,
+    coingeckoId: COINGECKO_IDS.ORB,
   },
   {
     symbol: "ETH",

@@ -699,7 +699,9 @@ function enhancePrototypeBuiltinTokenLogos() {
         ETH: "0x4200000000000000000000000000000000000006",
         WETH: "0x4200000000000000000000000000000000000006",
         WBTC: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
-        EURC: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B"
+        EURC: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
+        ORO: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+        ORB: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB"
       };
       var logoUrlsBySymbol = {};
       function htmlEscape(value){
@@ -783,6 +785,8 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.WETH = window.__luminaTokenLogoHtml("WETH", tokenLogo.ETH || "");
         tokenLogo.WBTC = window.__luminaTokenLogoHtml("WBTC", "");
         tokenLogo.EURC = window.__luminaTokenLogoHtml("EURC", "");
+        tokenLogo.ORO = window.__luminaTokenLogoHtml("ORO", "O");
+        tokenLogo.ORB = window.__luminaTokenLogoHtml("ORB", "O");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -795,6 +799,11 @@ function enhancePrototypeBuiltinTokenLogos() {
       dotColor.USDC = "var(--blue)";
       dotColor.USDT = "#26a17b";
       dotColor.ETH = "#1c2536";
+      dotColor.WETH = "#1c2536";
+      dotColor.WBTC = "#f7931a";
+      dotColor.EURC = "#2775ca";
+      dotColor.ORO = "linear-gradient(135deg,#203020,#314633)";
+      dotColor.ORB = "linear-gradient(135deg,#203020,#314633)";
       prices.USDT = prices.USDT || 1;
       balances.USDT = balances.USDT || "0";
       availMap.USDT = availMap.USDT || "0 USDT";
@@ -1763,6 +1772,17 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
+      var homeSwapWhitelist = new Set(["WLD","USDC","USDT","WETH","WBTC","ORO","ORB","EURC"]);
+      function hasVisibleHomeBalance(asset){
+        var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
+        var n = Number(raw);
+        return Number.isFinite(n) && n > 0;
+      }
+      function showOnHome(asset){
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        if (homeSwapWhitelist.has(sym)) return true;
+        return !!(asset && asset.custom && hasVisibleHomeBalance(asset));
+      }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
         if (menu) menu.classList.toggle("open");
@@ -1818,10 +1838,9 @@ function enhancePrototypeHome() {
         var search = document.getElementById("homeTokenSearch");
         if (search) filter = String(search.value || "").toLowerCase().trim();
         var verified = (assets || []).filter(function(a){
-          return !a.custom && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
+          return showOnHome(a) && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
         });
         var html = verified.map(function(a, i){ return rowHtml(a, i, false); }).join("");
-        html += importedHomeRows(filter).map(function(a){ return rowHtml(a, 0, true); }).join("");
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
       };
@@ -2453,6 +2472,29 @@ function enhancePrototypeSwapQuote() {
         var btn = document.getElementById("swapBtn");
         if (btn) btn.disabled = false;
       };
+      if (!window.__luminaTokenModalKeyboardFix) {
+        window.__luminaTokenModalKeyboardFix = true;
+        document.addEventListener("focusin", function(event){
+          if (event.target && event.target.id === "tkSearch") {
+            var modal = document.getElementById("tokenModal");
+            if (modal) modal.classList.add("keyboard-open");
+            setTimeout(function(){
+              var inner = modal && modal.querySelector(".modal");
+              if (inner) inner.scrollTop = 0;
+            }, 60);
+          }
+        });
+        document.addEventListener("focusout", function(event){
+          if (event.target && event.target.id === "tkSearch") {
+            setTimeout(function(){
+              var active = document.activeElement;
+              if (active && active.id === "tkSearch") return;
+              var modal = document.getElementById("tokenModal");
+              if (modal) modal.classList.remove("keyboard-open");
+            }, 120);
+          }
+        });
+      }
       flipSwap = function(){
         var nextSell = swapState.buy;
         var nextBuy = swapState.sell;

@@ -47,7 +47,7 @@
   #view-swap .swap-head .back-btn { display: none; }
   .view > .swap-head .gear { position: absolute; top: 15px; right: var(--pad-screen); margin: 0; color: var(--text); background: rgba(22,24,22,0.78); border: 1px solid rgba(255,255,255,0.08); border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   #view-swap > .swap-head { pointer-events: none; }
-  #view-swap .swap-head .gear { pointer-events: auto; top: -24px; right: var(--pad-screen); width: 34px; height: 34px; z-index: 20; color: #e9eee9; background: rgba(16,18,16,0.9); border-color: rgba(255,255,255,0.08); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
+  #view-swap .swap-head .gear { pointer-events: auto; top: 18px; right: calc(var(--pad-screen) + 4px); width: 38px; height: 38px; z-index: 30; color: #e9eee9; background: rgba(16,18,16,0.94); border-color: rgba(255,255,255,0.12); box-shadow: 0 10px 24px rgba(0,0,0,0.28); }
   #view-swap .swap-head .gear svg { width: 20px; height: 20px; }
   #view-home .balance-card,
   #view-earn .earn-hero,
@@ -492,7 +492,10 @@
   .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.42); display: none; align-items: flex-end; justify-content: center; z-index: 80; }
   .modal-mask.open { display: flex; animation: fade .2s ease; }
   .modal-mask.show { display: flex; animation: fade .2s ease; }
-  .modal { width: 100%; max-width: var(--phone-max); background: #111311; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid #303330; padding: 8px 0 24px; max-height: 76vh; overflow-y: auto; box-shadow: 0 -18px 55px rgba(0,0,0,0.45); }
+  .modal { width: 100%; max-width: var(--phone-max); background: #111311; border-top-left-radius: 24px; border-top-right-radius: 24px; border: 1px solid #303330; padding: 8px 0 24px; max-height: 76dvh; overflow-y: auto; box-shadow: 0 -18px 55px rgba(0,0,0,0.45); }
+  #tokenModal.keyboard-open { align-items: flex-start; padding-top: max(12px, env(safe-area-inset-top)); }
+  #tokenModal.keyboard-open .modal { max-height: min(58dvh, 520px); border-radius: 24px; }
+  #tokenModal.keyboard-open .tk-search { position: sticky; top: 0; z-index: 3; background: #111311; padding-top: 4px; }
   .modal-grip { width: 44px; height: 5px; border-radius: 5px; background: #666a66; margin: 8px auto 18px; }
   .modal h3 { font-size: 18px; color: var(--text); font-weight: 800; padding: 0 var(--pad-screen) 14px; }
   .modal .tk-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); cursor: pointer; }
