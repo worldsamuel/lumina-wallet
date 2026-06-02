@@ -75,10 +75,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
     throw new Error("Phase 2 execution currently supports Uniswap V3 routes only.");
   }
   if (freshQuote.blocked) throw new Error(freshQuote.blockReason || "Quote is blocked.");
-  const impact = Number(freshQuote.priceImpactPercent || 0);
-  if (impact > 5 && !params.forceHighImpact) {
-    throw new Error("Price impact is above 5%. Please confirm the high-impact warning.");
-  }
 
   const built = await buildSwapTxOnServer({
     fromToken: freshQuote.tokens.from,

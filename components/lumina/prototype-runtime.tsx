@@ -2449,6 +2449,15 @@ function enhancePrototypeSwapQuote() {
           scheduleQuote();
         };
       }
+      flipSwap = function(){
+        var nextSell = swapState.buy;
+        var nextBuy = swapState.sell;
+        swapState.sell = nextSell;
+        swapState.buy = nextBuy;
+        highImpactAcknowledged = false;
+        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+        toast(typeof t === "function" ? t("tFlipped") : "已对调买卖方向");
+      };
       recalc = scheduleQuote;
 	      confirmSwap = handleSwapClick;
       document.querySelectorAll(".slip-opt").forEach(function(el){
