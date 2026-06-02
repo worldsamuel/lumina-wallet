@@ -142,6 +142,8 @@ function pickMainQuote(v3: SourceQuote | null, v4: SourceQuote | null) {
     v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null,
     v4?.bestQuote ? { source: "uniswap-v4" as const, quote: v4.bestQuote } : null,
   ].filter((item): item is { source: "uniswap-v3" | "uniswap-v4"; quote: SwapQuoteResult } => Boolean(item));
+  const executable = candidates.find((item) => item.source === "uniswap-v3");
+  if (executable) return executable;
   return candidates.sort((a, b) => {
     const left = BigInt(a.quote.amountOutRaw);
     const right = BigInt(b.quote.amountOutRaw);

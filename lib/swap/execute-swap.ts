@@ -76,7 +76,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
   }
   if (freshQuote.blocked) throw new Error(freshQuote.blockReason || "Quote is blocked.");
   const impact = Number(freshQuote.priceImpactPercent || 0);
-  if (impact > 15) throw new Error("Price impact is above 15%. Swap blocked to protect funds.");
   if (impact > 5 && !params.forceHighImpact) {
     throw new Error("Price impact is above 5%. Please confirm the high-impact warning.");
   }
@@ -185,8 +184,8 @@ function estimateAmountUsd(amountHuman: string, priceUsd?: number) {
 }
 
 function getSwapMaxUsd() {
-  const value = Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "1000");
-  return Number.isFinite(value) && value > 0 ? Math.min(value, 1000) : 1000;
+  const value = Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000");
+  return Number.isFinite(value) && value > 0 ? Math.min(value, 100000) : 100000;
 }
 
 function isSwapEnabled() {

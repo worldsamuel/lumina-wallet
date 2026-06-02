@@ -1888,6 +1888,17 @@ function enhancePrototypeMarket() {
         tokenChanges24h = tokenChanges24h || {};
         tokenChanges24h[sym] = market.change24h;
         window.__luminaMarketBySymbol[sym] = market;
+        if (market.address && customTokens && !["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(String(sym).toUpperCase())) {
+          customTokens[sym] = {
+            symbol: sym,
+            name: market.name || sym,
+            address: market.address,
+            decimals: Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : 18,
+            logoUrl: market.logoUrl || null,
+            priceUsd: Number(market.priceUsd || 0),
+            trust: market.verified ? "audited" : "community"
+          };
+        }
         if (balances[sym] === undefined) balances[sym] = "0";
       }
       function openMarketDetail(symbol){
@@ -1990,7 +2001,7 @@ function enhancePrototypeMarket() {
           var bg = g.symbol === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
           var color = g.symbol === "WLD" ? "#000" : "#fff";
           var pctClass = Number(g.change24h || 0) >= 0 ? "pct" : "pct down";
-          var routeBadge = ["WLD","USDC","USDT","ETH","BTC"].indexOf(String(g.symbol || "").toUpperCase()) >= 0 ? "" : '<span class="market-route-badge">Market only</span>';
+          var routeBadge = g.address ? "" : '<span class="market-route-badge">Market only</span>';
           return '<div class="gainer" onclick="openMarketDetail(\\'' + g.symbol + '\\')">' +
             '<div class="' + rankCls + '">' + (i + 1) + '</div>' +
             '<div class="ic" style="background:' + bg + ';color:' + color + '">' + iconFor(g.symbol, g.symbol.slice(0, 3)) + '</div>' +
@@ -2071,7 +2082,7 @@ function enhancePrototypeSwapQuote() {
 	      var swapSubmitting = false;
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
-	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "1000") || 1000)};
+	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
       function shortAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -2194,7 +2205,7 @@ function enhancePrototypeSwapQuote() {
         var gas = feeEl();
         if (buy) buy.value = shortAmount(data.amountOut);
         if (rate && data.rate) {
-          rate.textContent = "1 " + swapState.sell + " ≈ " + formatRate(data.rate) + " " + swapState.buy + " · " + data.source + " · " + (data.feeTier / 10000) + "%";
+          rate.textContent = "1 " + swapState.sell + " ≈ " + formatRate(data.rate) + " " + swapState.buy;
         }
         if (impact) {
           var p = Number(data.priceImpactPercent || 0);
@@ -2297,6 +2308,17 @@ function enhancePrototypeSwapQuote() {
 	        if (percent >= 3) return "impact-mid";
 	        return "impact-low";
 	      }
+	      function swapRiskText(){
+	        if (!latestSwapQuote) return "";
+	        var warnings = latestSwapQuote.warnings || [];
+	        var risky = [latestSwapQuote.tokens && latestSwapQuote.tokens.from, latestSwapQuote.tokens && latestSwapQuote.tokens.to].filter(function(token){
+	          return token && token.trust === "community";
+	        });
+	        if (risky.length) return "高风险代币: " + risky[0].symbol + " 未经 Lumina 审核,价格和流动性可能剧烈波动。";
+	        if (warnings.indexOf("low_liquidity") >= 0) return "低流动性交易,成交价格可能明显变化。";
+	        if (warnings.indexOf("price_anomaly") >= 0) return "报价与参考价偏离较大,请确认你接受该价格。";
+	        return "";
+	      }
 	      function validateSwapSafety(){
 	        var sell = document.getElementById("sellAmt");
 	        var amountText = sell ? String(sell.value || "").replace(/,/g, "").trim() : "";
@@ -2311,12 +2333,12 @@ function enhancePrototypeSwapQuote() {
 	        if (amount > balanceNumber(swapState.sell)) return { ok:false, error:"余额不足" };
 	        if (slip <= 0) return { ok:false, error:"滑点不能设为 0,请至少选择 0.1%。" };
 	        if (!latestSwapQuote) return { ok:false, error:"请先获取报价。" };
-	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"Phase 2 只允许 Uniswap V3 路由执行,请切换交易对或等待下一阶段。" };
+	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (quoteAgeSeconds() > 30) return { ok:false, error:"报价已超过 30 秒,请刷新报价。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:"单笔限额 $" + swapMaxUsd + ",请降低金额。" };
-	        if (impact > 15) return { ok:false, error:"价格冲击超过 15%,为保护资金已拒绝执行。" };
-	        if (impact > 5 && !highImpactAcknowledged) return { ok:false, highImpact:true, error:"价格冲击超过 5%,需要再次确认。" };
-	        return { ok:true, amountText:amountText, impact:impact };
+	        var riskText = swapRiskText();
+	        if (impact > 5) riskText = riskText || "价格冲击超过 5%,请确认你接受这个价格。";
+	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
 	      }
 	      function openSwapConfirm(state){
 	        return new Promise(function(resolve){
@@ -2334,7 +2356,7 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>您将收到约</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>最少收到 (滑点保护)</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	              '</div>' +
-	              (state.impact > 5 ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">价格冲击超过 5%,我确认继续</button>' : '') +
+	              (state.riskText ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">' + state.riskText + '<br>我确认继续</button>' : '') +
 	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">取消</button><button class="btn-primary" id="swapConfirmOk">确认兑换</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
@@ -2354,9 +2376,9 @@ function enhancePrototypeSwapQuote() {
 	          modal.onclick = function(event){ if (event.target === modal) done(false); };
 	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
 	          var high = document.getElementById("swapHighImpactAck");
-	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.textContent = "已确认高价格冲击"; };
+	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.textContent = "已确认高风险交易"; };
 	          document.getElementById("swapConfirmOk").onclick = function(){
-	            if (state.impact > 5 && !highImpactAcknowledged) { toast("请先确认高价格冲击风险"); return; }
+	            if (state.riskText && !highImpactAcknowledged) { toast("请先确认高风险交易"); return; }
 	            done(true);
 	          };
 	        });

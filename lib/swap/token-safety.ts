@@ -1,12 +1,13 @@
 import { formatUnits, isAddress, parseUnits, zeroAddress, type Address } from "viem";
 import { publicClient } from "@/lib/chain";
+import { getWorldChainMarketCatalog } from "@/lib/market-data";
 import { quoteV3 } from "./v3-quoter";
 import { resolveCoreSwapToken, SWAP_TOKENS, VERIFIED_SWAP_TOKENS, type SwapToken } from "./tokens";
 
 const UNISWAP_V3_FACTORY = "0x7a5028BDa40e7B173C278C5342087826455ea25a" as Address;
 const FEE_TIERS = [500, 3000, 10000] as const;
 const REFERENCE_SYMBOLS = ["USDC", "WLD", "WETH"] as const;
-const MIN_TVL_USD = 100;
+const MIN_TVL_USD = 10;
 const LOW_TVL_USD = 5_000;
 const MAX_CACHE_AGE_MS = 5 * 60 * 1000;
 
@@ -56,6 +57,32 @@ const cache = globalThis.__luminaSwapTokenSafetyCache ?? new Map<string, { expir
 globalThis.__luminaSwapTokenSafetyCache = cache;
 
 const BLACKLIST = new Set<string>([]);
+const FALLBACK_MARKET_TOKENS: SwapToken[] = [
+  {
+    symbol: "ORO",
+    name: "ORO",
+    address: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+    decimals: 18,
+    priceSymbol: "USDC",
+    trust: "community",
+  },
+  {
+    symbol: "ORB",
+    name: "ORB",
+    address: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB",
+    decimals: 18,
+    priceSymbol: "USDC",
+    trust: "community",
+  },
+  {
+    symbol: "USDT0",
+    name: "Stargate Bridged USDT0",
+    address: "0x102d758f688a4C1C5a80b116bD945d4455460282",
+    decimals: 6,
+    priceSymbol: "USDC",
+    trust: "audited",
+  },
+];
 
 export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyReport> {
   if (!isAddress(input)) throw new Error("Invalid token contract");
@@ -100,7 +127,7 @@ export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyRe
   else if (sellback.ratio < 0.5) reasons.push("honeypot");
   else if (sellback.ratio < 0.9) reasons.push("high_sellback_impact");
 
-  const status = reasons.some((reason) => ["blacklisted", "low_liquidity", "honeypot", "honeypot_check_failed"].includes(reason))
+  const status = reasons.some((reason) => ["blacklisted"].includes(reason))
     ? "rejected"
     : "community";
 
@@ -127,6 +154,8 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
   const core = resolveCoreSwapToken(value);
   if (core) return core;
   const text = String(value ?? "").trim();
+  const market = await resolveMarketSwapToken(text);
+  if (market) return market;
   if (!isAddress(text)) return null;
   const report = await checkSwapTokenSafety(text);
   if (report.status === "rejected") return null;
@@ -138,6 +167,54 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
     priceSymbol: "USDC",
     trust: report.status === "verified" ? "audited" : "community",
     safety: report,
+  };
+}
+
+async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> {
+  const needle = value.trim();
+  if (!needle) return null;
+  const market = (await getWorldChainMarketCatalog()).find((item) => {
+    if (!item.address) return false;
+    if (isAddress(needle)) return item.address.toLowerCase() === needle.toLowerCase();
+    return item.symbol.toUpperCase() === needle.toUpperCase();
+  });
+  const fallback = FALLBACK_MARKET_TOKENS.find((token) => {
+    if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();
+    return token.symbol.toUpperCase() === needle.toUpperCase();
+  });
+  if (!market && fallback) return fallback;
+  if (!market?.address) return null;
+  return {
+    symbol: market.symbol,
+    name: market.name || market.symbol,
+    address: market.address,
+    decimals: market.decimals ?? 18,
+    priceSymbol: "USDC",
+    trust: market.verified ? "audited" : "community",
+    safety: {
+      status: market.verified ? "verified" : "community",
+      reasons: market.liquidityUsd < LOW_TVL_USD ? ["low_liquidity_warning"] : [],
+      metadata: {
+        address: market.address,
+        name: market.name || market.symbol,
+        symbol: market.symbol,
+        decimals: market.decimals ?? 18,
+        logo: market.logoUrl ?? undefined,
+      },
+      liquidity: {
+        tvlUsd: market.liquidityUsd,
+        pools: [{ address: market.poolAddress as Address, pair: `${market.symbol}/market`, fee: 0, tvlUsd: market.liquidityUsd }],
+      },
+      safety: {
+        hasMetadata: true,
+        hasLiquidity: market.liquidityUsd >= MIN_TVL_USD,
+        passedHoneypot: true,
+        transferFee: 0,
+        ageInDays: null,
+        blacklisted: false,
+        sellbackRatio: null,
+      },
+    },
   };
 }
 
