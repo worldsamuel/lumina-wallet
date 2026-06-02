@@ -224,25 +224,25 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     void window.__luminaRefreshMorphoPositions?.();
     if (address) void mutate(`/api/morpho/position/${address}`);
     setEarnUserOpHash("");
-    toastFromPrototype(earnPendingAction === "withdraw" ? "Withdrawal successful" : "Deposit successful");
+    toastFromPrototype(earnPendingAction === "withdraw" ? prototypeText("withdrawSuccess") : prototypeText("depositSuccess"));
   }, [address, earnPendingAction, mutate]);
 
   const handleEarnReceiptError = useCallback((receiptError?: Error) => {
     window.__luminaSetMorphoBusy?.(false);
     setEarnUserOpHash("");
-    toastFromPrototype(`${earnPendingAction === "withdraw" ? "Withdrawal" : "Deposit"} failed: ${receiptError?.message ?? "Transaction failed"}`);
+    toastFromPrototype(`${earnPendingAction === "withdraw" ? prototypeText("withdrawFailed") : prototypeText("depositFailed")}: ${receiptError?.message ?? "Transaction failed"}`);
   }, [earnPendingAction]);
 
   const handleSwapReceiptSuccess = useCallback(() => {
     setSwapUserOpHash("");
     window.__luminaRefreshWalletData?.();
-    toastFromPrototype("Swap successful");
+    toastFromPrototype(prototypeText("swapSuccess"));
     window.dispatchEvent(new CustomEvent("lumina:swap-confirmed"));
   }, []);
 
   const handleSwapReceiptError = useCallback((receiptError?: Error) => {
     setSwapUserOpHash("");
-    toastFromPrototype(`Swap failed: ${receiptError?.message ?? "Transaction failed"}`);
+    toastFromPrototype(`${prototypeText("swapFailed")}: ${receiptError?.message ?? "Transaction failed"}`);
     window.dispatchEvent(new CustomEvent("lumina:swap-failed", { detail: { message: receiptError?.message } }));
   }, []);
 
@@ -316,9 +316,22 @@ function installMobileConsole() {
   document.head.appendChild(script);
 }
 
-function toastFromPrototype(message: string) {
-  const toast = (window as unknown as { toast?: (text: string) => void }).toast;
-  if (toast) toast(message);
+      function toastFromPrototype(message: string) {
+        const toast = (window as unknown as { toast?: (text: string) => void }).toast;
+        if (toast) toast(message);
+      }
+
+function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFailed" | "withdrawFailed" | "swapSuccess" | "swapFailed") {
+  const lang = (window as unknown as { currentLang?: string }).currentLang || "en";
+  const copy = {
+    depositSuccess: { en: "Deposit successful", "zh-CN": "存入成功", "zh-TW": "存入成功" },
+    withdrawSuccess: { en: "Withdrawal successful", "zh-CN": "提现成功", "zh-TW": "提領成功" },
+    depositFailed: { en: "Deposit failed", "zh-CN": "存入失败", "zh-TW": "存入失敗" },
+    withdrawFailed: { en: "Withdrawal failed", "zh-CN": "提现失败", "zh-TW": "提領失敗" },
+    swapSuccess: { en: "Swap successful", "zh-CN": "兑换成功", "zh-TW": "兌換成功" },
+    swapFailed: { en: "Swap failed", "zh-CN": "兑换失败", "zh-TW": "兌換失敗" },
+  } as const;
+  return (copy[key] as Record<string, string>)[lang] ?? copy[key].en;
 }
 
 function exposeEarnWalletConfirm() {
@@ -999,6 +1012,17 @@ function enhancePrototypeEarn() {
         toast("APY includes Morpho rewards and updates daily");
       };
 
+      function morphoCopy(key){
+        var lang = window.currentLang || "en";
+        var copy = {
+          waitingConfirm: { en:"Waiting for on-chain confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation on-chain...", de:"Warten auf On-chain-Bestätigung...", es:"Esperando confirmación on-chain...", ja:"オンチェーン確認待ち..." },
+          depositFailed: { en:"Deposit failed", "zh-CN":"存入失败", "zh-TW":"存入失敗", fr:"Échec du dépôt", de:"Einzahlung fehlgeschlagen", es:"Depósito fallido", ja:"預入に失敗しました" },
+          withdrawFailed: { en:"Withdrawal failed", "zh-CN":"提现失败", "zh-TW":"提領失敗", fr:"Échec du retrait", de:"Auszahlung fehlgeschlagen", es:"Retiro fallido", ja:"引出に失敗しました" },
+          cancelled: { en:"Cancelled in World App", "zh-CN":"已在 World App 取消", "zh-TW":"已在 World App 取消", fr:"Annulé dans World App", de:"In World App abgebrochen", es:"Cancelado en World App", ja:"World App でキャンセル済み" }
+        };
+        return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
+      }
+
       function setMorphoBusy(isBusy){
         ["morphoDepositBtn"].forEach(function(id){
           var btn = document.getElementById(id);
@@ -1178,12 +1202,12 @@ function enhancePrototypeEarn() {
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           awaitingReceipt = true;
-          toast("Waiting for confirmation: " + String(hash).slice(0, 18));
+          toast(morphoCopy("waitingConfirm") + " " + String(hash).slice(0, 18));
         } catch(e) {
           console.error("[EARN] error:", e);
           var msg = e && e.message ? e.message : "Deposit failed";
-          if (/user_rejected/i.test(msg)) msg = "Cancelled in World App";
-          toast("Deposit failed: " + msg);
+          if (/user_rejected/i.test(msg)) msg = morphoCopy("cancelled");
+          toast(morphoCopy("depositFailed") + ": " + msg);
         } finally {
           if (!awaitingReceipt) setMorphoBusy(false);
         }
@@ -1264,11 +1288,11 @@ function enhancePrototypeEarn() {
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           closeMorphoWithdrawModal();
-          toast("Waiting for confirmation: " + String(hash).slice(0, 18));
+          toast(morphoCopy("waitingConfirm") + " " + String(hash).slice(0, 18));
         } catch(e) {
           var msg = e && e.message ? e.message : "Withdraw failed";
           if (/liquid|withdraw/i.test(msg)) msg = "Vault liquidity is low. Try a smaller amount later.";
-          toast("Withdrawal failed: " + msg);
+          toast(morphoCopy("withdrawFailed") + ": " + msg);
         }
       };
 
@@ -2230,6 +2254,15 @@ function enhancePrototypeSwapQuote() {
           signing: { en:"Signing...", "zh-CN":"签名中...", "zh-TW":"簽名中...", fr:"Signature...", de:"Signieren...", es:"Firmando...", ja:"署名中..." },
           submitting: { en:"Submitting transaction...", "zh-CN":"提交交易...", "zh-TW":"提交交易...", fr:"Envoi de la transaction...", de:"Transaktion wird gesendet...", es:"Enviando transacción...", ja:"取引を送信中..." },
           waitingChain: { en:"Waiting for confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation...", de:"Warten auf Bestätigung...", es:"Esperando confirmación...", ja:"確認待ち..." }
+          ,priceImpactUnknown: { en:"Pool quote", "zh-CN":"池子报价", "zh-TW":"池子報價", fr:"Prix du pool", de:"Pool-Preis", es:"Precio del pool", ja:"プール見積" }
+          ,communityRiskTitle: { en:"High-risk token", "zh-CN":"高风险代币", "zh-TW":"高風險代幣", fr:"Jeton à risque élevé", de:"Hochrisiko-Token", es:"Token de alto riesgo", ja:"高リスクトークン" }
+          ,communityRiskBody: { en:"This token has not been reviewed by Lumina. Price, liquidity and sellability may change sharply.", "zh-CN":"该代币未经 Lumina 审核,价格、流动性和可卖出性可能剧烈波动。", "zh-TW":"該代幣未經 Lumina 審核,價格、流動性和可賣出性可能劇烈波動。", fr:"Ce jeton n'a pas été vérifié par Lumina. Prix, liquidité et revente peuvent varier fortement.", de:"Dieser Token wurde nicht von Lumina geprüft. Preis, Liquidität und Verkaufbarkeit können stark schwanken.", es:"Lumina no ha revisado este token. Precio, liquidez y venta pueden cambiar mucho.", ja:"このトークンは Lumina の審査を受けていません。価格、流動性、売却可否が大きく変動する可能性があります。" }
+          ,lowLiquidityRisk: { en:"Low liquidity route. The execution price may move noticeably.", "zh-CN":"低流动性路由,成交价格可能明显变化。", "zh-TW":"低流動性路由,成交價格可能明顯變化。", fr:"Route à faible liquidité. Le prix d'exécution peut bouger.", de:"Route mit geringer Liquidität. Der Ausführungspreis kann sich deutlich bewegen.", es:"Ruta con baja liquidez. El precio puede moverse.", ja:"低流動性ルートです。約定価格が大きく動く可能性があります。" }
+          ,priceAnomalyRisk: { en:"Quote is far from reference markets. Confirm only if you accept this price.", "zh-CN":"报价与参考行情偏离较大,请确认你接受该价格。", "zh-TW":"報價與參考行情偏離較大,請確認你接受該價格。", fr:"Le devis s'écarte des marchés de référence.", de:"Das Angebot weicht stark von Referenzmärkten ab.", es:"La cotización se aleja de mercados de referencia.", ja:"見積もりが参照市場から大きく離れています。" }
+          ,impactRisk: { en:"Price impact is above 5%. Confirm only if you accept this price.", "zh-CN":"价格影响超过 5%,请确认你接受这个价格。", "zh-TW":"價格影響超過 5%,請確認你接受這個價格。", fr:"L'impact prix dépasse 5%.", de:"Preiseinfluss über 5%.", es:"Impacto de precio superior al 5%.", ja:"価格影響が 5% を超えています。" }
+          ,quoteUpdated: { en:"Quote refreshed", "zh-CN":"报价已刷新", "zh-TW":"報價已刷新", fr:"Devis actualisé", de:"Angebot aktualisiert", es:"Cotización actualizada", ja:"見積もりを更新しました" }
+          ,confirmInWorldApp: { en:"Confirm in World App...", "zh-CN":"请在 World App 确认...", "zh-TW":"請在 World App 確認...", fr:"Confirmez dans World App...", de:"In World App bestätigen...", es:"Confirma en World App...", ja:"World App で確認..." }
+          ,submittedHint: { en:"Your transaction is in the queue. Activity will update after World Chain confirms it.", "zh-CN":"交易已进入队列,World Chain 确认后 Activity 会自动更新。", "zh-TW":"交易已進入佇列,World Chain 確認後 Activity 會自動更新。", fr:"La transaction est en file. Activity se mettra à jour après confirmation.", de:"Die Transaktion ist in der Warteschlange. Activity aktualisiert sich nach Bestätigung.", es:"La transacción está en cola. Activity se actualizará al confirmar.", ja:"取引はキューに入りました。確認後 Activity が更新されます。" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || (typeof t === "function" ? t(key) : key);
       }
@@ -2383,9 +2416,14 @@ function enhancePrototypeSwapQuote() {
           rate.textContent = "1 " + swapState.sell + " ≈ " + formatRate(data.rate) + " " + swapState.buy;
         }
         if (impact) {
-          var p = Number(data.priceImpactPercent || 0);
-          impact.textContent = p < 0.01 ? "<0.01%" : p.toFixed(2) + "%";
-          impact.className = data.priceImpactLevel === "green" ? "impact-low" : (data.priceImpactLevel === "yellow" ? "impact-mid" : "impact-high");
+          if (data.priceImpactAvailable === false || data.priceImpactPercent === null || data.priceImpactLevel === "unknown") {
+            impact.textContent = swapCopy("priceImpactUnknown");
+            impact.className = "impact-mid";
+          } else {
+            var p = Number(data.priceImpactPercent || 0);
+            impact.textContent = p < 0.01 ? "<0.01%" : p.toFixed(2) + "%";
+            impact.className = data.priceImpactLevel === "green" ? "impact-low" : (data.priceImpactLevel === "yellow" ? "impact-mid" : "impact-high");
+          }
         }
         if (gas) gas.textContent = networkFeeText(data.gasEstimateUsd);
         renderReferences(data);
@@ -2477,7 +2515,7 @@ function enhancePrototypeSwapQuote() {
 	        return latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : 999;
 	      }
 	      function quoteSecondsLeft(){
-	        return Math.max(0, 30 - quoteAgeSeconds());
+	        return Math.max(0, 90 - quoteAgeSeconds());
 	      }
 	      function impactClassFor(percent){
 	        if (percent > 5) return "impact-high";
@@ -2490,9 +2528,9 @@ function enhancePrototypeSwapQuote() {
 	        var risky = [latestSwapQuote.tokens && latestSwapQuote.tokens.from, latestSwapQuote.tokens && latestSwapQuote.tokens.to].filter(function(token){
 	          return token && token.trust === "community";
 	        });
-	        if (risky.length) return "高风险代币: " + risky[0].symbol + " 未经 Lumina 审核,价格和流动性可能剧烈波动。";
-	        if (warnings.indexOf("low_liquidity") >= 0) return "低流动性交易,成交价格可能明显变化。";
-	        if (warnings.indexOf("price_anomaly") >= 0) return "报价与参考价偏离较大,请确认你接受该价格。";
+	        if (risky.length) return { title: swapCopy("communityRiskTitle") + ": " + risky[0].symbol, body: swapCopy("communityRiskBody") };
+	        if (warnings.indexOf("low_liquidity") >= 0) return { title: swapCopy("communityRiskTitle"), body: swapCopy("lowLiquidityRisk") };
+	        if (warnings.indexOf("price_anomaly") >= 0) return { title: swapCopy("communityRiskTitle"), body: swapCopy("priceAnomalyRisk") };
 	        return "";
 	      }
 	      function validateSwapSafety(){
@@ -2512,7 +2550,7 @@ function enhancePrototypeSwapQuote() {
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:"单笔限额 $" + swapMaxUsd + ",请降低金额。" };
 	        var riskText = swapRiskText();
-	        if (impact > 5) riskText = riskText || "价格冲击超过 5%,请确认你接受这个价格。";
+	        if (impact > 5) riskText = riskText || { title: swapCopy("communityRiskTitle"), body: swapCopy("impactRisk") };
 	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
 	      }
 	      function openSwapConfirm(state){
@@ -2531,7 +2569,7 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>' + swapCopy("youReceiveApprox") + '</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>' + swapCopy("minReceive") + '</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	              '</div>' +
-	              (state.riskText ? '<button class="btn-primary" id="swapHighImpactAck" style="width:100%;margin-top:14px;padding:16px;border-radius:18px;line-height:1.55;font-size:17px;background:#ff6b7a;color:#fff;box-shadow:0 0 0 2px rgba(255,107,122,.25);">' + swapCopy("riskAck") + '<br><span style="font-size:13px;font-weight:700;">' + state.riskText + '</span></button>' : '') +
+	              (state.riskText ? '<button type="button" class="swap-risk-card" id="swapHighImpactAck"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p><p>' + swapCopy("riskAck") + '</p></button>' : '') +
 	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
@@ -2551,7 +2589,7 @@ function enhancePrototypeSwapQuote() {
 	          modal.onclick = function(event){ if (event.target === modal) done(false); };
 	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
 	          var high = document.getElementById("swapHighImpactAck");
-	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.style.background = "#48dc7c"; high.style.color = "#06220f"; high.textContent = swapCopy("riskAcked"); };
+	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.classList.add("ack"); high.innerHTML = '<strong><span class="swap-risk-icon">✓</span><span>' + swapCopy("riskAcked") + '</span></strong>'; };
 	          document.getElementById("swapConfirmOk").onclick = function(){
 	            if (state.riskText && !highImpactAcknowledged) { toast(swapCopy("ackRiskFirst")); return; }
 	            done(true);
@@ -2565,9 +2603,10 @@ function enhancePrototypeSwapQuote() {
 	        modal.className = "modal-mask open";
 	        modal.id = "swapSuccessModal";
 	        modal.innerHTML =
-	          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;position:relative;">' +
+	          '<div class="modal send-confirm-sheet swap-success-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;position:relative;">' +
 	            '<button id="swapSuccessClose" aria-label="关闭" style="position:absolute;right:16px;top:14px;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font-size:22px;line-height:1;">×</button>' +
-	            '<div class="modal-grip"></div><h3>' + swapCopy("submitted") + '</h3><p class="send-confirm-body">' + swapCopy("waiting") + ' ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
+	            '<div class="modal-grip"></div><div class="swap-success-mark">✓</div><h3>' + swapCopy("submitted") + '</h3><p class="swap-success-sub">' + swapCopy("waiting") + ' ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
+	            '<div class="swap-success-route"><span>' + swapState.sell + '</span><i>→</i><span>' + swapState.buy + '</span></div><p class="swap-success-sub">' + swapCopy("submittedHint") + '</p>' +
 	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">' + swapCopy("viewActivity") + '</button>' +
 	          '</div>';
 	        document.body.appendChild(modal);
@@ -2576,8 +2615,8 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
-	        if (latestSwapQuote && quoteAgeSeconds() > 25) {
-	          toast("报价已更新");
+	        if (latestSwapQuote && quoteAgeSeconds() > 80) {
+	          toast(swapCopy("quoteUpdated"));
 	          await requestQuote();
 	        }
 	        var state = validateSwapSafety();
@@ -2594,7 +2633,7 @@ function enhancePrototypeSwapQuote() {
 	          if (!window.__luminaExecuteSwap) throw new Error("Swap execution is unavailable.");
 	          var fromQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.from : null;
 	          var toQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.to : null;
-	          setSwapButtonState(swapCopy("signing"), true);
+	          setSwapButtonState(swapCopy("confirmInWorldApp"), true);
 	          var promise = window.__luminaExecuteSwap({
 	            fromToken: tokenMeta(swapState.sell, fromQuoted),
 	            toToken: tokenMeta(swapState.buy, toQuoted),
@@ -2671,7 +2710,7 @@ function enhancePrototypeSwapQuote() {
         toast(typeof t === "function" ? t("tFlipped") : "已对调买卖方向");
       };
       var swapGear = document.querySelector("#view-swap .swap-head .gear");
-      if (swapGear) swapGear.classList.add("is-floating");
+      if (swapGear) swapGear.remove();
       function ensureSlipBack(){
         var panel = document.getElementById("slipPanel");
         if (!panel || panel.querySelector(".slip-back")) return;

@@ -77,14 +77,15 @@ export async function POST(req: NextRequest) {
 
   const amountOutNumber = Number(main.quote.amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
-  const deviationValues = [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter(
-    (value): value is number => value !== null,
-  );
+  const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
+  const deviationValues = reliableImpactReference
+    ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
+    : [];
   const closestDeviation = deviationValues.length ? Math.min(...deviationValues) : 0;
-  const priceImpactPercent = closestDeviation;
+  const priceImpactPercent = reliableImpactReference && deviationValues.length ? closestDeviation : null;
   const warnings: string[] = [];
-  if (closestDeviation > 0.05) warnings.push("price_anomaly");
-  if (priceImpactPercent > 0.1) warnings.push("low_liquidity");
+  if (priceImpactPercent !== null && closestDeviation > 0.05) warnings.push("price_anomaly");
+  if (priceImpactPercent !== null && priceImpactPercent > 0.1) warnings.push("low_liquidity");
 
   return jsonResponse(
     {
@@ -95,8 +96,9 @@ export async function POST(req: NextRequest) {
       amountOut: main.quote.amountOut,
       amountOutRaw: main.quote.amountOutRaw,
       rate: quoteRate,
-      priceImpactPercent: Number((priceImpactPercent * 100).toFixed(4)),
-      priceImpactLevel: impactLevel(priceImpactPercent * 100),
+      priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
+      priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
+      priceImpactAvailable: priceImpactPercent !== null,
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
       route: main.quote.route,
@@ -199,6 +201,16 @@ function priceUsd(prices: OnchainPricesResponse | MarketPricesResponse | null | 
     return value.usd;
   }
   return null;
+}
+
+function hasReliablePriceReference(token: SwapToken) {
+  const symbol = token.symbol.toUpperCase();
+  const priceSymbol = token.priceSymbol.toUpperCase();
+  if (symbol === priceSymbol) return true;
+  if (symbol === "WETH" && priceSymbol === "ETH") return true;
+  if ((symbol === "WBTC" || symbol === "BTC") && priceSymbol === "BTC") return true;
+  if ((symbol === "USDT" || symbol === "EURC") && priceSymbol === "USDC") return true;
+  return false;
 }
 
 function deviation(value: number | null, reference: number | null) {
