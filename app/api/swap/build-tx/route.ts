@@ -2,11 +2,13 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { getWorldChainMarketForToken } from "@/lib/market-data";
 import type { OnchainPricesResponse } from "@/lib/prices";
 import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
 import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
+import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 
 const MAX_PRICE_IMPACT_PERCENT = 15;
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
   const parsed = await parseBuildBody(body);
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: parsed.status ?? 400 });
 
-  const amountUsd = await estimateAmountUsd(req, parsed.from.priceSymbol, parsed.amountText);
+  const amountUsd = await estimateAmountUsd(req, parsed.from, parsed.amountText);
   const maxUsd = getSwapMaxUsd();
   if (amountUsd === null) {
     return jsonResponse({ error: "Unable to verify swap USD limit. Please try again later." }, { status: 503 });
@@ -121,11 +123,17 @@ async function parseBuildBody(body: BuildSwapBody | null) {
   }
 }
 
-async function estimateAmountUsd(req: NextRequest, priceSymbol: string, amountText: string) {
+async function estimateAmountUsd(req: NextRequest, token: SwapToken, amountText: string) {
   const amount = Number(amountText);
   if (!Number.isFinite(amount) || amount <= 0) return null;
+  if (token.trust === "community") {
+    const marketPrice = await getWorldChainMarketForToken(token.address, token.symbol)
+      .then((market) => market?.priceUsd ?? null)
+      .catch(() => null);
+    return marketPrice && marketPrice > 0 ? amount * marketPrice : 0;
+  }
   const price = await fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain")
-    .then((prices) => priceUsd(prices, priceSymbol))
+    .then((prices) => priceUsd(prices, token.priceSymbol))
     .catch(() => null);
   return price ? amount * price : null;
 }

@@ -2226,6 +2226,8 @@ function enhancePrototypeSwapQuote() {
 	      var latestSwapQuote = null;
 	      var latestQuoteAt = 0;
 	      var quoteCountdownTimer = null;
+	      var SWAP_QUOTE_TTL_SECONDS = 180;
+	      var SWAP_QUOTE_REFRESH_SECONDS = 165;
 	      var swapSubmitting = false;
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
@@ -2468,7 +2470,7 @@ function enhancePrototypeSwapQuote() {
       }
 	      function scheduleQuote(){
 	        clearTimeout(quoteTimer);
-	        quoteTimer = setTimeout(requestQuote, 500);
+	        quoteTimer = setTimeout(requestQuote, 300);
 	      }
 	      function tokenMeta(symbol, quoted){
 	        var meta = quoted || (customTokens && customTokens[symbol] ? customTokens[symbol] : null);
@@ -2516,7 +2518,7 @@ function enhancePrototypeSwapQuote() {
 	        return latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : 999;
 	      }
 	      function quoteSecondsLeft(){
-	        return Math.max(0, 90 - quoteAgeSeconds());
+	        return Math.max(0, SWAP_QUOTE_TTL_SECONDS - quoteAgeSeconds());
 	      }
 	      function impactClassFor(percent){
 	        if (percent > 5) return "impact-high";
@@ -2616,7 +2618,7 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
-	        if (latestSwapQuote && quoteAgeSeconds() > 80) {
+	        if (latestSwapQuote && quoteAgeSeconds() > SWAP_QUOTE_REFRESH_SECONDS) {
 	          toast(swapCopy("quoteUpdated"));
 	          await requestQuote();
 	        }

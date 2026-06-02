@@ -181,16 +181,17 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
 async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> {
   const needle = value.trim();
   if (!needle) return null;
+  const fallback = FALLBACK_MARKET_TOKENS.find((token) => {
+    if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();
+    return token.symbol.toUpperCase() === needle.toUpperCase();
+  });
+  if (fallback) return fallback;
+
   const market = (await getWorldChainMarketCatalog()).find((item) => {
     if (!item.address) return false;
     if (isAddress(needle)) return item.address.toLowerCase() === needle.toLowerCase();
     return item.symbol.toUpperCase() === needle.toUpperCase();
   });
-  const fallback = FALLBACK_MARKET_TOKENS.find((token) => {
-    if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();
-    return token.symbol.toUpperCase() === needle.toUpperCase();
-  });
-  if (!market && fallback) return fallback;
   const catalog = (worldChainTokenCatalog as CatalogToken[]).find((token) => {
     if (!token.address || !isAddress(token.address)) return false;
     if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();

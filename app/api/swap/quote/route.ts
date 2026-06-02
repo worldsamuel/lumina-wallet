@@ -43,6 +43,7 @@ export async function POST(req: NextRequest) {
   const amountIn = platformFee?.swapAmount ?? grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
+  const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
   const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
     withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
       .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
@@ -52,9 +53,9 @@ export async function POST(req: NextRequest) {
       : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 6_000)
           .then((quote) => ({ source: "uniswap-v4" as const, ...quote }))
           .catch(() => null),
-    fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null),
-    fetchJson<MarketPricesResponse>(req, "/api/prices/market").catch(() => null),
-    publicClient.getGasPrice().catch(() => 0n),
+    reliableImpactReference ? fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null) : Promise.resolve(null),
+    reliableImpactReference ? fetchJson<MarketPricesResponse>(req, "/api/prices/market").catch(() => null) : Promise.resolve(null),
+    reliableImpactReference ? publicClient.getGasPrice().catch(() => 0n) : Promise.resolve(0n),
   ]);
 
   const amountInNumber = Number(amountText);
@@ -77,7 +78,6 @@ export async function POST(req: NextRequest) {
 
   const amountOutNumber = Number(main.quote.amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
-  const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
   const deviationValues = reliableImpactReference
     ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
     : [];
