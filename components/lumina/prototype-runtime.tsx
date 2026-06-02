@@ -1701,7 +1701,8 @@ function enhancePrototypeTokens() {
       };
 
       function assetIconHtml(symbol, className, logo) {
-        return '<div class="coin ' + (className || "custom") + '">' + (logo || tokenInitial(symbol)) + '</div>';
+        var icon = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, logo || tokenInitial(symbol)) : (logo || tokenInitial(symbol));
+        return '<div class="coin ' + (className || "custom") + '">' + icon + '</div>';
       }
       function importedAssetRow(token, hidden) {
         var key = Object.keys(customTokens).find(function(sym){
@@ -1731,7 +1732,10 @@ function enhancePrototypeTokens() {
       function renderAllAssets(){
         ensureAllAssetsView();
         var hidden = hiddenSet();
-        var verifiedRows = (assets || []).map(function(a, i){
+        var verifiedRows = (assets || []).filter(function(a){
+          return a && ["BTC", "WBTC"].indexOf(String(a.sym || "").toUpperCase()) < 0;
+        }).map(function(a){
+          var i = assets.indexOf(a);
           return '<div class="asset all-asset-row" onclick="openDetail(' + i + ')">' +
             assetIconHtml(a.sym, a.cls, a.logo) +
             '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk low">Verified</span></div><div class="full">' + a.full + '</div></div>' +
@@ -3489,40 +3493,22 @@ function enhancePrototypeDetail() {
           return '<div class="detail-trade-row"' + open + '><span class="trade-side ' + side + '">' + (side === "buy" ? "Buy" : "Sell") + '</span><span class="trade-main"><b>' + amount + '</b><em>' + time + ' · ' + shortAddr(t.maker) + '</em></span><span class="trade-usd">' + usd + '</span></div>';
         }).join("");
       }
-      function holderRows(holders, asset){
-        if (!holders || !holders.length) return '<div class="detail-empty-row">No holder ranking available.</div>';
-        var market = marketForAsset(asset) || {};
-        var decimals = Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : (asset.sym === "USDC" || asset.sym === "USDT" ? 6 : 18);
-        var divisor = Math.pow(10, decimals);
-        return holders.slice(0, 8).map(function(h, i){
-          var raw = Number(h.balance || 0);
-          var amount = raw > divisor ? raw / divisor : raw;
-          var label = h.label || shortAddr(h.address);
-          var tag = h.isContract ? "Contract" : "Wallet";
-          return '<div class="detail-holder-row"><span class="holder-rank">' + (i + 1) + '</span><span class="holder-main"><b>' + label + '</b><em>' + tag + '</em></span><span class="holder-bal">' + amount.toLocaleString(undefined, { maximumFractionDigits: 3 }) + ' ' + asset.sym + '</span></div>';
-        }).join("");
-      }
       function renderMarketTables(asset) {
         var tradesBox = document.getElementById("detTrades");
-        var holdersBox = document.getElementById("detHolders");
-        if (!tradesBox || !holdersBox) return;
+        if (!tradesBox) return;
         var market = marketForAsset(asset);
         if (!market || !market.poolAddress || !market.address) {
           tradesBox.innerHTML = '<div class="detail-empty-row">Market pair unavailable.</div>';
-          holdersBox.innerHTML = '<div class="detail-empty-row">Holder ranking unavailable.</div>';
           return;
         }
         tradesBox.innerHTML = '<div class="detail-empty-row">Loading trades...</div>';
-        holdersBox.innerHTML = '<div class="detail-empty-row">Loading holders...</div>';
         fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { trades: [], holders: [] }; })
           .then(function(data){
             tradesBox.innerHTML = tradeRows(Array.isArray(data.trades) ? data.trades : [], asset);
-            holdersBox.innerHTML = holderRows(Array.isArray(data.holders) ? data.holders : [], asset);
           })
           .catch(function(){
             tradesBox.innerHTML = '<div class="detail-empty-row">Unable to load trades.</div>';
-            holdersBox.innerHTML = '<div class="detail-empty-row">Unable to load holders.</div>';
           });
       }
       window.openPoolInfo = function(){
@@ -3581,7 +3567,6 @@ function enhancePrototypeDetail() {
           '</div>' +
           '<section class="detail-market-panels">' +
             '<div class="detail-market-card"><div class="detail-market-title"><span>Trades</span><em>Live pool</em></div><div id="detTrades"></div></div>' +
-            '<div class="detail-market-card"><div class="detail-market-title"><span>Holders</span><em>Top ranking</em></div><div id="detHolders"></div></div>' +
           '</section>' +
           '<section class="detail-v2-menu">' +
             '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +

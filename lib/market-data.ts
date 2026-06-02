@@ -4,6 +4,7 @@ import { TOKENS } from "./tokens";
 const GECKO_NETWORK = "world-chain";
 const GECKO_POOLS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
 const GECKO_OHLCV_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
+const GECKO_TOKENS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/tokens`;
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
 const CACHE_TTL_MS = 30_000;
 const MIN_LIQUIDITY_USD = 10;
@@ -109,6 +110,7 @@ export type TokenHolder = {
 
 let cached: { expiresAt: number; data: MarketToken[] } | null = null;
 let lastGood: MarketToken[] = [];
+const tokenMarketCache = new Map<string, { expiresAt: number; data: MarketToken | null }>();
 const ohlcvCache = new Map<
   string,
   {
@@ -158,6 +160,21 @@ async function fetchGeckoPage(page: number) {
   return (await response.json()) as GeckoResponse;
 }
 
+async function fetchTokenPools(tokenAddress: string) {
+  const params = new URLSearchParams({
+    include: "base_token,quote_token",
+    page: "1",
+    sort: "h24_volume_usd_desc",
+  });
+  const response = await fetch(`${GECKO_TOKENS_URL}/${tokenAddress}/pools?${params}`, {
+    headers: { accept: "application/json" },
+    next: { revalidate: 60 },
+    signal: AbortSignal.timeout(7000),
+  });
+  if (!response.ok) throw new Error(`GeckoTerminal token pools responded ${response.status}`);
+  return (await response.json()) as GeckoResponse;
+}
+
 type PoolSide = {
   token: GeckoToken | undefined;
   address: string;
@@ -193,6 +210,30 @@ function sideFromPool(pool: GeckoPool, byAddress: Map<string, GeckoToken>, side:
   return { token, address, priceUsd, change24h };
 }
 
+function marketFromPoolSide(pool: GeckoPool, marketSide: PoolSide): MarketToken | null {
+  const volume24hUsd = num(pool.attributes?.volume_usd?.h24);
+  const liquidityUsd = num(pool.attributes?.reserve_in_usd);
+  if (liquidityUsd < MIN_LIQUIDITY_USD) return null;
+
+  const rawSymbol = String(marketSide.token?.attributes?.symbol ?? "").toUpperCase();
+  const symbol = symbolOverride(marketSide.address, rawSymbol);
+  if (!symbol) return null;
+
+  return {
+    symbol,
+    name: marketSide.token?.attributes?.name ?? TOKENS.find((token) => token.symbol === symbol)?.name ?? symbol,
+    address: formatAddress(marketSide.token?.attributes?.address ?? marketSide.address),
+    priceUsd: marketSide.priceUsd,
+    change24h: marketSide.change24h,
+    volume24hUsd,
+    liquidityUsd,
+    logoUrl: marketSide.token?.attributes?.image_url ?? null,
+    poolAddress: pool.attributes?.address ?? pool.id,
+    verified: verifiedBySymbol(symbol),
+    decimals: TOKENS.find((token) => token.symbol.toUpperCase() === symbol.toUpperCase())?.decimals ?? null,
+  };
+}
+
 /**
  * Reads GeckoTerminal World Chain pool data and derives token-level market data.
  */
@@ -221,33 +262,19 @@ export async function getWorldChainMarketCatalog() {
     const best = new Map<string, MarketToken>();
     for (const pool of pages.flatMap((page) => page.data ?? [])) {
       const volume24hUsd = num(pool.attributes?.volume_usd?.h24);
-      const liquidityUsd = num(pool.attributes?.reserve_in_usd);
-      if (liquidityUsd < MIN_LIQUIDITY_USD || volume24hUsd < MIN_VOLUME_24H_USD) continue;
+      if (volume24hUsd < MIN_VOLUME_24H_USD) continue;
 
       for (const side of ["base", "quote"] as const) {
         const marketSide = sideFromPool(pool, byAddress, side);
         if (!marketSide) continue;
 
-        const rawSymbol = String(marketSide.token?.attributes?.symbol ?? "").toUpperCase();
-        const symbol = symbolOverride(marketSide.address, rawSymbol);
-        if (!symbol) continue;
+        const market = marketFromPoolSide(pool, marketSide);
+        if (!market) continue;
 
-        const current = best.get(symbol);
-        if (current && current.liquidityUsd >= liquidityUsd) continue;
+        const current = best.get(market.symbol);
+        if (current && current.liquidityUsd >= market.liquidityUsd) continue;
 
-        best.set(symbol, {
-          symbol,
-          name: marketSide.token?.attributes?.name ?? TOKENS.find((token) => token.symbol === symbol)?.name ?? symbol,
-          address: formatAddress(marketSide.token?.attributes?.address ?? marketSide.address),
-          priceUsd: marketSide.priceUsd,
-          change24h: marketSide.change24h,
-          volume24hUsd,
-          liquidityUsd,
-          logoUrl: marketSide.token?.attributes?.image_url ?? null,
-          poolAddress: pool.attributes?.address ?? pool.id,
-          verified: verifiedBySymbol(symbol),
-          decimals: TOKENS.find((token) => token.symbol.toUpperCase() === symbol.toUpperCase())?.decimals ?? null,
-        });
+        best.set(market.symbol, market);
       }
     }
 
@@ -258,6 +285,42 @@ export async function getWorldChainMarketCatalog() {
   } catch (error) {
     console.error("Failed to fetch World Chain market data", error);
     return lastGood;
+  }
+}
+
+export async function getWorldChainMarketForToken(tokenAddress: string, symbolHint?: string | null) {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(tokenAddress)) return null;
+  const cacheKey = tokenAddress.toLowerCase();
+  const cachedTokenMarket = tokenMarketCache.get(cacheKey);
+  if (cachedTokenMarket && cachedTokenMarket.expiresAt > Date.now()) return cachedTokenMarket.data;
+
+  try {
+    const body = await fetchTokenPools(tokenAddress);
+    const byAddress = new Map<string, GeckoToken>();
+    for (const token of body.included ?? []) {
+      const key = tokenKey(token);
+      if (key) byAddress.set(key, token);
+    }
+
+    const target = tokenAddress.toLowerCase();
+    let best: MarketToken | null = null;
+    for (const pool of body.data ?? []) {
+      for (const side of ["base", "quote"] as const) {
+        const marketSide = sideFromPool(pool, byAddress, side);
+        if (!marketSide || marketSide.address.toLowerCase() !== target) continue;
+        const market = marketFromPoolSide(pool, marketSide);
+        if (!market) continue;
+        const symbol = symbolHint?.trim().toUpperCase();
+        const normalized = symbol ? { ...market, symbol, name: TOKENS.find((token) => token.symbol === symbol)?.name ?? market.name } : market;
+        if (!best || normalized.liquidityUsd > best.liquidityUsd) best = normalized;
+      }
+    }
+    tokenMarketCache.set(cacheKey, { data: best, expiresAt: Date.now() + 60_000 });
+    return best;
+  } catch (error) {
+    console.error("Failed to fetch GeckoTerminal token pools", error);
+    tokenMarketCache.set(cacheKey, { data: null, expiresAt: Date.now() + 20_000 });
+    return null;
   }
 }
 
