@@ -24,6 +24,13 @@ export async function PATCH(req: NextRequest) {
     adminLogoUrl?: string | null;
     faviconUrl?: string | null;
     swapNetworkFeeLabel?: string | null;
+    socialLinks?: {
+      x?: string | null;
+      telegram?: string | null;
+      website?: string | null;
+      discord?: string | null;
+      youtube?: string | null;
+    };
   };
   const config = await updateSystemConfig({
     maintenance: typeof body.maintenance === "boolean" ? body.maintenance : undefined,
@@ -36,6 +43,7 @@ export async function PATCH(req: NextRequest) {
       typeof body.swapNetworkFeeLabel === "string" || body.swapNetworkFeeLabel === null
         ? body.swapNetworkFeeLabel
         : undefined,
+    socialLinks: typeof body.socialLinks === "object" && body.socialLinks !== null ? body.socialLinks : undefined,
   });
   await auditLog(admin.id, "update_system_config", "system_config", body);
   return jsonResponse(config);

@@ -46,4 +46,11 @@ export type BackendSystemConfig = {
   adminLogoUrl: string | null;
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
+  socialLinks?: {
+    x?: string | null;
+    telegram?: string | null;
+    website?: string | null;
+    discord?: string | null;
+    youtube?: string | null;
+  };
 };

@@ -1410,6 +1410,7 @@ function enhancePrototypeSystemConfig() {
             el.innerHTML = '<img src="' + String(cfg.adminLogoUrl).replace(/"/g, "&quot;") + '" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block;" />';
           });
         }
+        if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
         if (!cfg.maintenance) {
           if (existing) existing.remove();
           return;
@@ -3070,6 +3071,13 @@ function enhancePrototypeMe() {
         var labels = {
           support: { en:"Support", fr:"Assistance", de:"Support", es:"Soporte", ja:"サポート", "zh-CN":"支持", "zh-TW":"支援" },
           feedback: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
+          points: { en:"Points", fr:"Points", de:"Punkte", es:"Puntos", ja:"ポイント", "zh-CN":"积分", "zh-TW":"積分" },
+          pointsCenter: { en:"Points Center", fr:"Centre de points", de:"Punktezentrum", es:"Centro de puntos", ja:"ポイントセンター", "zh-CN":"积分中心", "zh-TW":"積分中心" },
+          pointsRule: { en:"Earn 1 point for every $1 traded.", fr:"Gagnez 1 point par 1 $ échangé.", de:"1 Punkt pro gehandeltem $1.", es:"Gana 1 punto por cada $1 negociado.", ja:"取引 $1 ごとに 1 ポイント獲得。", "zh-CN":"交易 1 美元获得 1 积分。", "zh-TW":"交易 1 美元獲得 1 積分。" },
+          lifetimePoints: { en:"Lifetime points", fr:"Points cumulés", de:"Gesamtpunkte", es:"Puntos totales", ja:"累計ポイント", "zh-CN":"累计积分", "zh-TW":"累計積分" },
+          mediaCenter: { en:"Media Center", fr:"Centre média", de:"Medienzentrum", es:"Centro multimedia", ja:"メディアセンター", "zh-CN":"媒体中心", "zh-TW":"媒體中心" },
+          mediaHint: { en:"Follow Lumina official channels.", fr:"Suivez les canaux officiels Lumina.", de:"Folgen Sie den offiziellen Lumina-Kanälen.", es:"Sigue los canales oficiales de Lumina.", ja:"Lumina 公式チャンネルをフォロー。", "zh-CN":"查看 Lumina 官方媒体链接。", "zh-TW":"查看 Lumina 官方媒體連結。" },
+          noMedia: { en:"No media links configured yet.", fr:"Aucun lien média configuré.", de:"Noch keine Medienlinks konfiguriert.", es:"Aún no hay enlaces configurados.", ja:"メディアリンクは未設定です。", "zh-CN":"后台还没有配置媒体链接。", "zh-TW":"後台還沒有配置媒體連結。" },
           preferences: { en:"Preferences", fr:"Préférences", de:"Einstellungen", es:"Preferencias", ja:"設定", "zh-CN":"偏好设置", "zh-TW":"偏好設定" },
           language: { en:"Language", fr:"Langue", de:"Sprache", es:"Idioma", ja:"言語", "zh-CN":"语言", "zh-TW":"語言" },
           currency: { en:"Display currency", fr:"Devise d'affichage", de:"Anzeigewährung", es:"Moneda", ja:"表示通貨", "zh-CN":"显示货币", "zh-TW":"顯示貨幣" },
@@ -3098,6 +3106,8 @@ function enhancePrototypeMe() {
       }
       function meIcon(name) {
         if (name === "feedback") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg>';
+        if (name === "points") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg>';
+        if (name === "media") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/></svg>';
         if (name === "privacy") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9.5 12l1.7 1.7 3.8-4"/></svg>';
         if (name === "terms") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h6"/></svg>';
         if (name === "version") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
@@ -3111,6 +3121,93 @@ function enhancePrototypeMe() {
       }
       function toggleHtml(){
         return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
+      }
+      function socialLinks(){
+        try {
+          var cfg = JSON.parse(localStorage.getItem("ww_system_config") || "{}");
+          return cfg.socialLinks || {};
+        } catch(e) {
+          return {};
+        }
+      }
+      function linkIcon(label){
+        return '<span class="media-icon">' + String(label || "?").slice(0, 1).toUpperCase() + '</span>';
+      }
+      function socialRows(){
+        var links = socialLinks();
+        return [
+          ["x", "X"],
+          ["telegram", "Telegram"],
+          ["website", "Website"],
+          ["discord", "Discord"],
+          ["youtube", "YouTube"]
+        ].filter(function(item){ return links[item[0]]; }).map(function(item){
+          return '<button class="media-row" onclick="window.open(\\'' + String(links[item[0]]).replace(/'/g, "%27") + '\\', \\'_blank\\')">' + linkIcon(item[1]) + '<span>' + item[1] + '</span><i>↗</i></button>';
+        }).join("");
+      }
+      function ensureMediaModal(){
+        if (document.getElementById("mediaModal")) return;
+        var modal = document.createElement("div");
+        modal.className = "modal-mask";
+        modal.id = "mediaModal";
+        modal.onclick = function(event){ if(event.target === modal) closeMediaCenter(); };
+        modal.innerHTML = '<div class="modal media-sheet"><div class="modal-grip"></div><h3></h3><p></p><div id="mediaRows"></div></div>';
+        document.body.appendChild(modal);
+      }
+      window.openMediaCenter = function(){
+        ensureMediaModal();
+        var c = meCopy();
+        var modal = document.getElementById("mediaModal");
+        modal.querySelector("h3").textContent = c.mediaCenter;
+        modal.querySelector("p").textContent = c.mediaHint;
+        document.getElementById("mediaRows").innerHTML = socialRows() || '<div class="media-empty">' + c.noMedia + '</div>';
+        modal.classList.add("open");
+      };
+      window.closeMediaCenter = function(){
+        var modal = document.getElementById("mediaModal");
+        if (modal) modal.classList.remove("open");
+      };
+      function priceForSymbol(symbol){
+        try {
+          if (prices && prices[symbol]) return Number(prices[symbol]);
+          if (symbol === "WETH") return Number(prices && prices.ETH);
+          if (symbol === "WBTC" || symbol === "BTC") return Number(prices && prices.BTC);
+          if (symbol === "USDT" || symbol === "USDC" || symbol === "EURC") return 1;
+          var markets = window.__luminaMarketPrices || [];
+          var market = markets.find(function(item){ return item.symbol === symbol; });
+          return market ? Number(market.priceUsd || market.usd) : 0;
+        } catch(e) {
+          return 0;
+        }
+      }
+      function pointsFromActivity(rows){
+        var total = 0;
+        (rows || []).forEach(function(item){
+          var text = String(item.amount || "").replace(/[+,]/g, "").trim();
+          var match = text.match(/(-?\\d+(?:\\.\\d+)?)\\s+([A-Za-z0-9$]+)/);
+          if (!match) return;
+          var amount = Math.abs(Number(match[1]));
+          var symbol = match[2].replace(/^\\$/, "");
+          var price = priceForSymbol(symbol);
+          if (Number.isFinite(amount) && Number.isFinite(price) && price > 0) total += amount * price;
+        });
+        return Math.floor(total);
+      }
+      function refreshPoints(){
+        var badge = document.getElementById("mePointsBadge");
+        var center = document.getElementById("pointsCenterValue");
+        function setValue(value){
+          window.__luminaPoints = value;
+          if (badge) badge.textContent = value.toLocaleString();
+          if (center) center.textContent = value.toLocaleString();
+        }
+        setValue(Number(window.__luminaPoints || 0));
+        var address = window.__luminaUserAddress || "";
+        if (!address) return;
+        fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : []; })
+          .then(function(rows){ setValue(pointsFromActivity(Array.isArray(rows) ? rows : [])); })
+          .catch(function(){});
       }
       function updateFeedbackCopy(){
         var modal = document.getElementById("feedbackModal");
@@ -3237,11 +3334,15 @@ function enhancePrototypeMe() {
         var currencyValue = '<span id="currencyVal">' + (typeof currentCurrency !== "undefined" ? currentCurrency : "USD") + '</span>';
         view.innerHTML =
           '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
-          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>' + short + '</span>' + (address ? '<button type="button" class="me-copy-btn" onclick="copyMeAddress(event)" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '') + '</div><span class="me-orb">' + c.connected + '</span></div></div>' +
+          '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>' + short + '</span>' + (address ? '<button type="button" class="me-copy-btn" onclick="copyMeAddress(event)" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '') + '</div><span class="me-orb">' + c.connected + '</span></div><button type="button" class="me-points-chip" onclick="openPointsCenter()"><b id="mePointsBadge">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b><span>' + c.points + '</span></button></div>' +
           '<div class="me-group-label">' + c.support + '</div><div class="me-group">' +
             row("feedback", c.feedback, "", "openFeedback()") +
           '</div>' +
+          '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
+            row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
+          '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
+            row("media", c.mediaCenter, "", "openMediaCenter()") +
             row("language", c.language, langValue, "openLangModal()") +
             row("currency", c.currency, currencyValue, "openCurrencyModal()") +
             row("bell", c.notifications, "", "", toggleHtml()) +
@@ -3252,7 +3353,20 @@ function enhancePrototypeMe() {
             row("version", c.version, "Lumina v1.0.0", "", "") +
           '</div>';
         ensureFeedbackModal();
+        ensureMediaModal();
+        refreshPoints();
       }
+      window.openPointsCenter = function(){
+        var c = meCopy();
+        var old = document.getElementById("pointsModal");
+        if (old) old.remove();
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open";
+        modal.id = "pointsModal";
+        modal.onclick = function(event){ if(event.target === modal) modal.remove(); };
+        modal.innerHTML = '<div class="modal points-sheet"><div class="modal-grip"></div><h3>' + c.pointsCenter + '</h3><div class="points-hero"><strong>' + Number(window.__luminaPoints || 0).toLocaleString() + '</strong><span>' + c.lifetimePoints + '</span></div><div class="points-rule">' + c.pointsRule + '</div></div>';
+        document.body.appendChild(modal);
+      };
       window.__luminaRenderMe = renderMe;
       if (!window.__luminaMeLangPatch && typeof applyLang === "function") {
         window.__luminaMeLangPatch = true;

@@ -696,6 +696,25 @@
   .me-copy-btn { width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.09); border-radius: 50%; background: rgba(255,255,255,.045); color: var(--green); display: inline-grid; place-items: center; padding: 0; flex: 0 0 auto; }
   .me-copy-btn svg { width: 14px; height: 14px; }
   .me-orb { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: rgba(74,222,128,0.12); color: var(--green); border-radius: var(--radius-pill); padding: 5px 12px; font-size: 12px; font-weight: 600; }
+  .me-points-chip { align-self: flex-start; min-width: 82px; padding: 9px 10px; border: 1px solid rgba(74,222,128,.2); border-radius: 16px; background: rgba(74,222,128,.09); color: var(--green); text-align: center; }
+  .me-points-chip b { display: block; color: var(--text); font-size: 18px; line-height: 1.05; }
+  .me-points-chip span { display: block; margin-top: 3px; font-size: 10px; font-weight: 850; color: var(--green); white-space: nowrap; }
+  .points-sheet, .media-sheet { width: calc(100vw - 24px); max-width: 390px; padding: 22px; border-radius: 26px; }
+  .points-sheet h3, .media-sheet h3 { padding: 4px 0 12px; font-size: 24px; }
+  .points-hero { padding: 22px; border-radius: 22px; background: linear-gradient(145deg, rgba(74,222,128,.16), rgba(74,222,128,.05)); border: 1px solid rgba(74,222,128,.22); text-align: center; }
+  .points-hero strong { display: block; font-size: 42px; line-height: 1; color: var(--text); }
+  .points-hero span { display: block; margin-top: 8px; color: var(--green); font-size: 13px; font-weight: 850; }
+  .points-rule { margin-top: 12px; padding: 13px 14px; border-radius: 16px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07); color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+  .media-sheet p { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
+  .media-row { width: 100%; min-height: 56px; border: 1px solid var(--line); border-radius: 17px; background: rgba(255,255,255,.035); color: var(--text); display: flex; align-items: center; gap: 12px; padding: 0 13px; margin-top: 10px; font-size: 15px; font-weight: 850; }
+  .media-row i { margin-left: auto; color: var(--text-mute); font-style: normal; }
+  .media-icon { width: 34px; height: 34px; border-radius: 12px; display: inline-grid; place-items: center; background: rgba(74,222,128,.12); color: var(--green); font-size: 13px; font-weight: 950; }
+  .media-empty { padding: 22px 10px; color: var(--text-mute); text-align: center; font-size: 13px; }
+  @media (max-width: 380px) {
+    .me-card { gap: 12px; padding: 18px; }
+    .me-points-chip { min-width: 70px; padding: 8px; }
+    .me-points-chip b { font-size: 16px; }
+  }
   .me-group-label { color: var(--text-mute); font-size: 13px; margin: 24px 0 8px; padding: 0 var(--pad-screen); }
   .me-group { margin: 0 var(--pad-screen); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
   .me-row { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--line); cursor: pointer; }
