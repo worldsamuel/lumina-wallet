@@ -20,7 +20,6 @@
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@supabase/supabase-js": "^2.49.1",
-    "@uniswap/permit2-sdk": "^1.4.0",
     "@uniswap/sdk-core": "^7.16.1",
     "@uniswap/universal-router-sdk": "^5.5.1",
     "@uniswap/v3-sdk": "^3.30.3",

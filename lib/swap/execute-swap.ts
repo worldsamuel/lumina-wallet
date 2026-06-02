@@ -1,7 +1,6 @@
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
-import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, swapErc20Abi } from "./contracts";
-import { signPermit2 } from "./permit2-sign";
+import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
 
 type ExecuteSwapToken = {
   address: Address;
@@ -82,36 +81,25 @@ export async function executeSwap(params: ExecuteSwapParams) {
     throw new Error("Price impact is above 5%. Please confirm the high-impact warning.");
   }
 
-  const deadline = Math.floor(Date.now() / 1000) + 30 * 60;
-  const { permit, signature } = await signPermit2({
-    token: freshQuote.tokens.from.address,
-    amount: fromAmount,
-    spender: UNIVERSAL_ROUTER_ADDRESS,
-    userAddress: params.userAddress,
-    chainId: WORLD_CHAIN_ID,
-    deadline,
-  });
-
   const built = await buildSwapTxOnServer({
     fromToken: freshQuote.tokens.from,
     toToken: freshQuote.tokens.to,
     fromAmountHuman: params.fromAmountHuman,
     slippageBps: params.slippageBps,
     userAddress: params.userAddress,
-    permit,
-    signature,
   });
   const tx = built.tx;
   const executableQuote = built.quote;
   const expectedOut = BigInt(executableQuote.amountOutRaw);
+  const permit2Expiration = Math.floor(Date.now() / 1000) + 30 * 60;
 
   const transactions = [
     {
-      to: freshQuote.tokens.from.address,
+      to: PERMIT2_ADDRESS,
       data: encodeFunctionData({
-        abi: [swapErc20Abi[2]],
+        abi: [permit2Abi[0]],
         functionName: "approve",
-        args: [PERMIT2_ADDRESS, fromAmount],
+        args: [freshQuote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(fromAmount), permit2Expiration],
       }),
       value: "0x0",
     },
@@ -164,7 +152,7 @@ async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse
   return data as QuoteResponse;
 }
 
-async function buildSwapTxOnServer(params: ExecuteSwapParams & { permit: unknown; signature: `0x${string}` }): Promise<BuildTxResponse> {
+async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxResponse> {
   const response = await fetch("/api/swap/build-tx", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -177,8 +165,6 @@ async function buildSwapTxOnServer(params: ExecuteSwapParams & { permit: unknown
       fromAmount: params.fromAmountHuman,
       slippageBps: params.slippageBps,
       userAddress: params.userAddress,
-      permit: params.permit,
-      signature: params.signature,
     }),
   });
   const data = await response.json().catch(() => null);
@@ -206,6 +192,12 @@ function isSwapEnabled() {
 
 function applySlippage(amount: bigint, slippageBps: number) {
   return (amount * BigInt(10_000 - slippageBps)) / 10_000n;
+}
+
+function assertUint160(amount: bigint) {
+  const maxUint160 = (1n << 160n) - 1n;
+  if (amount > maxUint160) throw new Error("Swap amount exceeds Permit2 allowance limit.");
+  return amount;
 }
 
 export function friendlySwapError(error: unknown) {

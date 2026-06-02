@@ -11,7 +11,6 @@ import {
   v3FactoryAbi,
   v3PoolAbi,
 } from "./contracts";
-import type { SignedPermit2 } from "./permit2-sign";
 
 type SwapTokenLike = {
   address: Address;
@@ -29,8 +28,6 @@ type BuildSwapTransactionParams = {
   slippageBps: number;
   userAddress: Address;
   deadline: number;
-  permit: SignedPermit2["permit"];
-  signature: SignedPermit2["signature"];
 };
 
 export type BuiltSwapTransaction = {
@@ -48,8 +45,6 @@ export async function buildSwapTransaction({
   slippageBps,
   userAddress,
   deadline,
-  permit,
-  signature,
 }: BuildSwapTransactionParams): Promise<BuiltSwapTransaction> {
   if (!isAddress(userAddress)) throw new Error("Invalid swap recipient.");
   if (fromAmount <= 0n || expectedAmountOut <= 0n) throw new Error("Swap amounts must be greater than 0.");
@@ -70,7 +65,6 @@ export async function buildSwapTransaction({
     recipient: userAddress,
     slippageTolerance: new Percent(slippageBps, 10_000),
     deadlineOrPreviousBlockhash: deadline,
-    inputTokenPermit: { ...permit, signature },
     chainId: WORLD_CHAIN_ID,
   });
 

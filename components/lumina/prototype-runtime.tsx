@@ -2340,6 +2340,7 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>网络费用</span><b>~$' + Number(latestSwapQuote.gasEstimateUsd || 0.02).toFixed(2) + '</b></div>' +
 	                '<div class="ln"><span>滑点容忍</span><b>' + (slippageBps() / 100).toFixed(2).replace(/\\.00$/, "") + '%</b></div>' +
 	                '<div class="ln"><span>兑换路径</span><b>' + swapState.sell + ' → ' + swapState.buy + ' (Uniswap V3 ' + feePct + '% pool)</b></div>' +
+	                '<div class="ln"><span>签名次数</span><b>需要 1 次 World App 确认</b></div>' +
 	                '<div class="ln"><span>报价过期倒计时</span><b id="swapQuoteCountdown">' + quoteSecondsLeft() + 's</b></div>' +
 	              '</div>' +
 	              (state.impact > 5 ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">价格冲击超过 5%,我确认继续</button>' : '') +

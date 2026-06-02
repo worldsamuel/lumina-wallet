@@ -1,12 +1,10 @@
 import { NextRequest } from "next/server";
 import { isAddress, parseUnits, type Address } from "viem";
-import type { PermitSingle } from "@uniswap/permit2-sdk";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import type { OnchainPricesResponse } from "@/lib/prices";
 import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
 import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
-import type { SignedPermit2 } from "@/lib/swap/permit2-sign";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 
@@ -20,8 +18,6 @@ type BuildSwapBody = {
   fromAmount?: string;
   slippageBps?: number;
   userAddress?: string;
-  permit?: PermitSingle;
-  signature?: string;
 };
 
 export function OPTIONS() {
@@ -60,8 +56,6 @@ export async function POST(req: NextRequest) {
     slippageBps: parsed.slippageBps,
     userAddress: parsed.userAddress,
     deadline: parsed.deadline,
-    permit: parsed.permit,
-    signature: parsed.signature,
   });
 
   return jsonResponse({
@@ -100,23 +94,10 @@ async function parseBuildBody(body: BuildSwapBody | null) {
   const userAddress = String(body?.userAddress ?? "");
   if (!isAddress(userAddress)) return { error: "Invalid swap recipient.", status: 400 as const };
 
-  const signature = String(body?.signature ?? "");
-  if (!/^0x[0-9a-fA-F]+$/.test(signature)) return { error: "Missing Permit2 signature.", status: 400 as const };
-  const permit = body?.permit;
-  if (!isValidPermit(permit, from.address, userAddress as Address)) {
-    return { error: "Invalid Permit2 payload.", status: 400 as const };
-  }
-
   try {
     const fromAmount = parseUnits(amountText, from.decimals);
     if (fromAmount <= 0n) return { error: "Enter an amount greater than 0.", status: 400 as const };
-    if (BigInt(String(permit.details.amount)) < fromAmount) {
-      return { error: "Permit2 amount is below swap amount.", status: 400 as const };
-    }
-    const deadline = Number(permit.sigDeadline);
-    if (!Number.isFinite(deadline) || deadline <= Math.floor(Date.now() / 1000)) {
-      return { error: "Permit2 signature is expired.", status: 400 as const };
-    }
+    const deadline = Math.floor(Date.now() / 1000) + 30 * 60;
     return {
       from,
       to,
@@ -124,23 +105,11 @@ async function parseBuildBody(body: BuildSwapBody | null) {
       fromAmount,
       slippageBps,
       userAddress: userAddress as Address,
-      permit,
-      signature: signature as SignedPermit2["signature"],
       deadline,
     };
   } catch {
     return { error: "Invalid token amount.", status: 400 as const };
   }
-}
-
-function isValidPermit(permit: unknown, token: Address, owner: Address): permit is PermitSingle {
-  const candidate = permit as PermitSingle | undefined;
-  if (!candidate?.details) return false;
-  if (String(candidate.details.token).toLowerCase() !== token.toLowerCase()) return false;
-  if (String(candidate.spender).toLowerCase() !== UNIVERSAL_ROUTER_ADDRESS.toLowerCase()) return false;
-  if (!candidate.details.amount || !candidate.details.nonce || !candidate.details.expiration || !candidate.sigDeadline) return false;
-  void owner;
-  return true;
 }
 
 async function estimateAmountUsd(req: NextRequest, priceSymbol: string, amountText: string) {

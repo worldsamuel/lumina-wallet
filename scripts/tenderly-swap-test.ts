@@ -1,6 +1,5 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AllowanceTransfer, type PermitSingle } from "@uniswap/permit2-sdk";
 import {
   createPublicClient,
   createWalletClient,
@@ -198,8 +197,7 @@ async function runTest(test: TestCase): Promise<TestResult> {
 
     const approveHash = await approvePermit2(fromToken.address, fromAmount);
     const deadline = Math.floor(Date.now() / 1000) + test.deadlineOffset;
-    const permitDeadline = test.name === "6_deadline_expired" ? Math.floor(Date.now() / 1000) + 1800 : deadline;
-    const { permit, signature } = await signPermit2(fromToken.address, fromAmount, permitDeadline);
+    await approveUniversalRouterWithPermit2(fromToken.address, fromAmount, Math.floor(Date.now() / 1000) + 1800);
     const expectedAmountOut =
       test.name === "5_slippage_protection" ? (BigInt(quote.amountOutRaw) * 11_000n) / 10_000n : BigInt(quote.amountOutRaw);
     const tx = await buildSwapTransaction({
@@ -211,8 +209,6 @@ async function runTest(test: TestCase): Promise<TestResult> {
       slippageBps: test.slippageBps,
       userAddress: TEST_USER,
       deadline,
-      permit,
-      signature,
     });
 
     const receipt = await sendSwap(tx.to, tx.data, BigInt(tx.value));
@@ -331,31 +327,22 @@ async function approvePermit2(token: Address, amount: bigint) {
   return hash;
 }
 
-async function signPermit2(token: Address, amount: bigint, deadline: number) {
-  const [, , nonce] = await publicClient.readContract({
-    address: PERMIT2_ADDRESS,
-    abi: permit2Abi,
-    functionName: "allowance",
-    args: [TEST_USER, token, UNIVERSAL_ROUTER_ADDRESS],
+async function approveUniversalRouterWithPermit2(token: Address, amount: bigint, expiration: number) {
+  const hash = await walletClient.sendTransaction({
+    account,
+    chain: worldChainFork,
+    to: PERMIT2_ADDRESS,
+    data: encodeFunctionData({
+      abi: [permit2Abi[0]],
+      functionName: "approve",
+      args: [token, UNIVERSAL_ROUTER_ADDRESS, assertUint160(amount), expiration],
+    }),
+    value: 0n,
+    gas: 100_000n,
   });
-  const permit: PermitSingle = {
-    details: {
-      token,
-      amount: amount.toString(),
-      expiration: deadline,
-      nonce: nonce.toString(),
-    },
-    spender: UNIVERSAL_ROUTER_ADDRESS,
-    sigDeadline: deadline,
-  };
-  const { domain, types, values } = AllowanceTransfer.getPermitData(permit, PERMIT2_ADDRESS, WORLD_CHAIN_ID);
-  const signature = await account.signTypedData({
-    domain: domain as never,
-    types: types as never,
-    primaryType: "PermitSingle",
-    message: values as never,
-  } as never);
-  return { permit, signature };
+  const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+  assert(receipt.status === "success", `Permit2 Universal Router allowance failed for ${token}`);
+  return hash;
 }
 
 async function sendSwap(to: Address, data: Hex, value: bigint): Promise<TransactionReceipt> {
@@ -445,7 +432,7 @@ ${failed === 0 && warn === 0 ? "✅ **ALL TESTS PASSED** - Safe to proceed to ma
 
 ## Notes
 
-- The configured \`TEST_PRIVATE_KEY\` derives to \`${TEST_USER}\`; tests used that address so Permit2 signatures are valid.
+- The configured \`TEST_PRIVATE_KEY\` derives to \`${TEST_USER}\`; tests use Permit2 allowance transfers instead of typed-data signatures.
 - The prompt-listed fixed wallet \`0x0f3b31df2fa6781de2103588da675f02599b2b26\` was not used because the local test private key does not control it.
 - Case 5 intentionally raised \`expectedAmountOut\` by 10% before building calldata, creating a deterministic stale/over-optimistic minOut condition that validates the Universal Router slippage guard.
 - \`NEXT_PUBLIC_SWAP_ENABLED\` remains false in the example/test environment.
@@ -512,6 +499,12 @@ function redactRpc(value: string) {
 
 function escapeBackticks(value: string) {
   return value.replace(/`/g, "\\`");
+}
+
+function assertUint160(amount: bigint) {
+  const maxUint160 = (1n << 160n) - 1n;
+  if (amount > maxUint160) throw new Error("Amount exceeds Permit2 uint160 allowance limit.");
+  return amount;
 }
 
 function normalizeErrorMessage(error: unknown) {
