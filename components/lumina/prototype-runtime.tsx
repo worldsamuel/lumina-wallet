@@ -2181,16 +2181,6 @@ function enhancePrototypeSwapQuote() {
         if (!warn) return;
         var text = "";
         if (data.blocked) text = data.blockReason || "Quote risk is too high. Swap is blocked.";
-        else if (data.warnings && data.warnings.indexOf("price_anomaly") >= 0) text = "Large price deviation detected. This may be caused by low liquidity.";
-        else if (data.warnings && data.warnings.indexOf("low_liquidity") >= 0) text = "Low liquidity. Large swaps may have significant slippage.";
-        var community = [data.tokens && data.tokens.from, data.tokens && data.tokens.to].filter(function(t){ return t && t.trust === "community"; });
-        if (community.length) {
-          var t = community[0];
-          var safety = t.safety || {};
-          var liq = safety.liquidity || {};
-          var reasons = safety.reasons || [];
-          text = "Community token risk: " + t.symbol + " is not audited by Lumina. Automated checks found TVL $" + Math.round(liq.tvlUsd || 0).toLocaleString() + (reasons.length ? " · " + reasons.join(", ") : " · basic checks passed") + ". Test with a small amount first.";
-        }
         warn.textContent = text;
         warn.classList.toggle("show", !!text);
       }
@@ -2244,6 +2234,7 @@ function enhancePrototypeSwapQuote() {
           if (seq !== quoteSeq) return;
           if (!res.ok) throw new Error(data.error || "No quote");
           applyQuote(data);
+          return data;
         } catch(e) {
           if (seq !== quoteSeq) return;
           var msg = e && e.message ? e.message : "Quote failed";
@@ -2334,7 +2325,6 @@ function enhancePrototypeSwapQuote() {
 	        if (slip <= 0) return { ok:false, error:"滑点不能设为 0,请至少选择 0.1%。" };
 	        if (!latestSwapQuote) return { ok:false, error:"请先获取报价。" };
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
-	        if (quoteAgeSeconds() > 30) return { ok:false, error:"报价已超过 30 秒,请刷新报价。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:"单笔限额 $" + swapMaxUsd + ",请降低金额。" };
 	        var riskText = swapRiskText();
 	        if (impact > 5) riskText = riskText || "价格冲击超过 5%,请确认你接受这个价格。";
@@ -2356,7 +2346,7 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>您将收到约</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>最少收到 (滑点保护)</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	              '</div>' +
-	              (state.riskText ? '<button class="btn-ghost" id="swapHighImpactAck" style="width:100%;margin-top:12px;">' + state.riskText + '<br>我确认继续</button>' : '') +
+	              (state.riskText ? '<button class="btn-primary" id="swapHighImpactAck" style="width:100%;margin-top:14px;padding:16px;border-radius:18px;line-height:1.55;font-size:17px;background:#ff6b7a;color:#fff;box-shadow:0 0 0 2px rgba(255,107,122,.25);">⚠ 点这里确认风险<br><span style="font-size:13px;font-weight:700;">' + state.riskText + '</span></button>' : '') +
 	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">取消</button><button class="btn-primary" id="swapConfirmOk">确认兑换</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
@@ -2370,13 +2360,13 @@ function enhancePrototypeSwapQuote() {
 	            var ok = document.getElementById("swapConfirmOk");
 	            if (label) label.textContent = left + "s";
 	            if (left <= 0) {
-	              if (ok) { ok.setAttribute("disabled", "true"); ok.textContent = "报价已过期,请刷新"; }
+	              if (ok) { ok.textContent = "确认兑换"; }
 	            }
 	          }, 1000);
 	          modal.onclick = function(event){ if (event.target === modal) done(false); };
 	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
 	          var high = document.getElementById("swapHighImpactAck");
-	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.textContent = "已确认高风险交易"; };
+	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.style.background = "#48dc7c"; high.style.color = "#06220f"; high.textContent = "✓ 已确认风险,可以继续兑换"; };
 	          document.getElementById("swapConfirmOk").onclick = function(){
 	            if (state.riskText && !highImpactAcknowledged) { toast("请先确认高风险交易"); return; }
 	            done(true);
@@ -2401,6 +2391,10 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
+	        if (latestSwapQuote && quoteAgeSeconds() > 25) {
+	          toast("报价已更新");
+	          await requestQuote();
+	        }
 	        var state = validateSwapSafety();
 	        if (!state.ok) {
 	          if (/刷新报价/.test(state.error)) scheduleQuote();
@@ -2444,11 +2438,21 @@ function enhancePrototypeSwapQuote() {
         window.__luminaQuoteRefreshWrapped = true;
         refreshSwapLabels = function(){
           previousRefresh();
+          var warn = document.getElementById("unvWarn");
+          if (warn) warn.classList.remove("show");
+          var btn = document.getElementById("swapBtn");
+          if (btn) btn.disabled = false;
           setSwapPillLogo("sellDot", swapState.sell);
           setSwapPillLogo("buyDot", swapState.buy);
           scheduleQuote();
         };
       }
+      updateUnverifiedWarning = function(){
+        var warn = document.getElementById("unvWarn");
+        if (warn) warn.classList.remove("show");
+        var btn = document.getElementById("swapBtn");
+        if (btn) btn.disabled = false;
+      };
       flipSwap = function(){
         var nextSell = swapState.buy;
         var nextBuy = swapState.sell;

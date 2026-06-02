@@ -2,6 +2,10 @@ export type SwapQuoteResult = {
   amountOut: string;
   amountOutRaw: string;
   fee: number;
+  route?: {
+    tokens: string[];
+    fees: number[];
+  };
   sqrtPriceX96After?: string;
   gasEstimate: string;
 };

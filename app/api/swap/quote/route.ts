@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
       priceImpactLevel: impactLevel(priceImpactPercent * 100),
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
+      route: main.quote.route,
       tokens: {
         from: tokenPayload(parsed.from),
         to: tokenPayload(parsed.to),

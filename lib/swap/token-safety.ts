@@ -3,6 +3,7 @@ import { publicClient } from "@/lib/chain";
 import { getWorldChainMarketCatalog } from "@/lib/market-data";
 import { quoteV3 } from "./v3-quoter";
 import { resolveCoreSwapToken, SWAP_TOKENS, VERIFIED_SWAP_TOKENS, type SwapToken } from "./tokens";
+import worldChainTokenCatalog from "./worldchain-token-catalog.json";
 
 const UNISWAP_V3_FACTORY = "0x7a5028BDa40e7B173C278C5342087826455ea25a" as Address;
 const FEE_TIERS = [500, 3000, 10000] as const;
@@ -83,6 +84,13 @@ const FALLBACK_MARKET_TOKENS: SwapToken[] = [
     trust: "audited",
   },
 ];
+
+type CatalogToken = {
+  symbol?: string;
+  name?: string;
+  address?: string;
+  decimals?: string | number | null;
+};
 
 export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyReport> {
   if (!isAddress(input)) throw new Error("Invalid token contract");
@@ -183,6 +191,41 @@ async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> 
     return token.symbol.toUpperCase() === needle.toUpperCase();
   });
   if (!market && fallback) return fallback;
+  const catalog = (worldChainTokenCatalog as CatalogToken[]).find((token) => {
+    if (!token.address || !isAddress(token.address)) return false;
+    if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();
+    return String(token.symbol || "").toUpperCase() === needle.toUpperCase();
+  });
+  if (!market && catalog?.address && isAddress(catalog.address)) {
+    return {
+      symbol: String(catalog.symbol || "TOKEN").slice(0, 24),
+      name: String(catalog.name || catalog.symbol || "Token").slice(0, 80),
+      address: catalog.address,
+      decimals: Number.isInteger(Number(catalog.decimals)) ? Number(catalog.decimals) : 18,
+      priceSymbol: "USDC",
+      trust: "community",
+      safety: {
+        status: "community",
+        reasons: ["alchemy_catalog"],
+        metadata: {
+          address: catalog.address,
+          name: String(catalog.name || catalog.symbol || "Token").slice(0, 80),
+          symbol: String(catalog.symbol || "TOKEN").slice(0, 24),
+          decimals: Number.isInteger(Number(catalog.decimals)) ? Number(catalog.decimals) : 18,
+        },
+        liquidity: { tvlUsd: 0, pools: [] },
+        safety: {
+          hasMetadata: true,
+          hasLiquidity: false,
+          passedHoneypot: true,
+          transferFee: 0,
+          ageInDays: null,
+          blacklisted: false,
+          sellbackRatio: null,
+        },
+      },
+    };
+  }
   if (!market?.address) return null;
   return {
     symbol: market.symbol,

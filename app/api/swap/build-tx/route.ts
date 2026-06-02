@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     fromAmount: parsed.fromAmount,
     expectedAmountOut: BigInt(quote.bestQuote.amountOutRaw),
     feeTier: quote.bestQuote.fee,
+    route: quote.bestQuote.route,
     slippageBps: parsed.slippageBps,
     userAddress: parsed.userAddress,
     deadline: parsed.deadline,
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
       amountOut: quote.bestQuote.amountOut,
       amountOutRaw: quote.bestQuote.amountOutRaw,
       feeTier: quote.bestQuote.fee,
+      route: quote.bestQuote.route,
       gasEstimate: quote.bestQuote.gasEstimate,
       tokens: {
         from: parsed.from,
