@@ -8,6 +8,7 @@ import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
 import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
+import type { SwapQuoteResult } from "@/lib/swap/quote-types";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 
@@ -21,6 +22,17 @@ type BuildSwapBody = {
   fromAmount?: string;
   slippageBps?: number;
   userAddress?: string;
+  quote?: {
+    source?: string;
+    amountInRaw?: string;
+    amountOut?: string;
+    amountOutRaw?: string;
+    feeTier?: number;
+    route?: {
+      tokens?: string[];
+      fees?: number[];
+    };
+  };
 };
 
 export function OPTIONS() {
@@ -36,7 +48,8 @@ export async function POST(req: NextRequest) {
   const parsed = await parseBuildBody(body);
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: parsed.status ?? 400 });
 
-  const amountUsd = await estimateAmountUsd(req, parsed.from, parsed.amountText);
+  const quickAmountUsd = estimateAmountUsdFromQuote(body?.quote, parsed.from, parsed.to, parsed.fromAmount);
+  const amountUsd = quickAmountUsd ?? (await estimateAmountUsd(req, parsed.from, parsed.amountText));
   const maxUsd = getSwapMaxUsd();
   if (amountUsd === null) {
     return jsonResponse({ error: "Unable to verify swap USD limit. Please try again later." }, { status: 503 });
@@ -47,9 +60,9 @@ export async function POST(req: NextRequest) {
 
   const platformFee = await getSwapPlatformFee(parsed.from, parsed.fromAmount);
   const swapAmount = platformFee?.swapAmount ?? parsed.fromAmount;
-
-  const quote = await quoteBestV3(parsed.from, parsed.to, swapAmount);
-  if (!quote.bestQuote || BigInt(quote.bestQuote.amountOutRaw) <= 0n) {
+  const clientQuote = trustedClientQuote(body?.quote, parsed.from, parsed.to, swapAmount);
+  const bestQuote = clientQuote ?? (await quoteBestV3(parsed.from, parsed.to, swapAmount)).bestQuote;
+  if (!bestQuote || BigInt(bestQuote.amountOutRaw) <= 0n) {
     return jsonResponse({ error: "No executable Uniswap V3 route for this pair." }, { status: 404 });
   }
 
@@ -57,9 +70,9 @@ export async function POST(req: NextRequest) {
     fromToken: parsed.from,
     toToken: parsed.to,
     fromAmount: swapAmount,
-    expectedAmountOut: BigInt(quote.bestQuote.amountOutRaw),
-    feeTier: quote.bestQuote.fee,
-    route: quote.bestQuote.route,
+    expectedAmountOut: BigInt(bestQuote.amountOutRaw),
+    feeTier: bestQuote.fee,
+    route: bestQuote.route,
     slippageBps: parsed.slippageBps,
     userAddress: parsed.userAddress,
     deadline: parsed.deadline,
@@ -72,11 +85,11 @@ export async function POST(req: NextRequest) {
       amountIn: formatUnits(swapAmount, parsed.from.decimals),
       amountInRaw: swapAmount.toString(),
       grossAmountIn: parsed.amountText,
-      amountOut: quote.bestQuote.amountOut,
-      amountOutRaw: quote.bestQuote.amountOutRaw,
-      feeTier: quote.bestQuote.fee,
-      route: quote.bestQuote.route,
-      gasEstimate: quote.bestQuote.gasEstimate,
+      amountOut: bestQuote.amountOut,
+      amountOutRaw: bestQuote.amountOutRaw,
+      feeTier: bestQuote.fee,
+      route: bestQuote.route,
+      gasEstimate: bestQuote.gasEstimate,
       tokens: {
         from: parsed.from,
         to: parsed.to,
@@ -141,6 +154,50 @@ async function estimateAmountUsd(req: NextRequest, token: SwapToken, amountText:
 function priceUsd(prices: OnchainPricesResponse | null, symbol: string) {
   const value = prices?.[symbol as keyof OnchainPricesResponse];
   return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function trustedClientQuote(
+  quote: BuildSwapBody["quote"] | undefined,
+  from: SwapToken,
+  to: SwapToken,
+  swapAmount: bigint,
+): SwapQuoteResult | null {
+  if (!quote || quote.source !== "uniswap-v3") return null;
+  if (!quote.amountOutRaw || !quote.amountInRaw || quote.amountInRaw !== swapAmount.toString()) return null;
+  const amountOutRaw = BigInt(quote.amountOutRaw);
+  if (amountOutRaw <= 0n) return null;
+  const routeTokens = Array.isArray(quote.route?.tokens) ? quote.route.tokens : [];
+  const routeFees = Array.isArray(quote.route?.fees) ? quote.route.fees : [];
+  if (routeTokens.length >= 2) {
+    if (routeTokens[0]?.toLowerCase() !== from.address.toLowerCase()) return null;
+    if (routeTokens[routeTokens.length - 1]?.toLowerCase() !== to.address.toLowerCase()) return null;
+    if (routeFees.length !== routeTokens.length - 1) return null;
+  }
+  const fee = Number(quote.feeTier);
+  if (!Number.isInteger(fee) || fee <= 0) return null;
+  return {
+    amountOut: String(quote.amountOut || ""),
+    amountOutRaw: amountOutRaw.toString(),
+    fee,
+    route: routeTokens.length >= 2 ? { tokens: routeTokens, fees: routeFees } : undefined,
+    gasEstimate: "0",
+  };
+}
+
+function estimateAmountUsdFromQuote(
+  quote: BuildSwapBody["quote"] | undefined,
+  from: SwapToken,
+  to: SwapToken,
+  grossAmount: bigint,
+) {
+  if (!quote || !quote.amountOutRaw) return null;
+  try {
+    if (from.priceSymbol === "USDC") return Number(formatUnits(grossAmount, from.decimals));
+    if (to.priceSymbol === "USDC") return Number(formatUnits(BigInt(quote.amountOutRaw), to.decimals));
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchJson<T>(req: NextRequest, path: string): Promise<T> {

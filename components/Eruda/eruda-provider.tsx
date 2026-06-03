@@ -9,7 +9,7 @@ export const Eruda = (props: { children: ReactNode }) => {
 
     const params = new URLSearchParams(window.location.search);
     const enabled =
-      process.env.NEXT_PUBLIC_ENABLE_ERUDA !== "false" ||
+      process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true" ||
       params.get("debug") === "eruda" ||
       window.localStorage.getItem("lumina-debug-eruda") === "1";
 

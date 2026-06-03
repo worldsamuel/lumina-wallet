@@ -242,7 +242,8 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
   const handleSwapReceiptError = useCallback((receiptError?: Error) => {
     setSwapUserOpHash("");
-    toastFromPrototype(`${prototypeText("swapFailed")}: ${receiptError?.message ?? "Transaction failed"}`);
+    const message = receiptError?.message ?? prototypeText("transactionFailed");
+    toastFromPrototype(isCancellationMessage(message) ? prototypeText("transactionCancelled") : `${prototypeText("swapFailed")}: ${message}`);
     window.dispatchEvent(new CustomEvent("lumina:swap-failed", { detail: { message: receiptError?.message } }));
   }, []);
 
@@ -321,7 +322,7 @@ function installMobileConsole() {
         if (toast) toast(message);
       }
 
-function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFailed" | "withdrawFailed" | "swapSuccess" | "swapFailed") {
+function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFailed" | "withdrawFailed" | "swapSuccess" | "swapFailed" | "transactionFailed" | "transactionCancelled") {
   const lang = (window as unknown as { currentLang?: string }).currentLang || "en";
   const copy = {
     depositSuccess: { en: "Deposit successful", "zh-CN": "存入成功", "zh-TW": "存入成功" },
@@ -330,8 +331,14 @@ function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFaile
     withdrawFailed: { en: "Withdrawal failed", "zh-CN": "提现失败", "zh-TW": "提領失敗" },
     swapSuccess: { en: "Swap successful", "zh-CN": "兑换成功", "zh-TW": "兌換成功" },
     swapFailed: { en: "Swap failed", "zh-CN": "兑换失败", "zh-TW": "兌換失敗" },
+    transactionFailed: { en: "Transaction failed", "zh-CN": "交易失败", "zh-TW": "交易失敗" },
+    transactionCancelled: { en: "Transaction cancelled", "zh-CN": "交易已取消", "zh-TW": "交易已取消" },
   } as const;
   return (copy[key] as Record<string, string>)[lang] ?? copy[key].en;
+}
+
+function isCancellationMessage(message: string) {
+  return /cancel|reject|rejected|user_rejected|取消/i.test(message);
 }
 
 function exposeEarnWalletConfirm() {
@@ -1948,13 +1955,40 @@ function enhancePrototypeHome() {
         } catch(e) {}
         return rows;
       }
+      function priceForHome(symbol){
+        var sym = String(symbol || "").toUpperCase();
+        try {
+          if (prices && Number(prices[sym]) > 0) return Number(prices[sym]);
+          if (sym === "WETH") return Number(prices && prices.ETH) || 0;
+          if (sym === "WBTC" || sym === "BTC") return Number(prices && prices.BTC) || 0;
+          if (sym === "USDC" || sym === "USDT" || sym === "EURC") return 1;
+          var map = window.__luminaMarketBySymbol || {};
+          if (map[sym] && Number(map[sym].priceUsd) > 0) return Number(map[sym].priceUsd);
+          var markets = window.__luminaMarketPrices || [];
+          var market = markets.find(function(item){ return String(item.symbol || "").toUpperCase() === sym; });
+          return market ? Number(market.priceUsd || market.usd || 0) : 0;
+        } catch(e) { return 0; }
+      }
+      function assetAmountNumber(asset){
+        var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
+        var n = Number(raw);
+        return Number.isFinite(n) ? n : 0;
+      }
+      function assetUsdValue(asset){
+        var amount = assetAmountNumber(asset);
+        var price = priceForHome(asset && asset.sym);
+        if (amount > 0 && price > 0) return amount * price;
+        return Number(asset && asset.usdNum || 0);
+      }
       function rowHtml(asset, index, imported){
         var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openDetail(' + index + ')';
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
+        var usdValue = assetUsdValue(asset);
+        if (asset && usdValue > 0) asset.usdNum = usdValue;
         return '<div class="asset home-v2-asset" onclick="' + open + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
-          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (typeof formatMoney === "function" ? formatMoney(asset.usdNum) : "—") + '</div></div>' +
+          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
           '<span class="home-asset-chev">›</span>' +
         '</div>';
       }
@@ -2047,6 +2081,11 @@ function enhancePrototypeMarket() {
           };
         }
         if (balances[sym] === undefined) balances[sym] = "0";
+        (assets || []).forEach(function(asset){
+          if (String(asset.sym || "").toUpperCase() !== String(sym).toUpperCase()) return;
+          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
+          if (Number.isFinite(amount) && amount > 0 && Number(market.priceUsd) > 0) asset.usdNum = amount * Number(market.priceUsd);
+        });
       }
       function openMarketDetail(symbol){
         var market = window.__luminaMarketBySymbol[symbol];
@@ -2225,9 +2264,10 @@ function enhancePrototypeSwapQuote() {
 	      var quoteSeq = 0;
 	      var latestSwapQuote = null;
 	      var latestQuoteAt = 0;
+	      var activeQuotePromise = null;
 	      var quoteCountdownTimer = null;
 	      var SWAP_QUOTE_TTL_SECONDS = 180;
-	      var SWAP_QUOTE_REFRESH_SECONDS = 165;
+	      var SWAP_QUOTE_REFRESH_SECONDS = 180;
 	      var swapSubmitting = false;
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
@@ -2257,6 +2297,9 @@ function enhancePrototypeSwapQuote() {
           signing: { en:"Signing...", "zh-CN":"签名中...", "zh-TW":"簽名中...", fr:"Signature...", de:"Signieren...", es:"Firmando...", ja:"署名中..." },
           submitting: { en:"Submitting transaction...", "zh-CN":"提交交易...", "zh-TW":"提交交易...", fr:"Envoi de la transaction...", de:"Transaktion wird gesendet...", es:"Enviando transacción...", ja:"取引を送信中..." },
           waitingChain: { en:"Waiting for confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation...", de:"Warten auf Bestätigung...", es:"Esperando confirmación...", ja:"確認待ち..." }
+          ,swapFailed: { en:"Swap failed", "zh-CN":"兑换失败", "zh-TW":"兌換失敗", fr:"Échec de l'échange", de:"Swap fehlgeschlagen", es:"Intercambio fallido", ja:"スワップ失敗" }
+          ,cancelled: { en:"Transaction cancelled", "zh-CN":"交易已取消", "zh-TW":"交易已取消", fr:"Transaction annulée", de:"Transaktion abgebrochen", es:"Transacción cancelada", ja:"取引をキャンセルしました" }
+          ,transactionFailed: { en:"Transaction failed", "zh-CN":"交易失败", "zh-TW":"交易失敗", fr:"Transaction échouée", de:"Transaktion fehlgeschlagen", es:"Transacción fallida", ja:"取引に失敗しました" }
           ,priceImpactUnknown: { en:"Pool quote", "zh-CN":"池子报价", "zh-TW":"池子報價", fr:"Prix du pool", de:"Pool-Preis", es:"Precio del pool", ja:"プール見積" }
           ,communityRiskTitle: { en:"High-risk token", "zh-CN":"高风险代币", "zh-TW":"高風險代幣", fr:"Jeton à risque élevé", de:"Hochrisiko-Token", es:"Token de alto riesgo", ja:"高リスクトークン" }
           ,communityRiskBody: { en:"This token has not been reviewed by Lumina. Price, liquidity and sellability may change sharply.", "zh-CN":"该代币未经 Lumina 审核,价格、流动性和可卖出性可能剧烈波动。", "zh-TW":"該代幣未經 Lumina 審核,價格、流動性和可賣出性可能劇烈波動。", fr:"Ce jeton n'a pas été vérifié par Lumina. Prix, liquidité et revente peuvent varier fortement.", de:"Dieser Token wurde nicht von Lumina geprüft. Preis, Liquidität und Verkaufbarkeit können stark schwanken.", es:"Lumina no ha revisado este token. Precio, liquidez y venta pueden cambiar mucho.", ja:"このトークンは Lumina の審査を受けていません。価格、流動性、売却可否が大きく変動する可能性があります。" }
@@ -2367,16 +2410,18 @@ function enhancePrototypeSwapQuote() {
         el.style.background = symbol === "WLD" ? "#fff" : (dotColor && dotColor[symbol] ? dotColor[symbol] : "linear-gradient(135deg,#1b231e,#26362b)");
         el.style.color = symbol === "WLD" ? "#000" : "#fff";
       }
-	      function setQuoteState(message, impactClass){
+	      function setQuoteState(message, impactClass, clearQuote){
 	        ensureQuoteBox();
-	        latestSwapQuote = null;
-	        latestQuoteAt = 0;
+	        if (clearQuote !== false) {
+	          latestSwapQuote = null;
+	          latestQuoteAt = 0;
+	        }
         var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
         var gas = feeEl();
         var warn = document.getElementById("quoteWarning");
-        if (buy) buy.value = "—";
+        if (buy && (clearQuote !== false || !latestSwapQuote)) buy.value = "—";
         if (rate) rate.textContent = message;
         if (impact) { impact.textContent = "—"; impact.className = impactClass || "impact-mid"; }
         if (gas) gas.textContent = networkFeeText();
@@ -2442,8 +2487,8 @@ function enhancePrototypeSwapQuote() {
           return;
         }
         var seq = ++quoteSeq;
-        setQuoteState(swapCopy("readingRoute"));
-        try {
+        setQuoteState(swapCopy("readingRoute"), undefined, false);
+        var promise = (async function(){
           var res = await fetch("/api/swap/quote", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -2461,11 +2506,17 @@ function enhancePrototypeSwapQuote() {
           if (!res.ok) throw new Error(data.error || "No quote");
           applyQuote(data);
           return data;
+        })();
+        activeQuotePromise = promise;
+        try {
+          return await promise;
         } catch(e) {
           if (seq !== quoteSeq) return;
           var msg = e && e.message ? e.message : "Quote failed";
           if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = swapCopy("noRoute");
           setQuoteState(msg, "impact-high");
+        } finally {
+          if (activeQuotePromise === promise) activeQuotePromise = null;
         }
       }
 	      function scheduleQuote(){
@@ -2508,6 +2559,11 @@ function enhancePrototypeSwapQuote() {
 	        };
 	        try { out.serialized = JSON.stringify(error); } catch(e) {}
 	        return out;
+	      }
+	      function swapErrorToast(error){
+	        var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(error) : (error && error.message ? error.message : swapCopy("transactionFailed"));
+	        if (/cancel|reject|rejected|user_rejected|取消/i.test(String(msg))) return swapCopy("cancelled");
+	        return swapCopy("swapFailed") + ": " + msg;
 	      }
 	      function minOutText(){
 	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
@@ -2618,8 +2674,10 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
-	        if (latestSwapQuote && quoteAgeSeconds() > SWAP_QUOTE_REFRESH_SECONDS) {
-	          toast(swapCopy("quoteUpdated"));
+	        if (!latestSwapQuote && activeQuotePromise) {
+	          await activeQuotePromise;
+	        }
+	        if (!latestSwapQuote) {
 	          await requestQuote();
 	        }
 	        var state = validateSwapSafety();
@@ -2643,7 +2701,8 @@ function enhancePrototypeSwapQuote() {
 	            fromAmountHuman: state.amountText,
 	            slippageBps: slippageBps(),
 	            userAddress: window.__luminaUserAddress,
-	            forceHighImpact: highImpactAcknowledged
+	            forceHighImpact: highImpactAcknowledged,
+	            quote: latestSwapQuote
 	          });
 	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
@@ -2653,8 +2712,7 @@ function enhancePrototypeSwapQuote() {
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
-	          var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(e) : (e && e.message ? e.message : "Swap failed");
-	          toast("Swap failed: " + msg);
+	          toast(swapErrorToast(e));
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	        } finally {
 	          swapSubmitting = false;
@@ -3077,6 +3135,9 @@ function enhancePrototypeMe() {
           pointsCenter: { en:"Points Center", fr:"Centre de points", de:"Punktezentrum", es:"Centro de puntos", ja:"ポイントセンター", "zh-CN":"积分中心", "zh-TW":"積分中心" },
           pointsRule: { en:"Earn 1 point for every $1 traded.", fr:"Gagnez 1 point par 1 $ échangé.", de:"1 Punkt pro gehandeltem $1.", es:"Gana 1 punto por cada $1 negociado.", ja:"取引 $1 ごとに 1 ポイント獲得。", "zh-CN":"交易 1 美元获得 1 积分。", "zh-TW":"交易 1 美元獲得 1 積分。" },
           lifetimePoints: { en:"Lifetime points", fr:"Points cumulés", de:"Gesamtpunkte", es:"Puntos totales", ja:"累計ポイント", "zh-CN":"累计积分", "zh-TW":"累計積分" },
+          pointsHistory: { en:"Points history", fr:"Historique des points", de:"Punkteverlauf", es:"Historial de puntos", ja:"ポイント履歴", "zh-CN":"积分记录", "zh-TW":"積分記錄" },
+          tradeLabel: { en:"Trade", fr:"Transaction", de:"Transaktion", es:"Operación", ja:"取引", "zh-CN":"交易", "zh-TW":"交易" },
+          noPoints: { en:"No points records yet.", fr:"Aucun point pour le moment.", de:"Noch keine Punkte.", es:"Aún no hay puntos.", ja:"ポイント履歴はまだありません。", "zh-CN":"暂无积分记录。", "zh-TW":"暫無積分記錄。" },
           mediaCenter: { en:"Media Center", fr:"Centre média", de:"Medienzentrum", es:"Centro multimedia", ja:"メディアセンター", "zh-CN":"媒体中心", "zh-TW":"媒體中心" },
           mediaHint: { en:"Follow Lumina official channels.", fr:"Suivez les canaux officiels Lumina.", de:"Folgen Sie den offiziellen Lumina-Kanälen.", es:"Sigue los canales oficiales de Lumina.", ja:"Lumina 公式チャンネルをフォロー。", "zh-CN":"查看 Lumina 官方媒体链接。", "zh-TW":"查看 Lumina 官方媒體連結。" },
           noMedia: { en:"No media links configured yet.", fr:"Aucun lien média configuré.", de:"Noch keine Medienlinks konfiguriert.", es:"Aún no hay enlaces configurados.", ja:"メディアリンクは未設定です。", "zh-CN":"后台还没有配置媒体链接。", "zh-TW":"後台還沒有配置媒體連結。" },
@@ -3132,7 +3193,18 @@ function enhancePrototypeMe() {
           return {};
         }
       }
-      function linkIcon(label){
+      function normalizeSocialItem(raw){
+        if (!raw) return null;
+        if (typeof raw === "string") return { url: raw, logoUrl: "" };
+        return { url: raw.url || "", logoUrl: raw.logoUrl || "" };
+      }
+      function safeAttr(value){
+        return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+      }
+      function linkIcon(label, logoUrl){
+        if (/^https?:\\/\\//i.test(String(logoUrl || ""))) {
+          return '<span class="media-icon has-img"><img src="' + safeAttr(logoUrl) + '" alt="' + safeAttr(label) + ' logo" onerror="this.parentNode.textContent=\\'' + String(label || "?").slice(0, 1).toUpperCase() + '\\'"></span>';
+        }
         return '<span class="media-icon">' + String(label || "?").slice(0, 1).toUpperCase() + '</span>';
       }
       function socialRows(){
@@ -3143,8 +3215,11 @@ function enhancePrototypeMe() {
           ["website", "Website"],
           ["discord", "Discord"],
           ["youtube", "YouTube"]
-        ].filter(function(item){ return links[item[0]]; }).map(function(item){
-          return '<button class="media-row" onclick="window.open(\\'' + String(links[item[0]]).replace(/'/g, "%27") + '\\', \\'_blank\\')">' + linkIcon(item[1]) + '<span>' + item[1] + '</span><i>↗</i></button>';
+        ].map(function(item){
+          var data = normalizeSocialItem(links[item[0]]);
+          return data && data.url ? { key:item[0], label:item[1], url:data.url, logoUrl:data.logoUrl } : null;
+        }).filter(Boolean).map(function(item){
+          return '<button class="media-row" onclick="window.open(\\'' + String(item.url).replace(/'/g, "%27") + '\\', \\'_blank\\')">' + linkIcon(item.label, item.logoUrl) + '<span>' + item.label + '</span><i>↗</i></button>';
         }).join("");
       }
       function ensureMediaModal(){
@@ -3184,6 +3259,7 @@ function enhancePrototypeMe() {
       }
       function pointsFromActivity(rows){
         var total = 0;
+        var records = [];
         (rows || []).forEach(function(item){
           var text = String(item.amount || "").replace(/[+,]/g, "").trim();
           var match = text.match(/(-?\\d+(?:\\.\\d+)?)\\s+([A-Za-z0-9$]+)/);
@@ -3191,8 +3267,16 @@ function enhancePrototypeMe() {
           var amount = Math.abs(Number(match[1]));
           var symbol = match[2].replace(/^\\$/, "");
           var price = priceForSymbol(symbol);
-          if (Number.isFinite(amount) && Number.isFinite(price) && price > 0) total += amount * price;
+          if (Number.isFinite(amount) && Number.isFinite(price) && price > 0) {
+            var usd = amount * price;
+            var points = Math.floor(usd);
+            if (points > 0) {
+              records.push({ date: item.time || item.day || item.createdAt || "", usd: usd, points: points, symbol: symbol });
+              total += points;
+            }
+          }
         });
+        window.__luminaPointRecords = records;
         return Math.floor(total);
       }
       function refreshPoints(){
@@ -3200,6 +3284,7 @@ function enhancePrototypeMe() {
         var center = document.getElementById("pointsCenterValue");
         function setValue(value){
           window.__luminaPoints = value;
+          if (!Array.isArray(window.__luminaPointRecords)) window.__luminaPointRecords = [];
           if (badge) badge.textContent = value.toLocaleString();
           if (center) center.textContent = value.toLocaleString();
         }
@@ -3366,7 +3451,18 @@ function enhancePrototypeMe() {
         modal.className = "modal-mask open";
         modal.id = "pointsModal";
         modal.onclick = function(event){ if(event.target === modal) modal.remove(); };
-        modal.innerHTML = '<div class="modal points-sheet"><div class="modal-grip"></div><h3>' + c.pointsCenter + '</h3><div class="points-hero"><strong>' + Number(window.__luminaPoints || 0).toLocaleString() + '</strong><span>' + c.lifetimePoints + '</span></div><div class="points-rule">' + c.pointsRule + '</div></div>';
+        function dateText(raw){
+          var d = raw ? new Date(raw) : null;
+          if (!d || isNaN(d.getTime())) d = new Date();
+          return d.getFullYear() + "." + (d.getMonth() + 1) + "." + d.getDate();
+        }
+        var records = (window.__luminaPointRecords || []).slice(0, 20);
+        var list = records.length ? records.map(function(item){
+          var usd = Number(item.usd || 0);
+          var usdText = "$" + (usd >= 10 ? usd.toFixed(0) : usd.toFixed(2)).replace(/\\.00$/, "");
+          return '<div class="points-record"><div><strong>' + dateText(item.date) + '</strong><span>' + c.tradeLabel + ' ' + usdText + '</span></div><b>+' + Number(item.points || 0).toLocaleString() + '</b></div>';
+        }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
+        modal.innerHTML = '<div class="modal points-sheet"><div class="modal-grip"></div><h3>' + c.pointsCenter + '</h3><div class="points-hero"><strong>' + Number(window.__luminaPoints || 0).toLocaleString() + '</strong><span>' + c.lifetimePoints + '</span></div><div class="points-rule">' + c.pointsRule + '</div><div class="points-history-title">' + c.pointsHistory + '</div><div class="points-records">' + list + '</div></div>';
         document.body.appendChild(modal);
       };
       window.__luminaRenderMe = renderMe;

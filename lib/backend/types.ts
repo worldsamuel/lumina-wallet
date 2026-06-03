@@ -47,10 +47,15 @@ export type BackendSystemConfig = {
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
   socialLinks?: {
-    x?: string | null;
-    telegram?: string | null;
-    website?: string | null;
-    discord?: string | null;
-    youtube?: string | null;
+    x?: BackendSocialLink | string | null;
+    telegram?: BackendSocialLink | string | null;
+    website?: BackendSocialLink | string | null;
+    discord?: BackendSocialLink | string | null;
+    youtube?: BackendSocialLink | string | null;
   };
+};
+
+export type BackendSocialLink = {
+  url?: string | null;
+  logoUrl?: string | null;
 };

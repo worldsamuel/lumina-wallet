@@ -17,6 +17,7 @@ export type ExecuteSwapParams = {
   slippageBps: number;
   userAddress: Address;
   forceHighImpact?: boolean;
+  quote?: QuoteResponse;
 };
 
 type QuoteResponse = {
@@ -27,6 +28,10 @@ type QuoteResponse = {
   amountOut: string;
   amountOutRaw: string;
   feeTier: number;
+  route?: {
+    tokens: string[];
+    fees: number[];
+  };
   priceImpactPercent?: number;
   gasEstimateUsd?: number;
   blocked?: boolean;
@@ -82,7 +87,7 @@ export async function executeSwap(params: ExecuteSwapParams) {
     throw new Error(`Single swap limit is $${maxUsd}. Please reduce the amount.`);
   }
 
-  const freshQuote = await fetchFreshQuote(params);
+  const freshQuote = params.quote?.amountOutRaw ? params.quote : await fetchFreshQuote(params);
   if (freshQuote.source !== "uniswap-v3") {
     throw new Error("Phase 2 execution currently supports Uniswap V3 routes only.");
   }
@@ -94,6 +99,7 @@ export async function executeSwap(params: ExecuteSwapParams) {
     fromAmountHuman: params.fromAmountHuman,
     slippageBps: params.slippageBps,
     userAddress: params.userAddress,
+    quote: freshQuote,
   });
   const tx = built.tx;
   const executableQuote = built.quote;
@@ -200,6 +206,16 @@ async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxRe
       fromAmount: params.fromAmountHuman,
       slippageBps: params.slippageBps,
       userAddress: params.userAddress,
+      quote: params.quote
+        ? {
+            source: params.quote.source,
+            amountInRaw: params.quote.amountInRaw,
+            amountOut: params.quote.amountOut,
+            amountOutRaw: params.quote.amountOutRaw,
+            feeTier: params.quote.feeTier,
+            route: params.quote.route,
+          }
+        : undefined,
     }),
   });
   const data = await response.json().catch(() => null);

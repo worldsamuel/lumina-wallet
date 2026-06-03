@@ -25,11 +25,11 @@ export async function PATCH(req: NextRequest) {
     faviconUrl?: string | null;
     swapNetworkFeeLabel?: string | null;
     socialLinks?: {
-      x?: string | null;
-      telegram?: string | null;
-      website?: string | null;
-      discord?: string | null;
-      youtube?: string | null;
+      x?: unknown;
+      telegram?: unknown;
+      website?: unknown;
+      discord?: unknown;
+      youtube?: unknown;
     };
   };
   const config = await updateSystemConfig({

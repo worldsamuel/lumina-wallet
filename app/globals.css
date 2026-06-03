@@ -687,16 +687,16 @@
   .morpho-confirm-modal .modal h3 { padding: 0 0 10px; }
   .morpho-confirm-body { color: var(--text-dim); font-size: 13px; line-height: 1.6; margin: 0; }
   /* Me */
-  .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; display: flex; align-items: center; gap: 16px; }
-  .me-avatar { width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.7); flex-shrink: 0; }
+  .me-card { margin: 0 var(--pad-screen); background: radial-gradient(120% 120% at 100% 0%, rgba(34,224,107,0.12), transparent 50%), linear-gradient(150deg, #121512, #0a0b0a); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 18px; display: grid; grid-template-columns: 64px minmax(0, 1fr) 88px; align-items: center; gap: 14px; }
+  .me-avatar { width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(from 90deg, #1b6, #2cf, #93f, #1b6); filter: saturate(0.7); box-shadow: 0 0 0 1px rgba(255,255,255,.08), 0 14px 38px rgba(74,222,128,.08); }
   .me-info { flex: 1; min-width: 0; }
-  .me-name { font-size: 20px; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+  .me-name { font-size: 20px; font-weight: 900; display: flex; align-items: center; gap: 7px; min-width: 0; }
   .me-name .v { color: var(--green); display: inline-flex; }
   .me-addr { color: var(--text-dim); font-size: 13px; margin-top: 4px; display: inline-flex; align-items: center; gap: 8px; max-width: 100%; }
   .me-copy-btn { width: 26px; height: 26px; border: 1px solid rgba(255,255,255,.09); border-radius: 50%; background: rgba(255,255,255,.045); color: var(--green); display: inline-grid; place-items: center; padding: 0; flex: 0 0 auto; }
   .me-copy-btn svg { width: 14px; height: 14px; }
-  .me-orb { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; background: rgba(74,222,128,0.12); color: var(--green); border-radius: var(--radius-pill); padding: 5px 12px; font-size: 12px; font-weight: 600; }
-  .me-points-chip { align-self: flex-start; min-width: 82px; padding: 9px 10px; border: 1px solid rgba(74,222,128,.2); border-radius: 16px; background: rgba(74,222,128,.09); color: var(--green); text-align: center; }
+  .me-orb { display: inline-flex; align-items: center; justify-content: center; margin-top: 10px; max-width: 100%; background: rgba(74,222,128,0.13); color: var(--green); border: 1px solid rgba(74,222,128,.12); border-radius: 999px; padding: 7px 12px; font-size: 12px; line-height: 1.15; font-weight: 800; white-space: normal; text-align: center; }
+  .me-points-chip { align-self: center; min-width: 0; width: 88px; padding: 11px 8px; border: 1px solid rgba(74,222,128,.24); border-radius: 18px; background: rgba(74,222,128,.09); color: var(--green); text-align: center; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
   .me-points-chip b { display: block; color: var(--text); font-size: 18px; line-height: 1.05; }
   .me-points-chip span { display: block; margin-top: 3px; font-size: 10px; font-weight: 850; color: var(--green); white-space: nowrap; }
   .points-sheet, .media-sheet { width: calc(100vw - 24px); max-width: 390px; padding: 22px; border-radius: 26px; }
@@ -705,15 +705,26 @@
   .points-hero strong { display: block; font-size: 42px; line-height: 1; color: var(--text); }
   .points-hero span { display: block; margin-top: 8px; color: var(--green); font-size: 13px; font-weight: 850; }
   .points-rule { margin-top: 12px; padding: 13px 14px; border-radius: 16px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07); color: var(--text-dim); font-size: 13px; line-height: 1.5; }
+  .points-history-title { margin: 18px 2px 8px; color: var(--text); font-size: 14px; font-weight: 900; }
+  .points-records { display: grid; gap: 8px; max-height: 240px; overflow: auto; padding-right: 2px; }
+  .points-record { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 13px; border-radius: 15px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); }
+  .points-record strong { display: block; color: var(--text); font-size: 13px; line-height: 1.2; }
+  .points-record span { display: block; margin-top: 4px; color: var(--text-dim); font-size: 12px; }
+  .points-record b { color: var(--green); font-size: 15px; font-weight: 950; }
+  .points-empty { padding: 18px 10px; color: var(--text-mute); text-align: center; font-size: 13px; border: 1px dashed rgba(255,255,255,.08); border-radius: 16px; }
   .media-sheet p { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 14px; }
   .media-row { width: 100%; min-height: 56px; border: 1px solid var(--line); border-radius: 17px; background: rgba(255,255,255,.035); color: var(--text); display: flex; align-items: center; gap: 12px; padding: 0 13px; margin-top: 10px; font-size: 15px; font-weight: 850; }
   .media-row i { margin-left: auto; color: var(--text-mute); font-style: normal; }
   .media-icon { width: 34px; height: 34px; border-radius: 12px; display: inline-grid; place-items: center; background: rgba(74,222,128,.12); color: var(--green); font-size: 13px; font-weight: 950; }
+  .media-icon.has-img { overflow: hidden; background: rgba(255,255,255,.06); }
+  .media-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .media-empty { padding: 22px 10px; color: var(--text-mute); text-align: center; font-size: 13px; }
   @media (max-width: 380px) {
-    .me-card { gap: 12px; padding: 18px; }
-    .me-points-chip { min-width: 70px; padding: 8px; }
+    .me-card { grid-template-columns: 56px minmax(0,1fr) 78px; gap: 10px; padding: 16px; }
+    .me-avatar { width: 56px; height: 56px; }
+    .me-points-chip { width: 78px; padding: 9px 7px; }
     .me-points-chip b { font-size: 16px; }
+    .me-orb { padding: 6px 10px; font-size: 11px; }
   }
   .me-group-label { color: var(--text-mute); font-size: 13px; margin: 24px 0 8px; padding: 0 var(--pad-screen); }
   .me-group { margin: 0 var(--pad-screen); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }

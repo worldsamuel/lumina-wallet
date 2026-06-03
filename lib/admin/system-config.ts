@@ -7,12 +7,17 @@ export type SystemConfig = {
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
   socialLinks: {
-    x: string | null;
-    telegram: string | null;
-    website: string | null;
-    discord: string | null;
-    youtube: string | null;
+    x: SocialLinkConfig;
+    telegram: SocialLinkConfig;
+    website: SocialLinkConfig;
+    discord: SocialLinkConfig;
+    youtube: SocialLinkConfig;
   };
+};
+
+export type SocialLinkConfig = {
+  url: string | null;
+  logoUrl: string | null;
 };
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
@@ -22,11 +27,11 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   faviconUrl: null,
   swapNetworkFeeLabel: "~$0.00",
   socialLinks: {
-    x: null,
-    telegram: null,
-    website: null,
-    discord: null,
-    youtube: null,
+    x: { url: null, logoUrl: null },
+    telegram: { url: null, logoUrl: null },
+    website: { url: null, logoUrl: null },
+    discord: { url: null, logoUrl: null },
+    youtube: { url: null, logoUrl: null },
   },
 };
 
@@ -56,11 +61,20 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
 function normalizeSocialLinks(value: unknown): SystemConfig["socialLinks"] {
   const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["socialLinks"]> : {};
   return {
-    x: cleanUrl(source.x),
-    telegram: cleanUrl(source.telegram),
-    website: cleanUrl(source.website),
-    discord: cleanUrl(source.discord),
-    youtube: cleanUrl(source.youtube),
+    x: cleanSocialLink(source.x),
+    telegram: cleanSocialLink(source.telegram),
+    website: cleanSocialLink(source.website),
+    discord: cleanSocialLink(source.discord),
+    youtube: cleanSocialLink(source.youtube),
+  };
+}
+
+function cleanSocialLink(value: unknown): SocialLinkConfig {
+  if (typeof value === "string") return { url: cleanUrl(value), logoUrl: null };
+  const source = typeof value === "object" && value !== null ? value as Partial<SocialLinkConfig> : {};
+  return {
+    url: cleanUrl(source.url),
+    logoUrl: cleanUrl(source.logoUrl),
   };
 }
 
@@ -76,7 +90,7 @@ export async function getSystemConfig() {
 }
 
 export async function updateSystemConfig(
-  patch: Partial<Omit<SystemConfig, "socialLinks">> & { socialLinks?: Partial<SystemConfig["socialLinks"]> },
+  patch: Partial<Omit<SystemConfig, "socialLinks">> & { socialLinks?: unknown },
 ) {
   const current = await getSystemConfig();
   const next = normalizeSystemConfig({ ...current, ...patch });
