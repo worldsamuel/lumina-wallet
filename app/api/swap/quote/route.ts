@@ -9,7 +9,7 @@ import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
-import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
+import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
 
 type QuoteBody = {
   fromSymbol?: string;
@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
   if ("error" in parsed) return jsonResponse({ error: parsed.error }, { status: 400 });
 
   const grossAmountIn = parseUnits(parsed.amountText, parsed.from.decimals);
-  const platformFee = await getSwapPlatformFee(parsed.from, grossAmountIn);
-  const amountIn = platformFee?.swapAmount ?? grossAmountIn;
+  const amountIn = grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
+  const platformFeeConfig = await getSwapPlatformFeeConfig();
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
   const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
@@ -76,7 +76,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const amountOutNumber = Number(main.quote.amountOut);
+  const grossAmountOutRaw = BigInt(main.quote.amountOutRaw);
+  const { netAmountOut, payload: platformFee } = applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
+  const amountOut = formatUnits(netAmountOut, parsed.to.decimals);
+  const amountOutNumber = Number(amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
   const deviationValues = reliableImpactReference
     ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
@@ -93,8 +96,10 @@ export async function POST(req: NextRequest) {
       amountIn: amountText,
       amountInRaw: amountIn.toString(),
       grossAmountIn: parsed.amountText,
-      amountOut: main.quote.amountOut,
-      amountOutRaw: main.quote.amountOutRaw,
+      amountOut,
+      amountOutRaw: netAmountOut.toString(),
+      grossAmountOut: main.quote.amountOut,
+      grossAmountOutRaw: grossAmountOutRaw.toString(),
       rate: quoteRate,
       priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
       priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
@@ -102,7 +107,7 @@ export async function POST(req: NextRequest) {
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
       route: main.quote.route,
-      platformFee: platformFee?.payload ?? null,
+      platformFee,
       tokens: {
         from: tokenPayload(parsed.from),
         to: tokenPayload(parsed.to),

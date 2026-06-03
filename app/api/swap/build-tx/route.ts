@@ -7,7 +7,7 @@ import type { OnchainPricesResponse } from "@/lib/prices";
 import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
 import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
-import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
+import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
 import type { SwapQuoteResult } from "@/lib/swap/quote-types";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
@@ -27,6 +27,8 @@ type BuildSwapBody = {
     amountInRaw?: string;
     amountOut?: string;
     amountOutRaw?: string;
+    grossAmountOut?: string;
+    grossAmountOutRaw?: string;
     feeTier?: number;
     route?: {
       tokens?: string[];
@@ -58,35 +60,40 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ error: `Single swap limit is $${maxUsd}. Please reduce the amount.` }, { status: 400 });
   }
 
-  const platformFee = await getSwapPlatformFee(parsed.from, parsed.fromAmount);
-  const swapAmount = platformFee?.swapAmount ?? parsed.fromAmount;
-  const clientQuote = trustedClientQuote(body?.quote, parsed.from, parsed.to, swapAmount);
-  const bestQuote = clientQuote ?? (await quoteBestV3(parsed.from, parsed.to, swapAmount)).bestQuote;
+  const amountIn = parsed.fromAmount;
+  const platformFeeConfig = await getSwapPlatformFeeConfig();
+  const clientQuote = trustedClientQuote(body?.quote, parsed.from, parsed.to, amountIn);
+  const bestQuote = clientQuote ?? (await quoteBestV3(parsed.from, parsed.to, amountIn)).bestQuote;
   if (!bestQuote || BigInt(bestQuote.amountOutRaw) <= 0n) {
     return jsonResponse({ error: "No executable Uniswap V3 route for this pair." }, { status: 404 });
   }
+  const grossAmountOutRaw = BigInt(bestQuote.amountOutRaw);
+  const { netAmountOut, payload: platformFee } = applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
 
   const tx = await buildSwapTransaction({
     fromToken: parsed.from,
     toToken: parsed.to,
-    fromAmount: swapAmount,
-    expectedAmountOut: BigInt(bestQuote.amountOutRaw),
+    fromAmount: amountIn,
+    expectedAmountOut: netAmountOut,
     feeTier: bestQuote.fee,
     route: bestQuote.route,
     slippageBps: parsed.slippageBps,
     userAddress: parsed.userAddress,
     deadline: parsed.deadline,
+    platformFee: platformFeeConfig,
   });
 
   return jsonResponse({
     tx,
     quote: {
       source: "uniswap-v3",
-      amountIn: formatUnits(swapAmount, parsed.from.decimals),
-      amountInRaw: swapAmount.toString(),
+      amountIn: formatUnits(amountIn, parsed.from.decimals),
+      amountInRaw: amountIn.toString(),
       grossAmountIn: parsed.amountText,
-      amountOut: bestQuote.amountOut,
-      amountOutRaw: bestQuote.amountOutRaw,
+      amountOut: formatUnits(netAmountOut, parsed.to.decimals),
+      amountOutRaw: netAmountOut.toString(),
+      grossAmountOut: bestQuote.amountOut,
+      grossAmountOutRaw: grossAmountOutRaw.toString(),
       feeTier: bestQuote.fee,
       route: bestQuote.route,
       gasEstimate: bestQuote.gasEstimate,
@@ -95,7 +102,7 @@ export async function POST(req: NextRequest) {
         to: parsed.to,
       },
     },
-    platformFee: platformFee?.payload ?? null,
+    platformFee,
     permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
     deadline: parsed.deadline,
   });
@@ -164,7 +171,9 @@ function trustedClientQuote(
 ): SwapQuoteResult | null {
   if (!quote || quote.source !== "uniswap-v3") return null;
   if (!quote.amountOutRaw || !quote.amountInRaw || quote.amountInRaw !== swapAmount.toString()) return null;
-  const amountOutRaw = BigInt(quote.amountOutRaw);
+  const netAmountOutRaw = BigInt(quote.amountOutRaw);
+  if (netAmountOutRaw <= 0n) return null;
+  const amountOutRaw = BigInt(quote.grossAmountOutRaw || quote.amountOutRaw);
   if (amountOutRaw <= 0n) return null;
   const routeTokens = Array.isArray(quote.route?.tokens) ? quote.route.tokens : [];
   const routeFees = Array.isArray(quote.route?.fees) ? quote.route.fees : [];
@@ -176,7 +185,7 @@ function trustedClientQuote(
   const fee = Number(quote.feeTier);
   if (!Number.isInteger(fee) || fee <= 0) return null;
   return {
-    amountOut: String(quote.amountOut || ""),
+    amountOut: String(quote.grossAmountOut || quote.amountOut || ""),
     amountOutRaw: amountOutRaw.toString(),
     fee,
     route: routeTokens.length >= 2 ? { tokens: routeTokens, fees: routeFees } : undefined,

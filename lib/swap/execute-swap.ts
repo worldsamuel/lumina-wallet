@@ -47,6 +47,7 @@ type PlatformFeePayload = {
   token: Address;
   recipient: Address;
   percent: string;
+  bps?: number;
   amountRaw: string;
   amount: string;
 };
@@ -122,19 +123,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
       }),
       value: "0x0",
     },
-    ...(built.platformFee && BigInt(built.platformFee.amountRaw) > 0n
-      ? [
-          {
-            to: built.platformFee.token,
-            data: encodeFunctionData({
-              abi: [erc20TransferAbi],
-              functionName: "transfer",
-              args: [built.platformFee.recipient, BigInt(built.platformFee.amountRaw)],
-            }),
-            value: "0x0",
-          },
-        ]
-      : []),
     tx,
   ];
 
@@ -198,17 +186,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
     quote: executableQuote,
   };
 }
-
-const erc20TransferAbi = {
-  type: "function",
-  name: "transfer",
-  stateMutability: "nonpayable",
-  inputs: [
-    { name: "to", type: "address" },
-    { name: "amount", type: "uint256" },
-  ],
-  outputs: [{ name: "success", type: "bool" }],
-} as const;
 
 async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse> {
   const response = await fetch("/api/swap/quote", {

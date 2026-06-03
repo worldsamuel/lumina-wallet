@@ -33,6 +33,10 @@ type BuildSwapTransactionParams = {
   slippageBps: number;
   userAddress: Address;
   deadline: number;
+  platformFee?: {
+    recipient: Address;
+    bps: number;
+  } | null;
 };
 
 export type BuiltSwapTransaction = {
@@ -51,6 +55,7 @@ export async function buildSwapTransaction({
   slippageBps,
   userAddress,
   deadline,
+  platformFee,
 }: BuildSwapTransactionParams): Promise<BuiltSwapTransaction> {
   if (!isAddress(userAddress)) throw new Error("Invalid swap recipient.");
   if (fromAmount <= 0n || expectedAmountOut <= 0n) throw new Error("Swap amounts must be greater than 0.");
@@ -76,6 +81,13 @@ export async function buildSwapTransaction({
     slippageTolerance: new Percent(slippageBps, 10_000),
     deadlineOrPreviousBlockhash: deadline,
     chainId: WORLD_CHAIN_ID,
+    fee:
+      platformFee && platformFee.bps > 0
+        ? {
+            fee: new Percent(platformFee.bps, 10_000),
+            recipient: platformFee.recipient,
+          }
+        : undefined,
   });
 
   return {

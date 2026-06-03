@@ -3,22 +3,23 @@ import { ensureDefaultFees } from "@/lib/admin/ensure-fee-schema";
 import { db } from "@/lib/db";
 import type { SwapToken } from "./tokens";
 
-export type SwapPlatformFee = {
-  feeAmount: bigint;
-  swapAmount: bigint;
-  payload: {
-    businessType: "swap";
-    token: Address;
-    recipient: Address;
-    percent: string;
-    amountRaw: string;
-    amount: string;
-  };
+export type SwapPlatformFeeConfig = {
+  recipient: Address;
+  percent: string;
+  bps: number;
 };
 
-export async function getSwapPlatformFee(from: SwapToken, grossAmount: bigint): Promise<SwapPlatformFee | null> {
-  if (grossAmount <= 0n) return null;
+export type SwapPlatformFeePayload = {
+  businessType: "swap";
+  token: Address;
+  recipient: Address;
+  percent: string;
+  bps: number;
+  amountRaw: string;
+  amount: string;
+};
 
+export async function getSwapPlatformFeeConfig(): Promise<SwapPlatformFeeConfig | null> {
   await ensureDefaultFees();
   const config = await db.feeConfig.findUnique({ where: { businessType: "swap" } });
   const recipient = String(config?.recipient ?? "").trim();
@@ -27,22 +28,36 @@ export async function getSwapPlatformFee(from: SwapToken, grossAmount: bigint): 
   const percent = String(config?.percent ?? "0");
   const bps = Math.round(Number(percent) * 10_000);
   if (!Number.isFinite(bps) || bps <= 0) return null;
-
-  const feeAmount = (grossAmount * BigInt(bps)) / 10_000n;
-  if (feeAmount <= 0n) return null;
-  const swapAmount = grossAmount - feeAmount;
-  if (swapAmount <= 0n) throw new Error("Configured swap fee is too high for this amount.");
+  if (bps >= 10_000) throw new Error("Configured swap fee is too high.");
 
   return {
-    feeAmount,
-    swapAmount,
+    recipient,
+    percent,
+    bps,
+  };
+}
+
+export function applySwapOutputFee(
+  to: SwapToken,
+  grossAmountOut: bigint,
+  config: SwapPlatformFeeConfig | null,
+): { netAmountOut: bigint; payload: SwapPlatformFeePayload | null } {
+  if (!config || grossAmountOut <= 0n) return { netAmountOut: grossAmountOut, payload: null };
+
+  const feeAmount = (grossAmountOut * BigInt(config.bps)) / 10_000n;
+  const netAmountOut = grossAmountOut - feeAmount;
+  if (netAmountOut <= 0n) throw new Error("Configured swap fee is too high for this output amount.");
+
+  return {
+    netAmountOut,
     payload: {
       businessType: "swap",
-      token: from.address,
-      recipient,
-      percent,
+      token: to.address,
+      recipient: config.recipient,
+      percent: config.percent,
+      bps: config.bps,
       amountRaw: feeAmount.toString(),
-      amount: formatUnits(feeAmount, from.decimals),
+      amount: formatUnits(feeAmount, to.decimals),
     },
   };
 }

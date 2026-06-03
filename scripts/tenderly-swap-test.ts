@@ -19,8 +19,9 @@ import { privateKeyToAccount } from "viem/accounts";
 import { buildSwapTransaction } from "../lib/swap/build-swap-tx";
 import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi, swapErc20Abi } from "../lib/swap/contracts";
 import { SWAP_TOKENS } from "../lib/swap/tokens";
+import { quoteBestV3 } from "../lib/swap/v3-quoter";
 
-type TokenKey = "WLD" | "USDC" | "WETH";
+type TokenKey = "WLD" | "USDC" | "WETH" | "ORB";
 
 type TestCase = {
   name: string;
@@ -38,11 +39,24 @@ type QuoteResponse = {
   source: string;
   amountOut: string;
   amountOutRaw: string;
+  grossAmountOut?: string;
+  grossAmountOutRaw?: string;
   feeTier: number;
+  route?: {
+    tokens: string[];
+    fees: number[];
+  };
   blocked?: boolean;
   blockReason?: string;
   priceImpactPercent?: number;
   gasEstimateUsd?: number;
+  platformFee?: {
+    recipient: Address;
+    token: Address;
+    bps: number;
+    amountRaw: string;
+    amount: string;
+  } | null;
 };
 
 type TestResult = TestCase & {
@@ -52,6 +66,8 @@ type TestResult = TestCase & {
   txHash?: Hex;
   txUrl?: string;
   gasUsed?: bigint;
+  userReceivedRaw?: string;
+  feeReceivedRaw?: string;
   error?: string;
   actualError?: string;
   revertReason?: string;
@@ -60,14 +76,16 @@ type TestResult = TestCase & {
 const TENDERLY_RPC = requiredEnv("TENDERLY_RPC_URL");
 const account = privateKeyToAccount(normalizePrivateKey(requiredEnv("TEST_PRIVATE_KEY")));
 const TEST_USER = account.address;
-const QUOTE_BASE_URL = process.env.SWAP_QUOTE_BASE_URL?.trim() || "http://localhost:3000";
 const EXPLORER_BASE_URL = process.env.TENDERLY_EXPLORER_BASE_URL?.trim() || "";
 const SKIP_TENDERLY_FUNDING = process.env.SKIP_TENDERLY_FUNDING === "true";
+const FEE_BPS = 40;
+const FEE_RECIPIENT = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077" as Address;
 
 const TOKENS = {
   WLD: SWAP_TOKENS.WLD,
   USDC: SWAP_TOKENS.USDC,
   WETH: SWAP_TOKENS.WETH,
+  ORB: SWAP_TOKENS.ORB,
 } satisfies Record<TokenKey, (typeof SWAP_TOKENS)[keyof typeof SWAP_TOKENS]>;
 
 const TESTS: TestCase[] = [
@@ -82,7 +100,7 @@ const TESTS: TestCase[] = [
     description: "正常 1 WLD -> USDC 应该成功",
   },
   {
-    name: "2_USDC_to_WLD_small",
+    name: "2_USDC_to_WLD_reverse",
     from: "USDC",
     to: "WLD",
     amount: "1",
@@ -92,14 +110,14 @@ const TESTS: TestCase[] = [
     description: "反向 1 USDC -> WLD 应该成功",
   },
   {
-    name: "3_WETH_to_USDC",
-    from: "WETH",
+    name: "3_ORB_to_USDC_community",
+    from: "ORB",
     to: "USDC",
-    amount: "0.01",
+    amount: "1000",
     slippageBps: 50,
     deadlineOffset: 1800,
     expect: "success",
-    description: "0.01 WETH -> USDC, 测试 3 个 token 之间路径",
+    description: "1000 ORB -> USDC, 验证非核心 token 不再触发 invalid_contract 且 output fee 到金库",
   },
   {
     name: "4_dust_amount",
@@ -206,12 +224,23 @@ async function runTest(test: TestCase): Promise<TestResult> {
       fromAmount,
       expectedAmountOut,
       feeTier: quote.feeTier,
+      route: quote.route,
       slippageBps: test.slippageBps,
       userAddress: TEST_USER,
       deadline,
+      platformFee: {
+        recipient: FEE_RECIPIENT,
+        bps: FEE_BPS,
+      },
     });
 
+    const userOutputBefore = await erc20Balance(toToken.address, TEST_USER);
+    const feeOutputBefore = await erc20Balance(toToken.address, FEE_RECIPIENT);
     const receipt = await sendSwap(tx.to, tx.data, BigInt(tx.value));
+    const userOutputAfter = await erc20Balance(toToken.address, TEST_USER);
+    const feeOutputAfter = await erc20Balance(toToken.address, FEE_RECIPIENT);
+    const userReceived = userOutputAfter - userOutputBefore;
+    const feeReceived = feeOutputAfter - feeOutputBefore;
     const txUrl = tenderlyTxUrl(receipt.transactionHash);
     const succeeded = receipt.status === "success";
 
@@ -221,8 +250,34 @@ async function runTest(test: TestCase): Promise<TestResult> {
         console.log(`FAIL: expected success but reverted: ${error}`);
         return { ...test, quote, approveHash, txHash: receipt.transactionHash, txUrl, gasUsed: receipt.gasUsed, result: "FAIL", error };
       }
-      console.log(`PASS: swap succeeded, gas=${receipt.gasUsed}`);
-      return { ...test, quote, approveHash, txHash: receipt.transactionHash, txUrl, gasUsed: receipt.gasUsed, result: "PASS" };
+      if (feeReceived <= 0n) {
+        const error = `Fee vault did not receive output token fee. feeReceivedRaw=${feeReceived}`;
+        console.log(`FAIL: ${error}`);
+        return {
+          ...test,
+          quote,
+          approveHash,
+          txHash: receipt.transactionHash,
+          txUrl,
+          gasUsed: receipt.gasUsed,
+          userReceivedRaw: userReceived.toString(),
+          feeReceivedRaw: feeReceived.toString(),
+          result: "FAIL",
+          error,
+        };
+      }
+      console.log(`PASS: swap succeeded, gas=${receipt.gasUsed}, userReceived=${userReceived}, feeReceived=${feeReceived}`);
+      return {
+        ...test,
+        quote,
+        approveHash,
+        txHash: receipt.transactionHash,
+        txUrl,
+        gasUsed: receipt.gasUsed,
+        userReceivedRaw: userReceived.toString(),
+        feeReceivedRaw: feeReceived.toString(),
+        result: "PASS",
+      };
     }
 
     if (succeeded) {
@@ -287,26 +342,35 @@ function baseFunding(token: TokenKey) {
 }
 
 async function fetchQuote(test: TestCase): Promise<QuoteResponse> {
-  let lastError = "";
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    const response = await fetch(`${QUOTE_BASE_URL.replace(/\/$/, "")}/api/swap/quote`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fromSymbol: test.from,
-        toSymbol: test.to,
-        fromAmount: test.amount,
-      }),
-    });
-    const data = (await response.json().catch(() => null)) as QuoteResponse | { error?: string } | null;
-    if (response.ok && data && "amountOutRaw" in data) {
-      console.log(`Quote: ${test.amount} ${test.from} -> ${data.amountOut} ${test.to}, fee=${data.feeTier}`);
-      return data;
-    }
-    lastError = `Quote failed (${response.status}): ${JSON.stringify(data)}`;
-    if (attempt < 3) await sleep(1_500);
-  }
-  throw new Error(lastError);
+  const fromToken = TOKENS[test.from];
+  const toToken = TOKENS[test.to];
+  const fromAmount = parseUnits(test.amount, fromToken.decimals);
+  const quote = (await quoteBestV3(fromToken, toToken, fromAmount)).bestQuote;
+  if (!quote) throw new Error(`No V3 quote for ${test.from} -> ${test.to}`);
+
+  const grossAmountOutRaw = BigInt(quote.amountOutRaw);
+  const feeAmount = (grossAmountOutRaw * BigInt(FEE_BPS)) / 10_000n;
+  const netAmountOutRaw = grossAmountOutRaw - feeAmount;
+  const data: QuoteResponse = {
+    source: "uniswap-v3",
+    amountOut: formatUnits(netAmountOutRaw, toToken.decimals),
+    amountOutRaw: netAmountOutRaw.toString(),
+    grossAmountOut: quote.amountOut,
+    grossAmountOutRaw: grossAmountOutRaw.toString(),
+    feeTier: quote.fee,
+    route: quote.route,
+    platformFee: {
+      recipient: FEE_RECIPIENT,
+      token: toToken.address,
+      bps: FEE_BPS,
+      amountRaw: feeAmount.toString(),
+      amount: formatUnits(feeAmount, toToken.decimals),
+    },
+  };
+  console.log(
+    `Quote: ${test.amount} ${test.from} -> gross ${quote.amountOut} ${test.to}, net ${data.amountOut} ${test.to}, fee=${data.feeTier}`,
+  );
+  return data;
 }
 
 async function approvePermit2(token: Address, amount: bigint) {
@@ -325,6 +389,15 @@ async function approvePermit2(token: Address, amount: bigint) {
   const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
   assert(receipt.status === "success", `Permit2 approve failed for ${token}`);
   return hash;
+}
+
+async function erc20Balance(token: Address, owner: Address) {
+  return publicClient.readContract({
+    address: token,
+    abi: [swapErc20Abi[0]],
+    functionName: "balanceOf",
+    args: [owner],
+  });
 }
 
 async function approveUniversalRouterWithPermit2(token: Address, amount: bigint, expiration: number) {
@@ -453,6 +526,8 @@ ${result.approveHash ? `- **Permit2 approve tx**: \`${result.approveHash}\`` : "
 ${result.txHash ? `- **Swap tx**: \`${result.txHash}\`` : ""}
 ${result.txUrl ? `- **Tenderly**: [View trace](${result.txUrl})` : ""}
 ${result.gasUsed ? `- **Gas used**: ${result.gasUsed}` : ""}
+${result.userReceivedRaw ? `- **User received raw**: ${result.userReceivedRaw}` : ""}
+${result.feeReceivedRaw ? `- **Fee vault received raw**: ${result.feeReceivedRaw}` : ""}
 ${result.error ? `- **Error**: \`${escapeBackticks(result.error)}\`` : ""}
 ${result.actualError ? `- **Actual revert**: \`${escapeBackticks(result.actualError)}\`` : ""}
 ${result.revertReason ? `- **Revert reason**: \`${escapeBackticks(result.revertReason)}\`` : ""}
@@ -535,10 +610,6 @@ function toQuantityHex(value: bigint) {
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
-}
-
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 main();
