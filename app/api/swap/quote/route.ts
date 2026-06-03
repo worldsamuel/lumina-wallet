@@ -3,11 +3,12 @@ import { formatUnits, parseUnits } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { publicClient } from "@/lib/chain";
-import type { MarketPricesResponse } from "@/lib/prices";
+import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 import type { SwapQuoteResult, SwapQuoteSet } from "@/lib/swap/quote-types";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
+import { quoteBestV4 } from "@/lib/swap/v4-quoter";
 import { getSwapPlatformFee } from "@/lib/swap/platform-fee";
 
 type QuoteBody = {
@@ -19,7 +20,7 @@ type QuoteBody = {
 };
 
 type SourceQuote = {
-  source: "uniswap-v3";
+  source: "uniswap-v3" | "uniswap-v4";
   bestQuote: SwapQuoteResult | null;
   allQuotes: SwapQuoteSet["allQuotes"];
 };
@@ -41,24 +42,32 @@ export async function POST(req: NextRequest) {
   const platformFee = await getSwapPlatformFee(parsed.from, grossAmountIn);
   const amountIn = platformFee?.swapAmount ?? grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
+  const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
-  const [v3, gecko, gasPrice] = await Promise.all([
+  const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
     withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
       .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
       .catch(() => null),
+    hasCommunityToken
+      ? Promise.resolve(null)
+      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 6_000)
+          .then((quote) => ({ source: "uniswap-v4" as const, ...quote }))
+          .catch(() => null),
+    reliableImpactReference ? fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null) : Promise.resolve(null),
     reliableImpactReference ? fetchJson<MarketPricesResponse>(req, "/api/prices/market").catch(() => null) : Promise.resolve(null),
     reliableImpactReference ? publicClient.getGasPrice().catch(() => 0n) : Promise.resolve(0n),
   ]);
 
   const amountInNumber = Number(amountText);
-  const main = pickMainQuote(v3);
-  const geckoRate = referenceRate(parsed.from, parsed.to, gecko);
+  const main = pickMainQuote(v3, v4);
+  const chainlinkRate = referenceRate(parsed.from, parsed.to, chainlink);
+  const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
 
   if (!main || !main.quote || Number(main.quote.amountOut) <= 0) {
     return jsonResponse(
       {
         error: "No executable Uniswap route for this pair.",
-        references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, gecko),
+        references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko),
         warnings: ["low_liquidity"],
         blocked: true,
         blockReason: "No executable Uniswap route for this pair.",
@@ -70,7 +79,7 @@ export async function POST(req: NextRequest) {
   const amountOutNumber = Number(main.quote.amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
   const deviationValues = reliableImpactReference
-    ? [deviation(quoteRate, geckoRate)].filter((value): value is number => value !== null)
+    ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
     : [];
   const closestDeviation = deviationValues.length ? Math.min(...deviationValues) : 0;
   const priceImpactPercent = reliableImpactReference && deviationValues.length ? closestDeviation : null;
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
       priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
       priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
       priceImpactAvailable: priceImpactPercent !== null,
-      gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, gecko?.ETH?.usd),
+      gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
       route: main.quote.route,
       platformFee: platformFee?.payload ?? null,
@@ -98,7 +107,7 @@ export async function POST(req: NextRequest) {
         from: tokenPayload(parsed.from),
         to: tokenPayload(parsed.to),
       },
-      references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, gecko, main.source),
+      references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko, main.source),
       warnings,
       blocked: false,
       blockReason: undefined,
@@ -138,8 +147,18 @@ function tokenPayload(token: SwapToken) {
   };
 }
 
-function pickMainQuote(v3: SourceQuote | null) {
-  return v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null;
+function pickMainQuote(v3: SourceQuote | null, v4: SourceQuote | null) {
+  const candidates = [
+    v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null,
+    v4?.bestQuote ? { source: "uniswap-v4" as const, quote: v4.bestQuote } : null,
+  ].filter((item): item is { source: "uniswap-v3" | "uniswap-v4"; quote: SwapQuoteResult } => Boolean(item));
+  const executable = candidates.find((item) => item.source === "uniswap-v3");
+  if (executable) return executable;
+  return candidates.sort((a, b) => {
+    const left = BigInt(a.quote.amountOutRaw);
+    const right = BigInt(b.quote.amountOutRaw);
+    return left > right ? -1 : left < right ? 1 : 0;
+  })[0] ?? null;
 }
 
 function buildReferences(
@@ -147,12 +166,16 @@ function buildReferences(
   to: SwapToken,
   amountIn: number,
   v3: SourceQuote | null,
-  gecko: MarketPricesResponse | null,
-  selected?: "uniswap-v3",
+  v4: SourceQuote | null,
+  chainlink: OnchainPricesResponse | null,
+  coingecko: MarketPricesResponse | null,
+  selected?: "uniswap-v3" | "uniswap-v4",
 ) {
   return {
     uniswapV3: quoteReference(v3, amountIn, selected === "uniswap-v3"),
-    geckoTerminal: { rate: referenceRate(from, to, gecko), updatedAt: gecko?.updated_at ?? null },
+    uniswapV4: quoteReference(v4, amountIn, selected === "uniswap-v4"),
+    chainlink: { rate: referenceRate(from, to, chainlink), updatedAt: chainlink?.updatedAt ?? null },
+    coingecko: { rate: referenceRate(from, to, coingecko), updatedAt: coingecko?.updated_at ?? null },
   };
 }
 
@@ -165,13 +188,13 @@ function quoteReference(quote: SourceQuote | null, amountIn: number, selected: b
   };
 }
 
-function referenceRate(from: SwapToken, to: SwapToken, prices?: MarketPricesResponse | null) {
+function referenceRate(from: SwapToken, to: SwapToken, prices?: OnchainPricesResponse | MarketPricesResponse | null) {
   const fromUsd = priceUsd(prices, from.priceSymbol);
   const toUsd = priceUsd(prices, to.priceSymbol);
   return fromUsd && toUsd ? fromUsd / toUsd : null;
 }
 
-function priceUsd(prices: MarketPricesResponse | null | undefined, symbol: SwapToken["priceSymbol"]) {
+function priceUsd(prices: OnchainPricesResponse | MarketPricesResponse | null | undefined, symbol: SwapToken["priceSymbol"]) {
   const value = prices?.[symbol];
   if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
   if (typeof value === "object" && value && "usd" in value && typeof value.usd === "number" && value.usd > 0) {

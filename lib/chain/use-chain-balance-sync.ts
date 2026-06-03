@@ -109,7 +109,6 @@ function syncBalancesToPrototype(
       usdNum: usdValue,
       cls: item.className,
       logo: item.logo,
-      address: item.contractAddress ?? null,
     };
   });
   if (!assets.some((item) => item.sym === "BTC")) {
@@ -120,7 +119,6 @@ function syncBalancesToPrototype(
       usdNum: 0,
       cls: "btc",
       logo: "B",
-      address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
     });
   }
   const balanceMap: Record<string, string> = Object.fromEntries(
@@ -158,29 +156,10 @@ function syncBalancesToPrototype(
   const weightedChangePct = totalUsd > 0 ? (changeUsd / totalUsd) * 100 : 0;
 
   runInPrototypeScope(`
-    var previousPrices = prices || {};
-    var previousAssets = Array.isArray(assets) ? assets : [];
-    var previousAssetUsd = {};
-    previousAssets.forEach(function(asset){
-      if (asset && asset.sym && Number(asset.usdNum) > 0) previousAssetUsd[String(asset.sym).toUpperCase()] = Number(asset.usdNum);
-    });
-    var incomingAssets = ${JSON.stringify(assets)};
-    assets = incomingAssets.map(function(asset){
-      var sym = String(asset.sym || "").toUpperCase();
-      if ((asset.usdNum === null || asset.usdNum === undefined || Number(asset.usdNum) <= 0) && previousAssetUsd[sym] > 0) {
-        return Object.assign({}, asset, { usdNum: previousAssetUsd[sym] });
-      }
-      return asset;
-    });
+    assets = ${JSON.stringify(assets)};
     balances = ${JSON.stringify(balanceMap)};
     availMap = ${JSON.stringify(availableMap)};
-    var incomingPrices = ${JSON.stringify(priceMap)};
-    prices = Object.assign({}, previousPrices);
-    Object.keys(incomingPrices).forEach(function(sym){
-      var value = incomingPrices[sym];
-      if (typeof value === "number" && Number.isFinite(value) && value > 0) prices[sym] = value;
-      else if (prices[sym] === undefined) prices[sym] = value;
-    });
+    prices = ${JSON.stringify(priceMap)};
     marketPrices = ${JSON.stringify(marketPriceMap)};
     totalUsdNum = ${JSON.stringify(totalUsd)};
     change24hUsdNum = ${JSON.stringify(changeUsd)};
