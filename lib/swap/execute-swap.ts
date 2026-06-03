@@ -324,7 +324,7 @@ export function friendlySwapError(error: unknown) {
   if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(message)) return "价格变化过大,请重新报价";
   if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(message)) return "交易过期,请重新提交";
   if (/user_rejected/i.test(message)) return "您取消了交易。";
-  return "交易失败,请查看 Activity 页详情";
+  return "交易失败,请查看活动页详情";
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {

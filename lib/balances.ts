@@ -54,7 +54,6 @@ type BalanceTokenConfig = {
 };
 
 const WORLD_CHAIN_PUBLIC_RPC = "https://worldchain-mainnet.g.alchemy.com/public";
-const HOME_LIQUIDITY_MIN_USD = 10;
 
 function toBalance(token: BalanceTokenConfig | (typeof TOKENS)[number], balance: bigint): ChainBalance {
   const formatted = formatUnits(balance, token.decimals);
@@ -91,6 +90,33 @@ function toDiscoveredBalance(token: CatalogToken, balance: bigint): ChainBalance
     native: false,
     contractAddress: token.address as Address,
     usdValue: "",
+  };
+}
+
+async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<CatalogToken | null> {
+  const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: 1,
+      jsonrpc: "2.0",
+      method: "alchemy_getTokenMetadata",
+      params: [contractAddress],
+    }),
+    signal: AbortSignal.timeout(2_500),
+  }).catch(() => null);
+  if (!response?.ok) return null;
+
+  const body = (await response.json().catch(() => null)) as {
+    result?: { name?: string | null; symbol?: string | null; decimals?: number | null };
+  } | null;
+  const symbol = body?.result?.symbol?.trim();
+  if (!symbol) return null;
+  return {
+    address: contractAddress,
+    symbol,
+    name: body?.result?.name?.trim() || symbol,
+    decimals: body?.result?.decimals ?? 18,
   };
 }
 
@@ -196,17 +222,20 @@ async function fetchDiscoveredTokenBalances(userAddress: Address) {
       .map((token) => [String(token.address).toLowerCase(), token]),
   );
 
-  return balances
-    .map((item) => {
+  const discovered = await Promise.all(
+    balances.slice(0, 80).map(async (item) => {
       if (!item.contractAddress || !item.tokenBalance || item.error) return null;
       const balance = parseAlchemyBalance(item.tokenBalance);
       if (balance <= 0n) return null;
-      const token = catalogByAddress.get(item.contractAddress.toLowerCase());
-      if (!token || !hasHomeLiquidity(token)) return null;
+      const token =
+        catalogByAddress.get(item.contractAddress.toLowerCase()) ??
+        (await fetchAlchemyTokenMetadata(item.contractAddress));
+      if (!token) return null;
       return toDiscoveredBalance(token, balance);
-    })
-    .filter((item): item is ChainBalance => Boolean(item))
-    .slice(0, 40);
+    }),
+  );
+
+  return discovered.filter((item): item is ChainBalance => Boolean(item)).slice(0, 40);
 }
 
 function parseAlchemyBalance(value: string) {
@@ -215,13 +244,4 @@ function parseAlchemyBalance(value: string) {
   } catch {
     return 0n;
   }
-}
-
-function hasHomeLiquidity(token: CatalogToken) {
-  const volume = Number(token.volume24h ?? 0);
-  const marketCap = Number(token.marketCap ?? 0);
-  return (
-    (Number.isFinite(volume) && volume >= HOME_LIQUIDITY_MIN_USD) ||
-    (Number.isFinite(marketCap) && marketCap >= HOME_LIQUIDITY_MIN_USD)
-  );
 }

@@ -1985,7 +1985,7 @@ function enhancePrototypeHome() {
       function showOnHome(asset){
         var sym = String(asset && asset.sym || "").toUpperCase();
         if (homeSwapWhitelist.has(sym)) return true;
-        return !!(asset && asset.custom && hasVisibleHomeBalance(asset));
+        return !!(asset && hasVisibleHomeBalance(asset));
       }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
@@ -2179,6 +2179,7 @@ function enhancePrototypeMarket() {
         openDetail(idx);
       }
       window.openMarketDetail = openMarketDetail;
+      window.__luminaRegisterMarketToken = registerMarketToken;
       var marketTab = "gainers";
       function marketLang(){
         return (window.currentLang || "en") === "zh-CN" ? "zh-CN" : "en";
@@ -2363,7 +2364,7 @@ function enhancePrototypeSwapQuote() {
           ackRiskFirst: { en:"Please acknowledge the risk first", "zh-CN":"请先确认高风险交易", "zh-TW":"請先確認高風險交易", fr:"Veuillez d'abord accepter le risque", de:"Bitte zuerst das Risiko bestätigen", es:"Primero acepta el riesgo", ja:"先にリスクを確認してください" },
           submitted: { en:"Swap submitted", "zh-CN":"兑换已提交", "zh-TW":"兌換已提交", fr:"Échange envoyé", de:"Swap gesendet", es:"Intercambio enviado", ja:"スワップを送信しました" },
           waiting: { en:"Waiting for on-chain confirmation. Expected receive about", "zh-CN":"等待区块链确认中。预计收到约", "zh-TW":"等待區塊鏈確認中。預計收到約", fr:"En attente de confirmation on-chain. Réception prévue environ", de:"Warten auf On-chain-Bestätigung. Erwartet etwa", es:"Esperando confirmación on-chain. Recibirás aprox.", ja:"オンチェーン確認待ち。受取予定" },
-          viewActivity: { en:"View Activity", "zh-CN":"查看 Activity", "zh-TW":"查看 Activity", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver actividad", ja:"Activity を見る" },
+          viewActivity: { en:"View Activity", "zh-CN":"查看活动", "zh-TW":"查看活動", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver actividad", ja:"Activity を見る" },
           networkFee: { en:"Network fee", "zh-CN":"网络费", "zh-TW":"網絡費", fr:"Frais réseau", de:"Netzwerkgebühr", es:"Comisión de red", ja:"ネットワーク手数料" },
           platformFee: { en:"Platform fee", "zh-CN":"平台手续费", "zh-TW":"平台手續費", fr:"Frais plateforme", de:"Plattformgebühr", es:"Comisión de plataforma", ja:"プラットフォーム手数料" },
           free: { en:"Free", "zh-CN":"免费", "zh-TW":"免費", fr:"Gratuit", de:"Kostenlos", es:"Gratis", ja:"無料" },
@@ -2384,7 +2385,7 @@ function enhancePrototypeSwapQuote() {
           ,impactRisk: { en:"Price impact is above 5%. Confirm only if you accept this price.", "zh-CN":"价格影响超过 5%,请确认你接受这个价格。", "zh-TW":"價格影響超過 5%,請確認你接受這個價格。", fr:"L'impact prix dépasse 5%.", de:"Preiseinfluss über 5%.", es:"Impacto de precio superior al 5%.", ja:"価格影響が 5% を超えています。" }
           ,quoteUpdated: { en:"Quote refreshed", "zh-CN":"报价已刷新", "zh-TW":"報價已刷新", fr:"Devis actualisé", de:"Angebot aktualisiert", es:"Cotización actualizada", ja:"見積もりを更新しました" }
           ,confirmInWorldApp: { en:"Confirm in World App...", "zh-CN":"请在 World App 确认...", "zh-TW":"請在 World App 確認...", fr:"Confirmez dans World App...", de:"In World App bestätigen...", es:"Confirma en World App...", ja:"World App で確認..." }
-          ,submittedHint: { en:"Your transaction is in the queue. Activity will update after World Chain confirms it.", "zh-CN":"交易已进入队列,World Chain 确认后 Activity 会自动更新。", "zh-TW":"交易已進入佇列,World Chain 確認後 Activity 會自動更新。", fr:"La transaction est en file. Activity se mettra à jour après confirmation.", de:"Die Transaktion ist in der Warteschlange. Activity aktualisiert sich nach Bestätigung.", es:"La transacción está en cola. Activity se actualizará al confirmar.", ja:"取引はキューに入りました。確認後 Activity が更新されます。" }
+          ,submittedHint: { en:"Your transaction is in the queue. Activity will update after World Chain confirms it.", "zh-CN":"交易已进入队列,World Chain 确认后活动记录会自动更新。", "zh-TW":"交易已進入佇列,World Chain 確認後活動記錄會自動更新。", fr:"La transaction est en file. Activity se mettra à jour après confirmation.", de:"Die Transaktion ist in der Warteschlange. Activity aktualisiert sich nach Bestätigung.", es:"La transacción está en cola. Activity se actualizará al confirmar.", ja:"取引はキューに入りました。確認後 Activity が更新されます。" }
           ,limit: { en:"Single swap limit", "zh-CN":"单笔限额", "zh-TW":"單筆限額", fr:"Limite par swap", de:"Limit pro Swap", es:"Límite por swap", ja:"1回あたりの上限" }
           ,reduceAmount: { en:"Please reduce the amount.", "zh-CN":"请降低金额。", "zh-TW":"請降低金額。", fr:"Veuillez réduire le montant.", de:"Bitte Betrag reduzieren.", es:"Reduce el importe.", ja:"金額を下げてください。" }
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
@@ -3153,8 +3154,8 @@ function enhancePrototypeSend() {
           cancel: { en:"Cancel", "zh-CN":"取消", "zh-TW":"取消", fr:"Annuler", de:"Abbrechen", es:"Cancelar", ja:"キャンセル" },
           confirm: { en:"Confirm", "zh-CN":"确认", "zh-TW":"確認", fr:"Confirmer", de:"Bestätigen", es:"Confirmar", ja:"確認" },
           submitted: { en:"Transaction submitted", "zh-CN":"交易已提交", "zh-TW":"交易已提交", fr:"Transaction envoyée", de:"Transaktion gesendet", es:"Transacción enviada", ja:"取引を送信しました" },
-          waiting: { en:"Waiting for World Chain confirmation. Activity will update automatically.", "zh-CN":"等待 World Chain 确认。Activity 会自动更新。", "zh-TW":"等待 World Chain 確認。Activity 會自動更新。", fr:"En attente de confirmation World Chain. Activity se mettra à jour.", de:"Warten auf World Chain-Bestätigung. Activity aktualisiert automatisch.", es:"Esperando confirmación de World Chain. Activity se actualizará.", ja:"World Chain の確認待ちです。Activity は自動更新されます。" },
-          viewActivity: { en:"View Activity", "zh-CN":"查看 Activity", "zh-TW":"查看 Activity", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver Activity", ja:"Activity を見る" },
+          waiting: { en:"Waiting for World Chain confirmation. Activity will update automatically.", "zh-CN":"等待 World Chain 确认。活动记录会自动更新。", "zh-TW":"等待 World Chain 確認。活動記錄會自動更新。", fr:"En attente de confirmation World Chain. Activity se mettra à jour.", de:"Warten auf World Chain-Bestätigung. Activity aktualisiert automatisch.", es:"Esperando confirmación de World Chain. Activity se actualizará.", ja:"World Chain の確認待ちです。Activity は自動更新されます。" },
+          viewActivity: { en:"View Activity", "zh-CN":"查看活动", "zh-TW":"查看活動", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver Activity", ja:"Activity を見る" },
           explorer: { en:"Explorer", "zh-CN":"浏览器", "zh-TW":"瀏覽器", fr:"Explorer", de:"Explorer", es:"Explorer", ja:"Explorer" },
           close: { en:"Close", "zh-CN":"关闭", "zh-TW":"關閉", fr:"Fermer", de:"Schließen", es:"Cerrar", ja:"閉じる" },
           cancelled: { en:"Transaction cancelled", "zh-CN":"交易已取消", "zh-TW":"交易已取消", fr:"Transaction annulée", de:"Transaktion abgebrochen", es:"Transacción cancelada", ja:"取引をキャンセルしました" },
@@ -3905,14 +3906,65 @@ function enhancePrototypeDetail() {
         if (n >= 1000) return "$" + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K";
         return "$" + n.toFixed(0);
       }
+      function detailLang(){
+        return (window.currentLang || "en") === "zh-CN" ? "zh-CN" : "en";
+      }
+      function detailCopy(key){
+        var zh = detailLang() === "zh-CN";
+        var copy = {
+          noChart: zh ? "暂无" : "No real",
+          chartData: zh ? "行情图数据" : "chart data",
+          forToken: zh ? "的" : "for",
+          liveData: zh ? "实时行情" : "Live market data",
+          noCandles: zh ? "池子暂未返回 K 线历史。" : "No candle history from the pool yet.",
+          price: zh ? "价格" : "Price",
+          change24h: zh ? "24h 涨跌" : "24h Change",
+          volume24h: zh ? "24h 交易量" : "24h Volume",
+          liquidity: zh ? "流动性" : "Liquidity",
+          loadingMarket: zh ? "正在读取行情..." : "Loading market data...",
+          lookupFailed: zh ? "行情池查询失败。" : "Market pool lookup failed.",
+          noPool: zh ? "暂未找到 GeckoTerminal 池子。" : "No GeckoTerminal pool found.",
+          loadingHistory: zh ? "正在读取行情历史..." : "Loading market history...",
+          noHistory: zh ? "未找到市场历史。" : "No market history found.",
+          historyFailed: zh ? "行情历史请求失败。" : "Market history request failed.",
+          noDexPool: zh ? "未找到 DEX 池子,尝试读取历史行情。" : "No DEX pool found; CoinGecko history unavailable.",
+          loadingChart: zh ? "正在读取 K 线..." : "Loading chart...",
+          emptyOhlcv: zh ? "DEX K 线暂为空。" : "DEX OHLCV returned empty.",
+          ohlcvFailed: zh ? "DEX K 线请求失败。" : "DEX OHLCV request failed.",
+          noData: zh ? "暂无数据" : "No data",
+          noSwaps: zh ? "暂无最近兑换。" : "No recent swaps found.",
+          marketPairUnavailable: zh ? "暂无行情交易对。" : "Market pair unavailable.",
+          loadingTrades: zh ? "正在读取成交..." : "Loading trades...",
+          tradesFailed: zh ? "成交记录读取失败。" : "Unable to load trades.",
+          buy: zh ? "买入" : "Buy",
+          sell: zh ? "卖出" : "Sell",
+          trades: zh ? "成交" : "Trades",
+          livePool: zh ? "实时池子" : "Live pool",
+          receive: zh ? "接收" : "Receive",
+          swap: zh ? "兑换" : "Swap",
+          send: zh ? "发送" : "Send",
+          recentActivity: zh ? "最近活动" : "Recent Activity",
+          viewExplorer: zh ? "在浏览器查看" : "View on Explorer"
+        };
+        return copy[key] || key;
+      }
 
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
-        return map[asset.sym] || null;
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        if (map[sym]) return map[sym];
+        var address = String(asset && (asset.contractAddress || asset.marketAddress) || "").toLowerCase();
+        if (address) {
+          var values = Object.keys(map).map(function(key){ return map[key]; });
+          for (var i = 0; i < values.length; i++) {
+            if (String(values[i] && values[i].address || "").toLowerCase() === address) return values[i];
+          }
+        }
+        return null;
       }
       function realChartUnavailable(asset, range, reason) {
         var sym = asset && asset.sym ? asset.sym : "token";
-        return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data for ' + sym + (reason ? '<br><span>' + reason + '</span>' : '') + '</div>';
+        return '<div class="market-detail-state">' + detailCopy("noChart") + ' ' + (range || "1D") + ' ' + detailCopy("chartData") + ' ' + detailCopy("forToken") + ' ' + sym + (reason ? '<br><span>' + reason + '</span>' : '') + '</div>';
       }
       function liveMarketSummary(asset, range, reason) {
         var market = marketForAsset(asset);
@@ -3920,12 +3972,12 @@ function enhancePrototypeDetail() {
         var change = Number(market.change24h || 0);
         var changeClass = change >= 0 ? "up" : "down";
         return '<div class="market-detail-state live-market-summary">' +
-          '<strong>Live market data</strong>' +
-          '<span>' + (reason || "No candle history from the pool yet.") + '</span>' +
-          '<div class="market-stat-row"><span>Price</span><b>' + formatChartPrice(market.priceUsd) + '</b></div>' +
-          '<div class="market-stat-row"><span>24h Change</span><b class="' + changeClass + '">' + (change >= 0 ? "+" : "") + change.toFixed(2) + '%</b></div>' +
-          '<div class="market-stat-row"><span>24h Volume</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
-          '<div class="market-stat-row"><span>Liquidity</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
+          '<strong>' + detailCopy("liveData") + '</strong>' +
+          '<span>' + (reason || detailCopy("noCandles")) + '</span>' +
+          '<div class="market-stat-row"><span>' + detailCopy("price") + '</span><b>' + formatChartPrice(market.priceUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>' + detailCopy("change24h") + '</span><b class="' + changeClass + '">' + (change >= 0 ? "+" : "") + change.toFixed(2) + '%</b></div>' +
+          '<div class="market-stat-row"><span>' + detailCopy("volume24h") + '</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>' + detailCopy("liquidity") + '</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
           '</div>';
       }
 
@@ -3936,20 +3988,29 @@ function enhancePrototypeDetail() {
         if (!market || !market.liquidityUsd) {
           if (asset && !asset.__marketLookupStarted) {
             asset.__marketLookupStarted = true;
-            chart.innerHTML = '<div class="market-detail-state">Loading market data...</div>';
-            fetch("/api/tokens/top?mode=all", { cache: "no-store" })
+            chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingMarket") + '</div>';
+            var address = String(asset.contractAddress || asset.marketAddress || "");
+            var lookupUrl = /^0x[a-fA-F0-9]{40}$/.test(address)
+              ? "/api/market/token?address=" + encodeURIComponent(address) + "&symbol=" + encodeURIComponent(asset.sym || "")
+              : "/api/tokens/top?mode=all";
+            fetch(lookupUrl, { cache: "no-store" })
               .then(function(res){ return res.ok ? res.json() : []; })
-              .then(function(markets){
-                if (Array.isArray(markets)) markets.forEach(registerMarketToken);
+              .then(function(payload){
+                var markets = Array.isArray(payload) ? payload : (payload && payload.market ? [payload.market] : []);
+                if (Array.isArray(markets)) markets.forEach(function(item){
+                  if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(item);
+                  else if (typeof registerMarketToken === "function") registerMarketToken(item);
+                });
+                renderMarketTables(asset);
                 renderMarketCard(asset);
               })
               .catch(function(){
-                chart.innerHTML = realChartUnavailable(asset, "1D", "Market pool lookup failed.");
+                chart.innerHTML = realChartUnavailable(asset, "1D", detailCopy("lookupFailed"));
                 updateRangeChange(null, "1D", asset);
               });
             return;
           }
-          chart.innerHTML = realChartUnavailable(asset, "1D", "No GeckoTerminal pool found.");
+          chart.innerHTML = realChartUnavailable(asset, "1D", detailCopy("noPool"));
           updateRangeChange(null, "1D", asset);
           return;
         }
@@ -3960,7 +4021,7 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         function renderHistory(reason){
-          chart.innerHTML = '<div class="market-detail-state">Loading market history...</div>';
+          chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
             .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
             .then(function(data){
@@ -3969,20 +4030,20 @@ function enhancePrototypeDetail() {
                 chart.innerHTML = trendSvg(candles, range || "1D");
                 updateRangeChange(candles, range || "1D", asset);
               } else {
-                chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || "No market history found.");
+                chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
                 updateRangeChangeFromMarket(asset, range || "1D");
               }
             })
             .catch(function(){
-              chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || "Market history request failed.");
+              chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("historyFailed"));
               updateRangeChangeFromMarket(asset, range || "1D");
             });
         }
         if (!market || !market.poolAddress) {
-          renderHistory("No DEX pool found; CoinGecko history unavailable.");
+          renderHistory(detailCopy("noDexPool"));
           return;
         }
-        chart.innerHTML = '<div class="market-detail-state">Loading chart...</div>';
+        chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
         fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
@@ -3991,11 +4052,11 @@ function enhancePrototypeDetail() {
               chart.innerHTML = trendSvg(candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              renderHistory("DEX OHLCV returned empty.");
+              renderHistory(detailCopy("emptyOhlcv"));
             }
           })
           .catch(function(){
-            renderHistory("DEX OHLCV request failed.");
+            renderHistory(detailCopy("ohlcvFailed"));
           });
       }
       function updateRangeChange(candles, range, asset){
@@ -4013,7 +4074,7 @@ function enhancePrototypeDetail() {
         }
         if (change === null || change === undefined || !Number.isFinite(Number(change))) {
           pill.className = "none";
-          pill.textContent = "No data";
+          pill.textContent = detailCopy("noData");
           return;
         }
         var up = Number(change) >= 0;
@@ -4046,7 +4107,7 @@ function enhancePrototypeDetail() {
         return "$" + n.toPrecision(5);
       }
       function trendSvg(candles, range){
-        if (!candles.length) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
+        if (!candles.length) return '<div class="market-detail-state">' + detailCopy("noChart") + ' ' + (range || "1D") + ' ' + detailCopy("chartData") + '</div>';
         var width = 430, height = 230, padL = 54, padR = 48, padT = 26, chartH = 132, volY = 174, volH = 24;
         var rows = candles.map(function(c){
           return {
@@ -4058,11 +4119,11 @@ function enhancePrototypeDetail() {
             timestamp: Number(c.timestamp || c[0] || 0)
           };
         }).filter(function(c){ return c.open > 0 && c.high > 0 && c.low > 0 && c.close > 0; });
-        if (rows.length < 2) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
+        if (rows.length < 2) return '<div class="market-detail-state">' + detailCopy("noChart") + ' ' + (range || "1D") + ' ' + detailCopy("chartData") + '</div>';
         var highs = rows.map(function(c){ return c.high; });
         var lows = rows.map(function(c){ return c.low; });
         var max = Math.max.apply(null, highs), min = Math.min.apply(null, lows);
-        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state">No real ' + (range || "1D") + ' chart data</div>';
+        if (!Number.isFinite(max) || !Number.isFinite(min) || max <= min) return '<div class="market-detail-state">' + detailCopy("noChart") + ' ' + (range || "1D") + ' ' + detailCopy("chartData") + '</div>';
         var maxVol = Math.max.apply(null, rows.map(function(c){ return c.volume || 0; }).concat([1]));
         function y(v){ return padT + (max - v) / (max - min) * chartH; }
         function x(i){ return padL + (i / Math.max(1, rows.length - 1)) * (width - padL - padR); }
@@ -4111,7 +4172,7 @@ function enhancePrototypeDetail() {
         return value.length > 12 ? value.slice(0, 6) + "..." + value.slice(-4) : value;
       }
       function tradeRows(trades, asset){
-        if (!trades || !trades.length) return '<div class="detail-empty-row">No recent swaps found.</div>';
+        if (!trades || !trades.length) return '<div class="detail-empty-row">' + detailCopy("noSwaps") + '</div>';
         return trades.slice(0, 8).map(function(t){
           var side = t.side === "sell" ? "sell" : "buy";
           var amount = t.amount ? Number(t.amount).toLocaleString(undefined, { maximumFractionDigits: 4 }) + " " + asset.sym : "—";
@@ -4119,7 +4180,7 @@ function enhancePrototypeDetail() {
           var time = t.timestamp ? new Date(t.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "";
           var hash = t.hash ? String(t.hash) : "";
           var open = hash ? ' onclick="window.open(\\'https://worldscan.org/tx/' + hash + '\\', \\'_blank\\')"' : "";
-          return '<div class="detail-trade-row"' + open + '><span class="trade-side ' + side + '">' + (side === "buy" ? "Buy" : "Sell") + '</span><span class="trade-main"><b>' + amount + '</b><em>' + time + ' · ' + shortAddr(t.maker) + '</em></span><span class="trade-usd">' + usd + '</span></div>';
+          return '<div class="detail-trade-row"' + open + '><span class="trade-side ' + side + '">' + (side === "buy" ? detailCopy("buy") : detailCopy("sell")) + '</span><span class="trade-main"><b>' + amount + '</b><em>' + time + ' · ' + shortAddr(t.maker) + '</em></span><span class="trade-usd">' + usd + '</span></div>';
         }).join("");
       }
       function renderMarketTables(asset) {
@@ -4127,17 +4188,17 @@ function enhancePrototypeDetail() {
         if (!tradesBox) return;
         var market = marketForAsset(asset);
         if (!market || !market.poolAddress || !market.address) {
-          tradesBox.innerHTML = '<div class="detail-empty-row">Market pair unavailable.</div>';
+          tradesBox.innerHTML = '<div class="detail-empty-row">' + detailCopy("marketPairUnavailable") + '</div>';
           return;
         }
-        tradesBox.innerHTML = '<div class="detail-empty-row">Loading trades...</div>';
+        tradesBox.innerHTML = '<div class="detail-empty-row">' + detailCopy("loadingTrades") + '</div>';
         fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { trades: [], holders: [] }; })
           .then(function(data){
             tradesBox.innerHTML = tradeRows(Array.isArray(data.trades) ? data.trades : [], asset);
           })
           .catch(function(){
-            tradesBox.innerHTML = '<div class="detail-empty-row">Unable to load trades.</div>';
+            tradesBox.innerHTML = '<div class="detail-empty-row">' + detailCopy("tradesFailed") + '</div>';
           });
       }
       window.openPoolInfo = function(){
@@ -4153,8 +4214,8 @@ function enhancePrototypeDetail() {
         }
         modal.innerHTML =
           '<div class="pool-info-sheet"><button class="pool-close" onclick="document.getElementById(\\'poolInfoModal\\').classList.remove(\\'open\\')">×</button><strong>World Chain pool</strong>' +
-          '<div class="market-stat-row"><span>24h Volume</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
-          '<div class="market-stat-row"><span>Liquidity</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>' + detailCopy("volume24h") + '</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
+          '<div class="market-stat-row"><span>' + detailCopy("liquidity") + '</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
           '<div class="market-stat-row"><span>Pool</span><b>' + String(market.poolAddress || "").slice(0, 6) + "..." + String(market.poolAddress || "").slice(-4) + '</b></div>' +
           '</div>';
         modal.classList.add("open");
@@ -4190,16 +4251,16 @@ function enhancePrototypeDetail() {
             '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
-            '<button class="btn-ghost detail-action-receive" onclick="window.__luminaOpenReceive && window.__luminaOpenReceive()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>Receive</button>' +
-            '<button class="btn-ghost detail-action-swap" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>Swap</button>' +
-            '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>Send</button>' +
+            '<button class="btn-ghost detail-action-receive" onclick="window.__luminaOpenReceive && window.__luminaOpenReceive()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>' + detailCopy("receive") + '</button>' +
+            '<button class="btn-ghost detail-action-swap" onclick="goSwapFromDetail()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>' + detailCopy("swap") + '</button>' +
+            '<button class="btn-primary detail-action-send" onclick="goSend(assets[currentDetailIdx].sym)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21V6"/><path d="M6 12l6-6 6 6"/></svg>' + detailCopy("send") + '</button>' +
           '</div>' +
           '<section class="detail-market-panels">' +
-            '<div class="detail-market-card"><div class="detail-market-title"><span>Trades</span><em>Live pool</em></div><div id="detTrades"></div></div>' +
+            '<div class="detail-market-card"><div class="detail-market-title"><span>' + detailCopy("trades") + '</span><em>' + detailCopy("livePool") + '</em></div><div id="detTrades"></div></div>' +
           '</section>' +
           '<section class="detail-v2-menu">' +
-            '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>Recent Activity</strong><i>›</i></button>' +
-            '<a id="detExplorer" target="_blank" rel="noreferrer"><span>' + detailIcon("globe") + '</span><strong>View on Explorer</strong><i>›</i></a>' +
+            '<button type="button" onclick="go(\\'activity\\'); setTabByName(\\'Activity\\')"><span>' + detailIcon("activity") + '</span><strong>' + detailCopy("recentActivity") + '</strong><i>›</i></button>' +
+            '<a id="detExplorer" target="_blank" rel="noreferrer"><span>' + detailIcon("globe") + '</span><strong>' + detailCopy("viewExplorer") + '</strong><i>›</i></a>' +
           '</section>';
       }
 
@@ -4255,7 +4316,7 @@ function enhancePrototypeDetail() {
         var pill = document.getElementById("detChangePill");
         renderMarketTables(asset);
         pill.className = "none";
-        pill.textContent = "No data";
+        pill.textContent = detailCopy("noData");
         renderMarketCard(asset);
       }
 

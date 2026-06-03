@@ -185,7 +185,7 @@ async function fetchTokenPools(tokenAddress: string) {
   const response = await fetch(`${GECKO_TOKENS_URL}/${tokenAddress}/pools?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 60 },
-    signal: AbortSignal.timeout(7000),
+    signal: AbortSignal.timeout(4_000),
   });
   if (!response.ok) throw new Error(`GeckoTerminal token pools responded ${response.status}`);
   return (await response.json()) as GeckoResponse;
@@ -196,7 +196,7 @@ async function fetchDexScreenerTokenPairs(tokenAddress: string) {
     const response = await fetch(`${DEXSCREENER_API_URL}/token-pairs/v1/${chainId}/${tokenAddress}`, {
       headers: { accept: "application/json" },
       next: { revalidate: 30 },
-      signal: AbortSignal.timeout(7000),
+      signal: AbortSignal.timeout(3_500),
     }).catch(() => null);
     if (!response || !response.ok) continue;
     const body = (await response.json()) as DexScreenerPair[] | { pairs?: DexScreenerPair[] | null };
@@ -453,7 +453,7 @@ export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggre
   const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 180 },
-    signal: AbortSignal.timeout(7000),
+    signal: AbortSignal.timeout(4_000),
   });
   if (!response.ok) throw new Error(`GeckoTerminal OHLCV responded ${response.status}`);
   const body = (await response.json()) as GeckoOhlcvResponse;

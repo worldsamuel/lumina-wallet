@@ -99,7 +99,7 @@ function syncBalancesToPrototype(
 ) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
-    const priceUsd = pickOnchainPrice(item.symbol, onchainData);
+    const priceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
     const amount = Number.parseFloat(item.formatted || "0") || 0;
     const usdValue = priceUsd === null ? null : amount * priceUsd;
     return {
@@ -109,6 +109,9 @@ function syncBalancesToPrototype(
       usdNum: usdValue,
       cls: item.className,
       logo: item.logo,
+      contractAddress: item.contractAddress ?? null,
+      custom: item.className === "custom",
+      hasBalance: amount > 0,
     };
   });
   if (!assets.some((item) => item.sym === "BTC")) {
@@ -119,6 +122,9 @@ function syncBalancesToPrototype(
       usdNum: 0,
       cls: "btc",
       logo: "B",
+      contractAddress: null,
+      custom: false,
+      hasBalance: false,
     });
   }
   const balanceMap: Record<string, string> = Object.fromEntries(
@@ -130,7 +136,7 @@ function syncBalancesToPrototype(
   );
   availableMap.BTC ??= "0 BTC";
   const priceMap: Record<string, number | null> = Object.fromEntries(
-    items.map((item) => [item.symbol, pickOnchainPrice(item.symbol, onchainData)]),
+    items.map((item) => [item.symbol, pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData)]),
   );
   priceMap.BTC ??= pickMarketPrice("BTC", marketData);
   const marketPriceMap: Record<string, number | null> = Object.fromEntries(
@@ -147,7 +153,7 @@ function syncBalancesToPrototype(
   marketCapMap.BTC ??= pickMarketCap("BTC", marketData);
   const totalUsd = assets.reduce((sum, item) => sum + (item.usdNum ?? 0), 0);
   const changeUsd = items.reduce((sum, item) => {
-    const priceUsd = pickOnchainPrice(item.symbol, onchainData);
+    const priceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
     if (priceUsd === null) return sum;
     const currentValue = (Number.parseFloat(item.formatted || "0") || 0) * priceUsd;
     const changePct = changeMap[item.symbol] ?? 0;
