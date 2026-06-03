@@ -88,7 +88,7 @@ async function candlesForContract(address: string, symbol: string, range: string
   });
   if (!market?.poolAddress) return [];
   const cfg = ohlcvConfig(range);
-  return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit).catch((error) => {
+  return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit, address).catch((error) => {
     console.error("Failed to fetch contract OHLCV", error);
     return [];
   });

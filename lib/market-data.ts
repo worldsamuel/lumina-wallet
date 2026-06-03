@@ -446,12 +446,19 @@ export async function getWorldChainMarkets(mode: WorldChainMarketMode = "gainers
     .slice(0, 10);
 }
 
-export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggregate = "1", limit = "60") {
+export async function getPoolOhlcv(
+  poolAddress: string,
+  timeframe = "day",
+  aggregate = "1",
+  limit = "60",
+  tokenAddress?: string | null,
+) {
   if (!/^0x[a-fA-F0-9]{40}$/.test(poolAddress)) return [];
   const safeTimeframe = ["minute", "hour", "day"].includes(timeframe) ? timeframe : "day";
   const safeAggregate = String(Math.max(1, Math.min(30, Number.parseInt(aggregate, 10) || 1)));
   const safeLimit = String(Math.max(10, Math.min(365, Number.parseInt(limit, 10) || 60)));
-  const cacheKey = `${poolAddress.toLowerCase()}:${safeTimeframe}:${safeAggregate}:${safeLimit}`;
+  const safeToken = tokenAddress && /^0x[a-fA-F0-9]{40}$/.test(tokenAddress) ? tokenAddress.toLowerCase() : "";
+  const cacheKey = `${poolAddress.toLowerCase()}:${safeTimeframe}:${safeAggregate}:${safeLimit}:${safeToken}`;
   const cachedOhlcv = ohlcvCache.get(cacheKey);
   if (cachedOhlcv && cachedOhlcv.expiresAt > Date.now()) return cachedOhlcv.data;
 
@@ -460,6 +467,7 @@ export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggre
     limit: safeLimit,
     currency: "usd",
   });
+  if (safeToken) params.set("token", safeToken);
   const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 180 },
