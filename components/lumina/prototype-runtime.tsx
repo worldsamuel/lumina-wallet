@@ -4272,6 +4272,10 @@ function enhancePrototypeDetail() {
               updateRangeChangeFromMarket(asset, range || "1D");
             });
         }
+        if (address) {
+          renderHistory(!market || !market.poolAddress ? detailCopy("noDexPool") : null);
+          return;
+        }
         if (!market || !market.poolAddress) {
           renderHistory(detailCopy("noDexPool"));
           return;
@@ -4463,7 +4467,8 @@ function enhancePrototypeDetail() {
           '<div class="pool-info-sheet"><button class="pool-close" onclick="document.getElementById(\\'poolInfoModal\\').classList.remove(\\'open\\')">×</button><strong>World Chain pool</strong>' +
           '<div class="market-stat-row"><span>' + detailCopy("volume24h") + '</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
           '<div class="market-stat-row"><span>' + detailCopy("liquidity") + '</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
-          '<div class="market-stat-row"><span>Pool</span><b>' + String(market.poolAddress || "").slice(0, 6) + "..." + String(market.poolAddress || "").slice(-4) + '</b></div>' +
+          '<div class="market-stat-row"><span>Token contract</span><b>' + String(market.address || "").slice(0, 6) + "..." + String(market.address || "").slice(-4) + '</b></div>' +
+          '<div class="market-stat-row"><span>Pool address</span><b>' + String(market.poolAddress || "").slice(0, 6) + "..." + String(market.poolAddress || "").slice(-4) + '</b></div>' +
           '</div>';
         modal.classList.add("open");
       }
