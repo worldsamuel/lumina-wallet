@@ -9,6 +9,7 @@ export const COINGECKO_IDS = {
   ORB: "orb",
   LIFE: "life",
   WGEM: "world-gem",
+  HUB: "human-unique-bridge",
 } as const;
 
 export type CoinGeckoSymbol = keyof typeof COINGECKO_IDS;

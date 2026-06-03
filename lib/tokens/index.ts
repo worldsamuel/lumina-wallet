@@ -108,6 +108,15 @@ export const TOKENS: readonly TokenConfig[] = [
     coingeckoId: COINGECKO_IDS.WGEM,
   },
   {
+    symbol: "HUB",
+    name: "Human Unique Bridge",
+    decimals: 18,
+    logo: "H",
+    className: "custom",
+    contractAddress: "0xd469fDA5d9522A093760902e9bE51e0c5D822D26" as Address,
+    coingeckoId: COINGECKO_IDS.HUB,
+  },
+  {
     symbol: "ETH",
     name: "Ether",
     decimals: 18,

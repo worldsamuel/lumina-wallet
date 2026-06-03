@@ -12,7 +12,8 @@ export type SwapTokenSymbol =
   | "ORO"
   | "ORB"
   | "LIFE"
-  | "WGEM";
+  | "WGEM"
+  | "HUB";
 export type SwapTokenTrust = "core" | "alias" | "audited" | "community";
 
 export type SwapToken = {
@@ -109,6 +110,13 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     priceSymbol: "USDC",
     name: "World GEM",
     address: "0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740",
+    decimals: 18,
+  },
+  HUB: {
+    symbol: "HUB",
+    priceSymbol: "USDC",
+    name: "Human Unique Bridge",
+    address: "0xd469fDA5d9522A093760902e9bE51e0c5D822D26",
     decimals: 18,
   },
 };
