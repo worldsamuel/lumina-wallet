@@ -50,14 +50,14 @@ export function EarnTransactionStatus({ userOpHash, onSuccess, onError, onTimeou
   if (!userOpHash) return null;
 
   const label = isSuccess
-    ? (labels?.success ?? "存款成功")
+    ? (labels?.success ?? "Transaction successful")
     : isError
-      ? `${labels?.errorPrefix ?? "失败"}: ${error?.message ?? "Transaction failed"}`
+      ? `${labels?.errorPrefix ?? "Failed"}: ${error?.message ?? "Transaction failed"}`
       : timedOut
-        ? (labels?.timeout ?? "交易仍在进行,请稍后到 Activity 查看")
+        ? (labels?.timeout ?? "Transaction is still pending. Check Activity later.")
       : isLoading
-        ? (labels?.loading ?? "等待区块链确认...")
-        : (labels?.submitted ?? "交易已提交");
+        ? (labels?.loading ?? "Waiting for on-chain confirmation...")
+        : (labels?.submitted ?? "Transaction submitted");
 
   return (
     <div

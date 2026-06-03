@@ -278,13 +278,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
           onTimeout={() => {
             window.__luminaRefreshActivity?.();
           }}
-          labels={{
-            success: "兑换成功",
-            errorPrefix: "兑换失败",
-            loading: "等待区块链确认...",
-            submitted: "兑换交易已提交",
-            timeout: "交易仍在进行,请稍后到 Activity 查看",
-          }}
+          labels={transactionStatusLabels("swap", "en")}
         />
       ) : null}
     </>
@@ -333,6 +327,51 @@ function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFaile
     transactionCancelled: { en: "Transaction cancelled", "zh-CN": "交易已取消", "zh-TW": "交易已取消" },
   } as const;
   return (copy[key] as Record<string, string>)[lang] ?? copy[key].en;
+}
+
+function transactionStatusLabels(kind: "earn" | "swap", forcedLang?: string) {
+  const lang = forcedLang || (window as unknown as { currentLang?: string }).currentLang || "en";
+  const copy = {
+    swap: {
+      success: { en: "Swap successful", "zh-CN": "兑换成功", "zh-TW": "兌換成功" },
+      errorPrefix: { en: "Swap failed", "zh-CN": "兑换失败", "zh-TW": "兌換失敗" },
+      loading: {
+        en: "Waiting for on-chain confirmation...",
+        "zh-CN": "等待区块链确认...",
+        "zh-TW": "等待區塊鏈確認...",
+      },
+      submitted: { en: "Swap transaction submitted", "zh-CN": "兑换交易已提交", "zh-TW": "兌換交易已提交" },
+      timeout: {
+        en: "Transaction is still pending. Check Activity later.",
+        "zh-CN": "交易仍在进行,请稍后到活动页查看",
+        "zh-TW": "交易仍在進行,請稍後到活動頁查看",
+      },
+    },
+    earn: {
+      success: { en: "Transaction successful", "zh-CN": "交易成功", "zh-TW": "交易成功" },
+      errorPrefix: { en: "Transaction failed", "zh-CN": "交易失败", "zh-TW": "交易失敗" },
+      loading: {
+        en: "Waiting for on-chain confirmation...",
+        "zh-CN": "等待区块链确认...",
+        "zh-TW": "等待區塊鏈確認...",
+      },
+      submitted: { en: "Transaction submitted", "zh-CN": "交易已提交", "zh-TW": "交易已提交" },
+      timeout: {
+        en: "Transaction is still pending. Check Activity later.",
+        "zh-CN": "交易仍在进行,请稍后到活动页查看",
+        "zh-TW": "交易仍在進行,請稍後到活動頁查看",
+      },
+    },
+  }[kind];
+
+  const pick = (key: keyof typeof copy) => copy[key][lang as keyof (typeof copy)[typeof key]] ?? copy[key].en;
+  return {
+    success: pick("success"),
+    errorPrefix: pick("errorPrefix"),
+    loading: pick("loading"),
+    submitted: pick("submitted"),
+    timeout: pick("timeout"),
+  };
 }
 
 function isCancellationMessage(message: string) {
@@ -3953,7 +3992,7 @@ function enhancePrototypeDetail() {
         var map = window.__luminaMarketBySymbol || {};
         var sym = String(asset && asset.sym || "").toUpperCase();
         if (map[sym]) return map[sym];
-        var address = String(asset && (asset.contractAddress || asset.marketAddress) || "").toLowerCase();
+        var address = assetMarketAddress(asset);
         if (address) {
           var values = Object.keys(map).map(function(key){ return map[key]; });
           for (var i = 0; i < values.length; i++) {
@@ -3961,6 +4000,10 @@ function enhancePrototypeDetail() {
           }
         }
         return null;
+      }
+      function assetMarketAddress(asset) {
+        var address = String(asset && (asset.contractAddress || asset.marketAddress || asset.address || asset.contractAddr) || "").toLowerCase();
+        return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
       }
       function realChartUnavailable(asset, range, reason) {
         var sym = asset && asset.sym ? asset.sym : "token";
@@ -3989,7 +4032,7 @@ function enhancePrototypeDetail() {
           if (asset && !asset.__marketLookupStarted) {
             asset.__marketLookupStarted = true;
             chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingMarket") + '</div>';
-            var address = String(asset.contractAddress || asset.marketAddress || "");
+            var address = assetMarketAddress(asset);
             var lookupUrl = /^0x[a-fA-F0-9]{40}$/.test(address)
               ? "/api/market/token?address=" + encodeURIComponent(address) + "&symbol=" + encodeURIComponent(asset.sym || "")
               : "/api/tokens/top?mode=all";
@@ -4020,6 +4063,15 @@ function enhancePrototypeDetail() {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
         if (!chart) return;
+        var address = assetMarketAddress(asset);
+        if ((!market || !market.poolAddress) && address) {
+          if (!asset.__marketLookupStarted) {
+            renderMarketCard(asset);
+          }
+          chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingMarket") + '</div>';
+          updateRangeChange(null, range || "1D", asset);
+          return;
+        }
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
@@ -4052,11 +4104,21 @@ function enhancePrototypeDetail() {
               chart.innerHTML = trendSvg(candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              renderHistory(detailCopy("emptyOhlcv"));
+              if (address) {
+                chart.innerHTML = liveMarketSummary(asset, range || "1D", detailCopy("emptyOhlcv"));
+                updateRangeChangeFromMarket(asset, range || "1D");
+              } else {
+                renderHistory(detailCopy("emptyOhlcv"));
+              }
             }
           })
           .catch(function(){
-            renderHistory(detailCopy("ohlcvFailed"));
+            if (address) {
+              chart.innerHTML = liveMarketSummary(asset, range || "1D", detailCopy("ohlcvFailed"));
+              updateRangeChangeFromMarket(asset, range || "1D");
+            } else {
+              renderHistory(detailCopy("ohlcvFailed"));
+            }
           });
       }
       function updateRangeChange(candles, range, asset){

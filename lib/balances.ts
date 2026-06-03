@@ -222,20 +222,27 @@ async function fetchDiscoveredTokenBalances(userAddress: Address) {
       .map((token) => [String(token.address).toLowerCase(), token]),
   );
 
-  const discovered = await Promise.all(
-    balances.slice(0, 80).map(async (item) => {
+  const positiveBalances = balances
+    .map((item) => {
       if (!item.contractAddress || !item.tokenBalance || item.error) return null;
       const balance = parseAlchemyBalance(item.tokenBalance);
       if (balance <= 0n) return null;
+      return { contractAddress: item.contractAddress, balance };
+    })
+    .filter((item): item is { contractAddress: string; balance: bigint } => Boolean(item))
+    .slice(0, 120);
+
+  const discovered = await Promise.all(
+    positiveBalances.map(async (item) => {
       const token =
         catalogByAddress.get(item.contractAddress.toLowerCase()) ??
         (await fetchAlchemyTokenMetadata(item.contractAddress));
       if (!token) return null;
-      return toDiscoveredBalance(token, balance);
+      return toDiscoveredBalance(token, item.balance);
     }),
   );
 
-  return discovered.filter((item): item is ChainBalance => Boolean(item)).slice(0, 40);
+  return discovered.filter((item): item is ChainBalance => Boolean(item)).slice(0, 100);
 }
 
 function parseAlchemyBalance(value: string) {
