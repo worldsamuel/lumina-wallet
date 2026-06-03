@@ -5,8 +5,6 @@ const GECKO_NETWORK = "world-chain";
 const GECKO_POOLS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
 const GECKO_OHLCV_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
 const GECKO_TOKENS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/tokens`;
-const DEXSCREENER_API_URL = "https://api.dexscreener.com";
-const DEXSCREENER_CHAIN_IDS = ["worldchain", "world-chain"] as const;
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
 const CACHE_TTL_MS = 30_000;
 const MIN_LIQUIDITY_USD = 10;
@@ -77,20 +75,6 @@ type WorldscanHoldersResponse = {
       is_contract?: boolean;
     };
   }>;
-};
-
-type DexScreenerPair = {
-  chainId?: string;
-  dexId?: string;
-  url?: string;
-  pairAddress?: string;
-  baseToken?: { address?: string; name?: string; symbol?: string };
-  quoteToken?: { address?: string; name?: string; symbol?: string };
-  priceUsd?: string | null;
-  priceChange?: { h24?: number | string | null };
-  volume?: { h24?: number | string | null };
-  liquidity?: { usd?: number | string | null };
-  info?: { imageUrl?: string | null };
 };
 
 export type MarketToken = {
@@ -168,9 +152,10 @@ async function fetchGeckoPage(page: number) {
     page: String(page),
     sort: "h24_volume_usd_desc",
   });
-  const response = await fetch(`${GECKO_POOLS_URL}?${params}`, {
+  const response = await geckoFetch(`${GECKO_POOLS_URL}?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 30 },
+    signal: AbortSignal.timeout(7000),
   });
   if (!response.ok) throw new Error(`GeckoTerminal responded ${response.status}`);
   return (await response.json()) as GeckoResponse;
@@ -182,7 +167,7 @@ async function fetchTokenPools(tokenAddress: string) {
     page: "1",
     sort: "h24_volume_usd_desc",
   });
-  const response = await fetch(`${GECKO_TOKENS_URL}/${tokenAddress}/pools?${params}`, {
+  const response = await geckoFetch(`${GECKO_TOKENS_URL}/${tokenAddress}/pools?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 60 },
     signal: AbortSignal.timeout(7000),
@@ -191,19 +176,21 @@ async function fetchTokenPools(tokenAddress: string) {
   return (await response.json()) as GeckoResponse;
 }
 
-async function fetchDexScreenerTokenPairs(tokenAddress: string) {
-  for (const chainId of DEXSCREENER_CHAIN_IDS) {
-    const response = await fetch(`${DEXSCREENER_API_URL}/token-pairs/v1/${chainId}/${tokenAddress}`, {
-      headers: { accept: "application/json" },
-      next: { revalidate: 30 },
-      signal: AbortSignal.timeout(7000),
-    }).catch(() => null);
-    if (!response || !response.ok) continue;
-    const body = (await response.json()) as DexScreenerPair[] | { pairs?: DexScreenerPair[] | null };
-    const pairs = Array.isArray(body) ? body : (body.pairs ?? []);
-    if (pairs.length) return pairs;
+async function geckoFetch(url: string, init: RequestInit, attempts = 2) {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fetch(url, init);
+    } catch (error) {
+      lastError = error;
+      if (attempt + 1 < attempts) await sleep(350);
+    }
   }
-  return [];
+  throw lastError;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 type PoolSide = {
@@ -265,39 +252,6 @@ function marketFromPoolSide(pool: GeckoPool, marketSide: PoolSide): MarketToken 
   };
 }
 
-function marketFromDexPair(pair: DexScreenerPair, tokenAddress: string, symbolHint?: string | null): MarketToken | null {
-  const pairAddress = String(pair.pairAddress || "");
-  if (!/^0x[a-fA-F0-9]{40}$/.test(pairAddress)) return null;
-  const liquidityUsd = num(pair.liquidity?.usd);
-  if (liquidityUsd < MIN_LIQUIDITY_USD) return null;
-
-  const target = tokenAddress.toLowerCase();
-  const base = pair.baseToken;
-  const quote = pair.quoteToken;
-  const targetToken =
-    String(base?.address || "").toLowerCase() === target
-      ? base
-      : String(quote?.address || "").toLowerCase() === target
-        ? quote
-        : base;
-  const symbol = (symbolHint?.trim() || targetToken?.symbol || "").toUpperCase();
-  if (!symbol) return null;
-
-  return {
-    symbol,
-    name: targetToken?.name ?? TOKENS.find((token) => token.symbol === symbol)?.name ?? symbol,
-    address: formatAddress(tokenAddress),
-    priceUsd: numberOrNull(pair.priceUsd),
-    change24h: numberOrNull(pair.priceChange?.h24),
-    volume24hUsd: num(pair.volume?.h24),
-    liquidityUsd,
-    logoUrl: pair.info?.imageUrl ?? null,
-    poolAddress: pairAddress,
-    verified: verifiedBySymbol(symbol),
-    decimals: TOKENS.find((token) => token.symbol.toUpperCase() === symbol.toUpperCase())?.decimals ?? null,
-  };
-}
-
 /**
  * Reads GeckoTerminal World Chain pool data and derives token-level market data.
  */
@@ -305,14 +259,16 @@ export async function getWorldChainMarketCatalog() {
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
   try {
-    const settledPages = await Promise.allSettled([1, 2, 3, 4, 5, 6, 7, 8].map(fetchGeckoPage));
-    const pages = settledPages
-      .filter((result): result is PromiseFulfilledResult<GeckoResponse> => result.status === "fulfilled")
-      .map((result) => result.value);
+    const pages: GeckoResponse[] = [];
+    for (const page of [1, 2, 3]) {
+      try {
+        pages.push(await fetchGeckoPage(page));
+        if (page < 3) await sleep(250);
+      } catch (error) {
+        console.error(error);
+      }
+    }
     if (!pages.length) {
-      settledPages.forEach((result) => {
-        if (result.status === "rejected") console.error(result.reason);
-      });
       throw new Error("No GeckoTerminal World Chain pages returned");
     }
     const byAddress = new Map<string, GeckoToken>();
@@ -359,16 +315,6 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
   if (cachedTokenMarket && cachedTokenMarket.expiresAt > Date.now()) return cachedTokenMarket.data;
 
   try {
-    const dexPairs = await fetchDexScreenerTokenPairs(tokenAddress);
-    const dexMarket = dexPairs
-      .map((pair) => marketFromDexPair(pair, tokenAddress, symbolHint))
-      .filter((market): market is MarketToken => Boolean(market))
-      .sort((a, b) => (b.liquidityUsd || b.volume24hUsd || 0) - (a.liquidityUsd || a.volume24hUsd || 0))[0];
-    if (dexMarket) {
-      tokenMarketCache.set(cacheKey, { data: dexMarket, expiresAt: Date.now() + 60_000 });
-      return dexMarket;
-    }
-
     const body = await fetchTokenPools(tokenAddress);
     const byAddress = new Map<string, GeckoToken>();
     for (const token of body.included ?? []) {
@@ -389,13 +335,26 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
         if (!best || normalized.liquidityUsd > best.liquidityUsd) best = normalized;
       }
     }
-    tokenMarketCache.set(cacheKey, { data: best, expiresAt: Date.now() + 60_000 });
-    return best;
+    const resolved = best ?? (await findMarketInCatalog(tokenAddress, symbolHint));
+    tokenMarketCache.set(cacheKey, { data: resolved, expiresAt: Date.now() + 60_000 });
+    return resolved;
   } catch (error) {
     console.error("Failed to fetch GeckoTerminal token pools", error);
-    tokenMarketCache.set(cacheKey, { data: null, expiresAt: Date.now() + 20_000 });
-    return null;
+    const resolved = await findMarketInCatalog(tokenAddress, symbolHint);
+    tokenMarketCache.set(cacheKey, { data: resolved, expiresAt: Date.now() + 20_000 });
+    return resolved;
   }
+}
+
+async function findMarketInCatalog(tokenAddress: string, symbolHint?: string | null) {
+  const symbol = symbolHint?.trim().toUpperCase();
+  const address = tokenAddress.toLowerCase();
+  const catalog = await getWorldChainMarketCatalog();
+  return (
+    catalog.find((market) => market.address?.toLowerCase() === address) ??
+    (symbol ? catalog.find((market) => market.symbol.toUpperCase() === symbol) : null) ??
+    null
+  );
 }
 
 export type WorldChainMarketMode = "gainers" | "losers" | "new" | "all";
@@ -450,7 +409,7 @@ export async function getPoolOhlcv(poolAddress: string, timeframe = "day", aggre
     limit: safeLimit,
     currency: "usd",
   });
-  const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
+  const response = await geckoFetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
     headers: { accept: "application/json" },
     next: { revalidate: 180 },
     signal: AbortSignal.timeout(7000),
@@ -478,7 +437,7 @@ export async function getPoolTrades(poolAddress: string, tokenAddress?: string |
     params.set("token", tokenAddress);
   }
 
-  const response = await fetch(`${GECKO_POOLS_URL}/${poolAddress}/trades?${params}`, {
+  const response = await geckoFetch(`${GECKO_POOLS_URL}/${poolAddress}/trades?${params}`, {
     headers: { accept: "application/json;version=20230203" },
     next: { revalidate: 60 },
     signal: AbortSignal.timeout(7000),

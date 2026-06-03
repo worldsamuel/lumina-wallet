@@ -54,7 +54,6 @@ declare global {
     __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
-    eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
 }
@@ -292,27 +291,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 }
 
 function installMobileConsole() {
-  if (typeof window === "undefined" || window.__luminaErudaInstalled) return;
-  const debugAllowed = process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true";
-  if (!debugAllowed) return;
-  window.__luminaErudaInstalled = true;
-
-  const existing = document.getElementById("lumina-eruda-script") as HTMLScriptElement | null;
-  if (existing) return;
-
-  const script = document.createElement("script");
-  script.id = "lumina-eruda-script";
-  script.src = "https://cdn.jsdelivr.net/npm/eruda@3/eruda.min.js";
-  script.async = true;
-  script.onload = () => {
-    try {
-      window.eruda?.init();
-      console.log("=== ERUDA READY ===");
-    } catch (error) {
-      console.log("Failed to initialize Eruda", error);
-    }
-  };
-  document.head.appendChild(script);
+  return;
 }
 
       function toastFromPrototype(message: string) {
@@ -917,7 +896,12 @@ function enhancePrototypeEarn() {
       }
       function vaultDesc(vault){
         var lang = window.currentLang || "en";
-        return (vault.description && (vault.description[lang] || vault.description.en)) || "";
+        var desc = (vault.description && (vault.description[lang] || vault.description.en)) || "";
+        if (lang !== "zh-CN" && lang !== "zh-TW" && /[\\u4e00-\\u9fff]/.test(desc)) {
+          var sym = vault && vault.asset ? vault.asset.symbol : "";
+          return sym ? sym + " lending vault curated by Re7 Labs on Morpho." : "Lending vault curated by Re7 Labs on Morpho.";
+        }
+        return desc;
       }
       function updateEarnHero(){
         var zh = (window.currentLang || "en") === "zh-CN";
@@ -951,7 +935,7 @@ function enhancePrototypeEarn() {
           var section = document.createElement("div");
           section.id = "homeEarningSection";
           section.innerHTML =
-            '<div class="section-head"><h2>Earning</h2><span class="link" onclick="go(\\'earn\\'); setTabByName(\\'Earn\\')">View</span></div>' +
+            '<div class="section-head"><h2>' + morphoCopy("earning") + '</h2><span class="link" onclick="go(\\'earn\\'); setTabByName(\\'Earn\\')">' + morphoCopy("view") + '</span></div>' +
             '<div class="assets" id="homeEarningList"></div>';
           assetList.insertAdjacentElement("afterend", section);
           existing = section;
@@ -1005,7 +989,7 @@ function enhancePrototypeEarn() {
             '</div>' +
             '<div class="meta">' +
               '<div class="m"><div class="k">' + t("risk") + '</div><div class="val"><span class="risk ' + riskClass(vault.riskLevel) + '">' + riskText(vault.riskLevel) + '</span></div></div>' +
-              '<div class="m"><div class="k">My deposit</div><div class="val">' + deposited + '</div></div>' +
+              '<div class="m"><div class="k">' + morphoCopy("myDeposit") + '</div><div class="val">' + deposited + '</div></div>' +
               '<div class="m"><div class="k">TVL</div><div class="val">' + (vault.liveData ? fmtCompactUsd(vault.liveData.totalAssetsUsd) : "—") + '</div></div>' +
             '</div></div>';
         }).join('');
@@ -1020,10 +1004,43 @@ function enhancePrototypeEarn() {
       function morphoCopy(key){
         var lang = window.currentLang || "en";
         var copy = {
+          earning: { en:"Earning", "zh-CN":"理财中", "zh-TW":"理財中", fr:"Rendement", de:"Verdienen", es:"Ganando", ja:"運用中" },
+          view: { en:"View", "zh-CN":"查看", "zh-TW":"查看", fr:"Voir", de:"Anzeigen", es:"Ver", ja:"表示" },
+          myDeposit: { en:"My deposit", "zh-CN":"我的存入", "zh-TW":"我的存入", fr:"Mon dépôt", de:"Meine Einzahlung", es:"Mi depósito", ja:"預入額" },
+          deposited: { en:"Deposited ", "zh-CN":"已存入 ", "zh-TW":"已存入 ", fr:"Déposé ", de:"Eingezahlt ", es:"Depositado ", ja:"預入済み " },
+          amount: { en:"Amount", "zh-CN":"金额", "zh-TW":"金額", fr:"Montant", de:"Betrag", es:"Importe", ja:"金額" },
+          wallet: { en:"Wallet balance", "zh-CN":"钱包余额", "zh-TW":"錢包餘額", fr:"Solde du wallet", de:"Wallet-Guthaben", es:"Saldo de wallet", ja:"ウォレット残高" },
+          yearly: { en:"Estimated yearly yield", "zh-CN":"预计年收益", "zh-TW":"預計年收益", fr:"Rendement annuel estimé", de:"Geschätzter Jahresertrag", es:"Rendimiento anual estimado", ja:"推定年間利回り" },
+          daily: { en:"Estimated daily yield", "zh-CN":"预计日收益", "zh-TW":"預計日收益", fr:"Rendement journalier estimé", de:"Geschätzter Tagesertrag", es:"Rendimiento diario estimado", ja:"推定日次利回り" },
+          fee: { en:"Fee", "zh-CN":"手续费", "zh-TW":"手續費", fr:"Frais", de:"Gebühr", es:"Comisión", ja:"手数料" },
+          provider: { en:"Provider", "zh-CN":"提供方", "zh-TW":"提供方", fr:"Fournisseur", de:"Anbieter", es:"Proveedor", ja:"提供元" },
+          curator: { en:"Re7 Labs (Vault curator)", "zh-CN":"Re7 Labs (金库策展方)", "zh-TW":"Re7 Labs (金庫策展方)", fr:"Re7 Labs (curateur du vault)", de:"Re7 Labs (Vault-Kurator)", es:"Re7 Labs (curador del vault)", ja:"Re7 Labs (Vault キュレーター)" },
+          deposit: { en:"Deposit", "zh-CN":"存入", "zh-TW":"存入", fr:"Déposer", de:"Einzahlen", es:"Depositar", ja:"預入" },
+          withdraw: { en:"Withdraw", "zh-CN":"提现", "zh-TW":"提領", fr:"Retirer", de:"Auszahlen", es:"Retirar", ja:"引出" },
+          cancel: { en:"Cancel", "zh-CN":"取消", "zh-TW":"取消", fr:"Annuler", de:"Abbrechen", es:"Cancelar", ja:"キャンセル" },
+          anytime: { en:"Anytime, subject to vault liquidity", "zh-CN":"可随时操作,取决于金库流动性", "zh-TW":"可隨時操作,取決於金庫流動性", fr:"À tout moment, selon la liquidité du vault", de:"Jederzeit, abhängig von der Vault-Liquidität", es:"En cualquier momento, sujeto a liquidez", ja:"Vault の流動性に応じていつでも可能" },
+          pausedTitle: { en:"Deposits paused", "zh-CN":"存入已暂停", "zh-TW":"存入已暫停", fr:"Dépôts suspendus", de:"Einzahlungen pausiert", es:"Depósitos pausados", ja:"預入停止中" },
+          pausedBody: { en:"Emergency pause is active. Existing positions can still withdraw.", "zh-CN":"紧急暂停已开启,已有仓位仍可提现。", "zh-TW":"緊急暫停已開啟,已有倉位仍可提領。", fr:"Pause d'urgence active. Les positions existantes peuvent être retirées.", de:"Notfallpause aktiv. Bestehende Positionen können weiter ausgezahlt werden.", es:"Pausa de emergencia activa. Las posiciones existentes pueden retirarse.", ja:"緊急停止中です。既存ポジションは引き出せます。" },
+          pausedByOps: { en:"Deposits are temporarily paused by Lumina operations.", "zh-CN":"Lumina 运营已临时暂停存入。", "zh-TW":"Lumina 營運已臨時暫停存入。", fr:"Les dépôts sont temporairement suspendus par Lumina.", de:"Einzahlungen wurden von Lumina vorübergehend pausiert.", es:"Lumina pausó temporalmente los depósitos.", ja:"Lumina 運営により一時的に預入停止中です。" },
+          lowLiquidity: { en:"Vault liquidity is low. Try a smaller amount later.", "zh-CN":"金库流动性较低,请稍后尝试更小金额。", "zh-TW":"金庫流動性較低,請稍後嘗試更小金額。", fr:"La liquidité du vault est faible. Essayez un montant plus petit.", de:"Vault-Liquidität ist niedrig. Versuchen Sie später einen kleineren Betrag.", es:"La liquidez del vault es baja. Prueba un importe menor.", ja:"Vault の流動性が低いです。少額で再試行してください。" },
+          aboutTitle: { en:"About this product", "zh-CN":"关于该产品", "zh-TW":"關於該產品", fr:"À propos de ce produit", de:"Über dieses Produkt", es:"Acerca de este producto", ja:"この商品について" },
+          aboutBody: { en:"Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Funds are deposited into a Morpho Vault smart contract. APY varies in real time and is not guaranteed.", "zh-CN":"由 Morpho Protocol (morpho.org) 提供底层协议,Re7 Labs 策展。Lumina 是第三方钱包界面,不托管资产。资金会进入 Morpho Vault 智能合约,APY 实时变化且不保证收益。", "zh-TW":"由 Morpho Protocol (morpho.org) 提供底層協議,Re7 Labs 策展。Lumina 是第三方錢包介面,不託管資產。資金會進入 Morpho Vault 智能合約,APY 即時變化且不保證收益。", fr:"Propulsé par Morpho Protocol, curé par Re7 Labs. Lumina est une interface tierce et ne conserve pas vos actifs. L'APY varie en temps réel.", de:"Bereitgestellt durch Morpho Protocol, kuratiert von Re7 Labs. Lumina verwahrt keine Assets. APY variiert in Echtzeit.", es:"Impulsado por Morpho Protocol y curado por Re7 Labs. Lumina no custodia tus activos. El APY varía en tiempo real.", ja:"Morpho Protocol 提供、Re7 Labs キュレーション。Lumina は資産を保管しない第三者ウォレットUIです。APY はリアルタイムで変動します。" },
+          confirmDeposit: { en:"Confirm deposit", "zh-CN":"确认存入", "zh-TW":"確認存入", fr:"Confirmer le dépôt", de:"Einzahlung bestätigen", es:"Confirmar depósito", ja:"預入を確認" },
+          enterAmount: { en:"Enter an amount", "zh-CN":"请输入金额", "zh-TW":"請輸入金額", fr:"Saisissez un montant", de:"Betrag eingeben", es:"Ingresa un importe", ja:"金額を入力" },
+          insufficient: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" },
+          depositMessage: { en:"You are depositing", "zh-CN":"你正在存入", "zh-TW":"你正在存入", fr:"Vous déposez", de:"Sie zahlen ein", es:"Estás depositando", ja:"預入します" },
+          into: { en:"into", "zh-CN":"到", "zh-TW":"到", fr:"dans", de:"in", es:"en", ja:"に" },
+          currentApy: { en:"Current APY", "zh-CN":"当前 APY", "zh-TW":"當前 APY", fr:"APY actuel", de:"Aktueller APY", es:"APY actual", ja:"現在の APY" },
+          available: { en:"Available", "zh-CN":"可提现", "zh-TW":"可提領", fr:"Disponible", de:"Verfügbar", es:"Disponible", ja:"利用可能" },
+          fundsReturn: { en:"Funds return to your World Chain wallet after confirmation.", "zh-CN":"确认后资金会回到你的 World Chain 钱包。", "zh-TW":"確認後資金會回到你的 World Chain 錢包。", fr:"Les fonds reviennent dans votre wallet World Chain après confirmation.", de:"Nach Bestätigung kehren die Mittel in Ihr World Chain Wallet zurück.", es:"Los fondos vuelven a tu wallet World Chain tras confirmar.", ja:"確認後、資金は World Chain ウォレットに戻ります。" },
+          withdrawAmount: { en:"Withdraw amount", "zh-CN":"提现金额", "zh-TW":"提領金額", fr:"Retirer le montant", de:"Betrag auszahlen", es:"Retirar importe", ja:"金額を引き出す" },
+          withdrawAll: { en:"Withdraw all", "zh-CN":"全部提现", "zh-TW":"全部提領", fr:"Tout retirer", de:"Alles auszahlen", es:"Retirar todo", ja:"すべて引き出す" },
+          submitFailed: { en:"Unable to build transaction", "zh-CN":"无法构建交易", "zh-TW":"無法構建交易", fr:"Impossible de créer la transaction", de:"Transaktion konnte nicht erstellt werden", es:"No se pudo crear la transacción", ja:"取引を作成できません" },
           waitingConfirm: { en:"Waiting for on-chain confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation on-chain...", de:"Warten auf On-chain-Bestätigung...", es:"Esperando confirmación on-chain...", ja:"オンチェーン確認待ち..." },
           depositFailed: { en:"Deposit failed", "zh-CN":"存入失败", "zh-TW":"存入失敗", fr:"Échec du dépôt", de:"Einzahlung fehlgeschlagen", es:"Depósito fallido", ja:"預入に失敗しました" },
           withdrawFailed: { en:"Withdrawal failed", "zh-CN":"提现失败", "zh-TW":"提領失敗", fr:"Échec du retrait", de:"Auszahlung fehlgeschlagen", es:"Retiro fallido", ja:"引出に失敗しました" },
-          cancelled: { en:"Cancelled in World App", "zh-CN":"已在 World App 取消", "zh-TW":"已在 World App 取消", fr:"Annulé dans World App", de:"In World App abgebrochen", es:"Cancelado en World App", ja:"World App でキャンセル済み" }
+          cancelled: { en:"Cancelled in World App", "zh-CN":"已在 World App 取消", "zh-TW":"已在 World App 取消", fr:"Annulé dans World App", de:"In World App abgebrochen", es:"Cancelado en World App", ja:"World App でキャンセル済み" },
+          submitting: { en:"Submitting...", "zh-CN":"提交中...", "zh-TW":"提交中...", fr:"Envoi...", de:"Wird gesendet...", es:"Enviando...", ja:"送信中..." }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
       }
@@ -1033,7 +1050,7 @@ function enhancePrototypeEarn() {
           var btn = document.getElementById(id);
           if (!btn) return;
           btn.disabled = !!isBusy;
-          btn.textContent = isBusy ? "Submitting..." : "Deposit";
+          btn.textContent = isBusy ? morphoCopy("submitting") : morphoCopy("deposit");
         });
       }
       window.__luminaSetMorphoBusy = setMorphoBusy;
@@ -1046,9 +1063,9 @@ function enhancePrototypeEarn() {
           mask.className = "modal-mask open morpho-confirm-modal";
           mask.id = "morphoConfirmMask";
           mask.innerHTML =
-            '<div class="modal"><div class="modal-grip"></div><h3>Confirm deposit</h3>' +
+            '<div class="modal"><div class="modal-grip"></div><h3>' + morphoCopy("confirmDeposit") + '</h3>' +
             '<p class="morpho-confirm-body">' + message + '</p>' +
-            '<div class="earn-action-row"><button class="btn-ghost" id="morphoConfirmCancel">Cancel</button><button class="btn-primary" id="morphoConfirmOk">Confirm deposit</button></div></div>';
+            '<div class="earn-action-row"><button class="btn-ghost" id="morphoConfirmCancel">' + morphoCopy("cancel") + '</button><button class="btn-primary" id="morphoConfirmOk">' + morphoCopy("confirmDeposit") + '</button></div></div>';
           document.body.appendChild(mask);
           function done(value){
             mask.remove();
@@ -1064,23 +1081,7 @@ function enhancePrototypeEarn() {
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
         var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + token : "—";
-        var copy = {
-          deposited: "Deposited ",
-          amount: "Amount",
-          wallet: "Wallet balance",
-          yearly: "Estimated yearly yield",
-          daily: "Estimated daily yield",
-          fee: "Fee",
-          provider: "Provider",
-          curator: "Re7 Labs (Vault curator)",
-          deposit: "Deposit",
-          withdraw: "Withdraw",
-          pausedTitle: "Deposits paused",
-          pausedBody: "Emergency pause is active. Existing positions can still withdraw.",
-          aboutTitle: "ⓘ About this product",
-          aboutBody: "Powered by Morpho Protocol (morpho.org), curated by Re7 Labs. Lumina is a third-party wallet interface and does not custody your assets. Your funds are deposited into a Morpho Vault smart contract earning yield from lending markets. Smart contracts have been audited by Spearbit and OpenZeppelin, but all DeFi protocols carry technical risk (smart contract bugs, oracle failures, etc). APY varies in real-time and is not guaranteed. You can withdraw anytime, subject to vault liquidity."
-        };
-        document.getElementById("edMine").textContent = copy.deposited + deposited;
+        document.getElementById("edMine").textContent = morphoCopy("deposited") + deposited;
         var card = document.getElementById("earnActionCard");
         if (!card) {
           card = document.createElement("div");
@@ -1101,24 +1102,24 @@ function enhancePrototypeEarn() {
         var daily = "—";
         var amount = "";
         card.innerHTML =
-          '<label>' + copy.amount + '</label>' +
+          '<label>' + morphoCopy("amount") + '</label>' +
           '<div class="earn-amount-row"><input id="earnAmountInput" inputmode="decimal" placeholder="0.00" /><span>' + token + '</span></div>' +
           '<div class="morpho-estimates">' +
-            '<div><span>' + copy.wallet + '</span><strong>' + wallet + '</strong></div>' +
-            '<div><span>' + copy.yearly + '</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
-            '<div><span>' + copy.daily + '</span><strong id="morphoDaily">' + daily + '</strong></div>' +
-            '<div><span>' + copy.fee + '</span><strong>0</strong></div>' +
-            '<div><span>' + copy.provider + '</span><strong>Morpho</strong></div>' +
+            '<div><span>' + morphoCopy("wallet") + '</span><strong>' + wallet + '</strong></div>' +
+            '<div><span>' + morphoCopy("yearly") + '</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
+            '<div><span>' + morphoCopy("daily") + '</span><strong id="morphoDaily">' + daily + '</strong></div>' +
+            '<div><span>' + morphoCopy("fee") + '</span><strong>0</strong></div>' +
+            '<div><span>' + morphoCopy("provider") + '</span><strong>Morpho</strong></div>' +
           '</div>' +
-          '<div class="morpho-provider-note">' + copy.curator + '</div>' +
+          '<div class="morpho-provider-note">' + morphoCopy("curator") + '</div>' +
           '<div class="earn-action-row">' +
-            '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + copy.deposit + '</button>' +
-            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
+            '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + morphoCopy("deposit") + '</button>' +
+            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + morphoCopy("withdraw") + '</button>' +
           '</div>' +
-          (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + (cfg.morphoDepositEnabled === false ? "Deposits are temporarily paused by Lumina operations." : copy.pausedBody) + '</span></div>' : "") +
+          (paused ? '<div class="earn-dev-note"><strong>' + morphoCopy("pausedTitle") + '</strong><span>' + (cfg.morphoDepositEnabled === false ? morphoCopy("pausedByOps") : morphoCopy("pausedBody")) + '</span></div>' : "") +
           '<div class="morpho-compliance">' +
-            '<strong>' + copy.aboutTitle + '</strong>' +
-            '<p>' + copy.aboutBody + '</p>' +
+            '<strong>ⓘ ' + morphoCopy("aboutTitle") + '</strong>' +
+            '<p>' + morphoCopy("aboutBody") + '</p>' +
           '</div>';
         var bottomBtn = document.querySelector("#view-earn-detail > .send-submit");
         if (bottomBtn) {
@@ -1165,7 +1166,7 @@ function enhancePrototypeEarn() {
         ic.className = "ed-ic morpho-vault-ic";
         document.getElementById("edApy").textContent = p.liveData ? fmtPct(p.liveData.netApy) : "—";
         document.getElementById("edRisk").innerHTML = '<span class="risk ' + riskClass(p.riskLevel) + '">' + riskText(p.riskLevel) + '</span>';
-        document.getElementById("edLock").textContent = "Anytime, subject to vault liquidity";
+        document.getElementById("edLock").textContent = morphoCopy("anytime");
         document.getElementById("edTvl").textContent = p.liveData ? fmtCompactUsd(p.liveData.totalAssetsUsd) : "—";
         document.getElementById("edMin").textContent = "0.000001 " + p.asset.symbol;
         document.getElementById("edDesc").textContent = vaultDesc(p);
@@ -1179,11 +1180,11 @@ function enhancePrototypeEarn() {
         var amount = input ? String(input.value || "").trim() : "";
         var n = Number(amount.replace(/,/g, ""));
         var pos = vault ? positionFor(vault) : null;
-        if (!vault || !Number.isFinite(n) || n <= 0) return toast("Enter an amount");
-        if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
-        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("Insufficient " + vault.asset.symbol + " balance");
+        if (!vault || !Number.isFinite(n) || n <= 0) return toast(morphoCopy("enterAmount"));
+        if (vault.depositsPaused) return toast(morphoCopy("pausedBody"));
+        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast(morphoCopy("insufficient") + " " + vault.asset.symbol);
         var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
-        var confirmed = await confirmMorphoDeposit("You are depositing " + amount + " " + vault.asset.symbol + " into " + vault.displayName + " Vault. Current APY " + apy + ".");
+        var confirmed = await confirmMorphoDeposit(morphoCopy("depositMessage") + " " + amount + " " + vault.asset.symbol + " " + morphoCopy("into") + " " + vault.displayName + " Vault. " + morphoCopy("currentApy") + " " + apy + ".");
         if (!confirmed) return;
         var awaitingReceipt = false;
         try {
@@ -1199,7 +1200,7 @@ function enhancePrototypeEarn() {
             body: JSON.stringify({ type: "deposit", vaultAddress: vault.address, amount: amount, userAddress: window.__luminaUserAddress || "" })
           });
           var data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          if (!res.ok) throw new Error(data.error || morphoCopy("submitFailed"));
           console.log("[EARN] Amount wei:", data.debug && data.debug.amountWei);
           console.log("[EARN] built tx:", JSON.stringify(data));
           var result = await window.__luminaSendMorphoTransactions(data.transactions, data.permit2, "deposit");
@@ -1237,18 +1238,18 @@ function enhancePrototypeEarn() {
           '<div class="modal">' +
             '<div class="grab"></div>' +
             '<div class="withdraw-sheet-head">' +
-              '<div><p>Withdraw</p><h3>' + vault.displayName + '</h3></div>' +
+              '<div><p>' + morphoCopy("withdraw") + '</p><h3>' + vault.displayName + '</h3></div>' +
               '<button type="button" class="withdraw-close" onclick="closeMorphoWithdrawModal()">×</button>' +
             '</div>' +
             '<div class="withdraw-summary">' +
-              '<div><span>Deposited</span><strong>' + deposited + " " + vault.asset.symbol + '</strong></div>' +
-              '<div><span>Available</span><strong>' + available + " " + vault.asset.symbol + '</strong></div>' +
+              '<div><span>' + morphoCopy("deposited").trim() + '</span><strong>' + deposited + " " + vault.asset.symbol + '</strong></div>' +
+              '<div><span>' + morphoCopy("available") + '</span><strong>' + available + " " + vault.asset.symbol + '</strong></div>' +
             '</div>' +
-            '<label class="withdraw-label">Amount</label>' +
+            '<label class="withdraw-label">' + morphoCopy("amount") + '</label>' +
             '<div class="earn-amount-row withdraw-amount-row"><input id="morphoWithdrawAmount" inputmode="decimal" placeholder="0.00" /><span>' + vault.asset.symbol + '</span><button type="button" onclick="fillMorphoWithdrawMax()">MAX</button></div>' +
-            '<div class="withdraw-help">Funds return to your World Chain wallet after confirmation.</div>' +
-            '<div class="earn-action-row withdraw-action-row"><button class="btn-primary" onclick="submitMorphoWithdraw(false)">Withdraw amount</button><button class="btn-ghost" onclick="submitMorphoWithdraw(true)">Withdraw all</button></div>' +
-            '<button class="sheet-cancel withdraw-cancel" onclick="closeMorphoWithdrawModal()">Cancel</button>' +
+            '<div class="withdraw-help">' + morphoCopy("fundsReturn") + '</div>' +
+            '<div class="earn-action-row withdraw-action-row"><button class="btn-primary" onclick="submitMorphoWithdraw(false)">' + morphoCopy("withdrawAmount") + '</button><button class="btn-ghost" onclick="submitMorphoWithdraw(true)">' + morphoCopy("withdrawAll") + '</button></div>' +
+            '<button class="sheet-cancel withdraw-cancel" onclick="closeMorphoWithdrawModal()">' + morphoCopy("cancel") + '</button>' +
           '</div>';
         document.body.appendChild(mask);
       };
@@ -1276,8 +1277,8 @@ function enhancePrototypeEarn() {
         } else {
           var amount = input ? String(input.value || "").trim() : "";
           var n = Number(amount.replace(/,/g, ""));
-          if (!Number.isFinite(n) || n <= 0) return toast("Enter an amount");
-          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast("Vault liquidity is low. Try a smaller amount later.");
+          if (!Number.isFinite(n) || n <= 0) return toast(morphoCopy("enterAmount"));
+          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast(morphoCopy("lowLiquidity"));
           body.amount = amount;
         }
         try {
@@ -1287,7 +1288,7 @@ function enhancePrototypeEarn() {
             body: JSON.stringify(body)
           });
           var data = await res.json();
-          if (!res.ok) throw new Error(data.error || "Unable to build transaction");
+          if (!res.ok) throw new Error(data.error || morphoCopy("submitFailed"));
           var result = await window.__luminaSendMorphoTransactions(data.transactions, undefined, "withdraw");
           var payload = result && result.data;
           var hash = payload && payload.userOpHash;
@@ -1295,8 +1296,8 @@ function enhancePrototypeEarn() {
           closeMorphoWithdrawModal();
           toast(morphoCopy("waitingConfirm") + " " + String(hash).slice(0, 18));
         } catch(e) {
-          var msg = e && e.message ? e.message : "Withdraw failed";
-          if (/liquid|withdraw/i.test(msg)) msg = "Vault liquidity is low. Try a smaller amount later.";
+          var msg = e && e.message ? e.message : morphoCopy("withdrawFailed");
+          if (/liquid|withdraw/i.test(msg)) msg = morphoCopy("lowLiquidity");
           toast(morphoCopy("withdrawFailed") + ": " + msg);
         }
       };
@@ -1554,7 +1555,7 @@ function enhancePrototypeTokens() {
         if (token.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(symbol, token.logoUrl);
         tokenLogo[symbol] = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, tokenLogo[symbol] || symbol) : (tokenLogo[symbol] || tokenInitial(symbol));
         if (!dotColor[symbol]) dotColor[symbol] = "linear-gradient(135deg,#1b231e,#26362b)";
-        if (prices[symbol] === undefined) prices[symbol] = 0;
+        if (prices[symbol] === undefined) prices[symbol] = Number(token.priceUsd || 0) > 0 ? Number(token.priceUsd) : 0;
         if (balances[symbol] === undefined) balances[symbol] = "0";
         if (availMap[symbol] === undefined) availMap[symbol] = "0 " + symbol;
         return symbol;
@@ -1641,7 +1642,7 @@ function enhancePrototypeTokens() {
         }) || token.symbol;
         if (!customTokens[key] && prices[key] && token.address) key = token.symbol + "_" + token.address.slice(-4).toUpperCase();
         var score = token.risk && token.risk.score ? token.risk.score : "mid";
-        prices[key] = 0;
+        if (!(prices[key] > 0)) prices[key] = Number(token.priceUsd || 0) > 0 ? Number(token.priceUsd) : 0;
         tokenFull[key] = token.name || token.symbol;
         tokenLogo[key] = tokenInitial(token.symbol);
         dotColor[key] = "linear-gradient(135deg,#202820,#324036)";
@@ -2132,7 +2133,8 @@ function enhancePrototypeMarket() {
       function registerMarketToken(market){
         var sym = market.symbol;
         if (market.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(sym, market.logoUrl);
-        prices[sym] = market.priceUsd || 0;
+        if (Number(market.priceUsd) > 0) prices[sym] = Number(market.priceUsd);
+        else if (prices[sym] === undefined) prices[sym] = 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
         tokenFull[sym] = market.name || sym;
         tokenLogo[sym] = iconFor(sym, tokenLogo[sym] || market.symbol);
@@ -2266,45 +2268,16 @@ function enhancePrototypeMarket() {
           '</div>';
         }).join("");
       }
-      function marketsFromCoinGecko(payload){
-        if (!payload) return [];
-        return ["WLD","USDC","ETH","BTC"].map(function(sym){
-          var row = payload[sym];
-          if (!row || typeof row !== "object") return null;
-          return {
-            symbol: sym,
-            name: tokenFull[sym] || (sym === "BTC" ? "Bitcoin" : sym),
-            priceUsd: row.usd,
-            change24h: row.usd_24h_change,
-            volume24hUsd: 0,
-            liquidityUsd: row.usd_market_cap,
-            marketCapUsd: row.usd_market_cap,
-            logoUrl: null
-          };
-        }).filter(function(item){ return item && item.priceUsd; });
-      }
-      function registerMarketsFromPriceMeta(payload){
-        try { marketsFromCoinGecko(payload).forEach(registerMarketToken); } catch(e) {}
-      }
       applyTokenLogos();
       if (typeof renderGainers === "function") {
-        renderGainers = function(pricePayload){
+        renderGainers = function(){
           updateMarketTabs();
           var box = document.getElementById("gainersList");
           if (box) box.innerHTML = '<div class="import-load">' + marketCopy("loading") + '</div>';
-          var pricesPayload = pricePayload || window.__luminaMarketPrices || null;
           fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
             .then(function(result){
-              registerMarketsFromPriceMeta(pricesPayload);
-              var cg = marketsFromCoinGecko(pricesPayload);
               var poolMarkets = Array.isArray(result) ? result : [];
-              var merged = marketTab === "gainers" ? cg.map(function(item){
-                var pool = poolMarkets.find(function(candidate){ return candidate.symbol === item.symbol; });
-                return pool ? Object.assign({}, item, pool, { priceUsd: item.priceUsd || pool.priceUsd, change24h: item.change24h != null ? item.change24h : pool.change24h }) : item;
-              }).concat(poolMarkets.filter(function(item){
-                return !cg.some(function(existing){ return existing.symbol === item.symbol; });
-              })) : poolMarkets;
-              renderGainersFromMarkets(merged);
+              renderGainersFromMarkets(poolMarkets);
             })
             .catch(function(){ renderGainersFromMarkets([]); });
         };
@@ -2342,9 +2315,7 @@ function enhancePrototypeSwapQuote() {
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
 	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
-	      var configuredNetworkFeeLabel = "";
-	      var swapDebugStorageKey = "lumina_swap_debug_v1";
-	      var latestSwapDebug = null;
+		      var configuredNetworkFeeLabel = "";
       function swapLang(){
         return window.currentLang || "en";
       }
@@ -2385,11 +2356,7 @@ function enhancePrototypeSwapQuote() {
           ,reduceAmount: { en:"Please reduce the amount.", "zh-CN":"请降低金额。", "zh-TW":"請降低金額。", fr:"Veuillez réduire le montant.", de:"Bitte Betrag reduzieren.", es:"Reduce el importe.", ja:"金額を下げてください。" }
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
           ,slippageTooLow: { en:"Slippage cannot be 0. Please select at least 0.1%.", "zh-CN":"滑点不能设为 0,请至少选择 0.1%。", "zh-TW":"滑點不能設為 0,請至少選擇 0.1%。", fr:"Le slippage ne peut pas être 0. Sélectionnez au moins 0,1%.", de:"Slippage darf nicht 0 sein. Bitte mindestens 0,1% wählen.", es:"El slippage no puede ser 0. Selecciona al menos 0.1%.", ja:"スリッページは 0 にできません。0.1%以上を選択してください。" }
-          ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
-          ,debugTitle: { en:"Swap debug", "zh-CN":"Swap 调试", "zh-TW":"Swap 調試", fr:"Debug swap", de:"Swap debug", es:"Debug swap", ja:"Swap debug" }
-          ,debugEmpty: { en:"No swap debug data yet. Try quoting or signing once.", "zh-CN":"还没有调试数据。先报价或签名一次。", "zh-TW":"還沒有調試資料。先報價或簽名一次。", fr:"Aucune donnée de debug.", de:"Noch keine Debug-Daten.", es:"No hay datos de debug.", ja:"Debug データはまだありません。" }
-          ,copyDebug: { en:"Copy debug", "zh-CN":"复制调试信息", "zh-TW":"複製調試資訊", fr:"Copier debug", de:"Debug kopieren", es:"Copiar debug", ja:"Debug をコピー" }
-          ,debugCopied: { en:"Debug copied", "zh-CN":"调试信息已复制", "zh-TW":"調試資訊已複製", fr:"Debug copié", de:"Debug kopiert", es:"Debug copiado", ja:"コピーしました" }
+	          ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || (typeof t === "function" ? t(key) : key);
       }
@@ -2452,116 +2419,13 @@ function enhancePrototypeSwapQuote() {
         detail.insertAdjacentHTML("afterend", '<div class="quote-warning" id="quoteWarning"></div>');
         return document.getElementById("quoteWarning");
       }
-      function escapeDebugHtml(value){
-        return String(value == null ? "" : value).replace(/[&<>"']/g, function(ch){
-          return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-        });
-      }
-      function safeDebugValue(value, depth){
-        if (depth > 5) return "[depth-limit]";
-        if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
-        if (value instanceof Error) return readableSwapError(value);
-        if (Array.isArray(value)) return value.slice(0, 24).map(function(item){ return safeDebugValue(item, depth + 1); });
-        if (typeof value === "object") {
-          var out = {};
-          Object.keys(value).slice(0, 80).forEach(function(key){
-            if (/private|secret|mnemonic|seed/i.test(key)) return;
-            try { out[key] = safeDebugValue(value[key], depth + 1); } catch(e) { out[key] = "[unreadable]"; }
-          });
-          return out;
-        }
-        return String(value);
-      }
-      function swapDebugContext(extra){
-        return Object.assign({
-          at: new Date().toISOString(),
-          page: "swap",
-          sell: swapState && swapState.sell,
-          buy: swapState && swapState.buy,
-          amount: (document.getElementById("sellAmt") && document.getElementById("sellAmt").value) || "",
-          receive: (document.getElementById("buyAmt") && document.getElementById("buyAmt").value) || "",
-          balance: swapState ? balanceNumber(swapState.sell) : 0,
-          slippageBps: slippageBps(),
-          userAddress: window.__luminaUserAddress || "",
-          worldApp: !!window.MiniKit,
-          executionEnabled: swapExecutionEnabled,
-          quoteAgeSeconds: latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : null,
-          quote: latestSwapQuote ? {
-            source: latestSwapQuote.source,
-            amountIn: latestSwapQuote.amountIn,
-            amountOut: latestSwapQuote.amountOut,
-            rate: latestSwapQuote.rate,
-            fee: latestSwapQuote.fee,
-            routeSymbols: latestSwapQuote.routeSymbols,
-            priceImpactPercent: latestSwapQuote.priceImpactPercent,
-            priceImpactLevel: latestSwapQuote.priceImpactLevel,
-            priceImpactAvailable: latestSwapQuote.priceImpactAvailable,
-            blocked: latestSwapQuote.blocked,
-            blockReason: latestSwapQuote.blockReason
-          } : null
-        }, extra || {});
-      }
-      function setSwapDebug(stage, detail){
-        latestSwapDebug = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
-        window.__luminaSwapDebug = latestSwapDebug;
-        try { localStorage.setItem(swapDebugStorageKey, JSON.stringify(latestSwapDebug)); } catch(e) {}
-        try { console.info("[SWAP DEBUG]", latestSwapDebug); } catch(e) {}
-      }
-      function readSwapDebug(){
-        if (latestSwapDebug) return latestSwapDebug;
-        try {
-          var saved = JSON.parse(localStorage.getItem(swapDebugStorageKey) || "null");
-          if (saved) return saved;
-        } catch(e) {}
-        return null;
-      }
-      function openSwapDebug(){
-        var old = document.getElementById("swapDebugModal");
-        if (old) old.remove();
-        var data = readSwapDebug();
-        var json = data ? JSON.stringify(data, null, 2) : swapCopy("debugEmpty");
-        var modal = document.createElement("div");
-        modal.className = "modal-mask open";
-        modal.id = "swapDebugModal";
-        modal.innerHTML =
-          '<div class="modal send-confirm-sheet swap-debug-sheet">' +
-            '<button type="button" class="swap-debug-close" id="swapDebugClose" aria-label="Close">×</button>' +
-            '<div class="modal-grip"></div><h3>' + swapCopy("debugTitle") + '</h3>' +
-            (data ? '<div class="swap-debug-grid"><span>Stage</span><b>' + escapeDebugHtml(data.stage || "—") + '</b><span>Pair</span><b>' + escapeDebugHtml((data.sell || "?") + " → " + (data.buy || "?")) + '</b><span>Amount</span><b>' + escapeDebugHtml(data.amount || "—") + '</b><span>Route</span><b>' + escapeDebugHtml((data.quote && data.quote.routeSymbols && data.quote.routeSymbols.join(" → ")) || data.quote && data.quote.source || "—") + '</b></div>' : '<p class="swap-debug-empty">' + swapCopy("debugEmpty") + '</p>') +
-            '<pre class="swap-debug-pre">' + escapeDebugHtml(json) + '</pre>' +
-            '<button type="button" class="btn-primary swap-debug-copy" id="swapDebugCopy">' + swapCopy("copyDebug") + '</button>' +
-          '</div>';
-        document.body.appendChild(modal);
-        function close(){ modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); }
-        modal.onclick = function(event){ if (event.target === modal) close(); };
-        document.getElementById("swapDebugClose").onclick = close;
-        document.getElementById("swapDebugCopy").onclick = async function(){
-          try {
-            await navigator.clipboard.writeText(json);
-            toast(swapCopy("debugCopied"));
-          } catch(e) {
-            var pre = modal.querySelector(".swap-debug-pre");
-            if (pre) {
-              var range = document.createRange();
-              range.selectNodeContents(pre);
-              var sel = window.getSelection();
-              if (sel) { sel.removeAllRanges(); sel.addRange(range); }
-            }
-          }
-        };
-      }
-      function ensureSwapDebugButton(){
-        var view = document.getElementById("view-swap");
-        if (!view || document.getElementById("swapDebugBtn")) return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "swapDebugBtn";
-        btn.className = "gear is-floating swap-debug-btn";
-        btn.setAttribute("aria-label", "Swap debug");
-        btn.textContent = "DBG";
-        btn.onclick = openSwapDebug;
-        view.appendChild(btn);
-      }
+	      function setSwapTrace(stage, detail){
+	        try { console.info("[SWAP]", stage, detail || ""); } catch(e) {}
+	      }
+	      function ensureNoSwapDebugButton(){
+	        var existing = document.getElementById("swapDebugBtn");
+	        if (existing) existing.remove();
+	      }
       function formatMaxAmount(value){
         var n = Number(value);
         if (!Number.isFinite(n) || n <= 0) return "0";
@@ -2572,7 +2436,7 @@ function enhancePrototypeSwapQuote() {
         if (!sell) return;
         sell.value = formatMaxAmount(balanceNumber(swapState.sell));
         sell.dispatchEvent(new Event("input", { bubbles: true }));
-        setSwapDebug("input:max", { amount: sell.value, token: swapState.sell });
+	        setSwapTrace("input:max", { amount: sell.value, token: swapState.sell });
         scheduleQuote();
       }
       function ensureSwapMaxButton(){
@@ -2708,7 +2572,7 @@ function enhancePrototypeSwapQuote() {
           return;
         }
         var seq = ++quoteSeq;
-        setSwapDebug("quote:request", {
+        setSwapTrace("quote:request", {
           fromToken: tokenInputForQuote(swapState.sell),
           toToken: tokenInputForQuote(swapState.buy),
           fromSymbol: swapState.sell,
@@ -2733,7 +2597,7 @@ function enhancePrototypeSwapQuote() {
           if (seq !== quoteSeq) return;
           if (!res.ok) throw new Error(data.error || "No quote");
           applyQuote(data);
-          setSwapDebug("quote:success", data);
+          setSwapTrace("quote:success", data);
           return data;
         })();
         activeQuotePromise = promise;
@@ -2744,7 +2608,7 @@ function enhancePrototypeSwapQuote() {
           var msg = e && e.message ? e.message : "Quote failed";
           if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = swapCopy("noRoute");
           setQuoteState(msg, "impact-high");
-          setSwapDebug("quote:error", readableSwapError(e));
+          setSwapTrace("quote:error", readableSwapError(e));
         } finally {
           if (activeQuotePromise === promise) activeQuotePromise = null;
         }
@@ -2939,14 +2803,14 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        var state = validateSwapSafety();
 	        if (!state.ok) {
-	          setSwapDebug("validate:error", { error: state.error });
+	          setSwapTrace("validate:error", { error: state.error });
 	          if (/刷新报价/.test(state.error)) scheduleQuote();
 	          toast(state.error);
 	          return;
 	        }
-	        setSwapDebug("validate:success", state);
+	        setSwapTrace("validate:success", state);
 	        var confirmed = await openSwapConfirm(state);
-	        if (!confirmed) { setSwapDebug("confirm:cancelled", state); toast(swapCopy("cancelled")); return; }
+	        if (!confirmed) { setSwapTrace("confirm:cancelled", state); toast(swapCopy("cancelled")); return; }
 	        swapSubmitting = true;
 	        setSwapButtonState(swapCopy("signing"), true);
 	        try {
@@ -2954,7 +2818,7 @@ function enhancePrototypeSwapQuote() {
 	          var fromQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.from : null;
 	          var toQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.to : null;
 	          setSwapButtonState(swapCopy("confirmInWorldApp"), true);
-	          setSwapDebug("execute:start", {
+	          setSwapTrace("execute:start", {
 	            fromToken: tokenMeta(swapState.sell, fromQuoted),
 	            toToken: tokenMeta(swapState.buy, toQuoted),
 	            fromAmountHuman: state.amountText,
@@ -2972,14 +2836,14 @@ function enhancePrototypeSwapQuote() {
 	          });
 	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
-	          setSwapDebug("execute:submitted", result);
+	          setSwapTrace("execute:submitted", result);
 	          setSwapButtonState(swapCopy("waitingChain"), true);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          syncSwapQuotePriceToHome();
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
-	          setSwapDebug("execute:error", readableSwapError(e));
+	          setSwapTrace("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          toast(swapErrorToast(e));
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
@@ -2999,7 +2863,7 @@ function enhancePrototypeSwapQuote() {
           setSwapPillLogo("sellDot", swapState.sell);
           setSwapPillLogo("buyDot", swapState.buy);
           ensureSwapMaxButton();
-          ensureSwapDebugButton();
+          ensureNoSwapDebugButton();
           scheduleQuote();
         };
       }
@@ -3067,7 +2931,7 @@ function enhancePrototypeSwapQuote() {
       ensureSlipBack();
       resetInitialSwapAmounts();
       ensureSwapMaxButton();
-      ensureSwapDebugButton();
+      ensureNoSwapDebugButton();
       setSwapButtonPending();
       ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
@@ -3882,7 +3746,30 @@ function enhancePrototypeDetail() {
 
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
-        return map[asset.sym] || null;
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        return map[sym] || (sym === "ETH" ? map.WETH : null) || (sym === "BTC" ? map.WBTC : null) || null;
+      }
+      function assetMarketAddress(asset){
+        if (!asset) return "";
+        if (asset.address) return asset.address;
+        if (asset.marketAddress) return asset.marketAddress;
+        var sym = String(asset.sym || "").toUpperCase();
+        if (customTokens && customTokens[sym] && customTokens[sym].address) return customTokens[sym].address;
+        var known = {
+          WLD:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003",
+          USDC:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1",
+          USDT:"0x102d758f688a4c1c5a80b116bd945d4455460282",
+          WETH:"0x4200000000000000000000000000000000000006",
+          ETH:"0x4200000000000000000000000000000000000006",
+          WBTC:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
+          BTC:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
+	          EURC:"0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
+	          ORO:"0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+	          ORB:"0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB",
+	          LIFE:"0xE4D62e62013EaF065Fa3F0316384F88559C80889",
+	          WGEM:"0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740"
+	        };
+        return known[sym] || "";
       }
       function realChartUnavailable(asset, range, reason) {
         var sym = asset && asset.sym ? asset.sym : "token";
@@ -3911,10 +3798,15 @@ function enhancePrototypeDetail() {
           if (asset && !asset.__marketLookupStarted) {
             asset.__marketLookupStarted = true;
             chart.innerHTML = '<div class="market-detail-state">Loading market data...</div>';
-            fetch("/api/tokens/top?mode=all", { cache: "no-store" })
+            var address = assetMarketAddress(asset);
+            var url = address
+              ? "/api/market/token?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address)
+              : "/api/tokens/top?mode=all";
+            fetch(url, { cache: "no-store" })
               .then(function(res){ return res.ok ? res.json() : []; })
-              .then(function(markets){
-                if (Array.isArray(markets)) markets.forEach(registerMarketToken);
+              .then(function(payload){
+                var markets = Array.isArray(payload) ? payload : (payload && payload.market ? [payload.market] : []);
+                markets.forEach(registerMarketToken);
                 renderMarketCard(asset);
               })
               .catch(function(){
@@ -3953,7 +3845,7 @@ function enhancePrototypeDetail() {
             });
         }
         if (!market || !market.poolAddress) {
-          renderHistory("No DEX pool found; CoinGecko history unavailable.");
+          renderHistory("No GeckoTerminal pool found.");
           return;
         }
         chart.innerHTML = '<div class="market-detail-state">Loading chart...</div>';
