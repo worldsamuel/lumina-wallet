@@ -2270,6 +2270,13 @@ function enhancePrototypeHome() {
         var idx = (assets || []).findIndex(function(a){ return String(a && a.sym || "").toUpperCase() === sym; });
         if (idx >= 0) openDetail(idx);
       };
+      window.__luminaOpenHomeRow = function(event, row){
+        if (event && event.preventDefault) event.preventDefault();
+        var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
+        if (!symbol) return;
+        if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
+        else openHomeAsset(symbol);
+      };
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
         if (menu) menu.classList.toggle("open");
@@ -2338,7 +2345,7 @@ function enhancePrototypeHome() {
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
-        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-imported="' + (imported ? "1" : "0") + '">' +
+        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +

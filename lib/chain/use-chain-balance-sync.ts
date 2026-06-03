@@ -171,6 +171,39 @@ function syncBalancesToPrototype(
     change24hUsdNum = ${JSON.stringify(changeUsd)};
     tokenChanges24h = ${JSON.stringify(changeMap)};
     tokenMarketCaps = ${JSON.stringify(marketCapMap)};
+    (function(){
+      try {
+        var recent = JSON.parse(localStorage.getItem("lumina_recent_swap_assets_v1") || "[]");
+        if (!Array.isArray(recent)) return;
+        var existing = new Set((assets || []).map(function(asset){ return String(asset && asset.sym || "").toUpperCase(); }));
+        recent.forEach(function(token){
+          var sym = String(token && token.symbol || "").toUpperCase();
+          if (!sym || existing.has(sym)) return;
+          var amount = String(token.amount || balances[sym] || "0");
+          var amountNum = Number(amount.replace(/,/g, ""));
+          if (!Number.isFinite(amountNum)) amountNum = 0;
+          if (!tokenFull[sym]) tokenFull[sym] = token.name || sym;
+          if (!tokenLogo[sym]) tokenLogo[sym] = sym.replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
+          if (balances[sym] === undefined) balances[sym] = amount;
+          if (availMap[sym] === undefined) availMap[sym] = amount + " " + sym;
+          assets.push({
+            sym: sym,
+            full: tokenFull[sym] || token.name || sym,
+            amt: amount + " " + sym,
+            usdNum: Number(token.usdNum || 0),
+            cls: "custom",
+            logo: tokenLogo[sym],
+            contractAddress: token.contractAddr || token.address || null,
+            address: token.contractAddr || token.address || null,
+            custom: true,
+            hasBalance: amountNum > 0,
+            recentSwapAsset: true,
+            homeSwapAsset: true
+          });
+          existing.add(sym);
+        });
+      } catch(e) {}
+    })();
     window.__luminaOnchainPrices = ${JSON.stringify(onchainData ?? null)};
     window.__luminaMarketPrices = ${JSON.stringify(marketData ?? null)};
     if (typeof renderGainers === "function") renderGainers(window.__luminaMarketPrices);
