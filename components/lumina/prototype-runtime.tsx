@@ -1659,6 +1659,7 @@ function enhancePrototypeTokens() {
     (function(){
       var importStoreKey = "lumina_imported_tokens_v1";
       var hiddenStoreKey = "lumina_hidden_risk_tokens_v1";
+      var recentSwapStoreKey = "lumina_recent_swap_assets_v1";
 
       function readJson(key, fallback){
         try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; }
@@ -1762,6 +1763,20 @@ function enhancePrototypeTokens() {
         if (!(p > 0) && token && Number(token.priceUsd) > 0) p = Number(token.priceUsd);
         return Number.isFinite(p) && p > 0 ? p : 0;
       }
+      function recentSwapTokens(){
+        var list = readJson(recentSwapStoreKey, []);
+        return Array.isArray(list) ? list : [];
+      }
+      function saveRecentSwapToken(token){
+        var symbol = String(token && token.symbol || "").toUpperCase();
+        if (!symbol) return;
+        var list = recentSwapTokens().filter(function(item){
+          return String(item && item.symbol || "").toUpperCase() !== symbol;
+        });
+        list.unshift(Object.assign({}, token, { symbol: symbol }));
+        writeJson(recentSwapStoreKey, list.slice(0, 24));
+      }
+      window.__luminaRememberSwapAsset = saveRecentSwapToken;
       function upsertSwapHomeAssets(){
         if (!Array.isArray(assets)) assets = [];
         var tokenBySymbol = {};
@@ -1857,6 +1872,24 @@ function enhancePrototypeTokens() {
       }
       function restoreImportedTokens(){
         importedList().forEach(function(token){ registerImportedToken(token); });
+      }
+      function restoreRecentSwapTokens(){
+        recentSwapTokens().forEach(function(token){
+          var sym = registerBackendToken(token);
+          if (!sym || (assets || []).some(function(asset){ return String(asset && asset.sym || "").toUpperCase() === sym; })) return;
+          var amount = balances[sym] || token.amount || "0";
+          assets.push({
+            sym: sym,
+            full: tokenFull[sym] || token.name || sym,
+            amt: amount + " " + sym,
+            usdNum: Number(token.usdNum || 0),
+            cls: "custom",
+            logo: tokenLogo[sym] || tokenInitial(sym),
+            address: token.contractAddr || token.address || null,
+            recentSwapAsset: true,
+            homeSwapAsset: true
+          });
+        });
       }
       async function refreshImportedBalances(){
         var owner = window.__luminaUserAddress || "";
@@ -2077,6 +2110,7 @@ function enhancePrototypeTokens() {
       upsertSwapHomeAssets();
       syncBackendSwapTokens();
       restoreImportedTokens();
+      restoreRecentSwapTokens();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {
         window.__luminaImportedRefreshTimer = setInterval(refreshImportedBalances, 10000);
@@ -3031,7 +3065,21 @@ function enhancePrototypeSwapQuote() {
 	          balances[symbol] = shortAmount(amount);
 	          availMap[symbol] = balances[symbol] + " " + symbol;
 	        }
-	        var displayAmount = balances[symbol] || (amount > 0 ? shortAmount(amount) : "0");
+	        var amountText = amount > 0 ? shortAmount(amount) : (balances[symbol] || "0");
+	        if (window.__luminaRememberSwapAsset) {
+	          window.__luminaRememberSwapAsset({
+	            symbol: symbol,
+	            name: meta.name || symbol,
+	            contractAddr: meta.address || null,
+	            address: meta.address || null,
+	            decimals: meta.decimals || 18,
+	            amount: amountText,
+	            usdNum: 0,
+	            status: "verified",
+	            canSwap: true
+	          });
+	        }
+	        var displayAmount = balances[symbol] || amountText;
 	        var price = Number(meta.priceUsd || prices[symbol] || 0);
 	        var usdNum = amount > 0 && price > 0 ? amount * price : 0;
 	        if (existing) {
@@ -3089,6 +3137,7 @@ function enhancePrototypeSwapQuote() {
 	        var buy = String(swapState.buy || "").toUpperCase();
 	        var amountIn = Number(latestSwapQuote.amountIn || 0);
 	        var amountOut = Number(latestSwapQuote.amountOut || 0);
+	        if (buy) upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
 	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
 	        var sellPrice = tokenMeta(sell, latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
 	        if (!(sellPrice > 0) && sell === "WETH") sellPrice = Number(prices && prices.ETH) || 0;
@@ -3262,6 +3311,7 @@ function enhancePrototypeSwapQuote() {
 	          var result = await promise;
 	          setSwapDebug("execute:submitted", result);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
+	          upsertRecentSwapHomeAsset(swapState.buy, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.to, latestSwapQuote && latestSwapQuote.amountOut);
 	          syncSwapQuotePriceToHome();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
