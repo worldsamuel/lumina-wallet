@@ -1,6 +1,6 @@
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
-import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi, swapErc20Abi } from "./contracts";
+import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
 
 type ExecuteSwapToken = {
   address: Address;
@@ -106,21 +106,13 @@ export async function executeSwap(params: ExecuteSwapParams) {
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
-  // Universal Router pulls ERC20s through Permit2, so both the token allowance
-  // to Permit2 and the Permit2 allowance to Universal Router must exist.
+  // World App rejects broad ERC20 approve flows for many tokens, so keep the
+  // executable batch on the Permit2 + Universal Router path that is already
+  // supported by MiniKit.
   // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
   const permit2Expiration = 0;
 
   const transactions = [
-    {
-      to: freshQuote.tokens.from.address,
-      data: encodeFunctionData({
-        abi: [swapErc20Abi[2]],
-        functionName: "approve",
-        args: [PERMIT2_ADDRESS, executableAmount],
-      }),
-      value: "0x0",
-    },
     {
       to: PERMIT2_ADDRESS,
       data: encodeFunctionData({

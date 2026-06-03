@@ -2344,7 +2344,9 @@ function enhancePrototypeSwapQuote() {
 	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
 	      var configuredNetworkFeeLabel = "";
 	      var swapDebugStorageKey = "lumina_swap_debug_v1";
+	      var swapExecutionDebugStorageKey = "lumina_swap_execution_debug_v1";
 	      var latestSwapDebug = null;
+	      var latestSwapExecutionDebug = null;
       function swapLang(){
         return window.currentLang || "en";
       }
@@ -2505,9 +2507,19 @@ function enhancePrototypeSwapQuote() {
         latestSwapDebug = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
         window.__luminaSwapDebug = latestSwapDebug;
         try { localStorage.setItem(swapDebugStorageKey, JSON.stringify(latestSwapDebug)); } catch(e) {}
+        if (/^(execute|validate|confirm):/.test(String(stage || ""))) {
+          latestSwapExecutionDebug = latestSwapDebug;
+          window.__luminaSwapExecutionDebug = latestSwapExecutionDebug;
+          try { localStorage.setItem(swapExecutionDebugStorageKey, JSON.stringify(latestSwapExecutionDebug)); } catch(e) {}
+        }
         try { console.info("[SWAP DEBUG]", latestSwapDebug); } catch(e) {}
       }
       function readSwapDebug(){
+        try {
+          var exec = latestSwapExecutionDebug || JSON.parse(localStorage.getItem(swapExecutionDebugStorageKey) || "null");
+          var currentStage = latestSwapDebug && latestSwapDebug.stage ? String(latestSwapDebug.stage) : "";
+          if (exec && (/^execute:error/.test(String(exec.stage || "")) || /^quote:/.test(currentStage))) return exec;
+        } catch(e) {}
         if (latestSwapDebug) return latestSwapDebug;
         try {
           var saved = JSON.parse(localStorage.getItem(swapDebugStorageKey) || "null");
