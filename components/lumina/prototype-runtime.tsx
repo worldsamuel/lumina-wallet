@@ -2200,6 +2200,7 @@ function enhancePrototypeHome() {
       function showOnHome(asset){
         var sym = String(asset && asset.sym || "").toUpperCase();
         if (fixedHomeTokens.has(sym)) return true;
+        if (asset && asset.recentSwapAsset) return true;
         return !!(asset && hasVisibleHomeBalance(asset));
       }
       window.openHomeAsset = function(sym){
@@ -3017,6 +3018,46 @@ function enhancePrototypeSwapQuote() {
 	          priceUsd: Number.isFinite(price) ? price : undefined
 	        };
 	      }
+	      function upsertRecentSwapHomeAsset(symbol, quoted, amountHint){
+	        symbol = String(symbol || "").toUpperCase();
+	        if (!symbol) return;
+	        var meta = tokenMeta(symbol, quoted);
+	        var amount = Number(amountHint || 0);
+	        var existing = (assets || []).find(function(asset){ return String(asset && asset.sym || "").toUpperCase() === symbol; });
+	        tokenFull[symbol] = meta.name || tokenFull[symbol] || symbol;
+	        tokenLogo[symbol] = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, tokenLogo[symbol] || symbol.slice(0,1)) : (tokenLogo[symbol] || symbol.slice(0,1));
+	        if (!dotColor[symbol]) dotColor[symbol] = "linear-gradient(135deg,#1b231e,#26362b)";
+	        if (amount > 0 && (!balances[symbol] || Number(String(balances[symbol]).replace(/,/g, "")) <= 0)) {
+	          balances[symbol] = shortAmount(amount);
+	          availMap[symbol] = balances[symbol] + " " + symbol;
+	        }
+	        var displayAmount = balances[symbol] || (amount > 0 ? shortAmount(amount) : "0");
+	        var price = Number(meta.priceUsd || prices[symbol] || 0);
+	        var usdNum = amount > 0 && price > 0 ? amount * price : 0;
+	        if (existing) {
+	          existing.full = tokenFull[symbol] || meta.name || symbol;
+	          existing.amt = displayAmount + " " + symbol;
+	          existing.usdNum = usdNum || existing.usdNum || 0;
+	          existing.address = meta.address || existing.address || null;
+	          existing.logo = tokenLogo[symbol] || existing.logo || symbol.slice(0,1);
+	          existing.recentSwapAsset = true;
+	          existing.homeSwapAsset = true;
+	        } else {
+	          if (!Array.isArray(assets)) assets = [];
+	          assets.push({
+	            sym: symbol,
+	            full: tokenFull[symbol] || meta.name || symbol,
+	            amt: displayAmount + " " + symbol,
+	            usdNum: usdNum,
+	            cls: "custom",
+	            logo: tokenLogo[symbol] || symbol.slice(0,1),
+	            address: meta.address || null,
+	            recentSwapAsset: true,
+	            homeSwapAsset: true
+	          });
+	        }
+	        if (typeof renderAssets === "function") renderAssets();
+	      }
 	      function balanceNumber(symbol){
 	        var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
 	        var n = Number(raw.replace(/,/g, ""));
@@ -3060,6 +3101,7 @@ function enhancePrototypeSwapQuote() {
 	        if (customTokens && customTokens[buy]) customTokens[buy].priceUsd = buyPrice;
 	        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[buy];
 	        if (market) market.priceUsd = buyPrice;
+	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
 	        (assets || []).forEach(function(asset){
 	          if (String(asset.sym || "").toUpperCase() !== buy) return;
 	          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
