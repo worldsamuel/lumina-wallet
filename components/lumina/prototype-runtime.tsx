@@ -2271,11 +2271,11 @@ function enhancePrototypeHome() {
         return Number(asset && asset.usdNum || 0);
       }
       function rowHtml(asset, index, imported){
-        var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openHomeAsset(\\'' + String(asset.sym || "").toUpperCase() + '\\')';
+        var symbol = String(asset.sym || "").toUpperCase();
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
-        return '<div class="asset home-v2-asset" onclick="' + open + '">' +
+        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-imported="' + (imported ? "1" : "0") + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
@@ -2295,6 +2295,13 @@ function enhancePrototypeHome() {
         var html = verified.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
+        list.onclick = function(event){
+          var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
+          if (!row || !list.contains(row)) return;
+          var symbol = row.getAttribute("data-home-symbol") || "";
+          if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
+          else openHomeAsset(symbol);
+        };
       };
       ensureHomeShell();
       renderAssets();
