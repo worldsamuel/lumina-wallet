@@ -1,6 +1,18 @@
 import { isAddress, type Address } from "viem";
 
-export type SwapTokenSymbol = "WLD" | "USDC" | "USDT" | "ETH" | "WETH" | "BTC" | "WBTC" | "EURC";
+export type SwapTokenSymbol =
+  | "WLD"
+  | "USDC"
+  | "USDT"
+  | "ETH"
+  | "WETH"
+  | "BTC"
+  | "WBTC"
+  | "EURC"
+  | "ORO"
+  | "ORB"
+  | "LIFE"
+  | "WGEM";
 export type SwapTokenTrust = "core" | "alias" | "audited" | "community";
 
 export type SwapToken = {
@@ -70,6 +82,34 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     name: "EURC",
     address: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
     decimals: 6,
+  },
+  ORO: {
+    symbol: "ORO",
+    priceSymbol: "USDC",
+    name: "ORO",
+    address: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
+    decimals: 18,
+  },
+  ORB: {
+    symbol: "ORB",
+    priceSymbol: "USDC",
+    name: "Orb",
+    address: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB",
+    decimals: 18,
+  },
+  LIFE: {
+    symbol: "LIFE",
+    priceSymbol: "USDC",
+    name: "LIFE",
+    address: "0xE4D62e62013EaF065Fa3F0316384F88559C80889",
+    decimals: 18,
+  },
+  WGEM: {
+    symbol: "WGEM",
+    priceSymbol: "USDC",
+    name: "World GEM",
+    address: "0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740",
+    decimals: 18,
   },
 };
 

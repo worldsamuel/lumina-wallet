@@ -1554,6 +1554,63 @@ function enhancePrototypeTokens() {
         if (availMap[symbol] === undefined) availMap[symbol] = "0 " + symbol;
         return symbol;
       }
+      function tokenAddress(token){
+        return String(token && (token.contractAddr || token.address) || "").toLowerCase();
+      }
+      function formattedBalanceFor(sym){
+        var raw = balances && balances[sym] != null ? String(balances[sym]) : "0";
+        return raw || "0";
+      }
+      function amountNumberFor(sym){
+        var n = Number(formattedBalanceFor(sym).replace(/,/g, ""));
+        return Number.isFinite(n) ? n : 0;
+      }
+      function priceFor(sym, token){
+        var p = prices && prices[sym] != null ? Number(prices[sym]) : 0;
+        if (!(p > 0) && token && Number(token.priceUsd) > 0) p = Number(token.priceUsd);
+        return Number.isFinite(p) && p > 0 ? p : 0;
+      }
+      function upsertSwapHomeAssets(){
+        if (!Array.isArray(assets)) assets = [];
+        var existingSymbols = new Set();
+        var existingAddresses = new Set();
+        assets.forEach(function(asset){
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          if (sym) existingSymbols.add(sym);
+          var addr = String(asset && (asset.address || asset.contractAddr) || "").toLowerCase();
+          if (/^0x[a-f0-9]{40}$/.test(addr)) existingAddresses.add(addr);
+          if (sym && balances && balances[sym] != null) {
+            var amount = formattedBalanceFor(sym);
+            asset.amt = amount + " " + sym;
+            var p = priceFor(sym);
+            if (p > 0) asset.usdNum = amountNumberFor(sym) * p;
+          }
+        });
+        var additions = swapWhitelistTokens().map(function(token){
+          var sym = registerBackendToken(token);
+          if (!sym) return null;
+          var addr = tokenAddress(token);
+          if (existingSymbols.has(sym) || (addr && existingAddresses.has(addr))) return null;
+          existingSymbols.add(sym);
+          if (addr) existingAddresses.add(addr);
+          var amount = formattedBalanceFor(sym);
+          var price = priceFor(sym, token);
+          return {
+            sym: sym,
+            full: tokenFull[sym] || token.name || sym,
+            amt: amount + " " + sym,
+            usdNum: price > 0 ? amountNumberFor(sym) * price : 0,
+            cls: "custom",
+            logo: tokenLogo[sym] || tokenInitial(sym),
+            address: token.contractAddr || token.address || null
+          };
+        }).filter(Boolean);
+        if (!additions.length) return;
+        var insertAt = assets.findIndex(function(asset){ return String(asset && asset.sym || "").toUpperCase() === "ORB"; });
+        if (insertAt < 0) insertAt = assets.findIndex(function(asset){ return String(asset && asset.sym || "").toUpperCase() === "ETH"; }) - 1;
+        if (insertAt < 0) insertAt = assets.length - 1;
+        assets.splice(insertAt + 1, 0, ...additions);
+      }
       function hiddenSet(){
         var list = readJson(hiddenStoreKey, []);
         return new Set(Array.isArray(list) ? list.map(function(x){ return String(x).toLowerCase(); }) : []);
@@ -1790,6 +1847,15 @@ function enhancePrototypeTokens() {
       var viewAll = document.querySelector(".section-head .link[data-i18n='viewAll']");
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
+      if (typeof renderAssets === "function" && !window.__luminaSwapHomeAssetsWrapped) {
+        window.__luminaSwapHomeAssetsWrapped = true;
+        var previousRenderAssets = renderAssets;
+        renderAssets = function(){
+          upsertSwapHomeAssets();
+          previousRenderAssets();
+        };
+      }
+      upsertSwapHomeAssets();
       restoreImportedTokens();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {

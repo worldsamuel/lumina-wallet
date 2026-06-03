@@ -96,6 +96,7 @@ export async function GET(req: NextRequest) {
             subtitle: incomingTx ? `From ${shortAddress(from)}` : `To ${shortAddress(to)}`,
             amount: `${incomingTx ? "+" : "-"}${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
             tokenText: `${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
+            tokenAmount: Number(formatUnits(value, meta.decimals)),
             direction,
             status: "Completed",
             blockNumber: Number(log.blockNumber),
@@ -121,6 +122,7 @@ function mergeSwapActivity<
     subtitle: string;
     amount: string;
     tokenText: string;
+    tokenAmount: number;
     direction: "in" | "out";
     status: string;
     blockNumber: number;
@@ -134,10 +136,10 @@ function mergeSwapActivity<
     byHash.set(log.hash, rows);
   }
 
-  const rows: Array<Omit<T, "direction" | "tokenText">> = [];
+  const rows: Array<Omit<T, "direction" | "tokenText" | "tokenAmount">> = [];
   for (const group of byHash.values()) {
-    const outgoing = group.find((item) => item.direction === "out");
-    const incoming = group.find((item) => item.direction === "in");
+    const outgoing = largestTransfer(group.filter((item) => item.direction === "out"));
+    const incoming = largestTransfer(group.filter((item) => item.direction === "in"));
     if (outgoing && incoming && group.length >= 2) {
       const incomingSymbol = tokenSymbolFromText(incoming.tokenText);
       const outgoingSymbol = tokenSymbolFromText(outgoing.tokenText);
@@ -159,12 +161,22 @@ function mergeSwapActivity<
         status: "Completed",
         blockNumber: Math.max(...group.map((item) => item.blockNumber)),
         logIndex: Math.max(...group.map((item) => item.logIndex)),
-      } as Omit<T, "direction" | "tokenText">);
+      } as Omit<T, "direction" | "tokenText" | "tokenAmount">);
     } else {
-      rows.push(...group.map(({ direction: _direction, tokenText: _tokenText, ...item }) => item));
+      rows.push(...group.map(({ direction: _direction, tokenText: _tokenText, tokenAmount: _tokenAmount, ...item }) => item));
     }
   }
   return rows;
+}
+
+function largestTransfer<
+  T extends {
+    tokenAmount: number;
+  },
+>(items: T[]) {
+  return items
+    .filter((item) => Number.isFinite(item.tokenAmount) && item.tokenAmount > 0)
+    .sort((a, b) => b.tokenAmount - a.tokenAmount)[0];
 }
 
 function tokenSymbolFromText(tokenText: string) {

@@ -1,6 +1,7 @@
 import { formatUnits, type Address } from "viem";
 import { publicClient } from "./chain";
-import { ERC20_TOKENS, TOKENS, type TokenConfig } from "./tokens";
+import { db } from "./db";
+import { ERC20_TOKENS, TOKENS } from "./tokens";
 import worldChainTokenCatalog from "./swap/worldchain-token-catalog.json";
 
 const erc20BalanceAbi = [
@@ -41,10 +42,21 @@ type AlchemyTokenBalance = {
   error?: string | null;
 };
 
+type BalanceTokenConfig = {
+  symbol: string;
+  name: string;
+  decimals: number;
+  logo: string;
+  className: string;
+  contractAddress: Address;
+  native?: boolean;
+  coingeckoId: string;
+};
+
 const WORLD_CHAIN_PUBLIC_RPC = "https://worldchain-mainnet.g.alchemy.com/public";
 const HOME_LIQUIDITY_MIN_USD = 10;
 
-function toBalance(token: TokenConfig, balance: bigint): ChainBalance {
+function toBalance(token: BalanceTokenConfig | (typeof TOKENS)[number], balance: bigint): ChainBalance {
   const formatted = formatUnits(balance, token.decimals);
 
   return {
@@ -87,11 +99,12 @@ function toDiscoveredBalance(token: CatalogToken, balance: bigint): ChainBalance
  */
 export async function fetchBalances(userAddress: Address) {
   const ethToken = TOKENS.find((token) => token.native);
+  const balanceTokens = await getBalanceTokens();
   const [nativeBalance, erc20Results, discoveredBalances] = await Promise.all([
     publicClient.getBalance({ address: userAddress }),
     publicClient.multicall({
       allowFailure: true,
-      contracts: ERC20_TOKENS.map((token) => ({
+      contracts: balanceTokens.map((token) => ({
         address: token.contractAddress,
         abi: erc20BalanceAbi,
         functionName: "balanceOf",
@@ -101,7 +114,7 @@ export async function fetchBalances(userAddress: Address) {
     fetchDiscoveredTokenBalances(userAddress).catch(() => [] as ChainBalance[]),
   ]);
 
-  const erc20Balances = ERC20_TOKENS.map((token, index) => {
+  const erc20Balances = balanceTokens.map((token, index) => {
     const result = erc20Results[index];
     return toBalance(token, result?.status === "success" ? result.result : 0n);
   });
@@ -121,6 +134,41 @@ export async function fetchBalances(userAddress: Address) {
       return address && !configuredAddresses.has(address) && item.balance > 0n;
     }),
   ];
+}
+
+async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
+  const core = ERC20_TOKENS.map((token) => ({ ...token }));
+  let configured: BalanceTokenConfig[] = [];
+  try {
+    const rows = await db.token.findMany({
+      where: {
+        status: "verified",
+        contractAddr: { not: null },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+    configured = rows
+      .filter((row) => row.canTransfer !== false || row.canSwap !== false)
+      .map((row) => ({
+        symbol: row.symbol,
+        name: row.name,
+        decimals: row.decimals,
+        logo: row.symbol.replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?",
+        className: "custom",
+        contractAddress: row.contractAddr as Address,
+        coingeckoId: row.symbol.toLowerCase(),
+      }));
+  } catch (error) {
+    console.error("Failed to load configured balance tokens", error);
+  }
+
+  const seen = new Set<string>();
+  return [...core, ...configured].filter((token): token is BalanceTokenConfig => {
+    const address = token.contractAddress?.toLowerCase();
+    if (!address || seen.has(address)) return false;
+    seen.add(address);
+    return true;
+  });
 }
 
 async function fetchDiscoveredTokenBalances(userAddress: Address) {

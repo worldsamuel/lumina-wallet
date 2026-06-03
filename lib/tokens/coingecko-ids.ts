@@ -7,6 +7,8 @@ export const COINGECKO_IDS = {
   EURC: "euro-coin",
   ORO: "oro",
   ORB: "orb",
+  LIFE: "life",
+  WGEM: "world-gem",
 } as const;
 
 export type CoinGeckoSymbol = keyof typeof COINGECKO_IDS;
