@@ -495,14 +495,24 @@ export async function getPoolOhlcv(
     currency: "usd",
   });
   if (safeToken) params.set("token", safeToken);
-  const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${params}`, {
-    headers: { accept: "application/json" },
-    next: { revalidate: 180 },
-    signal: AbortSignal.timeout(4_000),
-  });
-  if (!response.ok) throw new Error(`GeckoTerminal OHLCV responded ${response.status}`);
-  const body = (await response.json()) as GeckoOhlcvResponse;
-  const data = (body.data?.attributes?.ohlcv_list ?? []).map(([timestamp, open, high, low, close, volume]) => ({
+  async function fetchOhlcv(requestParams: URLSearchParams) {
+    const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${requestParams}`, {
+      headers: { accept: "application/json" },
+      next: { revalidate: 180 },
+      signal: AbortSignal.timeout(4_000),
+    });
+    if (!response.ok) throw new Error(`GeckoTerminal OHLCV responded ${response.status}`);
+    const body = (await response.json()) as GeckoOhlcvResponse;
+    return body.data?.attributes?.ohlcv_list ?? [];
+  }
+
+  let list = await fetchOhlcv(params);
+  if (!list.length && safeToken) {
+    const fallbackParams = new URLSearchParams(params);
+    fallbackParams.delete("token");
+    list = await fetchOhlcv(fallbackParams);
+  }
+  const data = list.map(([timestamp, open, high, low, close, volume]) => ({
     timestamp,
     open,
     high,
