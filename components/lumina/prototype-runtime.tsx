@@ -907,7 +907,10 @@ function enhancePrototypeBuiltinTokenLogos() {
         WBTC: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
         EURC: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
         ORO: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
-        ORB: "0xee21af1d049211206b20b957d07794e7d0b140b3"
+        ORB: "0xee21af1d049211206b20b957d07794e7d0b140b3",
+        LIFE: "0xE4D62e62013EaF065Fa3F0316384F88559C80889",
+        WGEM: "0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740",
+        HUB: "0xd469fDA5d9522A093760902e9bE51e0c5D822D26"
       };
       var logoUrlsBySymbol = {};
       function htmlEscape(value){
@@ -993,6 +996,9 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.EURC = window.__luminaTokenLogoHtml("EURC", "");
         tokenLogo.ORO = window.__luminaTokenLogoHtml("ORO", "O");
         tokenLogo.ORB = window.__luminaTokenLogoHtml("ORB", "O");
+        tokenLogo.LIFE = window.__luminaTokenLogoHtml("LIFE", "L");
+        tokenLogo.WGEM = window.__luminaTokenLogoHtml("WGEM", "W");
+        tokenLogo.HUB = window.__luminaTokenLogoHtml("HUB", "H");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -2273,11 +2279,25 @@ function enhancePrototypeHome() {
       };
       window.__luminaOpenHomeRow = function(event, row){
         if (event && event.preventDefault) event.preventDefault();
+        if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         if (!symbol) return;
         if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
         else openHomeAsset(symbol);
       };
+      if (!window.__luminaHomeAssetCaptureBound) {
+        window.__luminaHomeAssetCaptureBound = true;
+        document.addEventListener("pointerup", function(event){
+          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
+          if (!row) return;
+          window.__luminaOpenHomeRow(event, row);
+        }, true);
+        document.addEventListener("click", function(event){
+          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
+          if (!row) return;
+          window.__luminaOpenHomeRow(event, row);
+        }, true);
+      }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
         if (menu) menu.classList.toggle("open");
@@ -2343,7 +2363,8 @@ function enhancePrototypeHome() {
       }
       function rowHtml(asset, index, imported){
         var symbol = String(asset.sym || "").toUpperCase();
-        var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
+        var logoSource = (tokenLogo && tokenLogo[symbol]) || asset.logo || tokenInitialHome(asset.sym);
+        var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource;
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
         return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
@@ -2424,7 +2445,8 @@ function enhancePrototypeMarket() {
         tokenLogo.ETH = iconFor("ETH", "");
         tokenLogo.BTC = iconFor("BTC", "");
         (assets || []).forEach(function(asset){
-          if (["WLD","USDC","USDT","ETH","BTC"].indexOf(asset.sym) >= 0) asset.logo = iconFor(asset.sym, asset.logo);
+          if (!asset || !asset.sym) return;
+          asset.logo = iconFor(asset.sym, (tokenLogo && tokenLogo[asset.sym]) || asset.logo);
         });
       }
       function registerMarketToken(market){
@@ -4609,6 +4631,26 @@ function enhancePrototypeDetail() {
         go("swap");
         setTabByName("Swap");
       }
+      function activeDetailReturnView(){
+        try {
+          var active = document.querySelector(".view.active");
+          var id = active && active.id ? String(active.id).replace(/^view-/, "") : "";
+          if (id && id !== "detail") return id;
+        } catch(e) {}
+        return window.__luminaDetailReturnView || "home";
+      }
+      function detailReturnTab(view){
+        if (view === "swap") return "Swap";
+        if (view === "activity") return "Activity";
+        if (view === "earn" || view === "earn-detail") return "Earn";
+        if (view === "me") return "Me";
+        return "Home";
+      }
+      window.__luminaBackFromDetail = function(){
+        var view = window.__luminaDetailReturnView || "home";
+        go(view);
+        setTabByName(detailReturnTab(view));
+      };
 
       function ensureDetailShell() {
         var view = document.getElementById("view-detail");
@@ -4616,7 +4658,7 @@ function enhancePrototypeDetail() {
         view.dataset.luminaDetailV2 = "1";
         view.innerHTML =
           '<div class="detail-v2-topbar">' +
-            '<button class="detail-v2-back" onclick="go(\\'home\\'); setTabByName(\\'Home\\')" aria-label="Back"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
+            '<button class="detail-v2-back" onclick="window.__luminaBackFromDetail && window.__luminaBackFromDetail()" aria-label="Back"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg></button>' +
             '<div class="detail-v2-token"><div class="detail-v2-token-icon" id="detCoin">◉</div><div><div class="detail-v2-symbol" id="detTitle">WLD</div><div class="detail-v2-name" id="detName">Worldcoin</div></div></div>' +
             '<div class="detail-v2-tools"><button type="button" onclick="openPoolInfo()">' + detailIcon("more") + '</button></div>' +
           '</div>' +
@@ -4702,13 +4744,14 @@ function enhancePrototypeDetail() {
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
       if (previousOpenDetail) {
         openDetail = function(index) {
+          window.__luminaDetailReturnView = activeDetailReturnView();
           currentDetailIdx = index;
           var asset = assets[index];
           if (!asset) return;
           updateDetailContent(asset);
           renderRange("1D");
           updateExplorer();
-          go("detail"); setTabByName("Home");
+          go("detail"); setTabByName(detailReturnTab(window.__luminaDetailReturnView));
         };
       }
 
