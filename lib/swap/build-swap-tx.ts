@@ -76,16 +76,19 @@ export async function buildSwapTransaction({
     tradeType: TradeType.EXACT_INPUT,
   });
 
+  const feeConfig = platformFee && platformFee.bps > 0 ? platformFee : null;
+  console.log("[SWAP] fee config:", feeConfig);
+
   const { calldata, value } = SwapRouter.swapCallParameters(trade, {
     recipient: userAddress,
     slippageTolerance: new Percent(slippageBps, 10_000),
     deadlineOrPreviousBlockhash: deadline,
     chainId: WORLD_CHAIN_ID,
     fee:
-      platformFee && platformFee.bps > 0
+      feeConfig
         ? {
-            fee: new Percent(platformFee.bps, 10_000),
-            recipient: platformFee.recipient,
+            fee: new Percent(feeConfig.bps, 10_000),
+            recipient: feeConfig.recipient,
           }
         : undefined,
   });

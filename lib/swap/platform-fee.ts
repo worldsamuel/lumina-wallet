@@ -1,6 +1,4 @@
 import { formatUnits, isAddress, type Address } from "viem";
-import { ensureDefaultFees } from "@/lib/admin/ensure-fee-schema";
-import { db } from "@/lib/db";
 import type { SwapToken } from "./tokens";
 
 export type SwapPlatformFeeConfig = {
@@ -19,20 +17,24 @@ export type SwapPlatformFeePayload = {
   amount: string;
 };
 
-export async function getSwapPlatformFeeConfig(): Promise<SwapPlatformFeeConfig | null> {
-  await ensureDefaultFees();
-  const config = await db.feeConfig.findUnique({ where: { businessType: "swap" } });
-  const recipient = String(config?.recipient ?? "").trim();
-  if (!isAddress(recipient)) return null;
+export function getSwapPlatformFeeConfig(): SwapPlatformFeeConfig | null {
+  const enabled = process.env.NEXT_PUBLIC_SWAP_FEE_ENABLED === "true";
+  if (!enabled) return null;
 
-  const percent = String(config?.percent ?? "0");
-  const bps = Math.round(Number(percent) * 10_000);
-  if (!Number.isFinite(bps) || bps <= 0) return null;
+  const bps = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || "0");
+  if (!Number.isInteger(bps) || bps <= 0) {
+    throw new Error("NEXT_PUBLIC_SWAP_FEE_ENABLED is true but NEXT_PUBLIC_SWAP_FEE_BPS is not a positive integer.");
+  }
   if (bps >= 10_000) throw new Error("Configured swap fee is too high.");
 
+  const recipient = String(process.env.NEXT_PUBLIC_SWAP_FEE_RECIPIENT ?? "").trim();
+  if (!isAddress(recipient)) {
+    throw new Error("NEXT_PUBLIC_SWAP_FEE_ENABLED is true but NEXT_PUBLIC_SWAP_FEE_RECIPIENT is invalid.");
+  }
+
   return {
-    recipient,
-    percent,
+    recipient: recipient as Address,
+    percent: String(bps / 10_000),
     bps,
   };
 }

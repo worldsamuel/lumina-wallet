@@ -78,8 +78,8 @@ const account = privateKeyToAccount(normalizePrivateKey(requiredEnv("TEST_PRIVAT
 const TEST_USER = account.address;
 const EXPLORER_BASE_URL = process.env.TENDERLY_EXPLORER_BASE_URL?.trim() || "";
 const SKIP_TENDERLY_FUNDING = process.env.SKIP_TENDERLY_FUNDING === "true";
-const FEE_BPS = 40;
-const FEE_RECIPIENT = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077" as Address;
+const FEE_BPS = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || "0");
+const FEE_RECIPIENT = requiredAddressEnv("NEXT_PUBLIC_SWAP_FEE_RECIPIENT");
 
 const TOKENS = {
   WLD: SWAP_TOKENS.WLD,
@@ -602,6 +602,12 @@ function requiredEnv(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`Missing required env var ${name}`);
   return value;
+}
+
+function requiredAddressEnv(name: string) {
+  const value = requiredEnv(name);
+  if (!/^0x[a-fA-F0-9]{40}$/.test(value)) throw new Error(`Invalid address env var ${name}`);
+  return value as Address;
 }
 
 function toQuantityHex(value: bigint) {

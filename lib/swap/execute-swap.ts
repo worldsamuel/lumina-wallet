@@ -1,5 +1,5 @@
 import { MiniKit } from "@worldcoin/minikit-js";
-import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
+import { decodeFunctionData, encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
 
 type ExecuteSwapToken = {
@@ -27,6 +27,8 @@ type QuoteResponse = {
   grossAmountIn?: string;
   amountOut: string;
   amountOutRaw: string;
+  grossAmountOut?: string;
+  grossAmountOutRaw?: string;
   feeTier: number;
   route?: {
     tokens: string[];
@@ -40,6 +42,7 @@ type QuoteResponse = {
     from: ExecuteSwapToken;
     to: ExecuteSwapToken;
   };
+  platformFee?: PlatformFeePayload | null;
 };
 
 type PlatformFeePayload = {
@@ -107,6 +110,10 @@ export async function executeSwap(params: ExecuteSwapParams) {
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
+  const feeConfig = built.platformFee ? { bps: built.platformFee.bps, recipient: built.platformFee.recipient } : null;
+  const universalRouterCommands = decodeUniversalRouterCommands(tx.data);
+  console.log("[SWAP] fee config:", feeConfig);
+  console.log("[SWAP] universal router commands:", universalRouterCommands);
   // World App rejects broad ERC20 approve flows for many tokens, so keep the
   // executable batch on the Permit2 + Universal Router path that is already
   // supported by MiniKit.
@@ -133,6 +140,8 @@ export async function executeSwap(params: ExecuteSwapParams) {
     executableAmountRaw: executableAmount.toString(),
     expectedOutRaw: expectedOut.toString(),
     platformFee: built.platformFee ?? null,
+    feeConfig,
+    universalRouterCommands,
     permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
     transactions: transactions.map((item, index) => ({
       index,
@@ -187,6 +196,39 @@ export async function executeSwap(params: ExecuteSwapParams) {
   };
 }
 
+const universalRouterExecuteAbi = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+function decodeUniversalRouterCommands(data: `0x${string}`) {
+  try {
+    const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
+    return String(decoded.args[0]);
+  } catch {
+    return null;
+  }
+}
+
 async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse> {
   const response = await fetch("/api/swap/quote", {
     method: "POST",
@@ -226,6 +268,8 @@ async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxRe
             amountInRaw: params.quote.amountInRaw,
             amountOut: params.quote.amountOut,
             amountOutRaw: params.quote.amountOutRaw,
+            grossAmountOut: params.quote.grossAmountOut,
+            grossAmountOutRaw: params.quote.grossAmountOutRaw,
             feeTier: params.quote.feeTier,
             route: params.quote.route,
           }
