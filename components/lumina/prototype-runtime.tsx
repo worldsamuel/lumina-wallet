@@ -1828,6 +1828,32 @@ function enhancePrototypeTokens() {
         if (insertAt < 0) insertAt = assets.length - 1;
         assets.splice(insertAt + 1, 0, ...additions);
       }
+      function upsertBalanceHomeAssets(){
+        if (!Array.isArray(assets) || !balances) return;
+        var existingSymbols = new Set((assets || []).map(function(asset){ return String(asset && asset.sym || "").toUpperCase(); }));
+        Object.keys(balances).forEach(function(symbol){
+          var sym = String(symbol || "").toUpperCase();
+          if (!sym || sym === "23" || existingSymbols.has(sym)) return;
+          var amount = Number(String(balances[sym] || "0").replace(/,/g, ""));
+          if (!Number.isFinite(amount) || amount <= 0) return;
+          var price = priceFor(sym);
+          if (!tokenFull[sym]) tokenFull[sym] = sym;
+          if (!tokenLogo[sym]) tokenLogo[sym] = tokenInitial(sym);
+          if (!dotColor[sym]) dotColor[sym] = "linear-gradient(135deg,#1b231e,#26362b)";
+          assets.push({
+            sym: sym,
+            full: tokenFull[sym] || sym,
+            amt: formattedBalanceFor(sym) + " " + sym,
+            usdNum: price > 0 ? amount * price : 0,
+            cls: "custom",
+            logo: tokenLogo[sym] || tokenInitial(sym),
+            address: null,
+            recentSwapAsset: true,
+            homeSwapAsset: true
+          });
+          existingSymbols.add(sym);
+        });
+      }
       function hiddenSet(){
         var list = readJson(hiddenStoreKey, []);
         return new Set(Array.isArray(list) ? list.map(function(x){ return String(x).toLowerCase(); }) : []);
@@ -2104,6 +2130,7 @@ function enhancePrototypeTokens() {
         var previousRenderAssets = renderAssets;
         renderAssets = function(){
           upsertSwapHomeAssets();
+          upsertBalanceHomeAssets();
           previousRenderAssets();
         };
       }
@@ -2111,6 +2138,7 @@ function enhancePrototypeTokens() {
       syncBackendSwapTokens();
       restoreImportedTokens();
       restoreRecentSwapTokens();
+      upsertBalanceHomeAssets();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {
         window.__luminaImportedRefreshTimer = setInterval(refreshImportedBalances, 10000);
