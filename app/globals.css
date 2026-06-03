@@ -400,6 +400,8 @@
   .detail-v2-ranges .range { min-width: 52px; padding: 9px 0; font-size: 15px; font-weight: 800; }
   .detail-v2-ranges .range.sel { background: rgba(255,255,255,0.045); color: var(--green); }
   .detail-v2-chart-card .detail-chart { margin: 0; height: 230px; background: radial-gradient(circle at 50% 0%, rgba(74,222,128,0.06), transparent 42%); }
+  .detail-v2-chart-card .detail-chart .tv-lightweight-charts { width: 100% !important; height: 100% !important; }
+  .detail-v2-chart-card .detail-chart table { color: inherit; }
   .market-candles { width: 100%; height: 100%; display: block; }
   .market-trend { filter: drop-shadow(0 0 18px rgba(74,222,128,0.12)); }
   .market-terminal { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }

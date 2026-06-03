@@ -2,6 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { MiniKit } from "@worldcoin/minikit-js";
+import {
+  CandlestickSeries,
+  ColorType,
+  createChart,
+  CrosshairMode,
+  HistogramSeries,
+  type UTCTimestamp,
+} from "lightweight-charts";
 import { useSWRConfig } from "swr";
 import { EarnTransactionStatus } from "@/components/EarnTransactionStatus";
 import { prototypeMarkup } from "./prototype-markup";
@@ -49,6 +57,7 @@ declare global {
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
     __luminaApplyBalancePrivacy?: () => void;
+    __luminaRenderLightweightChart?: (container: HTMLElement, candles: MarketChartCandle[], range?: string) => boolean;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
     __luminaOpenReceive?: () => void;
@@ -92,6 +101,22 @@ type MiniKitSendTransactionEnvelope = {
     message?: string;
   };
 };
+
+type MarketChartCandle = {
+  timestamp?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  volume?: number;
+};
+
+type LightweightChartHandle = {
+  remove: () => void;
+  resizeObserver?: ResizeObserver;
+};
+
+const lightweightCharts = new WeakMap<HTMLElement, LightweightChartHandle>();
 
 const tabByView: Record<string, string> = {
   home: "Home",
@@ -162,6 +187,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeBuiltinTokenLogos();
       enhancePrototypeHome();
       enhancePrototypeMarket();
+      installLightweightChartRenderer();
       enhancePrototypeSwapQuote();
       enhancePrototypeSend();
       enhancePrototypeActivity();
@@ -307,6 +333,140 @@ function installMobileConsole() {
     }
   };
   document.head.appendChild(script);
+}
+
+function installLightweightChartRenderer() {
+  if (typeof window === "undefined") return;
+
+  window.__luminaRenderLightweightChart = (container, candles, range = "1D") => {
+    const data = normalizeMarketCandles(candles);
+    if (!container || data.length < 2) return false;
+
+    try {
+      const existing = lightweightCharts.get(container);
+      existing?.resizeObserver?.disconnect();
+      existing?.remove();
+      lightweightCharts.delete(container);
+      container.replaceChildren();
+
+      const width = Math.max(280, container.clientWidth || 360);
+      const height = Math.max(210, container.clientHeight || 230);
+      const chart = createChart(container, {
+        width,
+        height,
+        autoSize: false,
+        layout: {
+          background: { type: ColorType.Solid, color: "rgba(3, 5, 5, 0)" },
+          textColor: "#8f969f",
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          fontSize: 11,
+        },
+        grid: {
+          vertLines: { color: "rgba(255,255,255,0.025)" },
+          horzLines: { color: "rgba(255,255,255,0.055)" },
+        },
+        crosshair: {
+          mode: CrosshairMode.Magnet,
+          vertLine: { color: "rgba(74,222,128,0.22)", labelBackgroundColor: "#151b18" },
+          horzLine: { color: "rgba(74,222,128,0.18)", labelBackgroundColor: "#151b18" },
+        },
+        rightPriceScale: {
+          borderVisible: false,
+          scaleMargins: { top: 0.08, bottom: 0.26 },
+        },
+        timeScale: {
+          borderVisible: false,
+          timeVisible: range === "1H" || range === "1D",
+          secondsVisible: false,
+          rightOffset: 2,
+          barSpacing: range === "1H" ? 11 : range === "1D" ? 9 : 7,
+          fixLeftEdge: true,
+          fixRightEdge: true,
+        },
+        localization: {
+          priceFormatter: formatChartAxisPrice,
+        },
+        handleScroll: false,
+        handleScale: false,
+      });
+
+      const candleSeries = chart.addSeries(CandlestickSeries, {
+        upColor: "#14d89a",
+        downColor: "#ff4d64",
+        borderUpColor: "#14d89a",
+        borderDownColor: "#ff4d64",
+        wickUpColor: "#72ffd0",
+        wickDownColor: "#ff8795",
+        priceLineVisible: true,
+        lastValueVisible: true,
+      });
+      candleSeries.setData(data.map(({ volume: _volume, ...candle }) => candle));
+
+      const volumeSeries = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: "volume" },
+        priceScaleId: "",
+        lastValueVisible: false,
+        priceLineVisible: false,
+      });
+      volumeSeries.setData(
+        data.map((candle) => ({
+          time: candle.time,
+          value: candle.volume,
+          color: candle.close >= candle.open ? "rgba(20,216,154,0.38)" : "rgba(255,77,100,0.38)",
+        })),
+      );
+      chart.priceScale("").applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
+      chart.timeScale().fitContent();
+
+      const resizeObserver = new ResizeObserver(() => {
+        const nextWidth = Math.max(280, container.clientWidth || width);
+        const nextHeight = Math.max(210, container.clientHeight || height);
+        chart.applyOptions({ width: nextWidth, height: nextHeight });
+        chart.timeScale().fitContent();
+      });
+      resizeObserver.observe(container);
+      lightweightCharts.set(container, {
+        remove: () => chart.remove(),
+        resizeObserver,
+      });
+      return true;
+    } catch (error) {
+      console.error("Failed to render Lightweight Chart", error);
+      return false;
+    }
+  };
+}
+
+function normalizeMarketCandles(candles: MarketChartCandle[]) {
+  const byTime = new Map<number, { time: UTCTimestamp; open: number; high: number; low: number; close: number; volume: number }>();
+  for (const candle of candles) {
+    const rawTimestamp = Number(candle.timestamp ?? 0);
+    const time = Math.floor(rawTimestamp > 9_999_999_999 ? rawTimestamp / 1000 : rawTimestamp);
+    const open = Number(candle.open ?? 0);
+    const high = Number(candle.high ?? 0);
+    const low = Number(candle.low ?? 0);
+    const close = Number(candle.close ?? 0);
+    const volume = Math.max(0, Number(candle.volume ?? 0));
+    if (!Number.isFinite(time) || !Number.isFinite(open) || !Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
+    if (time <= 0 || open <= 0 || high <= 0 || low <= 0 || close <= 0) continue;
+    byTime.set(time, {
+      time: time as UTCTimestamp,
+      open,
+      high: Math.max(high, open, close),
+      low: Math.min(low, open, close),
+      close,
+      volume,
+    });
+  }
+  return [...byTime.values()].sort((a, b) => Number(a.time) - Number(b.time));
+}
+
+function formatChartAxisPrice(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "$0";
+  if (value >= 1000) return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  if (value >= 1) return `$${value.toLocaleString(undefined, { maximumFractionDigits: value >= 100 ? 1 : 2 })}`;
+  if (value >= 0.01) return `$${value.toFixed(4)}`;
+  return `$${value.toPrecision(4)}`;
 }
 
       function toastFromPrototype(message: string) {
@@ -4079,7 +4239,7 @@ function enhancePrototypeDetail() {
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];
               if (candles.length) {
-                chart.innerHTML = trendSvg(candles, range || "1D");
+                renderCandlesChart(chart, candles, range || "1D");
                 updateRangeChange(candles, range || "1D", asset);
               } else {
                 chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
@@ -4101,7 +4261,7 @@ function enhancePrototypeDetail() {
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
             if (candles.length) {
-              chart.innerHTML = trendSvg(candles, range || "1D");
+              renderCandlesChart(chart, candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
               if (address) {
@@ -4142,6 +4302,10 @@ function enhancePrototypeDetail() {
         var up = Number(change) >= 0;
         pill.className = up ? "up" : "down";
         pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
+      }
+      function renderCandlesChart(chart, candles, range) {
+        if (window.__luminaRenderLightweightChart && window.__luminaRenderLightweightChart(chart, candles, range || "1D")) return;
+        chart.innerHTML = trendSvg(candles, range || "1D");
       }
       function updateRangeChangeFromMarket(asset, range) {
         var market = marketForAsset(asset);

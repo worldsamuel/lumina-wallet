@@ -28,6 +28,7 @@
     "bcryptjs": "^3.0.3",
     "eruda": "^3.2.3",
     "jsonwebtoken": "^9.0.3",
+    "lightweight-charts": "^5.2.0",
     "next": "14.2.6",
     "pg": "^8.21.0",
     "qrcode.react": "^4.2.0",
