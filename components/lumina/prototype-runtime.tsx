@@ -293,9 +293,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
 function installMobileConsole() {
   if (typeof window === "undefined" || window.__luminaErudaInstalled) return;
-  const debugAllowed =
-    process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true" ||
-    new URLSearchParams(window.location.search).get("debug") === "eruda";
+  const debugAllowed = process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true";
   if (!debugAllowed) return;
   window.__luminaErudaInstalled = true;
 
@@ -1962,6 +1960,7 @@ function enhancePrototypeHome() {
           if (sym === "WETH") return Number(prices && prices.ETH) || 0;
           if (sym === "WBTC" || sym === "BTC") return Number(prices && prices.BTC) || 0;
           if (sym === "USDC" || sym === "USDT" || sym === "EURC") return 1;
+          if (customTokens && customTokens[sym] && Number(customTokens[sym].priceUsd) > 0) return Number(customTokens[sym].priceUsd);
           var map = window.__luminaMarketBySymbol || {};
           if (map[sym] && Number(map[sym].priceUsd) > 0) return Number(map[sym].priceUsd);
           var markets = window.__luminaMarketPrices || [];
@@ -2565,6 +2564,31 @@ function enhancePrototypeSwapQuote() {
 	        if (/cancel|reject|rejected|user_rejected|取消/i.test(String(msg))) return swapCopy("cancelled");
 	        return swapCopy("swapFailed") + ": " + msg;
 	      }
+	      function syncSwapQuotePriceToHome(){
+	        if (!latestSwapQuote) return;
+	        var sell = String(swapState.sell || "").toUpperCase();
+	        var buy = String(swapState.buy || "").toUpperCase();
+	        var amountIn = Number(latestSwapQuote.amountIn || 0);
+	        var amountOut = Number(latestSwapQuote.amountOut || 0);
+	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
+	        var sellPrice = tokenMeta(sell, latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
+	        if (!(sellPrice > 0) && sell === "WETH") sellPrice = Number(prices && prices.ETH) || 0;
+	        if (!(sellPrice > 0) && (sell === "WBTC" || sell === "BTC")) sellPrice = Number(prices && prices.BTC) || 0;
+	        if (!(sellPrice > 0) && (sell === "USDC" || sell === "USDT" || sell === "EURC")) sellPrice = 1;
+	        if (!(sellPrice > 0)) return;
+	        var buyPrice = amountIn * sellPrice / amountOut;
+	        if (!Number.isFinite(buyPrice) || buyPrice <= 0) return;
+	        prices[buy] = buyPrice;
+	        if (customTokens && customTokens[buy]) customTokens[buy].priceUsd = buyPrice;
+	        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[buy];
+	        if (market) market.priceUsd = buyPrice;
+	        (assets || []).forEach(function(asset){
+	          if (String(asset.sym || "").toUpperCase() !== buy) return;
+	          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
+	          if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * buyPrice;
+	        });
+	        if (typeof renderAssets === "function") renderAssets();
+	      }
 	      function minOutText(){
 	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
 	        var slip = slippageBps();
@@ -2687,7 +2711,7 @@ function enhancePrototypeSwapQuote() {
 	          return;
 	        }
 	        var confirmed = await openSwapConfirm(state);
-	        if (!confirmed) { toast("Cancelled"); return; }
+	        if (!confirmed) { toast(swapCopy("cancelled")); return; }
 	        swapSubmitting = true;
 	        setSwapButtonState(swapCopy("signing"), true);
 	        try {
@@ -2708,6 +2732,7 @@ function enhancePrototypeSwapQuote() {
 	          var result = await promise;
 	          setSwapButtonState(swapCopy("waitingChain"), true);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
+	          syncSwapQuotePriceToHome();
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
@@ -2834,6 +2859,36 @@ function enhancePrototypeSend() {
       var submit = form.querySelector(".send-submit");
       var recipientError = document.getElementById("sendRecipientError");
       var amountError = document.getElementById("sendAmountError");
+      function sendLang(){
+        return window.currentLang || localStorage.getItem("ww_lang") || "en";
+      }
+      function sendCopy(key){
+        var lang = sendLang();
+        var copy = {
+          processing: { en:"Processing...", "zh-CN":"处理中...", "zh-TW":"處理中...", fr:"Traitement...", de:"Wird verarbeitet...", es:"Procesando...", ja:"処理中..." },
+          confirmTransfer: { en:"Confirm transfer", "zh-CN":"确认转账", "zh-TW":"確認轉帳", fr:"Confirmer le transfert", de:"Transfer bestätigen", es:"Confirmar transferencia", ja:"送金を確認" },
+          selectToken: { en:"Select a World Chain token", "zh-CN":"请选择 World Chain 代币", "zh-TW":"請選擇 World Chain 代幣", fr:"Sélectionnez un jeton World Chain", de:"World Chain Token auswählen", es:"Selecciona un token World Chain", ja:"World Chain トークンを選択" },
+          missingContract: { en:"Missing token contract address", "zh-CN":"缺少代币合约地址", "zh-TW":"缺少代幣合約地址", fr:"Adresse du contrat manquante", de:"Token-Vertragsadresse fehlt", es:"Falta la dirección del contrato", ja:"トークンコントラクトアドレスがありません" },
+          invalidRecipient: { en:"Invalid recipient address", "zh-CN":"收款地址无效", "zh-TW":"收款地址無效", fr:"Adresse destinataire invalide", de:"Ungültige Empfängeradresse", es:"Dirección de destinatario inválida", ja:"受取人アドレスが無効です" },
+          enterAmount: { en:"Enter an amount greater than 0", "zh-CN":"请输入大于 0 的金额", "zh-TW":"請輸入大於 0 的金額", fr:"Saisissez un montant supérieur à 0", de:"Betrag größer als 0 eingeben", es:"Ingresa un importe mayor que 0", ja:"0 より大きい金額を入力" },
+          insufficient: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" },
+          maxFilled: { en:"Max filled", "zh-CN":"已填入最大金额", "zh-TW":"已填入最大金額", fr:"Maximum rempli", de:"Maximum eingetragen", es:"Máximo rellenado", ja:"最大額を入力しました" },
+          confirmTitle: { en:"Confirm transfer", "zh-CN":"确认转账", "zh-TW":"確認轉帳", fr:"Confirmer le transfert", de:"Transfer bestätigen", es:"Confirmar transferencia", ja:"送金を確認" },
+          send: { en:"Send", "zh-CN":"发送", "zh-TW":"發送", fr:"Envoyer", de:"Senden", es:"Enviar", ja:"送金" },
+          to: { en:"to", "zh-CN":"至", "zh-TW":"至", fr:"à", de:"an", es:"a", ja:"宛先" },
+          cancel: { en:"Cancel", "zh-CN":"取消", "zh-TW":"取消", fr:"Annuler", de:"Abbrechen", es:"Cancelar", ja:"キャンセル" },
+          confirm: { en:"Confirm", "zh-CN":"确认", "zh-TW":"確認", fr:"Confirmer", de:"Bestätigen", es:"Confirmar", ja:"確認" },
+          submitted: { en:"Transaction submitted", "zh-CN":"交易已提交", "zh-TW":"交易已提交", fr:"Transaction envoyée", de:"Transaktion gesendet", es:"Transacción enviada", ja:"取引を送信しました" },
+          waiting: { en:"Waiting for World Chain confirmation. Activity will update automatically.", "zh-CN":"等待 World Chain 确认。Activity 会自动更新。", "zh-TW":"等待 World Chain 確認。Activity 會自動更新。", fr:"En attente de confirmation World Chain. Activity se mettra à jour.", de:"Warten auf World Chain-Bestätigung. Activity aktualisiert automatisch.", es:"Esperando confirmación de World Chain. Activity se actualizará.", ja:"World Chain の確認待ちです。Activity は自動更新されます。" },
+          viewActivity: { en:"View Activity", "zh-CN":"查看 Activity", "zh-TW":"查看 Activity", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver Activity", ja:"Activity を見る" },
+          explorer: { en:"Explorer", "zh-CN":"浏览器", "zh-TW":"瀏覽器", fr:"Explorer", de:"Explorer", es:"Explorer", ja:"Explorer" },
+          close: { en:"Close", "zh-CN":"关闭", "zh-TW":"關閉", fr:"Fermer", de:"Schließen", es:"Cerrar", ja:"閉じる" },
+          cancelled: { en:"Transaction cancelled", "zh-CN":"交易已取消", "zh-TW":"交易已取消", fr:"Transaction annulée", de:"Transaktion abgebrochen", es:"Transacción cancelada", ja:"取引をキャンセルしました" },
+          transferFailed: { en:"Transfer failed", "zh-CN":"转账失败", "zh-TW":"轉帳失敗", fr:"Échec du transfert", de:"Transfer fehlgeschlagen", es:"Transferencia fallida", ja:"送金に失敗しました" },
+          validRequired: { en:"Enter a valid address and amount", "zh-CN":"请输入有效地址和金额", "zh-TW":"請輸入有效地址和金額", fr:"Saisissez une adresse et un montant valides", de:"Gültige Adresse und Betrag eingeben", es:"Ingresa dirección e importe válidos", ja:"有効なアドレスと金額を入力" }
+        };
+        return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
+      }
       if (!recipientError) {
         recipientError = document.createElement("div");
         recipientError.id = "sendRecipientError";
@@ -2871,7 +2926,7 @@ function enhancePrototypeSend() {
       function setButtonLoading(active){
         if (!submit) return;
         submit.classList.toggle("is-loading", active);
-        submit.innerHTML = active ? '<span class="send-spinner"></span><span>Processing...</span>' : '<span data-i18n="confirmSend">Confirm transfer</span>';
+        submit.innerHTML = active ? '<span class="send-spinner"></span><span>' + sendCopy("processing") + '</span>' : '<span data-i18n="confirmSend">' + sendCopy("confirmTransfer") + '</span>';
       }
       function validation(){
         var token = selectedToken();
@@ -2881,11 +2936,11 @@ function enhancePrototypeSend() {
         var balance = token ? balanceNumber(token.symbol) : 0;
         var recipientMsg = "";
         var amountMsg = "";
-        if (!token) amountMsg = "Select a World Chain token";
-        if (token && !token.native && !token.address) amountMsg = "Missing token contract address";
-        if (recipient && !isValidAddress(recipient)) recipientMsg = "Invalid recipient address";
-        if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = "Enter an amount greater than 0";
-        if (token && Number.isFinite(amount) && amount > balance) amountMsg = "Insufficient balance";
+        if (!token) amountMsg = sendCopy("selectToken");
+        if (token && !token.native && !token.address) amountMsg = sendCopy("missingContract");
+        if (recipient && !isValidAddress(recipient)) recipientMsg = sendCopy("invalidRecipient");
+        if (amountText && (!Number.isFinite(amount) || amount <= 0)) amountMsg = sendCopy("enterAmount");
+        if (token && Number.isFinite(amount) && amount > balance) amountMsg = sendCopy("insufficient");
         if (recipientError) recipientError.textContent = recipientMsg;
         if (amountError) amountError.textContent = amountMsg;
         var disabled = sending || !window.__luminaUserAddress || !token || !recipient || !isValidAddress(recipient) || !amountText || !Number.isFinite(amount) || amount <= 0 || amount > balance;
@@ -2902,7 +2957,7 @@ function enhancePrototypeSend() {
         if (token.symbol === "ETH") max = Math.max(0, max - 0.001);
         amountInput.value = max > 0 ? String(Number(max.toFixed(token.decimals === 6 ? 6 : 8))) : "";
         validation();
-        toast("Max filled", "success");
+        toast(sendCopy("maxFilled"), "success");
       }
       function confirmSendAction(state){
         return new Promise(function(resolve){
@@ -2914,9 +2969,9 @@ function enhancePrototypeSend() {
           modal.innerHTML =
             '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;min-height:300px;padding:24px 24px 22px;margin:0 auto 10px;border-radius:26px;">' +
               '<div class="modal-grip"></div>' +
-              '<h3>Confirm transfer</h3>' +
-              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">Send ' + state.amountText + ' ' + state.token.symbol + '<br>to ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
-              '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">Cancel</button><button class="btn-primary" id="sendConfirmOk">Confirm</button></div>' +
+              '<h3>' + sendCopy("confirmTitle") + '</h3>' +
+              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">' + sendCopy("send") + ' ' + state.amountText + ' ' + state.token.symbol + '<br>' + sendCopy("to") + ' ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">' + sendCopy("cancel") + '</button><button class="btn-primary" id="sendConfirmOk">' + sendCopy("confirm") + '</button></div>' +
             '</div>';
           document.body.appendChild(modal);
           function done(value){
@@ -2931,7 +2986,7 @@ function enhancePrototypeSend() {
       }
       function shortHash(hash){
         var value = String(hash || "");
-        if (!value) return "Submitted";
+        if (!value) return sendCopy("submitted");
         if (value.length <= 22) return value;
         return value.slice(0, 10) + "..." + value.slice(-6);
       }
@@ -2946,9 +3001,9 @@ function enhancePrototypeSend() {
         panel.innerHTML =
           '<div class="tx-submitted-card">' +
             '<div class="tx-submitted-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>' +
-            '<div class="tx-submitted-body"><strong>Transaction submitted</strong><p>Waiting for World Chain confirmation. Activity will update automatically.</p><span class="tx-submitted-hash">' + shortHash(tx) + '</span></div>' +
-            '<div class="tx-submitted-actions"><button type="button" class="primary" id="txToastActivity">View Activity</button>' +
-            (canOpen ? '<a href="https://worldscan.org/tx/' + tx + '" target="_blank" rel="noreferrer">Explorer</a>' : '<button type="button" id="txToastClose">Close</button>') +
+            '<div class="tx-submitted-body"><strong>' + sendCopy("submitted") + '</strong><p>' + sendCopy("waiting") + '</p><span class="tx-submitted-hash">' + shortHash(tx) + '</span></div>' +
+            '<div class="tx-submitted-actions"><button type="button" class="primary" id="txToastActivity">' + sendCopy("viewActivity") + '</button>' +
+            (canOpen ? '<a href="https://worldscan.org/tx/' + tx + '" target="_blank" rel="noreferrer">' + sendCopy("explorer") + '</a>' : '<button type="button" id="txToastClose">' + sendCopy("close") + '</button>') +
             '</div>' +
           '</div>';
         document.body.appendChild(panel);
@@ -2965,12 +3020,12 @@ function enhancePrototypeSend() {
         var state = validation();
         if (sending) return;
         if (!state.ok) {
-          toast(state.error || "Enter a valid address and amount");
+          toast(state.error || sendCopy("validRequired"));
           return;
         }
         var confirmed = await confirmSendAction(state);
         if (!confirmed) {
-          toast("Cancelled");
+          toast(sendCopy("cancelled"));
           return;
         }
         sending = true;
@@ -2995,15 +3050,15 @@ function enhancePrototypeSend() {
             recipientInput.value = "";
             amountInput.value = "";
           } else if (result.status === "user_rejected") {
-            toast("You cancelled the transaction");
+            toast(sendCopy("cancelled"));
           } else {
-            var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Transaction failed");
-            toast("Transfer failed: " + msg);
+            var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || sendCopy("transferFailed"));
+            toast(sendCopy("transferFailed") + ": " + msg);
           }
         } catch(e) {
           var code = e && e.message ? e.message : "generic_error";
           var friendly = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(code) : code;
-          toast("Transfer failed: " + friendly);
+          toast(sendCopy("transferFailed") + ": " + friendly);
         } finally {
           console.log("[A7] finally — setSending false");
           sending = false;
@@ -3061,7 +3116,8 @@ function enhancePrototypeActivity() {
           loading: { en:"Loading activity...", fr:"Chargement de l'activité...", de:"Aktivität wird geladen...", es:"Cargando actividad...", ja:"アクティビティを読み込み中...", "zh-CN":"正在读取活动...", "zh-TW":"正在讀取活動..." },
           empty: { en:"No activity yet", fr:"Aucune activité pour le moment", de:"Noch keine Aktivität", es:"Aún no hay actividad", ja:"アクティビティはまだありません", "zh-CN":"暂无活动", "zh-TW":"暫無活動" },
           swapRoute: { en:"Swap", fr:"Échange", de:"Swap", es:"Intercambio", ja:"スワップ", "zh-CN":"兑换", "zh-TW":"兌換" },
-          completed: { en:"Completed", fr:"Terminé", de:"Abgeschlossen", es:"Completado", ja:"完了", "zh-CN":"已完成", "zh-TW":"已完成" }
+          completed: { en:"Completed", fr:"Terminé", de:"Abgeschlossen", es:"Completado", ja:"完了", "zh-CN":"已完成", "zh-TW":"已完成" },
+          pendingToast: { en:"Transaction submitted. Waiting for confirmation.", fr:"Transaction envoyée. En attente de confirmation.", de:"Transaktion gesendet. Warten auf Bestätigung.", es:"Transacción enviada. Esperando confirmación.", ja:"取引を送信しました。確認待ちです。", "zh-CN":"交易已提交,等待确认。", "zh-TW":"交易已提交,等待確認。" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
       }
@@ -3076,7 +3132,7 @@ function enhancePrototypeActivity() {
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
-        return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'Transaction submitted. Waiting for confirmation.\\')') + '" style="cursor:pointer;">' +
+        return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'' + activityCopy("pendingToast") + '\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
           '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + activitySubtitle(a.subtitle) + '</div></div>' +
           '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + activityStatus(a.status) + '</div></div>' +
