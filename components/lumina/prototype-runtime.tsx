@@ -2300,7 +2300,7 @@ function enhancePrototypeHome() {
         var verified = (assets || []).filter(function(a){
           return showOnHome(a) && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
         });
-        var html = verified.map(function(a, i){ return rowHtml(a, i, false); }).join("");
+        var html = verified.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
       };

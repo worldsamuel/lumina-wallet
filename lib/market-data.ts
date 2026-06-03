@@ -87,6 +87,7 @@ type DexScreenerPair = {
   baseToken?: { address?: string; name?: string; symbol?: string };
   quoteToken?: { address?: string; name?: string; symbol?: string };
   priceUsd?: string | null;
+  priceNative?: string | null;
   priceChange?: { h24?: number | string | null };
   volume?: { h24?: number | string | null };
   liquidity?: { usd?: number | string | null };
@@ -274,20 +275,29 @@ function marketFromDexPair(pair: DexScreenerPair, tokenAddress: string, symbolHi
   const target = tokenAddress.toLowerCase();
   const base = pair.baseToken;
   const quote = pair.quoteToken;
+  const targetIsBase = String(base?.address || "").toLowerCase() === target;
+  const targetIsQuote = String(quote?.address || "").toLowerCase() === target;
   const targetToken =
-    String(base?.address || "").toLowerCase() === target
+    targetIsBase
       ? base
-      : String(quote?.address || "").toLowerCase() === target
+      : targetIsQuote
         ? quote
         : base;
   const symbol = (symbolHint?.trim() || targetToken?.symbol || "").toUpperCase();
   if (!symbol) return null;
+  const basePriceUsd = numberOrNull(pair.priceUsd);
+  const basePerQuote = numberOrNull(pair.priceNative);
+  const targetPriceUsd = targetIsQuote
+    ? basePriceUsd !== null && basePerQuote !== null && basePerQuote > 0
+      ? basePriceUsd / basePerQuote
+      : null
+    : basePriceUsd;
 
   return {
     symbol,
     name: targetToken?.name ?? TOKENS.find((token) => token.symbol === symbol)?.name ?? symbol,
     address: formatAddress(tokenAddress),
-    priceUsd: numberOrNull(pair.priceUsd),
+    priceUsd: targetPriceUsd,
     change24h: numberOrNull(pair.priceChange?.h24),
     volume24hUsd: num(pair.volume?.h24),
     liquidityUsd,
