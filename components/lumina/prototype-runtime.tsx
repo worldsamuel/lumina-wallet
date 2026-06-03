@@ -295,18 +295,6 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
           onError={handleEarnReceiptError}
         />
       ) : null}
-      {swapUserOpHash ? (
-        <EarnTransactionStatus
-          userOpHash={swapUserOpHash}
-          onSuccess={handleSwapReceiptSuccess}
-          onError={handleSwapReceiptError}
-          timeoutMs={5 * 60 * 1000}
-          onTimeout={() => {
-            window.__luminaRefreshActivity?.();
-          }}
-          labels={transactionStatusLabels("swap", "en")}
-        />
-      ) : null}
     </>
   );
 }
@@ -2203,7 +2191,7 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
-      var homeSwapWhitelist = new Set(["WLD","USDC","USDT","WETH","WBTC","ORO","ORB","EURC","LIFE","WGEM"]);
+      var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC"]);
       function hasVisibleHomeBalance(asset){
         var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
         var n = Number(raw);
@@ -2211,10 +2199,14 @@ function enhancePrototypeHome() {
       }
       function showOnHome(asset){
         var sym = String(asset && asset.sym || "").toUpperCase();
-        if (asset && asset.homeSwapAsset) return true;
-        if (homeSwapWhitelist.has(sym)) return true;
+        if (fixedHomeTokens.has(sym)) return true;
         return !!(asset && hasVisibleHomeBalance(asset));
       }
+      window.openHomeAsset = function(sym){
+        sym = String(sym || "").toUpperCase();
+        var idx = (assets || []).findIndex(function(a){ return String(a && a.sym || "").toUpperCase() === sym; });
+        if (idx >= 0) openDetail(idx);
+      };
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
         if (menu) menu.classList.toggle("open");
@@ -2279,7 +2271,7 @@ function enhancePrototypeHome() {
         return Number(asset && asset.usdNum || 0);
       }
       function rowHtml(asset, index, imported){
-        var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openDetail(' + index + ')';
+        var open = imported ? 'openImportedTokenHome(\\'' + asset.sym + '\\')' : 'openHomeAsset(\\'' + String(asset.sym || "").toUpperCase() + '\\')';
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || tokenInitialHome(asset.sym)) : (asset.logo || tokenInitialHome(asset.sym));
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;

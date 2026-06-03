@@ -13,6 +13,8 @@ const MIN_LIQUIDITY_USD = 10;
 const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
 const STABLE_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE"]);
+const ORB_ADDRESS = "0xee21af1d049211206b20b957d07794e7d0b140b3";
+const ORB_POOL_ID = "0x01c4a12662895942be788160025e1359e232471f5e00228c1a1de14703975f4a";
 const KNOWN_TOKEN_ADDRESSES = new Map(
   TOKENS.flatMap((token) => {
     if (token.contractAddress) return [[token.contractAddress.toLowerCase(), token.symbol] as const];
@@ -161,6 +163,29 @@ function symbolOverride(address: string, fallback: string) {
 
 function formatAddress(value: string): Address | null {
   return /^0x[a-fA-F0-9]{40}$/.test(value) ? (value as Address) : null;
+}
+
+function isPoolIdentifier(value: string) {
+  return /^0x[a-fA-F0-9]{40}$/.test(value) || /^0x[a-fA-F0-9]{64}$/.test(value);
+}
+
+function overrideMarketForToken(tokenAddress: string, symbolHint?: string | null): MarketToken | null {
+  const target = tokenAddress.toLowerCase();
+  const symbol = String(symbolHint || "").toUpperCase();
+  if (target !== ORB_ADDRESS || (symbol && symbol !== "ORB")) return null;
+  return {
+    symbol: "ORB",
+    name: "Orb",
+    address: ORB_ADDRESS as Address,
+    priceUsd: null,
+    change24h: null,
+    volume24hUsd: 0,
+    liquidityUsd: 1,
+    logoUrl: "https://www.orbs.com/assets/img/brand-assets/gradient-logo.svg",
+    poolAddress: ORB_POOL_ID,
+    verified: true,
+    decimals: 18,
+  };
 }
 
 async function fetchGeckoPage(page: number) {
@@ -367,6 +392,7 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
   const cacheKey = tokenAddress.toLowerCase();
   const cachedTokenMarket = tokenMarketCache.get(cacheKey);
   if (cachedTokenMarket && cachedTokenMarket.expiresAt > Date.now()) return cachedTokenMarket.data;
+  const overrideMarket = overrideMarketForToken(tokenAddress, symbolHint);
 
   try {
     const dexPairs = await fetchDexScreenerTokenPairs(tokenAddress);
@@ -399,12 +425,13 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
         if (!best || normalized.liquidityUsd > best.liquidityUsd) best = normalized;
       }
     }
-    tokenMarketCache.set(cacheKey, { data: best, expiresAt: Date.now() + 60_000 });
-    return best;
+    const resolved = best ?? overrideMarket;
+    tokenMarketCache.set(cacheKey, { data: resolved, expiresAt: Date.now() + 60_000 });
+    return resolved;
   } catch (error) {
     console.error("Failed to fetch GeckoTerminal token pools", error);
-    tokenMarketCache.set(cacheKey, { data: null, expiresAt: Date.now() + 20_000 });
-    return null;
+    tokenMarketCache.set(cacheKey, { data: overrideMarket, expiresAt: Date.now() + 20_000 });
+    return overrideMarket;
   }
 }
 
@@ -453,7 +480,7 @@ export async function getPoolOhlcv(
   limit = "60",
   tokenAddress?: string | null,
 ) {
-  if (!/^0x[a-fA-F0-9]{40}$/.test(poolAddress)) return [];
+  if (!isPoolIdentifier(poolAddress)) return [];
   const safeTimeframe = ["minute", "hour", "day"].includes(timeframe) ? timeframe : "day";
   const safeAggregate = String(Math.max(1, Math.min(30, Number.parseInt(aggregate, 10) || 1)));
   const safeLimit = String(Math.max(10, Math.min(365, Number.parseInt(limit, 10) || 60)));
@@ -488,7 +515,7 @@ export async function getPoolOhlcv(
 }
 
 export async function getPoolTrades(poolAddress: string, tokenAddress?: string | null) {
-  if (!/^0x[a-fA-F0-9]{40}$/.test(poolAddress)) return [];
+  if (!isPoolIdentifier(poolAddress)) return [];
   const params = new URLSearchParams({
     trade_volume_in_usd_greater_than: "0",
   });
