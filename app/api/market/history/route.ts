@@ -29,6 +29,8 @@ const SYMBOL_ALIASES: Record<string, string> = {
   WBTC: "BTC",
   BTC: "BTC",
 };
+const ORB_ADDRESS = "0xee21af1d049211206b20b957d07794e7d0b140b3";
+const ORB_POOL_ID = "0x01c4a12662895942be788160025e1359e232471f5e00228c1a1de14703975f4a";
 
 export function OPTIONS() {
   return optionsResponse();
@@ -82,12 +84,18 @@ export async function GET(req: NextRequest) {
 }
 
 async function candlesForContract(address: string, symbol: string, range: string) {
+  const cfg = ohlcvConfig(range);
+  if (address.toLowerCase() === ORB_ADDRESS && symbol === "ORB") {
+    return getPoolOhlcv(ORB_POOL_ID, cfg.timeframe, cfg.aggregate, cfg.limit).catch((error) => {
+      console.error("Failed to fetch ORB override OHLCV", error);
+      return [];
+    });
+  }
   const market = await getWorldChainMarketForToken(address, symbol).catch((error) => {
     console.error("Failed to resolve market history contract", error);
     return null;
   });
   if (!market?.poolAddress) return [];
-  const cfg = ohlcvConfig(range);
   return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit, address).catch((error) => {
     console.error("Failed to fetch contract OHLCV", error);
     return [];
