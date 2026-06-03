@@ -353,7 +353,10 @@
   .swap-panel .row { display: flex; justify-content: space-between; align-items: center; }
   .swap-panel .cap { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
   .swap-panel .amt-in { background: none; border: none; color: var(--text); font-size: 30px; font-weight: 700; width: 60%; outline: none; }
-  .swap-panel .tk { display: flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-weight: 700; cursor: pointer; }
+  .swap-panel .swap-amount-wrap { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: calc(100% - 132px); }
+  .swap-panel .swap-amount-wrap .amt-in { width: 100%; min-width: 0; flex: 1 1 auto; }
+  .swap-max-btn { flex: 0 0 auto; min-width: 45px; height: 30px; border-radius: 999px; border: 1px solid rgba(108,237,143,0.42); background: rgba(108,237,143,0.11); color: var(--green); font-size: 12px; font-weight: 900; cursor: pointer; }
+  .swap-panel .tk { display: flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-weight: 700; cursor: pointer; flex: 0 0 auto; }
   .swap-panel .tk .dot2 { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; flex: 0 0 22px; color: #fff; font-size: 11px; font-weight: 900; }
   .swap-panel .tk .dot2 img, .swap-panel .tk .dot2 svg { width: 100%; height: 100%; object-fit: contain; display: block; }
   .swap-panel .bal { color: var(--text-mute); font-size: 12px; margin-top: 8px; }
@@ -494,6 +497,16 @@
   .quote-muted { color: var(--text-mute); font-weight: 500; }
   .gear { margin-left: auto; cursor: pointer; color: var(--text-dim); display: inline-flex; }
   .gear.is-floating { position: fixed; right: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px)); top: max(84px, env(safe-area-inset-top)); z-index: 34; width: 46px; height: 46px; border-radius: 999px; align-items: center; justify-content: center; background: rgba(18,20,18,0.92); border: 1px solid var(--line); box-shadow: 0 12px 34px rgba(0,0,0,0.32); backdrop-filter: blur(10px); }
+  .swap-debug-btn { top: max(132px, calc(env(safe-area-inset-top) + 132px)); color: var(--green); font-size: 11px; font-weight: 950; letter-spacing: 0; }
+  .swap-debug-sheet { width: calc(100vw - 24px); max-width: 430px; max-height: min(78vh, 680px); padding: 22px; border-radius: 24px; overflow: auto; }
+  .swap-debug-sheet h3 { padding: 0 44px 12px 0; font-size: 22px; }
+  .swap-debug-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--text); font-size: 28px; line-height: 1; cursor: pointer; }
+  .swap-debug-grid { display: grid; grid-template-columns: 86px minmax(0, 1fr); gap: 8px 12px; margin: 4px 0 14px; font-size: 13px; }
+  .swap-debug-grid span { color: var(--text-mute); }
+  .swap-debug-grid b { min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+  .swap-debug-empty { color: var(--text-dim); font-size: 14px; line-height: 1.45; }
+  .swap-debug-pre { margin: 0; padding: 12px; max-height: 340px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,0.32); color: var(--text); font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .swap-debug-copy { width: 100%; margin-top: 14px; min-height: 48px; border-radius: 16px; }
   .swap-head { display: grid; grid-template-columns: 40px 1fr 40px; align-items: center; gap: 14px; padding: 8px var(--pad-screen) 18px; }
   .swap-head > h1 { text-align: center; grid-column: 2; }
   .swap-head > .back-btn { grid-column: 1; }

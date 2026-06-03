@@ -1518,17 +1518,22 @@ function enhancePrototypeTokens() {
         return out;
       }
       function swapWhitelistTokens(){
-        var source = readJson("ww_swap_tokens", []);
-        if (!Array.isArray(source) || !source.length) source = readJson("ww_tokens", []);
-        if (!Array.isArray(source) || !source.length) {
-          source = [
-            { symbol:"WLD", name:"Worldcoin", contractAddr:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals:18, logoUrl:null },
-            { symbol:"USDC", name:"USD Coin", contractAddr:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals:6, logoUrl:null },
-            { symbol:"USDT", name:"Tether USD", contractAddr:"0x102d758f688a4c1c5a80b116bd945d4455460282", decimals:6, logoUrl:null },
-            { symbol:"WETH", name:"WETH", contractAddr:"0x4200000000000000000000000000000000000006", decimals:18, logoUrl:null },
-            { symbol:"WBTC", name:"Wrapped Bitcoin", contractAddr:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals:8, logoUrl:null }
-          ];
-        }
+        var source = [];
+        var builtin = [
+          { symbol:"WLD", name:"Worldcoin", contractAddr:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals:18, logoUrl:null },
+          { symbol:"USDC", name:"USD Coin", contractAddr:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals:6, logoUrl:null },
+          { symbol:"USDT", name:"Tether USD", contractAddr:"0x102d758f688a4c1c5a80b116bd945d4455460282", decimals:6, logoUrl:null },
+          { symbol:"WETH", name:"WETH", contractAddr:"0x4200000000000000000000000000000000000006", decimals:18, logoUrl:null },
+          { symbol:"WBTC", name:"Wrapped Bitcoin", contractAddr:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals:8, logoUrl:null },
+          { symbol:"EURC", name:"EURC", contractAddr:"0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0", decimals:6, logoUrl:null },
+          { symbol:"ORO", name:"ORO", contractAddr:"0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63", decimals:18, logoUrl:null },
+          { symbol:"ORB", name:"Orb", contractAddr:"0xF3F631145955cE35B104C10B392D07C821AD6C15", decimals:18, logoUrl:null },
+          { symbol:"LIFE", name:"Life", contractAddr:"0xE4Dfa75375a5cB188B532caAA4cADdf5d0f19b0C", decimals:18, logoUrl:null },
+          { symbol:"WGEM", name:"Wrapped Gem", contractAddr:"0xAC796Ee4FE4423daBf0B071eEea01f2a6A60c956", decimals:18, logoUrl:null }
+        ];
+        [readJson("ww_swap_tokens", []), readJson("ww_tokens", []), builtin].forEach(function(list){
+          if (Array.isArray(list)) source.push.apply(source, list);
+        });
         var seen = new Set();
         return source.filter(function(token){
           var symbol = String(token && token.symbol || "").toUpperCase();
@@ -2338,6 +2343,8 @@ function enhancePrototypeSwapQuote() {
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
 	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
 	      var configuredNetworkFeeLabel = "";
+	      var swapDebugStorageKey = "lumina_swap_debug_v1";
+	      var latestSwapDebug = null;
       function swapLang(){
         return window.currentLang || "en";
       }
@@ -2374,6 +2381,15 @@ function enhancePrototypeSwapQuote() {
           ,quoteUpdated: { en:"Quote refreshed", "zh-CN":"报价已刷新", "zh-TW":"報價已刷新", fr:"Devis actualisé", de:"Angebot aktualisiert", es:"Cotización actualizada", ja:"見積もりを更新しました" }
           ,confirmInWorldApp: { en:"Confirm in World App...", "zh-CN":"请在 World App 确认...", "zh-TW":"請在 World App 確認...", fr:"Confirmez dans World App...", de:"In World App bestätigen...", es:"Confirma en World App...", ja:"World App で確認..." }
           ,submittedHint: { en:"Your transaction is in the queue. Activity will update after World Chain confirms it.", "zh-CN":"交易已进入队列,World Chain 确认后 Activity 会自动更新。", "zh-TW":"交易已進入佇列,World Chain 確認後 Activity 會自動更新。", fr:"La transaction est en file. Activity se mettra à jour après confirmation.", de:"Die Transaktion ist in der Warteschlange. Activity aktualisiert sich nach Bestätigung.", es:"La transacción está en cola. Activity se actualizará al confirmar.", ja:"取引はキューに入りました。確認後 Activity が更新されます。" }
+          ,limit: { en:"Single swap limit", "zh-CN":"单笔限额", "zh-TW":"單筆限額", fr:"Limite par swap", de:"Limit pro Swap", es:"Límite por swap", ja:"1回あたりの上限" }
+          ,reduceAmount: { en:"Please reduce the amount.", "zh-CN":"请降低金额。", "zh-TW":"請降低金額。", fr:"Veuillez réduire le montant.", de:"Bitte Betrag reduzieren.", es:"Reduce el importe.", ja:"金額を下げてください。" }
+          ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
+          ,slippageTooLow: { en:"Slippage cannot be 0. Please select at least 0.1%.", "zh-CN":"滑点不能设为 0,请至少选择 0.1%。", "zh-TW":"滑點不能設為 0,請至少選擇 0.1%。", fr:"Le slippage ne peut pas être 0. Sélectionnez au moins 0,1%.", de:"Slippage darf nicht 0 sein. Bitte mindestens 0,1% wählen.", es:"El slippage no puede ser 0. Selecciona al menos 0.1%.", ja:"スリッページは 0 にできません。0.1%以上を選択してください。" }
+          ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
+          ,debugTitle: { en:"Swap debug", "zh-CN":"Swap 调试", "zh-TW":"Swap 調試", fr:"Debug swap", de:"Swap debug", es:"Debug swap", ja:"Swap debug" }
+          ,debugEmpty: { en:"No swap debug data yet. Try quoting or signing once.", "zh-CN":"还没有调试数据。先报价或签名一次。", "zh-TW":"還沒有調試資料。先報價或簽名一次。", fr:"Aucune donnée de debug.", de:"Noch keine Debug-Daten.", es:"No hay datos de debug.", ja:"Debug データはまだありません。" }
+          ,copyDebug: { en:"Copy debug", "zh-CN":"复制调试信息", "zh-TW":"複製調試資訊", fr:"Copier debug", de:"Debug kopieren", es:"Copiar debug", ja:"Debug をコピー" }
+          ,debugCopied: { en:"Debug copied", "zh-CN":"调试信息已复制", "zh-TW":"調試資訊已複製", fr:"Debug copié", de:"Debug kopiert", es:"Debug copiado", ja:"コピーしました" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || (typeof t === "function" ? t(key) : key);
       }
@@ -2436,6 +2452,146 @@ function enhancePrototypeSwapQuote() {
         detail.insertAdjacentHTML("afterend", '<div class="quote-warning" id="quoteWarning"></div>');
         return document.getElementById("quoteWarning");
       }
+      function escapeDebugHtml(value){
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function(ch){
+          return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
+        });
+      }
+      function safeDebugValue(value, depth){
+        if (depth > 5) return "[depth-limit]";
+        if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+        if (value instanceof Error) return readableSwapError(value);
+        if (Array.isArray(value)) return value.slice(0, 24).map(function(item){ return safeDebugValue(item, depth + 1); });
+        if (typeof value === "object") {
+          var out = {};
+          Object.keys(value).slice(0, 80).forEach(function(key){
+            if (/private|secret|mnemonic|seed/i.test(key)) return;
+            try { out[key] = safeDebugValue(value[key], depth + 1); } catch(e) { out[key] = "[unreadable]"; }
+          });
+          return out;
+        }
+        return String(value);
+      }
+      function swapDebugContext(extra){
+        return Object.assign({
+          at: new Date().toISOString(),
+          page: "swap",
+          sell: swapState && swapState.sell,
+          buy: swapState && swapState.buy,
+          amount: (document.getElementById("sellAmt") && document.getElementById("sellAmt").value) || "",
+          receive: (document.getElementById("buyAmt") && document.getElementById("buyAmt").value) || "",
+          balance: swapState ? balanceNumber(swapState.sell) : 0,
+          slippageBps: slippageBps(),
+          userAddress: window.__luminaUserAddress || "",
+          worldApp: !!window.MiniKit,
+          executionEnabled: swapExecutionEnabled,
+          quoteAgeSeconds: latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : null,
+          quote: latestSwapQuote ? {
+            source: latestSwapQuote.source,
+            amountIn: latestSwapQuote.amountIn,
+            amountOut: latestSwapQuote.amountOut,
+            rate: latestSwapQuote.rate,
+            fee: latestSwapQuote.fee,
+            routeSymbols: latestSwapQuote.routeSymbols,
+            priceImpactPercent: latestSwapQuote.priceImpactPercent,
+            priceImpactLevel: latestSwapQuote.priceImpactLevel,
+            priceImpactAvailable: latestSwapQuote.priceImpactAvailable,
+            blocked: latestSwapQuote.blocked,
+            blockReason: latestSwapQuote.blockReason
+          } : null
+        }, extra || {});
+      }
+      function setSwapDebug(stage, detail){
+        latestSwapDebug = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
+        window.__luminaSwapDebug = latestSwapDebug;
+        try { localStorage.setItem(swapDebugStorageKey, JSON.stringify(latestSwapDebug)); } catch(e) {}
+        try { console.info("[SWAP DEBUG]", latestSwapDebug); } catch(e) {}
+      }
+      function readSwapDebug(){
+        if (latestSwapDebug) return latestSwapDebug;
+        try {
+          var saved = JSON.parse(localStorage.getItem(swapDebugStorageKey) || "null");
+          if (saved) return saved;
+        } catch(e) {}
+        return null;
+      }
+      function openSwapDebug(){
+        var old = document.getElementById("swapDebugModal");
+        if (old) old.remove();
+        var data = readSwapDebug();
+        var json = data ? JSON.stringify(data, null, 2) : swapCopy("debugEmpty");
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open";
+        modal.id = "swapDebugModal";
+        modal.innerHTML =
+          '<div class="modal send-confirm-sheet swap-debug-sheet">' +
+            '<button type="button" class="swap-debug-close" id="swapDebugClose" aria-label="Close">×</button>' +
+            '<div class="modal-grip"></div><h3>' + swapCopy("debugTitle") + '</h3>' +
+            (data ? '<div class="swap-debug-grid"><span>Stage</span><b>' + escapeDebugHtml(data.stage || "—") + '</b><span>Pair</span><b>' + escapeDebugHtml((data.sell || "?") + " → " + (data.buy || "?")) + '</b><span>Amount</span><b>' + escapeDebugHtml(data.amount || "—") + '</b><span>Route</span><b>' + escapeDebugHtml((data.quote && data.quote.routeSymbols && data.quote.routeSymbols.join(" → ")) || data.quote && data.quote.source || "—") + '</b></div>' : '<p class="swap-debug-empty">' + swapCopy("debugEmpty") + '</p>') +
+            '<pre class="swap-debug-pre">' + escapeDebugHtml(json) + '</pre>' +
+            '<button type="button" class="btn-primary swap-debug-copy" id="swapDebugCopy">' + swapCopy("copyDebug") + '</button>' +
+          '</div>';
+        document.body.appendChild(modal);
+        function close(){ modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); }
+        modal.onclick = function(event){ if (event.target === modal) close(); };
+        document.getElementById("swapDebugClose").onclick = close;
+        document.getElementById("swapDebugCopy").onclick = async function(){
+          try {
+            await navigator.clipboard.writeText(json);
+            toast(swapCopy("debugCopied"));
+          } catch(e) {
+            var pre = modal.querySelector(".swap-debug-pre");
+            if (pre) {
+              var range = document.createRange();
+              range.selectNodeContents(pre);
+              var sel = window.getSelection();
+              if (sel) { sel.removeAllRanges(); sel.addRange(range); }
+            }
+          }
+        };
+      }
+      function ensureSwapDebugButton(){
+        var view = document.getElementById("view-swap");
+        if (!view || document.getElementById("swapDebugBtn")) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapDebugBtn";
+        btn.className = "gear is-floating swap-debug-btn";
+        btn.setAttribute("aria-label", "Swap debug");
+        btn.textContent = "DBG";
+        btn.onclick = openSwapDebug;
+        view.appendChild(btn);
+      }
+      function formatMaxAmount(value){
+        var n = Number(value);
+        if (!Number.isFinite(n) || n <= 0) return "0";
+        return n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: n < 1 ? 8 : 6 });
+      }
+      function fillSwapMax(){
+        var sell = document.getElementById("sellAmt");
+        if (!sell) return;
+        sell.value = formatMaxAmount(balanceNumber(swapState.sell));
+        sell.dispatchEvent(new Event("input", { bubbles: true }));
+        setSwapDebug("input:max", { amount: sell.value, token: swapState.sell });
+        scheduleQuote();
+      }
+      function ensureSwapMaxButton(){
+        var sell = document.getElementById("sellAmt");
+        if (!sell || document.getElementById("swapMaxBtn")) return;
+        var parent = sell.parentElement;
+        if (!parent) return;
+        var wrap = document.createElement("div");
+        wrap.className = "swap-amount-wrap";
+        parent.insertBefore(wrap, sell);
+        wrap.appendChild(sell);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapMaxBtn";
+        btn.className = "swap-max-btn";
+        btn.textContent = "MAX";
+        btn.onclick = fillSwapMax;
+        wrap.appendChild(btn);
+      }
 	      function setSwapButtonState(label, disabled){
 	        var btn = document.getElementById("swapBtn");
 	        if (!btn) return;
@@ -2454,7 +2610,7 @@ function enhancePrototypeSwapQuote() {
 	        var amount = sell ? Number(String(sell.value || "").replace(/,/g, "")) : 0;
 	        var price = tokenMeta(swapState.sell, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
 	        if (Number.isFinite(amount) && amount > 0 && Number.isFinite(Number(price)) && amount * Number(price) > swapMaxUsd) {
-	          setSwapButtonState("单笔限额 $" + swapMaxUsd, true);
+	          setSwapButtonState(swapCopy("limit") + " $" + swapMaxUsd, true);
 	          return;
 	        }
 	        setSwapButtonState(swapCopy("confirmSwap"), false);
@@ -2552,6 +2708,13 @@ function enhancePrototypeSwapQuote() {
           return;
         }
         var seq = ++quoteSeq;
+        setSwapDebug("quote:request", {
+          fromToken: tokenInputForQuote(swapState.sell),
+          toToken: tokenInputForQuote(swapState.buy),
+          fromSymbol: swapState.sell,
+          toSymbol: swapState.buy,
+          fromAmount: amount
+        });
         setQuoteState(swapCopy("readingRoute"), undefined, false);
         var promise = (async function(){
           var res = await fetch("/api/swap/quote", {
@@ -2570,6 +2733,7 @@ function enhancePrototypeSwapQuote() {
           if (seq !== quoteSeq) return;
           if (!res.ok) throw new Error(data.error || "No quote");
           applyQuote(data);
+          setSwapDebug("quote:success", data);
           return data;
         })();
         activeQuotePromise = promise;
@@ -2580,6 +2744,7 @@ function enhancePrototypeSwapQuote() {
           var msg = e && e.message ? e.message : "Quote failed";
           if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = swapCopy("noRoute");
           setQuoteState(msg, "impact-high");
+          setSwapDebug("quote:error", readableSwapError(e));
         } finally {
           if (activeQuotePromise === promise) activeQuotePromise = null;
         }
@@ -2693,11 +2858,11 @@ function enhancePrototypeSwapQuote() {
 	        if (!swapExecutionEnabled) return { ok:false, error:"Swap mainnet execution is disabled until Tenderly verification is approved." };
 	        if (!window.__luminaUserAddress) return { ok:false, error:"Connect wallet before swapping." };
 	        if (!amount || !Number.isFinite(amount) || amount <= 0) return { ok:false, error:"Enter an amount greater than 0." };
-	        if (amount > balanceNumber(swapState.sell)) return { ok:false, error:"余额不足" };
-	        if (slip <= 0) return { ok:false, error:"滑点不能设为 0,请至少选择 0.1%。" };
-	        if (!latestSwapQuote) return { ok:false, error:"请先获取报价。" };
+	        if (amount > balanceNumber(swapState.sell)) return { ok:false, error:swapCopy("insufficientBalance") };
+	        if (slip <= 0) return { ok:false, error:swapCopy("slippageTooLow") };
+	        if (!latestSwapQuote) return { ok:false, error:swapCopy("quoteFirst") };
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
-	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:"单笔限额 $" + swapMaxUsd + ",请降低金额。" };
+	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:swapCopy("limit") + " $" + swapMaxUsd + ". " + swapCopy("reduceAmount") };
 	        var riskText = swapRiskText();
 	        if (impact > 5) riskText = riskText || { title: swapCopy("communityRiskTitle"), body: swapCopy("impactRisk") };
 	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
@@ -2772,12 +2937,14 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        var state = validateSwapSafety();
 	        if (!state.ok) {
+	          setSwapDebug("validate:error", { error: state.error });
 	          if (/刷新报价/.test(state.error)) scheduleQuote();
 	          toast(state.error);
 	          return;
 	        }
+	        setSwapDebug("validate:success", state);
 	        var confirmed = await openSwapConfirm(state);
-	        if (!confirmed) { toast(swapCopy("cancelled")); return; }
+	        if (!confirmed) { setSwapDebug("confirm:cancelled", state); toast(swapCopy("cancelled")); return; }
 	        swapSubmitting = true;
 	        setSwapButtonState(swapCopy("signing"), true);
 	        try {
@@ -2785,6 +2952,13 @@ function enhancePrototypeSwapQuote() {
 	          var fromQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.from : null;
 	          var toQuoted = latestSwapQuote && latestSwapQuote.tokens ? latestSwapQuote.tokens.to : null;
 	          setSwapButtonState(swapCopy("confirmInWorldApp"), true);
+	          setSwapDebug("execute:start", {
+	            fromToken: tokenMeta(swapState.sell, fromQuoted),
+	            toToken: tokenMeta(swapState.buy, toQuoted),
+	            fromAmountHuman: state.amountText,
+	            slippageBps: slippageBps(),
+	            quote: latestSwapQuote
+	          });
 	          var promise = window.__luminaExecuteSwap({
 	            fromToken: tokenMeta(swapState.sell, fromQuoted),
 	            toToken: tokenMeta(swapState.buy, toQuoted),
@@ -2796,12 +2970,14 @@ function enhancePrototypeSwapQuote() {
 	          });
 	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
+	          setSwapDebug("execute:submitted", result);
 	          setSwapButtonState(swapCopy("waitingChain"), true);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          syncSwapQuotePriceToHome();
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
+	          setSwapDebug("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          toast(swapErrorToast(e));
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
@@ -2820,6 +2996,8 @@ function enhancePrototypeSwapQuote() {
           if (btn) btn.disabled = false;
           setSwapPillLogo("sellDot", swapState.sell);
           setSwapPillLogo("buyDot", swapState.buy);
+          ensureSwapMaxButton();
+          ensureSwapDebugButton();
           scheduleQuote();
         };
       }
@@ -2886,6 +3064,8 @@ function enhancePrototypeSwapQuote() {
       if (customSlip) customSlip.addEventListener("input", scheduleQuote);
       ensureSlipBack();
       resetInitialSwapAmounts();
+      ensureSwapMaxButton();
+      ensureSwapDebugButton();
       setSwapButtonPending();
       ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
