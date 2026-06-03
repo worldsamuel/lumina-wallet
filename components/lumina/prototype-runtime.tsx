@@ -1527,9 +1527,9 @@ function enhancePrototypeTokens() {
           { symbol:"WBTC", name:"Wrapped Bitcoin", contractAddr:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals:8, logoUrl:null },
           { symbol:"EURC", name:"EURC", contractAddr:"0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0", decimals:6, logoUrl:null },
           { symbol:"ORO", name:"ORO", contractAddr:"0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63", decimals:18, logoUrl:null },
-          { symbol:"ORB", name:"Orb", contractAddr:"0xF3F631145955cE35B104C10B392D07C821AD6C15", decimals:18, logoUrl:null },
-          { symbol:"LIFE", name:"Life", contractAddr:"0xE4Dfa75375a5cB188B532caAA4cADdf5d0f19b0C", decimals:18, logoUrl:null },
-          { symbol:"WGEM", name:"Wrapped Gem", contractAddr:"0xAC796Ee4FE4423daBf0B071eEea01f2a6A60c956", decimals:18, logoUrl:null }
+          { symbol:"ORB", name:"Orb", contractAddr:"0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB", decimals:18, logoUrl:null },
+          { symbol:"LIFE", name:"LIFE", contractAddr:"0xE4D62e62013EaF065Fa3F0316384F88559C80889", decimals:18, logoUrl:null },
+          { symbol:"WGEM", name:"World GEM", contractAddr:"0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740", decimals:18, logoUrl:null }
         ];
         [readJson("ww_swap_tokens", []), readJson("ww_tokens", []), builtin].forEach(function(list){
           if (Array.isArray(list)) source.push.apply(source, list);
@@ -1976,7 +1976,7 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
-      var homeSwapWhitelist = new Set(["WLD","USDC","USDT","WETH","WBTC","ORO","ORB","EURC"]);
+      var homeSwapWhitelist = new Set(["WLD","USDC","USDT","WETH","WBTC","ORO","ORB","EURC","LIFE","WGEM"]);
       function hasVisibleHomeBalance(asset){
         var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
         var n = Number(raw);
@@ -2785,6 +2785,8 @@ function enhancePrototypeSwapQuote() {
 	          code: error.code,
 	          error_code: error.error_code,
 	          data: error.data,
+	          details: error.details,
+	          debug: error.debug,
 	          cause: error.cause && (error.cause.message || error.cause.data || error.cause.code || error.cause.error_code)
 	        };
 	        try { out.serialized = JSON.stringify(error); } catch(e) {}

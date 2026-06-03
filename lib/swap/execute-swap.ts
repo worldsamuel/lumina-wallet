@@ -1,6 +1,6 @@
 import { MiniKit } from "@worldcoin/minikit-js";
 import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
-import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
+import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi, swapErc20Abi } from "./contracts";
 
 type ExecuteSwapToken = {
   address: Address;
@@ -70,6 +70,7 @@ type MiniKitTransactionResult = {
     userOpHash?: string;
     error_code?: string;
     message?: string;
+    details?: unknown;
   };
 };
 
@@ -105,11 +106,21 @@ export async function executeSwap(params: ExecuteSwapParams) {
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
-  // World App consumes this Permit2 allowance in the same sendTransaction batch.
+  // Universal Router pulls ERC20s through Permit2, so both the token allowance
+  // to Permit2 and the Permit2 allowance to Universal Router must exist.
   // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
   const permit2Expiration = 0;
 
   const transactions = [
+    {
+      to: freshQuote.tokens.from.address,
+      data: encodeFunctionData({
+        abi: [swapErc20Abi[2]],
+        functionName: "approve",
+        args: [PERMIT2_ADDRESS, executableAmount],
+      }),
+      value: "0x0",
+    },
     {
       to: PERMIT2_ADDRESS,
       data: encodeFunctionData({
@@ -135,23 +146,57 @@ export async function executeSwap(params: ExecuteSwapParams) {
     tx,
   ];
 
-  const result = (await withTimeout(
-    MiniKit.sendTransaction({
-      chainId: WORLD_CHAIN_ID,
-      transactions,
-    }),
-    30_000,
-    "sendTransaction timed out before returning userOpHash.",
-  )) as MiniKitTransactionResult;
+  const debug = {
+    fromToken: freshQuote.tokens.from,
+    toToken: freshQuote.tokens.to,
+    fromAmountHuman: params.fromAmountHuman,
+    executableAmountRaw: executableAmount.toString(),
+    expectedOutRaw: expectedOut.toString(),
+    platformFee: built.platformFee ?? null,
+    permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
+    transactions: transactions.map((item, index) => ({
+      index,
+      to: item.to,
+      value: item.value,
+      dataPrefix: item.data.slice(0, 10),
+      dataLength: item.data.length,
+    })),
+  };
+
+  let result: MiniKitTransactionResult;
+  try {
+    result = (await withTimeout(
+      MiniKit.sendTransaction({
+        chainId: WORLD_CHAIN_ID,
+        transactions,
+      }),
+      30_000,
+      "sendTransaction timed out before returning userOpHash.",
+    )) as MiniKitTransactionResult;
+  } catch (error) {
+    throw attachSwapDebug(error, { ...debug, stage: "minikit:throw" });
+  }
 
   const payload = result.data;
   console.log("[SWAP] MiniKit.sendTransaction result", result);
   if (payload?.status && payload.status !== "success") {
-    throw new Error(payload.error_code || payload.message || "Swap was not submitted.");
+    throw attachSwapDebug(new Error(payload.error_code || payload.message || "Swap was not submitted."), {
+      ...debug,
+      stage: "minikit:status",
+      result,
+    });
   }
-  if (payload?.error_code) throw new Error(payload.error_code);
+  if (payload?.error_code) {
+    throw attachSwapDebug(new Error(payload.error_code), { ...debug, stage: "minikit:error_code", result });
+  }
   const userOpHash = payload?.userOpHash;
-  if (!userOpHash) throw new Error(`No userOpHash returned: ${JSON.stringify(result)}`);
+  if (!userOpHash) {
+    throw attachSwapDebug(new Error(`No userOpHash returned: ${JSON.stringify(result)}`), {
+      ...debug,
+      stage: "minikit:no_user_op",
+      result,
+    });
+  }
 
   return {
     userOpHash,
@@ -249,6 +294,12 @@ function assertUint160(amount: bigint) {
   const maxUint160 = (1n << 160n) - 1n;
   if (amount > maxUint160) throw new Error("Swap amount exceeds Permit2 allowance limit.");
   return amount;
+}
+
+function attachSwapDebug(error: unknown, debug: unknown) {
+  const err = error instanceof Error ? error : new Error(String(error || "Swap failed."));
+  (err as Error & { debug?: unknown }).debug = debug;
+  return err;
 }
 
 export function friendlySwapError(error: unknown) {
