@@ -31,6 +31,15 @@ export async function GET(req: NextRequest) {
   const merged = tokens.map((token) => {
       const configuredToken =
         byAddress.get(token.address?.toLowerCase() ?? "") ?? bySymbol.get(token.symbol.toUpperCase());
+      const configuredAddress = configuredToken?.contractAddr?.toLowerCase();
+      if (
+        configuredAddress &&
+        token.address &&
+        token.address.toLowerCase() !== configuredAddress &&
+        configuredToken?.symbol.toUpperCase() === token.symbol.toUpperCase()
+      ) {
+        return null;
+      }
       return configuredToken?.logoUrl || configuredToken?.onTopRanking
         ? {
             ...token,
@@ -38,7 +47,7 @@ export async function GET(req: NextRequest) {
             verified: true,
           }
         : token;
-    });
+    }).filter((token): token is (typeof tokens)[number] => Boolean(token));
 
   if (mode === "all") {
     const seenSymbols = new Set(merged.map((token) => token.symbol.toUpperCase()));

@@ -86,7 +86,7 @@ export const TOKENS: readonly TokenConfig[] = [
     decimals: 18,
     logo: "O",
     className: "custom",
-    contractAddress: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB" as Address,
+    contractAddress: "0xee21af1d049211206b20b957d07794e7d0b140b3" as Address,
     coingeckoId: COINGECKO_IDS.ORB,
   },
   {

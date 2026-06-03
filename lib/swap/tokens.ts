@@ -94,7 +94,7 @@ export const SWAP_TOKENS: Record<SwapTokenSymbol, SwapToken> = {
     symbol: "ORB",
     priceSymbol: "USDC",
     name: "Orb",
-    address: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB",
+    address: "0xee21af1d049211206b20b957d07794e7d0b140b3",
     decimals: 18,
   },
   LIFE: {

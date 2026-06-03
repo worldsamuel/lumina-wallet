@@ -19,6 +19,16 @@ function coreTokenContractAddr(token: TokenConfig) {
   return token.native ? null : (token.contractAddress ?? token.wrappedAddress ?? null);
 }
 
+const LEGACY_CORE_CONTRACTS: Record<string, string[]> = {
+  ORB: ["0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db"],
+};
+
+function shouldRefreshCoreContract(symbol: string, existing: string | null, next: string | null) {
+  if (!next) return existing !== null;
+  if (!existing) return true;
+  return LEGACY_CORE_CONTRACTS[symbol.toUpperCase()]?.includes(existing.toLowerCase()) ?? false;
+}
+
 export async function ensureCoreTokens() {
   await ensureTokenControlColumns();
 
@@ -37,8 +47,11 @@ export async function ensureCoreTokens() {
 
     const existingBySymbol = await db.token.findUnique({ where: { symbol: token.symbol } });
     if (existingBySymbol) {
+      const nextContractAddr = shouldRefreshCoreContract(token.symbol, existingBySymbol.contractAddr, contractAddr)
+        ? contractAddr
+        : existingBySymbol.contractAddr;
       try {
-        await db.token.update({ where: { id: existingBySymbol.id }, data });
+        await db.token.update({ where: { id: existingBySymbol.id }, data: { ...data, contractAddr: nextContractAddr } });
       } catch {
         await db.token.update({
           where: { id: existingBySymbol.id },

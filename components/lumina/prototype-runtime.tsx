@@ -651,11 +651,11 @@ function exposeTokenTransfer(
 function resetPrototypePortfolio() {
   const source = `
     assets = [
-      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "W" },
-      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "$" },
-      { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$" },
-      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E" },
-      { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true }
+      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+      { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$", address: "0x102d758f688a4c1c5a80b116bd945d4455460282" },
+      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E", address: "0x4200000000000000000000000000000000000006" },
+      { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true, address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
     ];
     balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0", BTC: "0" };
     availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH", BTC: "0 BTC" };
@@ -919,7 +919,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         WBTC: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3",
         EURC: "0x1C60ba0A0eD1019e8Eb035E6daF4155A5cE2380B",
         ORO: "0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63",
-        ORB: "0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB"
+        ORB: "0xee21af1d049211206b20b957d07794e7d0b140b3"
       };
       var logoUrlsBySymbol = {};
       function htmlEscape(value){
@@ -1726,7 +1726,7 @@ function enhancePrototypeTokens() {
           { symbol:"WBTC", name:"Wrapped Bitcoin", contractAddr:"0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals:8, logoUrl:null },
           { symbol:"EURC", name:"EURC", contractAddr:"0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0", decimals:6, logoUrl:null },
           { symbol:"ORO", name:"ORO", contractAddr:"0xcd1E32B86953D79a6AC58e813D2EA7a1790cAb63", decimals:18, logoUrl:null },
-          { symbol:"ORB", name:"Orb", contractAddr:"0xF3F92A60e6004f3982F0FdE0d43602fC0a30a0dB", decimals:18, logoUrl:null },
+          { symbol:"ORB", name:"Orb", contractAddr:"0xee21af1d049211206b20b957d07794e7d0b140b3", decimals:18, logoUrl:null },
           { symbol:"LIFE", name:"LIFE", contractAddr:"0xE4D62e62013EaF065Fa3F0316384F88559C80889", decimals:18, logoUrl:null },
           { symbol:"WGEM", name:"World GEM", contractAddr:"0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740", decimals:18, logoUrl:null }
         ];
@@ -1776,11 +1776,20 @@ function enhancePrototypeTokens() {
       }
       function upsertSwapHomeAssets(){
         if (!Array.isArray(assets)) assets = [];
+        var tokenBySymbol = {};
+        swapWhitelistTokens().forEach(function(token){
+          var sym = String(token && token.symbol || "").toUpperCase();
+          if (sym && !tokenBySymbol[sym]) tokenBySymbol[sym] = token;
+        });
         var existingSymbols = new Set();
         var existingAddresses = new Set();
         assets.forEach(function(asset){
           var sym = String(asset && asset.sym || "").toUpperCase();
           if (sym) existingSymbols.add(sym);
+          var token = sym ? tokenBySymbol[sym] : null;
+          if (token && !asset.address && !asset.contractAddr) {
+            asset.address = token.contractAddr || token.address || null;
+          }
           var addr = String(asset && (asset.address || asset.contractAddr) || "").toLowerCase();
           if (/^0x[a-f0-9]{40}$/.test(addr)) existingAddresses.add(addr);
           if (sym && balances && balances[sym] != null) {
@@ -1790,7 +1799,7 @@ function enhancePrototypeTokens() {
             if (p > 0) asset.usdNum = amountNumberFor(sym) * p;
           }
         });
-        var additions = swapWhitelistTokens().map(function(token){
+        var additions = Object.keys(tokenBySymbol).map(function(symbol){ return tokenBySymbol[symbol]; }).map(function(token){
           var sym = registerBackendToken(token);
           if (!sym) return null;
           var addr = tokenAddress(token);
@@ -1806,7 +1815,8 @@ function enhancePrototypeTokens() {
             usdNum: price > 0 ? amountNumberFor(sym) * price : 0,
             cls: "custom",
             logo: tokenLogo[sym] || tokenInitial(sym),
-            address: token.contractAddr || token.address || null
+            address: token.contractAddr || token.address || null,
+            homeSwapAsset: true
           };
         }).filter(Boolean);
         if (!additions.length) return;
@@ -2051,6 +2061,23 @@ function enhancePrototypeTokens() {
       var viewAll = document.querySelector(".section-head .link[data-i18n='viewAll']");
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
+      function syncBackendSwapTokens(){
+        fetch("/api/tokens", { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : []; })
+          .then(function(list){
+            if (!Array.isArray(list)) return;
+            var verified = list.filter(function(token){
+              return token && token.status === "verified" && token.canSwap !== false;
+            });
+            writeJson("ww_tokens", verified);
+            upsertSwapHomeAssets();
+            if (typeof renderAssets === "function") renderAssets();
+            if (typeof renderAllAssets === "function") renderAllAssets();
+            if (window.__luminaRefreshTokenLogos) window.__luminaRefreshTokenLogos();
+          })
+          .catch(function(){});
+      }
+
       if (typeof renderAssets === "function" && !window.__luminaSwapHomeAssetsWrapped) {
         window.__luminaSwapHomeAssetsWrapped = true;
         var previousRenderAssets = renderAssets;
@@ -2060,6 +2087,7 @@ function enhancePrototypeTokens() {
         };
       }
       upsertSwapHomeAssets();
+      syncBackendSwapTokens();
       restoreImportedTokens();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {
@@ -2183,6 +2211,7 @@ function enhancePrototypeHome() {
       }
       function showOnHome(asset){
         var sym = String(asset && asset.sym || "").toUpperCase();
+        if (asset && asset.homeSwapAsset) return true;
         if (homeSwapWhitelist.has(sym)) return true;
         return !!(asset && hasVisibleHomeBalance(asset));
       }
@@ -2775,16 +2804,8 @@ function enhancePrototypeSwapQuote() {
         };
       }
       function ensureSwapDebugButton(){
-        var view = document.getElementById("view-swap");
-        if (!view || document.getElementById("swapDebugBtn")) return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "swapDebugBtn";
-        btn.className = "gear is-floating swap-debug-btn";
-        btn.setAttribute("aria-label", "Swap debug");
-        btn.textContent = "DBG";
-        btn.onclick = openSwapDebug;
-        view.appendChild(btn);
+        var existing = document.getElementById("swapDebugBtn");
+        if (existing) existing.remove();
       }
       function formatMaxAmount(value){
         var n = Number(value);
@@ -3147,7 +3168,7 @@ function enhancePrototypeSwapQuote() {
 	        modal.innerHTML =
 	          '<div class="modal send-confirm-sheet swap-success-sheet" style="width:calc(100vw - 24px);max-width:390px;padding:24px;border-radius:26px;text-align:center;position:relative;">' +
 	            '<button id="swapSuccessClose" aria-label="关闭" style="position:absolute;right:16px;top:14px;width:36px;height:36px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.06);color:var(--text);font-size:22px;line-height:1;">×</button>' +
-	            '<div class="modal-grip"></div><div class="swap-success-mark">✓</div><h3>' + swapCopy("submitted") + '</h3><p class="swap-success-sub">' + swapCopy("waiting") + ' ' + shortAmount(result.expectedOut) + ' ' + swapState.buy + '</p>' +
+	            '<div class="modal-grip"></div><div class="swap-success-mark">✓</div><h3>' + swapCopy("submitted") + '</h3>' +
 	            '<div class="swap-success-route"><span>' + swapState.sell + '</span><i>→</i><span>' + swapState.buy + '</span></div><p class="swap-success-sub">' + swapCopy("submittedHint") + '</p>' +
 	            '<button class="btn-primary" id="swapSuccessOk" style="width:100%;margin-top:16px;">' + swapCopy("viewActivity") + '</button>' +
 	          '</div>';
@@ -3199,9 +3220,9 @@ function enhancePrototypeSwapQuote() {
 	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
 	          setSwapDebug("execute:submitted", result);
-	          setSwapButtonState(swapCopy("waitingChain"), true);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          syncSwapQuotePriceToHome();
+	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
 	        } catch(e) {
@@ -4234,7 +4255,7 @@ function enhancePrototypeDetail() {
         }
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
-          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
+          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
             .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];

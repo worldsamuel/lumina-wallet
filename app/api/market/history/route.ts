@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { getPoolOhlcv, getWorldChainMarketForToken } from "@/lib/market-data";
 import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
 import { TOKENS } from "@/lib/tokens";
 
@@ -39,7 +40,13 @@ export async function GET(req: NextRequest) {
   }
 
   const symbol = (req.nextUrl.searchParams.get("symbol") ?? "").toUpperCase();
+  const address = req.nextUrl.searchParams.get("address") ?? "";
   const range = (req.nextUrl.searchParams.get("range") ?? "1D").toUpperCase();
+  if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    const candles = await candlesForContract(address, symbol, range);
+    if (candles.length) return jsonResponse({ symbol, range, source: "geckoterminal", candles });
+  }
+
   const id = coingeckoIdForSymbol(symbol);
   if (!id) return jsonResponse({ symbol, range, candles: [] });
 
@@ -74,6 +81,19 @@ export async function GET(req: NextRequest) {
   }
 }
 
+async function candlesForContract(address: string, symbol: string, range: string) {
+  const market = await getWorldChainMarketForToken(address, symbol).catch((error) => {
+    console.error("Failed to resolve market history contract", error);
+    return null;
+  });
+  if (!market?.poolAddress) return [];
+  const cfg = ohlcvConfig(range);
+  return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit).catch((error) => {
+    console.error("Failed to fetch contract OHLCV", error);
+    return [];
+  });
+}
+
 function coingeckoIdForSymbol(symbol: string) {
   const normalized = SYMBOL_ALIASES[symbol] ?? symbol;
   const token = TOKENS.find((item) => item.symbol.toUpperCase() === symbol || item.symbol.toUpperCase() === normalized);
@@ -86,6 +106,14 @@ function chartConfig(range: string) {
   if (range === "1Y") return { days: "365", interval: "daily" };
   if (range === "ALL") return { days: "max", interval: "daily" };
   return { days: "1", interval: "hourly" };
+}
+
+function ohlcvConfig(range: string) {
+  if (range === "1H") return { timeframe: "minute", aggregate: "5", limit: "24" };
+  if (range === "1W") return { timeframe: "hour", aggregate: "4", limit: "42" };
+  if (range === "1Y") return { timeframe: "day", aggregate: "1", limit: "365" };
+  if (range === "ALL") return { timeframe: "day", aggregate: "1", limit: "365" };
+  return { timeframe: "hour", aggregate: "1", limit: "24" };
 }
 
 function pricePointsToCandles(prices: Array<[number, number]>, volumes: Array<[number, number]>) {
