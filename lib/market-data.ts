@@ -14,8 +14,8 @@ const MIN_LIQUIDITY_USD = 10;
 const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
 const STABLE_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE"]);
-const ORB_ADDRESS = "0xee21af1d049211206b20b957d07794e7d0b140b3";
-const ORB_POOL_ID = "0x01c4a12662895942be788160025e1359e232471f5e00228c1a1de14703975f4a";
+const ORB_ADDRESS = "0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db";
+const ORB_POOL_ID = "0xee21af1d049211206b20b957d07794e7d0b140b3";
 const KNOWN_TOKEN_ADDRESSES = new Map(
   TOKENS.flatMap((token) => {
     if (token.contractAddress) return [[token.contractAddress.toLowerCase(), token.symbol] as const];
