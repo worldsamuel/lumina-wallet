@@ -51,9 +51,22 @@ type BalanceTokenConfig = {
   contractAddress: Address;
   native?: boolean;
   coingeckoId: string;
+  aliasOf?: string;
 };
 
 const WORLD_CHAIN_PUBLIC_RPC = "https://worldchain-mainnet.g.alchemy.com/public";
+const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
+  {
+    symbol: "ORB",
+    name: "Orb",
+    decimals: 18,
+    logo: "O",
+    className: "custom",
+    contractAddress: "0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db" as Address,
+    coingeckoId: "orb",
+    aliasOf: "ORB",
+  },
+];
 
 function toBalance(token: BalanceTokenConfig | (typeof TOKENS)[number], balance: bigint): ChainBalance {
   const formatted = formatUnits(balance, token.decimals);
@@ -140,10 +153,11 @@ export async function fetchBalances(userAddress: Address) {
     fetchDiscoveredTokenBalances(userAddress).catch(() => [] as ChainBalance[]),
   ]);
 
-  const erc20Balances = balanceTokens.map((token, index) => {
+  const rawConfiguredBalances = balanceTokens.map((token, index) => {
     const result = erc20Results[index];
     return toBalance(token, result?.status === "success" ? result.result : 0n);
   });
+  const erc20Balances = mergeAliasBalances(rawConfiguredBalances);
 
   const configured = [
     ...erc20Balances,
@@ -189,7 +203,7 @@ async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
   }
 
   const seen = new Set<string>();
-  return [...core, ...configured].filter((token): token is BalanceTokenConfig => {
+  return [...core, ...configured, ...LEGACY_BALANCE_TOKENS].filter((token): token is BalanceTokenConfig => {
     const address = token.contractAddress?.toLowerCase();
     if (!address || seen.has(address)) return false;
     seen.add(address);
@@ -198,23 +212,7 @@ async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
 }
 
 async function fetchDiscoveredTokenBalances(userAddress: Address) {
-  const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      id: 1,
-      jsonrpc: "2.0",
-      method: "alchemy_getTokenBalances",
-      params: [userAddress],
-    }),
-    signal: AbortSignal.timeout(4_000),
-  });
-  if (!response.ok) return [];
-
-  const body = (await response.json()) as {
-    result?: { tokenBalances?: AlchemyTokenBalance[] };
-  };
-  const balances = body.result?.tokenBalances ?? [];
+  const balances = await fetchAllAlchemyTokenBalances(userAddress);
   const catalog = worldChainTokenCatalog as CatalogToken[];
   const catalogByAddress = new Map(
     catalog
@@ -229,8 +227,7 @@ async function fetchDiscoveredTokenBalances(userAddress: Address) {
       if (balance <= 0n) return null;
       return { contractAddress: item.contractAddress, balance };
     })
-    .filter((item): item is { contractAddress: string; balance: bigint } => Boolean(item))
-    .slice(0, 120);
+    .filter((item): item is { contractAddress: string; balance: bigint } => Boolean(item));
 
   const discovered = await Promise.all(
     positiveBalances.map(async (item) => {
@@ -242,7 +239,62 @@ async function fetchDiscoveredTokenBalances(userAddress: Address) {
     }),
   );
 
-  return discovered.filter((item): item is ChainBalance => Boolean(item)).slice(0, 100);
+  return discovered.filter((item): item is ChainBalance => Boolean(item));
+}
+
+async function fetchAllAlchemyTokenBalances(userAddress: Address) {
+  const out = await fetchAlchemyTokenBalancePages([userAddress, "erc20"]);
+  if (out.length) return out;
+  return fetchAlchemyTokenBalancePages([userAddress]);
+}
+
+async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
+  const out: AlchemyTokenBalance[] = [];
+  let pageKey: string | undefined;
+
+  for (let page = 0; page < 8; page += 1) {
+    const params = [...baseParams];
+    if (pageKey) params.push({ pageKey });
+    const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: page + 1,
+        jsonrpc: "2.0",
+        method: "alchemy_getTokenBalances",
+        params,
+      }),
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!response.ok) break;
+
+    const body = (await response.json()) as {
+      result?: { tokenBalances?: AlchemyTokenBalance[]; pageKey?: string };
+    };
+    out.push(...(body.result?.tokenBalances ?? []));
+    pageKey = body.result?.pageKey;
+    if (!pageKey) break;
+  }
+
+  return out;
+}
+
+function mergeAliasBalances(items: ChainBalance[]) {
+  const byKey = new Map<string, ChainBalance>();
+  for (const item of items) {
+    const token = [...ERC20_TOKENS, ...LEGACY_BALANCE_TOKENS].find(
+      (candidate) => candidate.contractAddress?.toLowerCase() === item.contractAddress?.toLowerCase(),
+    ) as (BalanceTokenConfig | (typeof ERC20_TOKENS)[number]) | undefined;
+    const key = String((token && "aliasOf" in token ? token.aliasOf : null) || item.symbol).toUpperCase();
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { ...item, symbol: key });
+      continue;
+    }
+    existing.balance += item.balance;
+    existing.formatted = formatUnits(existing.balance, existing.decimals);
+  }
+  return Array.from(byKey.values());
 }
 
 function parseAlchemyBalance(value: string) {
