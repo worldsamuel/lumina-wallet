@@ -2558,11 +2558,14 @@ function enhancePrototypeMarket() {
         return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
       }
       function verifyStatus(item){
-        var status = String(item && item.status || "").toLowerCase();
+        var sym = String(item && item.symbol || "").toUpperCase();
+        var configured = window.__luminaBackendTokenBySymbol && window.__luminaBackendTokenBySymbol[sym];
+        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
+        var status = String((configured && configured.status) || (market && market.status) || (item && item.status) || "").toLowerCase();
         if (status === "verified") return "verified";
         if (status === "rejected" || status === "high" || status === "danger") return "rejected";
         if (status === "pending" || status === "community" || status === "unverified") return "pending";
-        if (item && item.verified === true) return "verified";
+        if ((market && market.verified === true) || (item && item.verified === true)) return "verified";
         return "pending";
       }
       function verifyBadge(item){
@@ -2620,6 +2623,7 @@ function enhancePrototypeMarket() {
           var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
           if (Number.isFinite(amount) && amount > 0 && Number(market.priceUsd) > 0) asset.usdNum = amount * Number(market.priceUsd);
         });
+        return market;
       }
       function openMarketDetail(symbol){
         var market = window.__luminaMarketBySymbol[symbol];
@@ -2720,7 +2724,7 @@ function enhancePrototypeMarket() {
           return;
         }
         box.innerHTML = markets.map(function(g, i){
-          registerMarketToken(g);
+          g = registerMarketToken(g) || g;
           var rankCls = i < 3 ? "rank top" : "rank";
           var bg = g.symbol === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
           var color = g.symbol === "WLD" ? "#000" : "#fff";
