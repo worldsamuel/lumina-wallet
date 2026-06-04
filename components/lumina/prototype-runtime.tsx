@@ -2327,19 +2327,11 @@ function enhancePrototypeHome() {
         if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         var index = row && row.getAttribute ? Number(row.getAttribute("data-home-index")) : NaN;
-        if (symbol && fixedHomeTokens.has(String(symbol).toUpperCase())) {
-          openHomeAsset(symbol);
-          return;
-        }
         if (Number.isInteger(index) && assets && assets[index]) {
           openDetail(index);
           return;
         }
         if (!symbol) return;
-        if (symbol === "USDC") {
-          openHomeAsset("USDC");
-          return;
-        }
         if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
         else openHomeAsset(symbol);
       };
