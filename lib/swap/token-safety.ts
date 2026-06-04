@@ -59,6 +59,9 @@ const cache = globalThis.__luminaSwapTokenSafetyCache ?? new Map<string, { expir
 globalThis.__luminaSwapTokenSafetyCache = cache;
 
 const BLACKLIST = new Set<string>([]);
+const LEGACY_POOL_ADDRESS_ALIASES: Record<string, SwapToken> = {
+  "0xee21af1d049211206b20b957d07794e7d0b140b3": SWAP_TOKENS.ORB,
+};
 const FALLBACK_MARKET_TOKENS: SwapToken[] = [
   SWAP_TOKENS.ORO,
   SWAP_TOKENS.ORB,
@@ -88,6 +91,8 @@ export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyRe
 
   const configured = await resolveVerifiedAdminToken(address);
   if (configured) return verifiedReport(configured, "verified");
+  const alias = LEGACY_POOL_ADDRESS_ALIASES[lower];
+  if (alias) return verifiedReport(alias, "verified");
 
   const cached = cache.get(lower);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
@@ -174,6 +179,8 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
 async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> {
   const needle = value.trim();
   if (!needle) return null;
+  const alias = isAddress(needle) ? LEGACY_POOL_ADDRESS_ALIASES[needle.toLowerCase()] : null;
+  if (alias) return { ...alias, safety: verifiedReport(alias, "verified") };
   const configured = await resolveVerifiedAdminToken(needle);
   if (configured) return { ...configured, safety: verifiedReport(configured, "verified") };
 

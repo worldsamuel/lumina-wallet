@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { ensureCoreTokens } from "@/lib/admin/ensure-token-schema";
+import { normalizeTokenFields } from "@/lib/admin/token-normalization";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -16,7 +17,7 @@ export async function GET() {
   const tokens = await db.token.findMany({
     orderBy: { createdAt: "asc" },
   });
-  return jsonResponse(tokens);
+  return jsonResponse(tokens, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" } });
 }
 
 export async function POST(req: NextRequest) {
@@ -37,20 +38,21 @@ export async function POST(req: NextRequest) {
     onTopRanking?: boolean;
   };
 
+  const data = normalizeTokenFields({
+    symbol: body.symbol,
+    name: body.name,
+    contractAddr: body.contractAddr ?? null,
+    poolAddress: body.poolAddress ?? null,
+    decimals: body.decimals ?? 18,
+    logoUrl: body.logoUrl ?? null,
+    status: body.status ?? "pending",
+    tier: body.tier ?? "community",
+    canTransfer: body.canTransfer ?? true,
+    canSwap: body.canSwap ?? true,
+    onTopRanking: body.onTopRanking ?? false,
+  });
   const token = await db.token.create({
-    data: {
-      symbol: body.symbol,
-      name: body.name,
-      contractAddr: body.contractAddr ?? null,
-      poolAddress: body.poolAddress ?? null,
-      decimals: body.decimals ?? 18,
-      logoUrl: body.logoUrl ?? null,
-      status: body.status ?? "pending",
-      tier: body.tier ?? "community",
-      canTransfer: body.canTransfer ?? true,
-      canSwap: body.canSwap ?? true,
-      onTopRanking: body.onTopRanking ?? false,
-    },
+    data,
   });
   await auditLog(admin.id, "create_token", token.id, body);
   return jsonResponse(token);

@@ -2180,7 +2180,7 @@ function enhancePrototypeTokens() {
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
       function syncBackendSwapTokens(){
-        fetch("/api/tokens", { cache: "no-store" })
+        fetch("/api/tokens?ts=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(list){
             if (!Array.isArray(list)) return;

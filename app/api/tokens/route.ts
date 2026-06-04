@@ -49,7 +49,9 @@ export async function GET(req: NextRequest) {
     onTopRanking: token.symbol === "WLD",
     createdAt: new Date(0).toISOString(),
   }));
-  return jsonResponse([...coreFallback, ...tokens]);
+  return jsonResponse([...coreFallback, ...tokens], {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
+  });
 }
 
 async function ensurePublicCoreTokens() {

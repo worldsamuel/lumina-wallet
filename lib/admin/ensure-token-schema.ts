@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { TOKENS, type TokenConfig } from "@/lib/tokens";
+import { coreTokenPoolAddress, normalizeTokenFields } from "./token-normalization";
 
 let ensured: Promise<void> | null = null;
 
@@ -21,7 +22,10 @@ function coreTokenContractAddr(token: TokenConfig) {
 }
 
 const LEGACY_CORE_CONTRACTS: Record<string, string[]> = {
-  ORB: ["0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db"],
+  ORB: [
+    "0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db",
+    "0xee21af1d049211206b20b957d07794e7d0b140b3",
+  ],
 };
 
 function shouldRefreshCoreContract(symbol: string, existing: string | null, next: string | null) {
@@ -35,15 +39,16 @@ export async function ensureCoreTokens() {
 
   for (const token of TOKENS) {
     const contractAddr = coreTokenContractAddr(token);
-    const data = {
+    const data = normalizeTokenFields({
       symbol: token.symbol,
       name: token.name,
       contractAddr,
+      poolAddress: coreTokenPoolAddress(token.symbol),
       decimals: token.decimals,
       tier: "core",
       canTransfer: true,
       canSwap: true,
-    };
+    });
 
     const existingBySymbol = await db.token.findUnique({ where: { symbol: token.symbol } });
     if (existingBySymbol) {
@@ -55,7 +60,7 @@ export async function ensureCoreTokens() {
       } catch {
         await db.token.update({
           where: { id: existingBySymbol.id },
-          data: { ...data, contractAddr: existingBySymbol.contractAddr },
+          data: normalizeTokenFields({ ...data, contractAddr: existingBySymbol.contractAddr }),
         });
       }
       continue;
