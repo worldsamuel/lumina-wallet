@@ -645,8 +645,8 @@ function exposeTokenTransfer(
 function resetPrototypePortfolio() {
   const source = `
     assets = [
-      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
-      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
       { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$", address: "0x102d758f688a4c1c5a80b116bd945d4455460282" },
       { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E", address: "0x4200000000000000000000000000000000000006" },
       { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true, address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
@@ -945,22 +945,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       function logoImg(symbol, url, fallbackUrl){
         var sym = String(symbol || "").toUpperCase();
         var fallback = isLogoUrl(fallbackUrl) ? String(fallbackUrl) : "";
-        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"eager\\" decoding=\\"async\\" fetchpriority=\\"high\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" data-initial=\\"" + htmlEscape(initial(sym)) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
-      }
-      function builtinLogo(symbol){
-        var sym = String(symbol || "").toUpperCase();
-        var cryptologos = {
-          WLD: "https://cryptologos.cc/logos/worldcoin-org-wld-logo.svg",
-          USDT: "https://cryptologos.cc/logos/tether-usdt-logo.svg",
-          USDC: "https://cryptologos.cc/logos/usd-coin-usdc-logo.svg",
-          ETH: "https://cryptologos.cc/logos/ethereum-eth-logo.svg",
-          WETH: "https://cryptologos.cc/logos/ethereum-eth-logo.svg",
-          BTC: "https://cryptologos.cc/logos/bitcoin-btc-logo.svg",
-          WBTC: "https://cryptologos.cc/logos/wrapped-bitcoin-wbtc-logo.svg",
-          EURC: "https://cryptologos.cc/logos/euro-coin-euroc-logo.svg"
-        };
-        if (cryptologos[sym]) return logoImg(sym, cryptologos[sym], "");
-        return "";
+        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"eager\\" decoding=\\"async\\" fetchpriority=\\"high\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML='';}\\"/>";
       }
       function trustedLogoUrl(symbol){
         var sym = String(symbol || "").toUpperCase();
@@ -982,14 +967,8 @@ function enhancePrototypeBuiltinTokenLogos() {
       window.__luminaTokenLogoHtml = function(symbol, fallback){
         var sym = String(symbol || "").toUpperCase();
         var configured = logoUrlsBySymbol[sym];
-        if (configured) return logoImg(sym, configured, ethTrustLogoUrl(sym));
-        var builtin = builtinLogo(sym);
-        if (builtin) return builtin;
-        var trusted = trustedLogoUrl(sym);
-        if (trusted) return logoImg(sym, trusted, ethTrustLogoUrl(sym));
-        var fb = String(fallback || "");
-        if (fb.indexOf("<img") >= 0) return initial(sym);
-        return initial(sym);
+        if (configured) return logoImg(sym, configured, "");
+        return "";
       };
       window.__luminaRefreshTokenLogos = function(){
         readLogoConfig();
@@ -2130,7 +2109,7 @@ function enhancePrototypeTokens() {
       };
 
       function assetIconHtml(symbol, className, logo) {
-        var icon = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, logo || tokenInitial(symbol)) : (logo || tokenInitial(symbol));
+        var icon = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, logo || "") : "";
         return '<div class="coin ' + (className || "custom") + '">' + icon + '</div>';
       }
       function importedAssetRow(token, hidden) {
@@ -2346,8 +2325,8 @@ function enhancePrototypeHome() {
       var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC","USOL"]);
       function fixedHomeTokenMeta(sym){
         var defaults = {
-          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
-          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
           WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
           EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
           WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" },
@@ -2545,13 +2524,9 @@ function enhancePrototypeMarket() {
   const source = `
     (function(){
       window.__luminaMarketBySymbol = window.__luminaMarketBySymbol || {};
-      function worldLogo(){
-        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      }
       function iconFor(symbol, fallback){
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, fallback);
-        if (String(symbol).toUpperCase() === "WLD") return worldLogo();
-        return fallback || String(symbol || "?").slice(0, 3).toUpperCase();
+        return "";
       }
       function coinHtml(asset){
         return '<div class="coin ' + (asset.cls || "custom") + '">' + iconFor(asset.sym, asset.logo) + '</div>';
@@ -4558,12 +4533,8 @@ function enhancePrototypeDetail() {
         return "";
       }
 
-      function detailWorldLogo(){
-        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      }
-
       function detailTokenIcon(asset) {
-        return window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || asset.sym.charAt(0)) : (asset.sym === "WLD" ? detailWorldLogo() : (asset.logo || asset.sym.charAt(0)));
+        return window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, asset.logo || asset.sym.charAt(0)) : "";
       }
 
       function compactUsd(value) {

@@ -223,9 +223,6 @@
   .token-logo-fallback { display: inline-grid; place-items: center; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
   .token-logo-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .token-logo-fallback { font-weight: 800; line-height: 1; }
-  .coin .wld-mark,
-  .home-chain-pill .wld-mark,
-  .gainer .ic .wld-mark { width: 72%; height: 72%; display: block; }
   .coin .lumina-token-mark,
   .coin .lumina-token-img,
   .tk-row .ic .lumina-token-mark,
@@ -238,9 +235,7 @@
   .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; margin: auto; pointer-events: none; }
   .lumina-token-mark,
   .lumina-token-mark *,
-  .lumina-token-img,
-  .wld-mark,
-  .wld-mark * { pointer-events: none; }
+  .lumina-token-img { pointer-events: none; }
   .coin.eth .lumina-token-img,
   .detail-v2-token-icon.eth .lumina-token-img,
   .swap-panel .tk .dot2.eth .lumina-token-img,
