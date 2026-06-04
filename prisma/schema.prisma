@@ -19,6 +19,7 @@ model Token {
   symbol       String   @unique
   name         String
   contractAddr String?  @unique
+  poolAddress  String?
   decimals     Int      @default(18)
   logoUrl      String?
   status       String   @default("pending")

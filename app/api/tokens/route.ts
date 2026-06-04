@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
     symbol: token.symbol,
     name: token.name,
     contractAddr: token.native ? null : (token.contractAddress ?? token.wrappedAddress ?? null),
+    poolAddress: null,
     decimals: token.decimals,
     logoUrl: null,
     status: "verified",

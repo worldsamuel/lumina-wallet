@@ -9,7 +9,8 @@ export function ensureTokenControlColumns() {
       ALTER TABLE "Token"
         ADD COLUMN IF NOT EXISTS "tier" TEXT NOT NULL DEFAULT 'community',
         ADD COLUMN IF NOT EXISTS "canTransfer" BOOLEAN NOT NULL DEFAULT true,
-        ADD COLUMN IF NOT EXISTS "canSwap" BOOLEAN NOT NULL DEFAULT true
+        ADD COLUMN IF NOT EXISTS "canSwap" BOOLEAN NOT NULL DEFAULT true,
+        ADD COLUMN IF NOT EXISTS "poolAddress" TEXT
     `)
     .then(() => undefined);
   return ensured;

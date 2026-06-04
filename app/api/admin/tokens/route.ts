@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     symbol: string;
     name: string;
     contractAddr?: string | null;
+    poolAddress?: string | null;
     decimals?: number;
     logoUrl?: string | null;
     status?: string;
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
       symbol: body.symbol,
       name: body.name,
       contractAddr: body.contractAddr ?? null,
+      poolAddress: body.poolAddress ?? null,
       decimals: body.decimals ?? 18,
       logoUrl: body.logoUrl ?? null,
       status: body.status ?? "pending",

@@ -23,6 +23,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         typeof body.contractAddr === "string" || body.contractAddr === null
           ? body.contractAddr
           : undefined,
+      poolAddress:
+        typeof body.poolAddress === "string" || body.poolAddress === null
+          ? body.poolAddress
+          : undefined,
       decimals: typeof body.decimals === "number" ? body.decimals : undefined,
       logoUrl: typeof body.logoUrl === "string" || body.logoUrl === null ? body.logoUrl : undefined,
       status: typeof body.status === "string" ? body.status : undefined,

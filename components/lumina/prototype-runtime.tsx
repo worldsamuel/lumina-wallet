@@ -1745,6 +1745,8 @@ function enhancePrototypeTokens() {
       function registerBackendToken(token){
         var symbol = String(token.symbol || "").toUpperCase();
         if (!symbol || symbol === "23") return "";
+        window.__luminaBackendTokenBySymbol = window.__luminaBackendTokenBySymbol || {};
+        window.__luminaBackendTokenBySymbol[symbol] = token;
         tokenFull[symbol] = token.name || tokenFull[symbol] || symbol;
         if (token.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(symbol, token.logoUrl);
         tokenLogo[symbol] = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, tokenLogo[symbol] || symbol) : (tokenLogo[symbol] || tokenInitial(symbol));
@@ -1800,6 +1802,7 @@ function enhancePrototypeTokens() {
           if (token && !asset.address && !asset.contractAddr) {
             asset.address = token.contractAddr || token.address || null;
           }
+          if (token && token.poolAddress && !asset.poolAddress) asset.poolAddress = token.poolAddress;
           var addr = String(asset && (asset.address || asset.contractAddr) || "").toLowerCase();
           if (/^0x[a-f0-9]{40}$/.test(addr)) existingAddresses.add(addr);
           if (sym && balances && balances[sym] != null) {
@@ -1826,6 +1829,7 @@ function enhancePrototypeTokens() {
             cls: "custom",
             logo: tokenLogo[sym] || tokenInitial(sym),
             address: token.contractAddr || token.address || null,
+            poolAddress: token.poolAddress || null,
             homeSwapAsset: true
           };
         }).filter(Boolean);
@@ -1919,6 +1923,7 @@ function enhancePrototypeTokens() {
             cls: "custom",
             logo: tokenLogo[sym] || tokenInitial(sym),
             address: token.contractAddr || token.address || null,
+            poolAddress: token.poolAddress || null,
             recentSwapAsset: true,
             homeSwapAsset: true
           });
@@ -2261,6 +2266,28 @@ function enhancePrototypeHome() {
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
       var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC"]);
+      function fixedHomeTokenMeta(sym){
+        var defaults = {
+          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+          WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
+          EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
+          WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
+        };
+        var meta = defaults[sym] || null;
+        var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];
+        var configured = Array.isArray(whitelist) ? whitelist.find(function(token){ return String(token && token.symbol || "").toUpperCase() === sym; }) : null;
+        if (!meta && configured) {
+          meta = { full: configured.name || sym, decimals: configured.decimals || 18, cls: "custom", logo: tokenLogo[sym] || tokenInitialHome(sym), address: configured.contractAddr || configured.address || null };
+        }
+        if (meta && configured) {
+          meta.full = configured.name || meta.full;
+          meta.logo = tokenLogo[sym] || configured.logoUrl || meta.logo;
+          meta.address = configured.contractAddr || configured.address || meta.address;
+          meta.poolAddress = configured.poolAddress || meta.poolAddress || null;
+        }
+        return meta;
+      }
       function hasVisibleHomeBalance(asset){
         var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
         var n = Number(raw);
@@ -2275,6 +2302,22 @@ function enhancePrototypeHome() {
       window.openHomeAsset = function(sym){
         sym = String(sym || "").toUpperCase();
         var idx = (assets || []).findIndex(function(a){ return String(a && a.sym || "").toUpperCase() === sym; });
+        if (idx < 0 && fixedHomeTokens.has(sym)) {
+          var meta = fixedHomeTokenMeta(sym);
+          if (!meta) return;
+          if (!Array.isArray(assets)) assets = [];
+          idx = assets.length;
+          assets.push({
+            sym: sym,
+            full: meta.full || sym,
+            amt: (balances[sym] || "0") + " " + sym,
+            usdNum: (Number(String(balances[sym] || "0").replace(/,/g, "")) || 0) * (Number(prices[sym] || 0) || (sym === "USDC" || sym === "EURC" ? 1 : 0)),
+            cls: meta.cls || "custom",
+            logo: meta.logo || tokenInitialHome(sym),
+            address: meta.address || null,
+            poolAddress: meta.poolAddress || null
+          });
+        }
         if (idx >= 0) openDetail(idx);
       };
       window.__luminaOpenHomeRow = function(event, row){
@@ -2282,11 +2325,19 @@ function enhancePrototypeHome() {
         if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         var index = row && row.getAttribute ? Number(row.getAttribute("data-home-index")) : NaN;
+        if (symbol && fixedHomeTokens.has(String(symbol).toUpperCase())) {
+          openHomeAsset(symbol);
+          return;
+        }
         if (Number.isInteger(index) && assets && assets[index]) {
           openDetail(index);
           return;
         }
         if (!symbol) return;
+        if (symbol === "USDC") {
+          openHomeAsset("USDC");
+          return;
+        }
         if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
         else openHomeAsset(symbol);
       };
@@ -4333,6 +4384,22 @@ function enhancePrototypeDetail() {
           for (var i = 0; i < values.length; i++) {
             if (String(values[i] && values[i].address || "").toLowerCase() === address) return values[i];
           }
+        }
+        if (asset && asset.poolAddress) {
+          return {
+            symbol: sym,
+            name: asset.full || sym,
+            address: address || asset.address || asset.contractAddr || null,
+            poolAddress: asset.poolAddress,
+            priceUsd: Number(asset.usdNum || 0) > 0 && Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "")) > 0
+              ? Number(asset.usdNum || 0) / Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""))
+              : (sym === "USDC" || sym === "EURC" ? 1 : null),
+            change24h: null,
+            volume24hUsd: 0,
+            liquidityUsd: 1,
+            logoUrl: null,
+            verified: true
+          };
         }
         return null;
       }

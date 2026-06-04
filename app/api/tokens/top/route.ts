@@ -40,10 +40,11 @@ export async function GET(req: NextRequest) {
       ) {
         return null;
       }
-      return configuredToken?.logoUrl || configuredToken?.onTopRanking
+      return configuredToken?.logoUrl || configuredToken?.onTopRanking || configuredToken?.poolAddress
         ? {
             ...token,
             logoUrl: configuredToken.logoUrl ?? token.logoUrl,
+            poolAddress: configuredToken.poolAddress || token.poolAddress,
             verified: true,
           }
         : token;
@@ -67,6 +68,7 @@ export async function GET(req: NextRequest) {
           ? {
               ...market,
               logoUrl: token.logoUrl ?? market.logoUrl,
+              poolAddress: token.poolAddress || market.poolAddress,
               verified: true,
             }
           : null;
