@@ -235,7 +235,12 @@
   .gainer .ic .lumina-token-mark,
   .gainer .ic .lumina-token-img,
   .detail-v2-token-icon .lumina-token-mark,
-  .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; margin: auto; }
+  .detail-v2-token-icon .lumina-token-img { width: 72%; height: 72%; display: block; object-fit: contain; margin: auto; pointer-events: none; }
+  .lumina-token-mark,
+  .lumina-token-mark *,
+  .lumina-token-img,
+  .wld-mark,
+  .wld-mark * { pointer-events: none; }
   .coin.eth .lumina-token-img,
   .detail-v2-token-icon.eth .lumina-token-img,
   .swap-panel .tk .dot2.eth .lumina-token-img,
@@ -550,6 +555,8 @@
   .modal-grip { width: 44px; height: 5px; border-radius: 5px; background: #666a66; margin: 8px auto 18px; }
   .modal h3 { font-size: 18px; color: var(--text); font-weight: 800; padding: 0 var(--pad-screen) 14px; }
   .modal .tk-row { display: flex; align-items: center; gap: 14px; padding: 14px var(--pad-screen); cursor: pointer; }
+  #view-swap .swap-panel .tk,
+  #tokenModalList .tk-row { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   .modal .tk-row:active { background: #1a1d1a; }
   .modal .tk-row .ic { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
   .modal .tk-row .mid { flex: 1; } .modal .tk-row .mid .s { color: var(--text); font-weight: 700; } .modal .tk-row .mid .f { color: #a2a8a2; font-size: 12px; margin-top: 2px; }

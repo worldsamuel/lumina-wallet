@@ -2419,11 +2419,20 @@ function enhancePrototypeHome() {
       };
       if (!window.__luminaHomeAssetCaptureBound) {
         window.__luminaHomeAssetCaptureBound = true;
-        document.addEventListener("click", function(event){
+        function handleHomeAssetActivate(event){
           var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .asset") : null;
           if (!row) return;
+          var now = Date.now();
+          if (window.__luminaLastHomeAssetTap && now - window.__luminaLastHomeAssetTap < 420) {
+            if (event.preventDefault) event.preventDefault();
+            return;
+          }
+          window.__luminaLastHomeAssetTap = now;
           window.__luminaOpenHomeRow(event, row);
-        }, true);
+        }
+        document.addEventListener("click", handleHomeAssetActivate, true);
+        document.addEventListener("touchend", handleHomeAssetActivate, true);
+        document.addEventListener("pointerup", handleHomeAssetActivate, true);
       }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
@@ -3594,13 +3603,17 @@ function enhancePrototypeSwapQuote() {
       };
       if (!window.__luminaTokenModalKeyboardFix) {
         window.__luminaTokenModalKeyboardFix = true;
-        document.addEventListener("click", function(event){
+        function handleTokenRowActivate(event){
           var row = event.target && event.target.closest ? event.target.closest("#tokenModalList .tk-row") : null;
-          if (!row || !document.getElementById("tokenModalList")?.contains(row)) return;
+          var list = document.getElementById("tokenModalList");
+          if (!row || !list || !list.contains(row)) return;
           if (event.__luminaTokenPicked) return;
           event.__luminaTokenPicked = true;
           if (event.preventDefault) event.preventDefault();
           if (event.stopPropagation) event.stopPropagation();
+          var now = Date.now();
+          if (window.__luminaLastTokenRowTap && now - window.__luminaLastTokenRowTap < 420) return;
+          window.__luminaLastTokenRowTap = now;
           var symbol = row.getAttribute("data-token-symbol") || "";
           if (!symbol) {
             var symEl = row.querySelector(".s");
@@ -3608,17 +3621,26 @@ function enhancePrototypeSwapQuote() {
           }
           symbol = String(symbol || "").toUpperCase();
           if (symbol && typeof pickToken === "function") pickToken(symbol);
-        }, true);
-        document.addEventListener("click", function(event){
+        }
+        function handleSwapPickerActivate(event){
           var picker = event.target && event.target.closest ? event.target.closest("#view-swap .swap-panel .tk") : null;
           if (!picker) return;
           if (event.__luminaSwapPickerOpened) return;
           event.__luminaSwapPickerOpened = true;
           if (event.preventDefault) event.preventDefault();
           if (event.stopPropagation) event.stopPropagation();
+          var now = Date.now();
+          if (window.__luminaLastSwapPickerTap && now - window.__luminaLastSwapPickerTap < 420) return;
+          window.__luminaLastSwapPickerTap = now;
           var target = picker.querySelector("#buyDot, #buySym") ? "buy" : "sell";
           if (typeof openTokenModal === "function") openTokenModal(target);
-        }, true);
+        }
+        document.addEventListener("click", handleTokenRowActivate, true);
+        document.addEventListener("touchend", handleTokenRowActivate, true);
+        document.addEventListener("pointerup", handleTokenRowActivate, true);
+        document.addEventListener("click", handleSwapPickerActivate, true);
+        document.addEventListener("touchend", handleSwapPickerActivate, true);
+        document.addEventListener("pointerup", handleSwapPickerActivate, true);
         document.addEventListener("focusin", function(event){
           if (event.target && event.target.id === "tkSearch") {
             var modal = document.getElementById("tokenModal");
