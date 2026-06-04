@@ -40,7 +40,6 @@ export async function ensureCoreTokens() {
       name: token.name,
       contractAddr,
       decimals: token.decimals,
-      status: "verified",
       tier: "core",
       canTransfer: true,
       canSwap: true,
@@ -71,6 +70,7 @@ export async function ensureCoreTokens() {
     await db.token.create({
       data: {
         ...data,
+        status: "verified",
         logoUrl: null,
         onTopRanking: token.symbol === "WLD",
       },

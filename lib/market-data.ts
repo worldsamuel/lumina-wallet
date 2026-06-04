@@ -1,5 +1,6 @@
 import type { Address } from "viem";
 import { TOKENS } from "./tokens";
+import worldChainTokenCatalog from "./swap/worldchain-token-catalog.json";
 
 const GECKO_NETWORK = "world-chain";
 const GECKO_POOLS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_NETWORK}/pools`;
@@ -94,6 +95,15 @@ type DexScreenerPair = {
   volume?: { h24?: number | string | null };
   liquidity?: { usd?: number | string | null };
   info?: { imageUrl?: string | null };
+};
+
+type WorldChainCatalogToken = {
+  symbol?: string;
+  name?: string;
+  address?: string;
+  decimals?: string | number | null;
+  marketCap?: string | number | null;
+  volume24h?: string | number | null;
 };
 
 export type MarketToken = {
@@ -437,6 +447,75 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
 
 export type WorldChainMarketMode = "gainers" | "losers" | "new" | "all";
 
+function catalogTokenToMarket(token: WorldChainCatalogToken): MarketToken | null {
+  const symbol = String(token.symbol || "").trim().toUpperCase();
+  const name = String(token.name || symbol).trim();
+  const address = String(token.address || "").trim();
+  if (!symbol || !/^0x[a-fA-F0-9]{40}$/.test(address)) return null;
+
+  return {
+    symbol,
+    name: name || symbol,
+    address: address as Address,
+    priceUsd: null,
+    change24h: null,
+    volume24hUsd: num(token.volume24h),
+    liquidityUsd: num(token.marketCap),
+    logoUrl: null,
+    poolAddress: "",
+    verified: verifiedBySymbol(symbol),
+    decimals: Number.parseInt(String(token.decimals ?? ""), 10) || 18,
+  };
+}
+
+function getWorldChainCatalogTokens() {
+  return (worldChainTokenCatalog as WorldChainCatalogToken[])
+    .map(catalogTokenToMarket)
+    .filter((token): token is MarketToken => Boolean(token));
+}
+
+function mergeMarketTokens(primary: MarketToken[], fallback: MarketToken[]) {
+  const byKey = new Map<string, MarketToken>();
+  const symbolKeys = new Map<string, string>();
+
+  function keysFor(token: MarketToken) {
+    const address = token.address?.toLowerCase();
+    const symbol = token.symbol.toUpperCase();
+    return {
+      key: address ? `addr:${address}` : `sym:${symbol}`,
+      symbolKey: `sym:${symbol}`,
+    };
+  }
+
+  function add(token: MarketToken, replaceMissingOnly: boolean) {
+    const { key, symbolKey } = keysFor(token);
+    const existingKey = byKey.has(key) ? key : symbolKeys.get(symbolKey);
+    if (!existingKey) {
+      byKey.set(key, token);
+      symbolKeys.set(symbolKey, key);
+      return;
+    }
+    if (!replaceMissingOnly) return;
+    const existing = byKey.get(existingKey);
+    if (!existing) return;
+    byKey.set(existingKey, {
+      ...token,
+      ...existing,
+      logoUrl: existing.logoUrl || token.logoUrl,
+      poolAddress: existing.poolAddress || token.poolAddress,
+      priceUsd: existing.priceUsd ?? token.priceUsd,
+      change24h: existing.change24h ?? token.change24h,
+      volume24hUsd: existing.volume24hUsd || token.volume24hUsd,
+      liquidityUsd: existing.liquidityUsd || token.liquidityUsd,
+      decimals: existing.decimals ?? token.decimals,
+    });
+  }
+
+  primary.forEach((token) => add(token, false));
+  fallback.forEach((token) => add(token, true));
+  return [...byKey.values()];
+}
+
 /**
  * Returns ranked World Chain markets from GeckoTerminal pools.
  */
@@ -447,7 +526,7 @@ export async function getWorldChainMarkets(mode: WorldChainMarketMode = "gainers
     Number(market.volume24hUsd || 0) >= MIN_VOLUME_24H_USD &&
     !!market.poolAddress
   );
-  if (mode === "all") return catalog;
+  if (mode === "all") return mergeMarketTokens(catalog, getWorldChainCatalogTokens());
 
   const changed = catalog
     .filter((market) => market.change24h !== null && Number.isFinite(Number(market.change24h)));
