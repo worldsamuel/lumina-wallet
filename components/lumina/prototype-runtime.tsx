@@ -2499,8 +2499,10 @@ function enhancePrototypeMarket() {
       }
       function verifyStatus(item){
         var status = String(item && item.status || "").toLowerCase();
-        if (status === "verified" || item && item.verified === true) return "verified";
+        if (status === "verified") return "verified";
         if (status === "rejected" || status === "high" || status === "danger") return "rejected";
+        if (status === "pending" || status === "community" || status === "unverified") return "pending";
+        if (item && item.verified === true) return "verified";
         return "pending";
       }
       function verifyBadge(item){
@@ -2526,6 +2528,12 @@ function enhancePrototypeMarket() {
       }
       function registerMarketToken(market){
         var sym = market.symbol;
+        var existingMarket = window.__luminaMarketBySymbol[sym];
+        var explicitStatus = String(market.status || "").toLowerCase();
+        var existingStatus = String(existingMarket && existingMarket.status || "").toLowerCase();
+        var resolvedStatus = explicitStatus || existingStatus || (market.verified ? "verified" : "pending");
+        var resolvedVerified = resolvedStatus === "verified";
+        market = Object.assign({}, existingMarket || {}, market, { status: resolvedStatus, verified: resolvedVerified });
         if (market.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(sym, market.logoUrl);
         prices[sym] = market.priceUsd || 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
@@ -2542,8 +2550,8 @@ function enhancePrototypeMarket() {
             decimals: Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : 18,
             logoUrl: market.logoUrl || null,
             priceUsd: Number(market.priceUsd || 0),
-            status: market.status || (market.verified ? "verified" : "pending"),
-            trust: market.verified ? "audited" : "community"
+            status: resolvedStatus,
+            trust: resolvedVerified ? "audited" : "community"
           };
         }
         if (balances[sym] === undefined) balances[sym] = "0";
@@ -4468,8 +4476,10 @@ function enhancePrototypeDetail() {
       function detailVerifyMeta(asset){
         var market = marketForAsset(asset);
         var status = String((asset && asset.status) || (market && market.status) || "").toLowerCase();
-        if (status === "verified" || (market && market.verified === true)) return { cls:"ok", text: detailLang() === "zh-CN" ? "已验证" : "Verified" };
+        if (status === "verified") return { cls:"ok", text: detailLang() === "zh-CN" ? "已验证" : "Verified" };
         if (status === "rejected" || status === "high" || status === "danger") return { cls:"danger", text: detailLang() === "zh-CN" ? "高风险" : "High risk" };
+        if (status === "pending" || status === "community" || status === "unverified") return { cls:"warn", text: detailLang() === "zh-CN" ? "未验证" : "Unverified" };
+        if (market && market.verified === true) return { cls:"ok", text: detailLang() === "zh-CN" ? "已验证" : "Verified" };
         return { cls:"warn", text: detailLang() === "zh-CN" ? "未验证" : "Unverified" };
       }
       function updateDetailVerifyBadge(asset){

@@ -93,10 +93,10 @@ function normalizeTokenAddress(value: string | null | undefined) {
   return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
 }
 
-function uniqueVerifiedTokens(rows: BackendToken[] | undefined, swapOnly = false) {
+function uniqueTokens(rows: BackendToken[] | undefined, swapOnly = false) {
   const seen = new Set<string>();
   return (rows || []).filter((token) => {
-    if (token.status !== "verified") return false;
+    if (token.status === "disabled") return false;
     if (swapOnly && token.canSwap === false) return false;
     const symbol = String(token.symbol || "").trim().toUpperCase();
     if (!symbol) return false;
@@ -183,13 +183,13 @@ export function useBackendConfigSync(enabled: boolean) {
     }
 
     if (tokens.data) {
-      window.localStorage.setItem("ww_tokens", JSON.stringify(uniqueVerifiedTokens(tokens.data)));
-      window.localStorage.setItem("ww_swap_tokens", JSON.stringify(uniqueVerifiedTokens(tokens.data, true)));
+      window.localStorage.setItem("ww_tokens", JSON.stringify(uniqueTokens(tokens.data)));
+      window.localStorage.setItem("ww_swap_tokens", JSON.stringify(uniqueTokens(tokens.data, true)));
       window.__luminaRefreshTokenLogos?.();
       window.renderAssets?.();
     }
     if (topTokens.data) {
-      window.localStorage.setItem("ww_top_tokens", JSON.stringify(uniqueVerifiedTokens(topTokens.data)));
+      window.localStorage.setItem("ww_top_tokens", JSON.stringify(uniqueTokens(topTokens.data)));
       window.__luminaRefreshTokenLogos?.();
       window.renderAssets?.();
     }

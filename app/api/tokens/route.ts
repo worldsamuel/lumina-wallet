@@ -18,14 +18,23 @@ export async function GET(req: NextRequest) {
   let tokens: Awaited<ReturnType<typeof db.token.findMany>> = [];
   try {
     tokens = await db.token.findMany({
-      where: { status: "verified" },
+      where: { status: { not: "disabled" } },
       orderBy: { createdAt: "asc" },
     });
   } catch (error) {
     console.error("Failed to load public tokens, using core fallback", error);
   }
-  const configured = new Map(tokens.map((token) => [token.symbol.toUpperCase(), token]));
-  const coreFallback = TOKENS.filter((token) => !configured.has(token.symbol.toUpperCase())).map((token) => ({
+  const configuredBySymbol = new Map(tokens.map((token) => [token.symbol.toUpperCase(), token]));
+  const configuredByAddress = new Set(
+    tokens
+      .map((token) => token.contractAddr?.toLowerCase())
+      .filter((address): address is string => Boolean(address)),
+  );
+  const coreFallback = TOKENS.filter((token) => {
+    if (configuredBySymbol.has(token.symbol.toUpperCase())) return false;
+    const address = token.native ? "" : (token.contractAddress ?? token.wrappedAddress ?? "").toLowerCase();
+    return !address || !configuredByAddress.has(address);
+  }).map((token) => ({
     id: `core-${token.symbol}`,
     symbol: token.symbol,
     name: token.name,
