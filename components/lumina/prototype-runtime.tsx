@@ -1052,11 +1052,11 @@ function enhancePrototypeBuiltinTokenLogos() {
           var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
           var meta = customTokens && customTokens[sym];
           var status = String((market && market.status) || (meta && meta.status) || "").toLowerCase();
-          if (status === "verified") return '<span class="custom-badge verified">✅</span>';
-          if (status === "rejected" || status === "high" || status === "danger") return '<span class="custom-badge danger">❗</span>';
-          if (status === "pending" || status === "community" || status === "unverified") return '<span class="custom-badge warn">⚠️</span>';
-          if ((market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge verified">✅</span>';
-          return '<span class="custom-badge warn">⚠️</span>';
+          if (status === "verified") return '<span class="custom-badge status-dot verified" title="Verified" aria-label="Verified"></span>';
+          if (status === "rejected" || status === "high" || status === "danger") return '<span class="custom-badge status-dot danger" title="High risk" aria-label="High risk"></span>';
+          if (status === "pending" || status === "community" || status === "unverified") return '<span class="custom-badge status-dot warn" title="Unverified" aria-label="Unverified"></span>';
+          if ((market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge status-dot verified" title="Verified" aria-label="Verified"></span>';
+          return '<span class="custom-badge status-dot warn" title="Unverified" aria-label="Unverified"></span>';
         }
         renderTokenList = function(filter){
           filter = (filter || "").toLowerCase();
@@ -2574,9 +2574,9 @@ function enhancePrototypeMarket() {
       }
       function verifyBadge(item){
         var status = verifyStatus(item);
-        if (status === "verified") return '<span class="token-verify-badge ok">✅</span>';
-        if (status === "rejected") return '<span class="token-verify-badge danger">❗</span>';
-        return '<span class="token-verify-badge warn">⚠️</span>';
+        if (status === "verified") return '<span class="token-verify-badge ok" title="Verified" aria-label="Verified"></span>';
+        if (status === "rejected") return '<span class="token-verify-badge danger" title="High risk" aria-label="High risk"></span>';
+        return '<span class="token-verify-badge warn" title="Unverified" aria-label="Unverified"></span>';
       }
       function setIcon(el, symbol, fallback){
         if (!el) return;

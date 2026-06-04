@@ -563,6 +563,10 @@
   .custom-badge.verified { background: rgba(74,222,128,0.14); color: var(--green); }
   .custom-badge.warn { background: rgba(245,196,81,0.15); color: #f5c451; }
   .custom-badge.danger { background: rgba(248,113,113,0.15); color: var(--red); }
+  .custom-badge.status-dot { width: 9px; height: 9px; padding: 0; border-radius: 999px; line-height: 0; vertical-align: 1px; box-shadow: 0 0 0 3px rgba(255,255,255,0.045); }
+  .custom-badge.status-dot.verified { background: var(--green); }
+  .custom-badge.status-dot.warn { background: #f5c451; }
+  .custom-badge.status-dot.danger { background: var(--red); }
   /* 代币安全扫描 */
   .scan-rows { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
   .scan-row { display: flex; align-items: center; gap: 9px; font-size: 12px; }
@@ -803,10 +807,10 @@
   .tx-submitted-actions button, .tx-submitted-actions a { min-height: 40px; border-radius: 14px; border: 1px solid var(--line); display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.045); color: var(--text); text-decoration: none; font-size: 13px; font-weight: 850; cursor: pointer; }
   .tx-submitted-actions .primary { background: var(--green); border-color: transparent; color: #062312; }
   .market-route-badge { display: inline-flex; vertical-align: middle; margin-left: 7px; padding: 2px 6px; border-radius: 999px; background: rgba(255,255,255,.07); color: var(--text-mute); font-size: 9px; font-weight: 850; line-height: 1.2; }
-  .token-verify-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 999px; font-size: 11px; line-height: 1; font-weight: 900; }
-  .token-verify-badge.ok { background: rgba(74,222,128,0.14); color: var(--green); }
-  .token-verify-badge.warn { background: rgba(245,196,81,0.15); color: #f5c451; }
-  .token-verify-badge.danger { background: rgba(248,113,113,0.15); color: var(--red); }
+  .token-verify-badge { display: inline-block; width: 9px; height: 9px; border-radius: 999px; line-height: 0; flex: 0 0 auto; box-shadow: 0 0 0 3px rgba(255,255,255,0.045); }
+  .token-verify-badge.ok { background: var(--green); }
+  .token-verify-badge.warn { background: #f5c451; }
+  .token-verify-badge.danger { background: var(--red); }
 
 
 body {
