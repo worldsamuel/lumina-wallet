@@ -926,6 +926,14 @@ function enhancePrototypeBuiltinTokenLogos() {
       function initial(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
+      function fallbackInitial(symbol, fallback){
+        var sym = String(symbol || "").toUpperCase();
+        var name = "";
+        try { name = String((tokenFull && tokenFull[sym]) || ""); } catch(e) {}
+        var source = String(name || fallback || sym || "?").trim();
+        var word = source.split(/\\s+/)[0] || source;
+        return '<span class="token-logo-fallback">' + htmlEscape(initial(word)) + '</span>';
+      }
       function isLogoUrl(url){
         return /^https?:\\/\\//i.test(String(url || ""));
       }
@@ -945,7 +953,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       function logoImg(symbol, url, fallbackUrl){
         var sym = String(symbol || "").toUpperCase();
         var fallback = isLogoUrl(fallbackUrl) ? String(fallbackUrl) : "";
-        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"eager\\" decoding=\\"async\\" fetchpriority=\\"high\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML='';}\\"/>";
+        return "<img class=\\"lumina-token-img\\" src=\\"" + htmlEscape(url) + "\\" alt=\\"" + htmlEscape(sym) + " logo\\" loading=\\"eager\\" decoding=\\"async\\" fetchpriority=\\"high\\" data-fallback=\\"" + htmlEscape(fallback) + "\\" data-initial=\\"" + htmlEscape(fallbackInitial(sym, '')) + "\\" onerror=\\"if(this.dataset.fallback&&this.src!==this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback='';}else{this.outerHTML=this.dataset.initial||'';}\\"/>";
       }
       function trustedLogoUrl(symbol){
         var sym = String(symbol || "").toUpperCase();
@@ -968,7 +976,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         var sym = String(symbol || "").toUpperCase();
         var configured = logoUrlsBySymbol[sym];
         if (configured) return logoImg(sym, configured, "");
-        return "";
+        return fallbackInitial(sym, fallback);
       };
       window.__luminaRefreshTokenLogos = function(){
         readLogoConfig();
@@ -2410,8 +2418,6 @@ function enhancePrototypeHome() {
           window.__luminaOpenHomeRow(event, row);
         }
         document.addEventListener("click", handleHomeAssetActivate, true);
-        document.addEventListener("touchend", handleHomeAssetActivate, true);
-        document.addEventListener("pointerup", handleHomeAssetActivate, true);
       }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
@@ -3611,11 +3617,7 @@ function enhancePrototypeSwapQuote() {
           if (typeof openTokenModal === "function") openTokenModal(target);
         }
         document.addEventListener("click", handleTokenRowActivate, true);
-        document.addEventListener("touchend", handleTokenRowActivate, true);
-        document.addEventListener("pointerup", handleTokenRowActivate, true);
         document.addEventListener("click", handleSwapPickerActivate, true);
-        document.addEventListener("touchend", handleSwapPickerActivate, true);
-        document.addEventListener("pointerup", handleSwapPickerActivate, true);
         document.addEventListener("focusin", function(event){
           if (event.target && event.target.id === "tkSearch") {
             var modal = document.getElementById("tokenModal");
