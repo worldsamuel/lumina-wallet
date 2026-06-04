@@ -2858,6 +2858,12 @@ function enhancePrototypeSwapQuote() {
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
           ,slippageTooLow: { en:"Slippage cannot be 0. Please select at least 0.1%.", "zh-CN":"滑点不能设为 0,请至少选择 0.1%。", "zh-TW":"滑點不能設為 0,請至少選擇 0.1%。", fr:"Le slippage ne peut pas être 0. Sélectionnez au moins 0,1%.", de:"Slippage darf nicht 0 sein. Bitte mindestens 0,1% wählen.", es:"El slippage no puede ser 0. Selecciona al menos 0.1%.", ja:"スリッページは 0 にできません。0.1%以上を選択してください。" }
           ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
+          ,unsupportedToken: { en:"Token not supported", "zh-CN":"暂不支持此代币", "zh-TW":"暫不支援此代幣", fr:"Jeton non pris en charge", de:"Token nicht unterstützt", es:"Token no compatible", ja:"未対応のトークン" }
+          ,worldAppBlocked: { en:"Blocked by World App", "zh-CN":"World App 已拦截", "zh-TW":"World App 已攔截", fr:"Bloqué par World App", de:"Von World App blockiert", es:"Bloqueado por World App", ja:"World App がブロック" }
+          ,approvalFailed: { en:"Approval failed", "zh-CN":"授权失败", "zh-TW":"授權失敗", fr:"Autorisation échouée", de:"Freigabe fehlgeschlagen", es:"Falló la autorización", ja:"承認に失敗" }
+          ,sellRestricted: { en:"Sell may be restricted", "zh-CN":"可能限制卖出", "zh-TW":"可能限制賣出", fr:"Vente peut être limitée", de:"Verkauf evtl. eingeschränkt", es:"Venta posiblemente limitada", ja:"売却制限の可能性" }
+          ,refreshQuoteShort: { en:"Refresh quote", "zh-CN":"请刷新报价", "zh-TW":"請刷新報價", fr:"Actualisez le devis", de:"Angebot aktualisieren", es:"Actualiza cotización", ja:"見積もりを更新" }
+          ,quoteExpiredShort: { en:"Quote expired", "zh-CN":"报价已过期", "zh-TW":"報價已過期", fr:"Devis expiré", de:"Angebot abgelaufen", es:"Cotización vencida", ja:"見積期限切れ" }
           ,debugTitle: { en:"Swap debug", "zh-CN":"Swap 调试", "zh-TW":"Swap 調試", fr:"Debug swap", de:"Swap debug", es:"Debug swap", ja:"Swap debug" }
           ,debugEmpty: { en:"No swap debug data yet. Try quoting or signing once.", "zh-CN":"还没有调试数据。先报价或签名一次。", "zh-TW":"還沒有調試資料。先報價或簽名一次。", fr:"Aucune donnée de debug.", de:"Noch keine Debug-Daten.", es:"No hay datos de debug.", ja:"Debug データはまだありません。" }
           ,copyDebug: { en:"Copy debug", "zh-CN":"复制调试信息", "zh-TW":"複製調試資訊", fr:"Copier debug", de:"Debug kopieren", es:"Copiar debug", ja:"Debug をコピー" }
@@ -3336,9 +3342,24 @@ function enhancePrototypeSwapQuote() {
 	        return out;
 	      }
 	      function swapErrorToast(error){
-	        var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(error) : (error && error.message ? error.message : swapCopy("transactionFailed"));
-	        if (/cancel|reject|rejected|user_rejected|取消/i.test(String(msg))) return swapCopy("cancelled");
-	        return swapCopy("swapFailed") + ". " + swapCopy("checkActivityDetails");
+	        var readable = readableSwapError(error);
+	        var raw = [
+	          readable && readable.message,
+	          readable && readable.code,
+	          readable && readable.error_code,
+	          readable && readable.cause,
+	          readable && readable.serialized
+	        ].filter(Boolean).join(" ");
+	        var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(error) : raw;
+	        var text = String(raw || msg || "");
+	        if (/cancel|reject|rejected|user_rejected|取消/i.test(text)) return swapCopy("cancelled");
+	        if (/invalid_contract/i.test(text)) return swapCopy("unsupportedToken");
+	        if (/disallowed_operation/i.test(text)) return swapCopy("worldAppBlocked");
+	        if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(text)) return swapCopy("approvalFailed");
+	        if (/TRANSFER_FROM_FAILED|transferFrom|transfer failed/i.test(text)) return swapCopy("sellRestricted");
+	        if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(text)) return swapCopy("refreshQuoteShort");
+	        if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(text)) return swapCopy("quoteExpiredShort");
+	        return swapCopy("swapFailed");
 	      }
 	      function syncSwapQuotePriceToHome(){
 	        if (!latestSwapQuote) return;
