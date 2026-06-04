@@ -2321,6 +2321,8 @@ function enhancePrototypeHome() {
         if (idx >= 0) openDetail(idx);
       };
       window.__luminaOpenHomeRow = function(event, row){
+        if (event && event.__luminaHomeHandled) return;
+        if (event) event.__luminaHomeHandled = true;
         if (event && event.preventDefault) event.preventDefault();
         if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
@@ -2343,6 +2345,11 @@ function enhancePrototypeHome() {
       };
       if (!window.__luminaHomeAssetCaptureBound) {
         window.__luminaHomeAssetCaptureBound = true;
+        document.addEventListener("pointerdown", function(event){
+          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
+          if (!row) return;
+          window.__luminaOpenHomeRow(event, row);
+        }, true);
         document.addEventListener("pointerup", function(event){
           var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
           if (!row) return;
@@ -2423,7 +2430,7 @@ function enhancePrototypeHome() {
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource;
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
-        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
+        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onpointerdown="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +

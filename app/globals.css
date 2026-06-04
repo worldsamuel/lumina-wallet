@@ -211,7 +211,7 @@
   #view-home .home-view-all { color: #7e857e; font-size: 13px; font-weight: 800; text-decoration: none; }
   #view-home .home-add-circle { width: 42px; height: 42px; border: none; border-radius: 50%; display: grid; place-items: center; background: #101210; color: var(--green); cursor: pointer; box-shadow: 0 12px 26px rgba(0,0,0,0.22); }
   #view-home .home-add-circle span { display: block; font-size: 31px; line-height: 1; transform: translateY(-2px); }
-  #view-home .home-token-search { height: 50px; margin: 0 var(--pad-screen) 10px; padding: 0 16px; display: flex; align-items: center; gap: 13px; border-radius: 25px; background: #121412; color: #8d938d; box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); }
+  #view-home .home-token-search { position: relative; z-index: 1; height: 50px; margin: 0 var(--pad-screen) 10px; padding: 0 16px; display: flex; align-items: center; gap: 13px; border-radius: 25px; background: #121412; color: #8d938d; box-shadow: inset 0 1px 0 rgba(255,255,255,0.02); }
   #view-home .home-token-search input { min-width: 0; flex: 1; height: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 16px; font-weight: 650; }
   #view-home .home-token-search input::placeholder { color: #8d938d; }
   .assets { margin: 0 var(--pad-screen); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
@@ -245,8 +245,8 @@
   .asset .name .sym { font-weight: 700; font-size: 16px; } .asset .name .full { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
   .asset .spark { width: 80px; height: 34px; }
   .asset .vals { text-align: right; white-space: nowrap; } .asset .vals .amt { font-weight: 700; font-size: 15px; } .asset .vals .usd { color: var(--text-mute); font-size: 13px; margin-top: 2px; }
-  #view-home .assets { margin: 0 var(--pad-screen); border: none; border-radius: 24px; background: #101110; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025); }
-  #view-home .asset.home-v2-asset { grid-template-columns: 52px minmax(0,1fr) minmax(96px,104px) 14px; gap: 12px; min-height: 76px; padding: 12px 15px; border-bottom-color: rgba(255,255,255,0.055); }
+  #view-home .assets { position: relative; z-index: 3; margin: 0 var(--pad-screen); border: none; border-radius: 24px; background: #101110; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.025); }
+  #view-home .asset.home-v2-asset { position: relative; z-index: 4; touch-action: manipulation; grid-template-columns: 52px minmax(0,1fr) minmax(96px,104px) 14px; gap: 12px; min-height: 76px; padding: 12px 15px; border-bottom-color: rgba(255,255,255,0.055); }
   #view-home .asset.home-v2-asset .coin { width: 46px; height: 46px; font-size: 17px; flex-shrink: 0; }
   #view-home .asset.home-v2-asset .name { min-width: 0; }
   #view-home .asset.home-v2-asset .name .sym { font-size: 16px; font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
