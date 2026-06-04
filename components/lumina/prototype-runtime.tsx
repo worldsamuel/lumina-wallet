@@ -916,7 +916,8 @@ function enhancePrototypeBuiltinTokenLogos() {
         ORB: "0xee21af1d049211206b20b957d07794e7d0b140b3",
         LIFE: "0xE4D62e62013EaF065Fa3F0316384F88559C80889",
         WGEM: "0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740",
-        HUB: "0xd469fDA5d9522A093760902e9bE51e0c5D822D26"
+        HUB: "0xd469fDA5d9522A093760902e9bE51e0c5D822D26",
+        USOL: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55"
       };
       var logoUrlsBySymbol = {};
       function htmlEscape(value){
@@ -1005,6 +1006,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.LIFE = window.__luminaTokenLogoHtml("LIFE", "L");
         tokenLogo.WGEM = window.__luminaTokenLogoHtml("WGEM", "W");
         tokenLogo.HUB = window.__luminaTokenLogoHtml("HUB", "H");
+        tokenLogo.USOL = window.__luminaTokenLogoHtml("USOL", "S");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -1022,6 +1024,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       dotColor.EURC = "#2775ca";
       dotColor.ORO = "linear-gradient(135deg,#203020,#314633)";
       dotColor.ORB = "linear-gradient(135deg,#203020,#314633)";
+      dotColor.USOL = "linear-gradient(135deg,#1d2d28,#2f5f4d)";
       prices.USDT = prices.USDT || 1;
       balances.USDT = balances.USDT || "0";
       availMap.USDT = availMap.USDT || "0 USDT";
@@ -1752,7 +1755,8 @@ function enhancePrototypeTokens() {
           { symbol:"ORB", name:"Orb", contractAddr:"0xee21af1d049211206b20b957d07794e7d0b140b3", decimals:18, logoUrl:null },
           { symbol:"LIFE", name:"LIFE", contractAddr:"0xE4D62e62013EaF065Fa3F0316384F88559C80889", decimals:18, logoUrl:null },
           { symbol:"WGEM", name:"World GEM", contractAddr:"0xAC794B2a7F81e5778f3733AF00901d4c6Ee2A740", decimals:18, logoUrl:null },
-          { symbol:"HUB", name:"Human Unique Bridge", contractAddr:"0xd469fDA5d9522A093760902e9bE51e0c5D822D26", decimals:18, logoUrl:null }
+          { symbol:"HUB", name:"Human Unique Bridge", contractAddr:"0xd469fDA5d9522A093760902e9bE51e0c5D822D26", decimals:18, logoUrl:null },
+          { symbol:"USOL", name:"Wrapped Solana (Universal)", contractAddr:"0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55", decimals:18, logoUrl:null }
         ];
         [readJson("ww_swap_tokens", []), readJson("ww_tokens", []), builtin].forEach(function(list){
           if (Array.isArray(list)) source.push.apply(source, list);
@@ -2339,14 +2343,15 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
-      var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC"]);
+      var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC","USOL"]);
       function fixedHomeTokenMeta(sym){
         var defaults = {
           WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
           USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
           WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
           EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
-          WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
+          WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" },
+          USOL: { full: tokenFull.USOL || "Wrapped Solana (Universal)", decimals: 18, cls: "custom", logo: tokenLogo.USOL || "S", address: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55" }
         };
         var meta = defaults[sym] || null;
         var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];
@@ -3384,8 +3389,29 @@ function enhancePrototypeSwapQuote() {
 	        if (percent >= 3) return "impact-mid";
 	        return "impact-low";
 	      }
+	      function normalizedSwapTokenAddress(token){
+	        var address = token && (token.contractAddr || token.contractAddress || token.address || token.tokenAddress || token.id);
+	        address = String(address || "").toLowerCase();
+	        return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
+	      }
+	      function verifiedSwapToken(token){
+	        if (!token) return false;
+	        if (token.verified === true) return true;
+	        var symbol = String(token.symbol || token.sym || "").toUpperCase();
+	        var address = normalizedSwapTokenAddress(token);
+	        var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];
+	        if (Array.isArray(whitelist)) {
+	          return whitelist.some(function(item){
+	            var itemSymbol = String(item && item.symbol || item && item.sym || "").toUpperCase();
+	            var itemAddress = normalizedSwapTokenAddress(item);
+	            return (address && itemAddress && address === itemAddress) || (symbol && itemSymbol && symbol === itemSymbol);
+	          });
+	        }
+	        return false;
+	      }
 	      function riskySwapToken(token){
 	        if (!token) return false;
+	        if (verifiedSwapToken(token)) return false;
 	        var trust = String(token.trust || "").toLowerCase();
 	        var status = String(token.status || (token.safety && token.safety.status) || "").toLowerCase();
 	        return trust === "community" || status === "community" || status === "pending" || status === "unverified" || status === "rejected" || status === "high" || status === "danger";
@@ -3427,7 +3453,7 @@ function enhancePrototypeSwapQuote() {
 	          modal.className = "modal-mask open";
 	          modal.id = "swapConfirmModal";
 	          modal.innerHTML =
-	            '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;padding:24px;border-radius:26px;">' +
+	            '<div class="modal send-confirm-sheet swap-confirm-sheet-v2">' +
 	              '<div class="modal-grip"></div><h3>' + swapCopy("confirmSwap") + '</h3>' +
 	              '<div class="swap-confirm-list">' +
 	                '<div class="ln"><span>' + swapCopy("youPay") + '</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
@@ -3435,8 +3461,8 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>' + swapCopy("minReceive") + '</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>' + swapCopy("platformFee") + '</span><b>' + platformFeeText(latestSwapQuote) + '</b></div>' +
 	              '</div>' +
-	              (state.riskText ? '<div class="swap-risk-card"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p></div><button type="button" class="swap-risk-check" id="swapHighImpactAck"><span class="swap-risk-checkbox" aria-hidden="true"></span><span>' + swapCopy("riskAck") + '</span></button>' : '') +
-	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
+	              (state.riskText ? '<div class="swap-risk-wrap"><div class="swap-risk-card"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p></div><button type="button" class="swap-risk-check" id="swapHighImpactAck"><span class="swap-risk-checkbox" aria-hidden="true"></span><span class="swap-risk-check-text">' + swapCopy("riskAck") + '</span></button></div>' : '') +
+	              '<div class="earn-action-row swap-confirm-actions"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
 	          function done(value){

@@ -117,6 +117,15 @@ export const TOKENS: readonly TokenConfig[] = [
     coingeckoId: COINGECKO_IDS.HUB,
   },
   {
+    symbol: "USOL",
+    name: "Wrapped Solana (Universal)",
+    decimals: 18,
+    logo: "S",
+    className: "custom",
+    contractAddress: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55" as Address,
+    coingeckoId: COINGECKO_IDS.USOL,
+  },
+  {
     symbol: "ETH",
     name: "Ether",
     decimals: 18,
