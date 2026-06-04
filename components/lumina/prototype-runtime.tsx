@@ -256,8 +256,9 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const handleEarnReceiptError = useCallback((receiptError?: Error) => {
     window.__luminaSetMorphoBusy?.(false);
     setEarnUserOpHash("");
-    toastFromPrototype(`${earnPendingAction === "withdraw" ? prototypeText("withdrawFailed") : prototypeText("depositFailed")}: ${receiptError?.message ?? "Transaction failed"}`);
-  }, [earnPendingAction]);
+    const message = receiptError?.message ?? "";
+    toastFromPrototype(isCancellationMessage(message) ? prototypeText("transactionCancelled") : localizedTransactionFailure("earn"));
+  }, []);
 
   const handleSwapReceiptSuccess = useCallback(() => {
     setSwapUserOpHash("");
@@ -269,7 +270,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   const handleSwapReceiptError = useCallback((receiptError?: Error) => {
     setSwapUserOpHash("");
     const message = receiptError?.message ?? prototypeText("transactionFailed");
-    toastFromPrototype(isCancellationMessage(message) ? prototypeText("transactionCancelled") : `${prototypeText("swapFailed")}: ${message}`);
+    toastFromPrototype(isCancellationMessage(message) ? prototypeText("transactionCancelled") : localizedTransactionFailure("swap"));
     window.dispatchEvent(new CustomEvent("lumina:swap-failed", { detail: { message: receiptError?.message } }));
   }, []);
 
@@ -470,11 +471,16 @@ function prototypeText(key: "depositSuccess" | "withdrawSuccess" | "depositFaile
     depositFailed: { en: "Deposit failed", "zh-CN": "存入失败", "zh-TW": "存入失敗" },
     withdrawFailed: { en: "Withdrawal failed", "zh-CN": "提现失败", "zh-TW": "提領失敗" },
     swapSuccess: { en: "Swap successful", "zh-CN": "兑换成功", "zh-TW": "兌換成功" },
-    swapFailed: { en: "Swap failed", "zh-CN": "兑换失败", "zh-TW": "兌換失敗" },
+    swapFailed: { en: "Swap failed", "zh-CN": "交易失败", "zh-TW": "交易失敗" },
     transactionFailed: { en: "Transaction failed", "zh-CN": "交易失败", "zh-TW": "交易失敗" },
     transactionCancelled: { en: "Transaction cancelled", "zh-CN": "交易已取消", "zh-TW": "交易已取消" },
   } as const;
   return (copy[key] as Record<string, string>)[lang] ?? copy[key].en;
+}
+
+function localizedTransactionFailure(kind: "earn" | "swap") {
+  const labels = transactionStatusLabels(kind);
+  return `${labels.errorPrefix}. ${labels.timeout}`;
 }
 
 function transactionStatusLabels(kind: "earn" | "swap", forcedLang?: string) {
@@ -482,7 +488,7 @@ function transactionStatusLabels(kind: "earn" | "swap", forcedLang?: string) {
   const copy = {
     swap: {
       success: { en: "Swap successful", "zh-CN": "兑换成功", "zh-TW": "兌換成功" },
-      errorPrefix: { en: "Swap failed", "zh-CN": "兑换失败", "zh-TW": "兌換失敗" },
+      errorPrefix: { en: "Swap failed", "zh-CN": "交易失败", "zh-TW": "交易失敗" },
       loading: {
         en: "Waiting for on-chain confirmation...",
         "zh-CN": "等待区块链确认...",
@@ -490,9 +496,9 @@ function transactionStatusLabels(kind: "earn" | "swap", forcedLang?: string) {
       },
       submitted: { en: "Swap transaction submitted", "zh-CN": "兑换交易已提交", "zh-TW": "兌換交易已提交" },
       timeout: {
-        en: "Transaction is still pending. Check Activity later.",
-        "zh-CN": "交易仍在进行,请稍后到活动页查看",
-        "zh-TW": "交易仍在進行,請稍後到活動頁查看",
+        en: "Check Activity for details.",
+        "zh-CN": "请到活动页查看详情。",
+        "zh-TW": "請到活動頁查看詳情。",
       },
     },
     earn: {
@@ -505,9 +511,9 @@ function transactionStatusLabels(kind: "earn" | "swap", forcedLang?: string) {
       },
       submitted: { en: "Transaction submitted", "zh-CN": "交易已提交", "zh-TW": "交易已提交" },
       timeout: {
-        en: "Transaction is still pending. Check Activity later.",
-        "zh-CN": "交易仍在进行,请稍后到活动页查看",
-        "zh-TW": "交易仍在進行,請稍後到活動頁查看",
+        en: "Check Activity for details.",
+        "zh-CN": "请到活动页查看详情。",
+        "zh-TW": "請到活動頁查看詳情。",
       },
     },
   }[kind];
@@ -2334,10 +2340,19 @@ function enhancePrototypeHome() {
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
       var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC"]);
+      function homeWorldLogo(){
+        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+      }
+      function stableHomeLogo(symbol, fallback){
+        var sym = String(symbol || "").toUpperCase();
+        if (sym === "WLD") return homeWorldLogo();
+        if (sym === "USDC") return "$";
+        return fallback;
+      }
       function fixedHomeTokenMeta(sym){
         var defaults = {
-          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
-          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: homeWorldLogo(), address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
           WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
           EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
           WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
@@ -2395,26 +2410,15 @@ function enhancePrototypeHome() {
         if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         var index = row && row.getAttribute ? Number(row.getAttribute("data-home-index")) : NaN;
-        if (Number.isInteger(index) && assets && assets[index]) {
-          openDetail(index);
+        if (symbol) {
+          if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
+          else openHomeAsset(symbol);
           return;
         }
-        if (!symbol) return;
-        if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
-        else openHomeAsset(symbol);
+        if (Number.isInteger(index) && assets && assets[index]) openDetail(index);
       };
       if (!window.__luminaHomeAssetCaptureBound) {
         window.__luminaHomeAssetCaptureBound = true;
-        document.addEventListener("pointerdown", function(event){
-          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
-          if (!row) return;
-          window.__luminaOpenHomeRow(event, row);
-        }, true);
-        document.addEventListener("pointerup", function(event){
-          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
-          if (!row) return;
-          window.__luminaOpenHomeRow(event, row);
-        }, true);
         document.addEventListener("click", function(event){
           var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
           if (!row) return;
@@ -2486,11 +2490,11 @@ function enhancePrototypeHome() {
       }
       function rowHtml(asset, index, imported){
         var symbol = String(asset.sym || "").toUpperCase();
-        var logoSource = (tokenLogo && tokenLogo[symbol]) || asset.logo || tokenInitialHome(asset.sym);
-        var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource;
+        var logoSource = stableHomeLogo(symbol, asset.logo || (tokenLogo && tokenLogo[symbol]) || tokenInitialHome(asset.sym));
+        var logoHtml = (symbol === "WLD" || symbol === "USDC") ? logoSource : (window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource);
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
-        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onpointerdown="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
+        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
@@ -2846,7 +2850,7 @@ function enhancePrototypeSwapQuote() {
           signing: { en:"Signing...", "zh-CN":"签名中...", "zh-TW":"簽名中...", fr:"Signature...", de:"Signieren...", es:"Firmando...", ja:"署名中..." },
           submitting: { en:"Submitting transaction...", "zh-CN":"提交交易...", "zh-TW":"提交交易...", fr:"Envoi de la transaction...", de:"Transaktion wird gesendet...", es:"Enviando transacción...", ja:"取引を送信中..." },
           waitingChain: { en:"Waiting for confirmation...", "zh-CN":"等待区块链确认...", "zh-TW":"等待區塊鏈確認...", fr:"En attente de confirmation...", de:"Warten auf Bestätigung...", es:"Esperando confirmación...", ja:"確認待ち..." }
-          ,swapFailed: { en:"Swap failed", "zh-CN":"兑换失败", "zh-TW":"兌換失敗", fr:"Échec de l'échange", de:"Swap fehlgeschlagen", es:"Intercambio fallido", ja:"スワップ失敗" }
+          ,swapFailed: { en:"Swap failed", "zh-CN":"交易失败", "zh-TW":"交易失敗", fr:"Échec de l'échange", de:"Swap fehlgeschlagen", es:"Intercambio fallido", ja:"スワップ失敗" }
           ,cancelled: { en:"Transaction cancelled", "zh-CN":"交易已取消", "zh-TW":"交易已取消", fr:"Transaction annulée", de:"Transaktion abgebrochen", es:"Transacción cancelada", ja:"取引をキャンセルしました" }
           ,transactionFailed: { en:"Transaction failed", "zh-CN":"交易失败", "zh-TW":"交易失敗", fr:"Transaction échouée", de:"Transaktion fehlgeschlagen", es:"Transacción fallida", ja:"取引に失敗しました" }
           ,priceImpactUnknown: { en:"Pool quote", "zh-CN":"池子报价", "zh-TW":"池子報價", fr:"Prix du pool", de:"Pool-Preis", es:"Precio del pool", ja:"プール見積" }
@@ -2858,6 +2862,7 @@ function enhancePrototypeSwapQuote() {
           ,quoteUpdated: { en:"Quote refreshed", "zh-CN":"报价已刷新", "zh-TW":"報價已刷新", fr:"Devis actualisé", de:"Angebot aktualisiert", es:"Cotización actualizada", ja:"見積もりを更新しました" }
           ,confirmInWorldApp: { en:"Confirm in World App...", "zh-CN":"请在 World App 确认...", "zh-TW":"請在 World App 確認...", fr:"Confirmez dans World App...", de:"In World App bestätigen...", es:"Confirma en World App...", ja:"World App で確認..." }
           ,submittedHint: { en:"Your transaction is in the queue. Activity will update after World Chain confirms it.", "zh-CN":"交易已进入队列,World Chain 确认后活动记录会自动更新。", "zh-TW":"交易已進入佇列,World Chain 確認後活動記錄會自動更新。", fr:"La transaction est en file. Activity se mettra à jour après confirmation.", de:"Die Transaktion ist in der Warteschlange. Activity aktualisiert sich nach Bestätigung.", es:"La transacción está en cola. Activity se actualizará al confirmar.", ja:"取引はキューに入りました。確認後 Activity が更新されます。" }
+          ,checkActivityDetails: { en:"Check Activity for details.", "zh-CN":"请到活动页查看详情。", "zh-TW":"請到活動頁查看詳情。", fr:"Consultez l'activité pour les détails.", de:"Details finden Sie in Aktivität.", es:"Consulta Activity para ver detalles.", ja:"詳細は Activity で確認してください。" }
           ,limit: { en:"Single swap limit", "zh-CN":"单笔限额", "zh-TW":"單筆限額", fr:"Limite par swap", de:"Limit pro Swap", es:"Límite por swap", ja:"1回あたりの上限" }
           ,reduceAmount: { en:"Please reduce the amount.", "zh-CN":"请降低金额。", "zh-TW":"請降低金額。", fr:"Veuillez réduire le montant.", de:"Bitte Betrag reduzieren.", es:"Reduce el importe.", ja:"金額を下げてください。" }
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
@@ -3343,7 +3348,7 @@ function enhancePrototypeSwapQuote() {
 	      function swapErrorToast(error){
 	        var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(error) : (error && error.message ? error.message : swapCopy("transactionFailed"));
 	        if (/cancel|reject|rejected|user_rejected|取消/i.test(String(msg))) return swapCopy("cancelled");
-	        return swapCopy("swapFailed") + ": " + msg;
+	        return swapCopy("swapFailed") + ". " + swapCopy("checkActivityDetails");
 	      }
 	      function syncSwapQuotePriceToHome(){
 	        if (!latestSwapQuote) return;
