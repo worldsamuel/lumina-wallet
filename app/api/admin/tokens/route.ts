@@ -3,6 +3,7 @@ import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { ensureCoreTokens } from "@/lib/admin/ensure-token-schema";
 import { normalizeTokenFields } from "@/lib/admin/token-normalization";
+import { applySellRouteValidation } from "@/lib/admin/token-swap-validation";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     onTopRanking?: boolean;
   };
 
-  const data = normalizeTokenFields({
+  const normalized = normalizeTokenFields({
     symbol: body.symbol,
     name: body.name,
     contractAddr: body.contractAddr ?? null,
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
     canSwap: body.canSwap ?? true,
     onTopRanking: body.onTopRanking ?? false,
   });
+  const data = await applySellRouteValidation(normalized);
   const token = await db.token.create({
     data,
   });

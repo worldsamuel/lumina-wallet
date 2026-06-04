@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { normalizeTokenFields } from "@/lib/admin/token-normalization";
+import { applySellRouteValidation } from "@/lib/admin/token-swap-validation";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -15,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = (await req.json()) as Record<string, unknown>;
   const current = await db.token.findFirst({ where: { OR: [{ id: params.id }, { symbol: params.id.toUpperCase() }] } });
   if (!current) return jsonResponse({ error: "Token not found." }, { status: 404 });
-  const data = normalizeTokenFields({
+  const normalized = normalizeTokenFields({
     symbol: typeof body.symbol === "string" ? body.symbol : current.symbol,
     name: typeof body.name === "string" ? body.name : undefined,
     contractAddr:
@@ -33,6 +34,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     canTransfer: typeof body.canTransfer === "boolean" ? body.canTransfer : undefined,
     canSwap: typeof body.canSwap === "boolean" ? body.canSwap : undefined,
     onTopRanking: typeof body.onTopRanking === "boolean" ? body.onTopRanking : undefined,
+  });
+  const data = await applySellRouteValidation({
+    ...normalized,
+    name: normalized.name ?? current.name,
+    contractAddr: normalized.contractAddr === undefined ? current.contractAddr : normalized.contractAddr,
+    decimals: normalized.decimals ?? current.decimals,
+    canSwap: normalized.canSwap ?? current.canSwap,
   });
   const token = await db.token.update({
     where: { id: current.id },
