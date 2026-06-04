@@ -1758,7 +1758,7 @@ function enhancePrototypeTokens() {
           { symbol:"HUB", name:"Human Unique Bridge", contractAddr:"0xd469fDA5d9522A093760902e9bE51e0c5D822D26", decimals:18, logoUrl:null },
           { symbol:"USOL", name:"Wrapped Solana (Universal)", contractAddr:"0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55", decimals:18, logoUrl:null }
         ];
-        [readJson("ww_swap_tokens", []), readJson("ww_tokens", []), builtin].forEach(function(list){
+        [readJson("ww_swap_tokens", []), readJson("ww_tokens", []), readJson("ww_top_tokens", []), builtin].forEach(function(list){
           if (Array.isArray(list)) source.push.apply(source, list);
         });
         var seen = new Set();
@@ -3397,6 +3397,8 @@ function enhancePrototypeSwapQuote() {
 	      function verifiedSwapToken(token){
 	        if (!token) return false;
 	        if (token.verified === true) return true;
+	        var tokenStatus = String(token.status || token.trust || (token.safety && token.safety.status) || "").toLowerCase();
+	        if (tokenStatus === "verified") return true;
 	        var symbol = String(token.symbol || token.sym || "").toUpperCase();
 	        var address = normalizedSwapTokenAddress(token);
 	        var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];

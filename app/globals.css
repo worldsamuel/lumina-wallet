@@ -482,16 +482,16 @@
   .swap-detail .ln .impact-low { color: var(--green); } .swap-detail .ln .impact-mid { color: #f5c451; } .swap-detail .ln .impact-high { color: var(--red); }
   .quote-warning { display: none; margin: 12px var(--pad-screen) 0; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(248,113,113,0.24); background: rgba(248,113,113,0.1); color: var(--red); font-size: 12px; line-height: 1.45; }
   .quote-warning.show { display: block; }
-  .swap-confirm-sheet-v2 { width: calc(100vw - 24px); max-width: 430px; max-height: calc(100dvh - 26px); overflow: auto; padding: 22px 20px 20px; border-radius: 26px; }
+  .swap-confirm-sheet-v2 { width: calc(100vw - 48px); max-width: 390px; max-height: calc(100dvh - 26px); overflow: auto; padding: 24px 24px 22px; margin: 0 auto 10px; border-radius: 26px; }
   .swap-risk-wrap { width: 100%; margin-top: 14px; display: grid; gap: 10px; }
   .swap-risk-card { width: 100%; border: 1px solid rgba(248,113,113,.2); border-radius: 18px; padding: 13px; background: linear-gradient(145deg, rgba(52,17,22,.9), rgba(22,14,16,.96)); color: #fff; text-align: left; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
   .swap-risk-card strong { display: grid; grid-template-columns: 28px minmax(0,1fr); align-items: center; gap: 9px; font-size: 15px; line-height: 1.25; }
   .swap-risk-card strong span:last-child { min-width: 0; overflow-wrap: anywhere; }
   .swap-risk-card p { margin: 9px 0 0; color: rgba(255,255,255,.76); font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
   .swap-risk-icon { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; background: rgba(255,255,255,.1); color: #ff9cab; }
-  .swap-risk-check { width: 100%; min-height: 50px; border: 1px solid rgba(74,222,128,.22); border-radius: 16px; padding: 10px 12px; background: rgba(74,222,128,.075); color: rgba(255,255,255,.88); display: grid; grid-template-columns: 26px minmax(0,1fr); align-items: center; gap: 10px; text-align: left; font-size: 12px; line-height: 1.35; }
+  .swap-risk-check { width: 100%; min-height: 42px; border: 1px solid rgba(74,222,128,.22); border-radius: 14px; padding: 8px 11px; background: rgba(74,222,128,.075); color: rgba(255,255,255,.88); display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: center; gap: 9px; text-align: left; font-size: 11px; line-height: 1.3; }
   .swap-risk-check.ack { border-color: rgba(74,222,128,.42); background: rgba(74,222,128,.13); color: #eafff0; }
-  .swap-risk-checkbox { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid rgba(255,255,255,.36); display: grid; place-items: center; }
+  .swap-risk-checkbox { width: 20px; height: 20px; border-radius: 6px; border: 1.5px solid rgba(255,255,255,.36); display: grid; place-items: center; }
   .swap-risk-check-text { min-width: 0; overflow-wrap: anywhere; }
   .swap-risk-check.ack .swap-risk-checkbox { border-color: var(--green); background: var(--green); }
   .swap-risk-check.ack .swap-risk-checkbox::after { content: ""; width: 8px; height: 4px; border-left: 2px solid #062312; border-bottom: 2px solid #062312; transform: rotate(-45deg) translateY(-1px); }
