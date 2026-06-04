@@ -3736,7 +3736,7 @@ function enhancePrototypeSend() {
       var recipientError = document.getElementById("sendRecipientError");
       var amountError = document.getElementById("sendAmountError");
       function sendLang(){
-        return window.currentLang || localStorage.getItem("ww_lang") || "en";
+        return window.currentLang || localStorage.getItem("ww_lang_pref_v2") || "en";
       }
       function sendCopy(key){
         var lang = sendLang();
@@ -4467,11 +4467,38 @@ function enhancePrototypeMe() {
         var previousApplyLang = applyLang;
         applyLang = function(code){
           previousApplyLang(code);
-          try { localStorage.setItem("ww_lang", code); } catch(e) {}
+          if (window.__luminaLanguageChoiceActive) {
+            try {
+              localStorage.setItem("ww_lang_pref_v2", code);
+              localStorage.setItem("ww_lang", code);
+            } catch(e) {}
+          }
           if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
           updateFeedbackCopy();
         };
       }
+      if (!window.__luminaChooseLangPatch && typeof chooseLang === "function") {
+        window.__luminaChooseLangPatch = true;
+        var previousChooseLang = chooseLang;
+        chooseLang = function(code){
+          window.__luminaLanguageChoiceActive = true;
+          try {
+            previousChooseLang(code);
+          } finally {
+            window.__luminaLanguageChoiceActive = false;
+          }
+        };
+      }
+      (function enforceDefaultEnglishLang(){
+        var savedLang = "";
+        try { savedLang = localStorage.getItem("ww_lang_pref_v2") || ""; } catch(e) {}
+        if (savedLang) {
+          applyLang(savedLang);
+          return;
+        }
+        try { localStorage.removeItem("ww_lang"); } catch(e) {}
+        applyLang("en");
+      })();
       if (!window.__luminaMeCurrencyPatch && typeof pickCurrency === "function") {
         window.__luminaMeCurrencyPatch = true;
         var previousPickCurrency = pickCurrency;

@@ -317,14 +317,14 @@ function attachSwapDebug(error: unknown, debug: unknown) {
 
 export function friendlySwapError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "Swap failed.");
-  if (/invalid_contract/i.test(message)) return "暂时不支持此代币,请联系客服";
-  if (/disallowed_operation/i.test(message)) return "World App 暂时拦截了此交易,请确认 Permit2/Universal Router 已在开发者后台加入白名单";
-  if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(message)) return "授权金额校验失败,请刷新报价后重试";
-  if (/TRANSFER_FROM_FAILED/i.test(message)) return "卖出失败:代币授权或合约转出被拒绝,可能不支持 Permit2 或限制卖出。";
-  if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(message)) return "价格变化过大,请重新报价";
-  if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(message)) return "交易过期,请重新提交";
-  if (/user_rejected/i.test(message)) return "您取消了交易。";
-  return "交易失败,请查看活动页详情";
+  if (/invalid_contract/i.test(message)) return "Token not supported";
+  if (/disallowed_operation/i.test(message)) return "Blocked by World App";
+  if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(message)) return "Approval failed";
+  if (/TRANSFER_FROM_FAILED/i.test(message)) return "Sell may be restricted";
+  if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(message)) return "Refresh quote";
+  if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(message)) return "Quote expired";
+  if (/user_rejected/i.test(message)) return "Transaction cancelled";
+  return "Swap failed";
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
