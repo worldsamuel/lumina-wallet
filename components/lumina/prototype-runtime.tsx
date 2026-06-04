@@ -1048,7 +1048,7 @@ function enhancePrototypeBuiltinTokenLogos() {
           var status = String((market && market.status) || (meta && meta.status) || "").toLowerCase();
           if (status === "verified" || (market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge verified">✅</span>';
           if (status === "rejected" || status === "high" || status === "danger") return '<span class="custom-badge danger">❗</span>';
-          return '<span class="custom-badge warn">❗</span>';
+          return '<span class="custom-badge warn">⚠️</span>';
         }
         renderTokenList = function(filter){
           filter = (filter || "").toLowerCase();
@@ -2507,7 +2507,7 @@ function enhancePrototypeMarket() {
         var status = verifyStatus(item);
         if (status === "verified") return '<span class="token-verify-badge ok">✅</span>';
         if (status === "rejected") return '<span class="token-verify-badge danger">❗</span>';
-        return '<span class="token-verify-badge warn">❗</span>';
+        return '<span class="token-verify-badge warn">⚠️</span>';
       }
       function setIcon(el, symbol, fallback){
         if (!el) return;
@@ -3194,6 +3194,8 @@ function enhancePrototypeSwapQuote() {
 	        symbol = String(symbol || "").toUpperCase();
 	        if (!symbol) return;
 	        var meta = tokenMeta(symbol, quoted);
+	        var marketMeta = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[symbol];
+	        var tokenStatus = (marketMeta && marketMeta.status) || (quoted && quoted.status) || (customTokens && customTokens[symbol] && customTokens[symbol].status) || "pending";
 	        var amount = Number(amountHint || 0);
 	        var existing = (assets || []).find(function(asset){ return String(asset && asset.sym || "").toUpperCase() === symbol; });
 	        tokenFull[symbol] = meta.name || tokenFull[symbol] || symbol;
@@ -3213,7 +3215,7 @@ function enhancePrototypeSwapQuote() {
 	            decimals: meta.decimals || 18,
 	            amount: amountText,
 	            usdNum: 0,
-	            status: "verified",
+	            status: tokenStatus,
 	            canSwap: true
 	          });
 	        }
@@ -3226,6 +3228,7 @@ function enhancePrototypeSwapQuote() {
 	          existing.usdNum = usdNum || existing.usdNum || 0;
 	          existing.address = meta.address || existing.address || null;
 	          existing.logo = tokenLogo[symbol] || existing.logo || symbol.slice(0,1);
+	          existing.status = tokenStatus;
 	          existing.recentSwapAsset = true;
 	          existing.homeSwapAsset = true;
 	        } else {
@@ -3238,6 +3241,7 @@ function enhancePrototypeSwapQuote() {
 	            cls: "custom",
 	            logo: tokenLogo[symbol] || symbol.slice(0,1),
 	            address: meta.address || null,
+	            status: tokenStatus,
 	            recentSwapAsset: true,
 	            homeSwapAsset: true
 	          });
