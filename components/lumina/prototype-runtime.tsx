@@ -1042,13 +1042,21 @@ function enhancePrototypeBuiltinTokenLogos() {
         };
       }
       if (typeof renderTokenList === "function") {
+        function pickerVerifyBadge(sym){
+          var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
+          var meta = customTokens && customTokens[sym];
+          var status = String((market && market.status) || (meta && meta.status) || "").toLowerCase();
+          if (status === "verified" || (market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge verified">✅</span>';
+          if (status === "rejected" || status === "high" || status === "danger") return '<span class="custom-badge danger">❗</span>';
+          return '<span class="custom-badge warn">❗</span>';
+        }
         renderTokenList = function(filter){
           filter = (filter || "").toLowerCase();
           var rows = Object.keys(prices).filter(function(sym){
             if (!filter) return true;
             return sym.toLowerCase().indexOf(filter) >= 0 || (tokenFull[sym]||"").toLowerCase().indexOf(filter) >= 0;
           }).map(function(sym){
-            var badge = customTokens[sym] ? '<span class="custom-badge">Community</span>' : '<span class="custom-badge verified">✓</span>';
+            var badge = pickerVerifyBadge(sym);
             var color = sym === "WLD" ? "#000" : "#fff";
             return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic coin ' + String(sym).toLowerCase() + '" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
           }).join('');
@@ -2489,6 +2497,18 @@ function enhancePrototypeMarket() {
         if (n < 1) return "$" + n.toLocaleString(undefined, { maximumSignificantDigits: 4 });
         return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
       }
+      function verifyStatus(item){
+        var status = String(item && item.status || "").toLowerCase();
+        if (status === "verified" || item && item.verified === true) return "verified";
+        if (status === "rejected" || status === "high" || status === "danger") return "rejected";
+        return "pending";
+      }
+      function verifyBadge(item){
+        var status = verifyStatus(item);
+        if (status === "verified") return '<span class="token-verify-badge ok">✅</span>';
+        if (status === "rejected") return '<span class="token-verify-badge danger">❗</span>';
+        return '<span class="token-verify-badge warn">❗</span>';
+      }
       function setIcon(el, symbol, fallback){
         if (!el) return;
         el.innerHTML = iconFor(symbol, fallback);
@@ -2522,6 +2542,7 @@ function enhancePrototypeMarket() {
             decimals: Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : 18,
             logoUrl: market.logoUrl || null,
             priceUsd: Number(market.priceUsd || 0),
+            status: market.status || (market.verified ? "verified" : "pending"),
             trust: market.verified ? "audited" : "community"
           };
         }
@@ -2548,8 +2569,11 @@ function enhancePrototypeMarket() {
             logo: iconFor(symbol, symbol),
             marketOnly: true,
             marketAddress: market.address,
+            status: market.status || (market.verified ? "verified" : "pending"),
             marketChange24h: market.change24h
           });
+        } else {
+          assets[idx].status = market.status || (market.verified ? "verified" : "pending");
         }
         openDetail(idx);
       }
@@ -2634,10 +2658,11 @@ function enhancePrototypeMarket() {
           var color = g.symbol === "WLD" ? "#000" : "#fff";
           var pctClass = Number(g.change24h || 0) >= 0 ? "pct" : "pct down";
           var routeBadge = g.address ? "" : '<span class="market-route-badge">Market only</span>';
+          var verify = verifyBadge(g);
           return '<div class="gainer" onclick="openMarketDetail(\\'' + g.symbol + '\\')">' +
             '<div class="' + rankCls + '">' + (i + 1) + '</div>' +
             '<div class="ic" style="background:' + bg + ';color:' + color + '">' + iconFor(g.symbol, g.symbol.slice(0, 3)) + '</div>' +
-            '<div class="mid"><div class="s">' + g.symbol + routeBadge + '</div><div class="p">' + formatMarketPrice(g.priceUsd) + '</div></div>' +
+            '<div class="mid"><div class="s">' + g.symbol + verify + routeBadge + '</div><div class="p">' + formatMarketPrice(g.priceUsd) + '</div></div>' +
             '<div class="chg"><div class="' + pctClass + '">' + (Number(g.change24h || 0) >= 0 ? "+" : "") + Number(g.change24h || 0).toFixed(2) + '%</div><div class="vol">Vol ' + moneyCompact(g.volume24hUsd) + '</div></div>' +
           '</div>';
         }).join("");
@@ -4436,6 +4461,20 @@ function enhancePrototypeDetail() {
         };
         return copy[key] || key;
       }
+      function detailVerifyMeta(asset){
+        var market = marketForAsset(asset);
+        var status = String((asset && asset.status) || (market && market.status) || "").toLowerCase();
+        if (status === "verified" || (market && market.verified === true)) return { cls:"ok", text: detailLang() === "zh-CN" ? "已验证" : "Verified" };
+        if (status === "rejected" || status === "high" || status === "danger") return { cls:"danger", text: detailLang() === "zh-CN" ? "高风险" : "High risk" };
+        return { cls:"warn", text: detailLang() === "zh-CN" ? "未验证" : "Unverified" };
+      }
+      function updateDetailVerifyBadge(asset){
+        var badge = document.getElementById("detVerifyBadge");
+        if (!badge) return;
+        var meta = detailVerifyMeta(asset);
+        badge.className = "detail-verify-badge " + meta.cls;
+        badge.textContent = meta.text;
+      }
 
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
@@ -4510,6 +4549,7 @@ function enhancePrototypeDetail() {
                   else if (typeof registerMarketToken === "function") registerMarketToken(item);
                 });
                 renderMarketTables(asset);
+                updateDetailVerifyBadge(asset);
                 renderMarketCard(asset);
               })
               .catch(function(){
@@ -4800,7 +4840,7 @@ function enhancePrototypeDetail() {
           '<section class="detail-v2-hero">' +
             '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
             '<div class="detail-v2-fiat" id="detUsd">≈ $0.00</div>' +
-            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em id="detChangeLabel">1D</em></div>' +
+            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em id="detChangeLabel">1D</em><b id="detVerifyBadge" class="detail-verify-badge warn">未验证</b></div>' +
           '</section>' +
           '<section class="detail-v2-chart-card">' +
             '<div class="detail-chart" id="detChart"></div>' +
@@ -4871,6 +4911,7 @@ function enhancePrototypeDetail() {
         document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
         var pill = document.getElementById("detChangePill");
         renderMarketTables(asset);
+        updateDetailVerifyBadge(asset);
         pill.className = "none";
         pill.textContent = detailCopy("noData");
         renderMarketCard(asset);

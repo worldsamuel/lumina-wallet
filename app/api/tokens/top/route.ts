@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   await ensureTokenControlColumns().catch((error) => console.error("Failed to ensure token control columns", error));
   const [tokens, configured] = await Promise.all([
     getWorldChainMarkets(mode),
-    db.token.findMany({ where: { status: "verified" } }).catch(() => []),
+    db.token.findMany().catch(() => []),
   ]);
   const bySymbol = new Map(configured.map((token) => [token.symbol.toUpperCase(), token]));
   const byAddress = new Map(
@@ -40,12 +40,13 @@ export async function GET(req: NextRequest) {
       ) {
         return null;
       }
-      return configuredToken?.logoUrl || configuredToken?.onTopRanking || configuredToken?.poolAddress
+      return configuredToken
         ? {
             ...token,
             logoUrl: configuredToken.logoUrl ?? token.logoUrl,
             poolAddress: configuredToken.poolAddress || token.poolAddress,
-            verified: true,
+            status: configuredToken.status,
+            verified: configuredToken.status === "verified",
           }
         : token;
     }).filter((token): token is (typeof tokens)[number] => Boolean(token));
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest) {
       return (
         token.contractAddr &&
         token.canSwap !== false &&
+        token.status !== "disabled" &&
         (!seenSymbols.has(token.symbol.toUpperCase()) || (address && !seenAddresses.has(address)))
       );
     });
@@ -69,7 +71,8 @@ export async function GET(req: NextRequest) {
               ...market,
               logoUrl: token.logoUrl ?? market.logoUrl,
               poolAddress: token.poolAddress || market.poolAddress,
-              verified: true,
+              status: token.status,
+              verified: token.status === "verified",
             }
           : null;
       }),
