@@ -1046,8 +1046,10 @@ function enhancePrototypeBuiltinTokenLogos() {
           var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
           var meta = customTokens && customTokens[sym];
           var status = String((market && market.status) || (meta && meta.status) || "").toLowerCase();
-          if (status === "verified" || (market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge verified">✅</span>';
+          if (status === "verified") return '<span class="custom-badge verified">✅</span>';
           if (status === "rejected" || status === "high" || status === "danger") return '<span class="custom-badge danger">❗</span>';
+          if (status === "pending" || status === "community" || status === "unverified") return '<span class="custom-badge warn">⚠️</span>';
+          if ((market && market.verified === true) || (!status && !customTokens[sym])) return '<span class="custom-badge verified">✅</span>';
           return '<span class="custom-badge warn">⚠️</span>';
         }
         renderTokenList = function(filter){
@@ -1719,8 +1721,20 @@ function enhancePrototypeTokens() {
         });
         return out;
       }
+      function backendTokensBySymbol(){
+        var out = {};
+        [readJson("ww_tokens", []), readJson("ww_swap_tokens", []), readJson("ww_top_tokens", [])].forEach(function(list){
+          if (!Array.isArray(list)) return;
+          list.forEach(function(token){
+            var symbol = String(token && token.symbol || "").toUpperCase();
+            if (symbol && !out[symbol]) out[symbol] = token;
+          });
+        });
+        return out;
+      }
       function swapWhitelistTokens(){
         var source = [];
+        var backendBySymbol = backendTokensBySymbol();
         var builtin = [
           { symbol:"WLD", name:"Worldcoin", contractAddr:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals:18, logoUrl:null },
           { symbol:"USDC", name:"USD Coin", contractAddr:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals:6, logoUrl:null },
@@ -1741,6 +1755,11 @@ function enhancePrototypeTokens() {
         return source.filter(function(token){
           var symbol = String(token && token.symbol || "").toUpperCase();
           if (!symbol || symbol === "23") return false;
+          var configured = backendBySymbol[symbol];
+          if (configured) {
+            token = Object.assign({}, token, configured);
+            if (configured.status && configured.status !== "verified") return false;
+          }
           if (token.status && token.status !== "verified") return false;
           if (token.canSwap === false) return false;
           var address = String(token.contractAddr || token.address || "").toLowerCase();
@@ -1755,6 +1774,20 @@ function enhancePrototypeTokens() {
         if (!symbol || symbol === "23") return "";
         window.__luminaBackendTokenBySymbol = window.__luminaBackendTokenBySymbol || {};
         window.__luminaBackendTokenBySymbol[symbol] = token;
+        window.__luminaMarketBySymbol = window.__luminaMarketBySymbol || {};
+        var existingMarket = window.__luminaMarketBySymbol[symbol] || {};
+        var status = String(token.status || existingMarket.status || "pending").toLowerCase();
+        window.__luminaMarketBySymbol[symbol] = Object.assign({}, existingMarket, {
+          symbol: symbol,
+          name: token.name || existingMarket.name || symbol,
+          address: token.contractAddr || token.address || existingMarket.address || null,
+          poolAddress: token.poolAddress || existingMarket.poolAddress || "",
+          decimals: token.decimals || existingMarket.decimals || 18,
+          logoUrl: token.logoUrl || existingMarket.logoUrl || null,
+          status: status,
+          verified: status === "verified"
+        });
+        if (customTokens && customTokens[symbol]) customTokens[symbol].status = status;
         tokenFull[symbol] = token.name || tokenFull[symbol] || symbol;
         if (token.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(symbol, token.logoUrl);
         tokenLogo[symbol] = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(symbol, tokenLogo[symbol] || symbol) : (tokenLogo[symbol] || tokenInitial(symbol));
@@ -1763,6 +1796,19 @@ function enhancePrototypeTokens() {
         if (balances[symbol] === undefined) balances[symbol] = "0";
         if (availMap[symbol] === undefined) availMap[symbol] = "0 " + symbol;
         return symbol;
+      }
+      function syncAssetTokenStatuses(){
+        var backend = backendTokensBySymbol();
+        if (!Array.isArray(assets)) return;
+        assets.forEach(function(asset){
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          var token = backend[sym];
+          if (!token) return;
+          asset.status = token.status || "pending";
+          asset.address = asset.address || token.contractAddr || token.address || null;
+          asset.contractAddr = asset.contractAddr || token.contractAddr || token.address || null;
+          if (token.poolAddress && !asset.poolAddress) asset.poolAddress = token.poolAddress;
+        });
       }
       function tokenAddress(token){
         return String(token && (token.contractAddr || token.address) || "").toLowerCase();
@@ -1807,6 +1853,7 @@ function enhancePrototypeTokens() {
           var sym = String(asset && asset.sym || "").toUpperCase();
           if (sym) existingSymbols.add(sym);
           var token = sym ? tokenBySymbol[sym] : null;
+          if (token) asset.status = token.status || "pending";
           if (token && !asset.address && !asset.contractAddr) {
             asset.address = token.contractAddr || token.address || null;
           }
@@ -1838,6 +1885,7 @@ function enhancePrototypeTokens() {
             logo: tokenLogo[sym] || tokenInitial(sym),
             address: token.contractAddr || token.address || null,
             poolAddress: token.poolAddress || null,
+            status: token.status || "pending",
             homeSwapAsset: true
           };
         }).filter(Boolean);
@@ -1849,6 +1897,7 @@ function enhancePrototypeTokens() {
       }
       function upsertBalanceHomeAssets(){
         if (!Array.isArray(assets) || !balances) return;
+        var backend = backendTokensBySymbol();
         var existingSymbols = new Set((assets || []).map(function(asset){ return String(asset && asset.sym || "").toUpperCase(); }));
         Object.keys(balances).forEach(function(symbol){
           var sym = String(symbol || "").toUpperCase();
@@ -1867,6 +1916,7 @@ function enhancePrototypeTokens() {
             cls: "custom",
             logo: tokenLogo[sym] || tokenInitial(sym),
             address: null,
+            status: backend[sym] ? (backend[sym].status || "pending") : undefined,
             recentSwapAsset: true,
             homeSwapAsset: true
           });
@@ -1932,6 +1982,7 @@ function enhancePrototypeTokens() {
             logo: tokenLogo[sym] || tokenInitial(sym),
             address: token.contractAddr || token.address || null,
             poolAddress: token.poolAddress || null,
+            status: token.status || "pending",
             recentSwapAsset: true,
             homeSwapAsset: true
           });
@@ -2104,9 +2155,12 @@ function enhancePrototypeTokens() {
           return a && ["BTC", "WBTC"].indexOf(String(a.sym || "").toUpperCase()) < 0;
         }).map(function(a){
           var i = assets.indexOf(a);
+          var status = String(a.status || "").toLowerCase();
+          var cls = status === "rejected" || status === "high" || status === "danger" ? "high" : (status === "pending" || status === "community" || status === "unverified" ? "mid" : "low");
+          var label = cls === "high" ? "High risk" : (cls === "mid" ? "Unverified" : "Verified");
           return '<div class="asset all-asset-row" onclick="openDetail(' + i + ')">' +
             assetIconHtml(a.sym, a.cls, a.logo) +
-            '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk low">Verified</span></div><div class="full">' + a.full + '</div></div>' +
+            '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk ' + cls + '">' + label + '</span></div><div class="full">' + a.full + '</div></div>' +
             '<div></div><div class="vals"><div class="amt">' + a.amt + '</div><div class="usd">' + formatMoney(a.usdNum || 0) + '</div></div></div>';
         });
         var importedRows = importedList().map(function(token){
@@ -2133,11 +2187,15 @@ function enhancePrototypeTokens() {
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(list){
             if (!Array.isArray(list)) return;
-            var verified = list.filter(function(token){
-              return token && token.status === "verified" && token.canSwap !== false;
+            var active = list.filter(function(token){
+              return token && token.status !== "disabled";
             });
-            writeJson("ww_tokens", verified);
+            var swappable = active.filter(function(token){ return token.canSwap !== false; });
+            writeJson("ww_tokens", active);
+            writeJson("ww_swap_tokens", swappable);
+            active.forEach(registerBackendToken);
             upsertSwapHomeAssets();
+            syncAssetTokenStatuses();
             if (typeof renderAssets === "function") renderAssets();
             if (typeof renderAllAssets === "function") renderAllAssets();
             if (window.__luminaRefreshTokenLogos) window.__luminaRefreshTokenLogos();
@@ -2151,6 +2209,7 @@ function enhancePrototypeTokens() {
         renderAssets = function(){
           upsertSwapHomeAssets();
           upsertBalanceHomeAssets();
+          syncAssetTokenStatuses();
           previousRenderAssets();
         };
       }
@@ -2159,6 +2218,7 @@ function enhancePrototypeTokens() {
       restoreImportedTokens();
       restoreRecentSwapTokens();
       upsertBalanceHomeAssets();
+      syncAssetTokenStatuses();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {
         window.__luminaImportedRefreshTimer = setInterval(refreshImportedBalances, 10000);
