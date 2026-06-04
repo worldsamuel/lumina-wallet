@@ -2340,19 +2340,10 @@ function enhancePrototypeHome() {
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
       var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC"]);
-      function homeWorldLogo(){
-        return '<svg class="wld-mark" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="11" fill="none" stroke="currentColor" stroke-width="3"/><path d="M5 16h22M16 5c5 5.5 5 16.5 0 22M16 5c-5 5.5-5 16.5 0 22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-      }
-      function stableHomeLogo(symbol, fallback){
-        var sym = String(symbol || "").toUpperCase();
-        if (sym === "WLD") return homeWorldLogo();
-        if (sym === "USDC") return "$";
-        return fallback;
-      }
       function fixedHomeTokenMeta(sym){
         var defaults = {
-          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: homeWorldLogo(), address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
-          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+          WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "W", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+          USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "$", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
           WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
           EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
           WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
@@ -2490,8 +2481,8 @@ function enhancePrototypeHome() {
       }
       function rowHtml(asset, index, imported){
         var symbol = String(asset.sym || "").toUpperCase();
-        var logoSource = stableHomeLogo(symbol, asset.logo || (tokenLogo && tokenLogo[symbol]) || tokenInitialHome(asset.sym));
-        var logoHtml = (symbol === "WLD" || symbol === "USDC") ? logoSource : (window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource);
+        var logoSource = asset.logo || (tokenLogo && tokenLogo[symbol]) || tokenInitialHome(asset.sym);
+        var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource;
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
         return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
