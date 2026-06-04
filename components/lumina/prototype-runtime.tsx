@@ -2826,7 +2826,7 @@ function enhancePrototypeSwapQuote() {
           youPay: { en:"You pay", "zh-CN":"您要支付", "zh-TW":"您要支付", fr:"Vous payez", de:"Sie zahlen", es:"Pagas", ja:"支払う" },
           youReceiveApprox: { en:"You receive about", "zh-CN":"您将收到约", "zh-TW":"您將收到約", fr:"Vous recevrez environ", de:"Sie erhalten etwa", es:"Recibirás aprox.", ja:"受取予定" },
           minReceive: { en:"Minimum received (slippage protection)", "zh-CN":"最少收到 (滑点保护)", "zh-TW":"最少收到 (滑點保護)", fr:"Minimum reçu (protection slippage)", de:"Mindestens erhalten (Slippage-Schutz)", es:"Mínimo recibido (protección)", ja:"最低受取額 (スリッページ保護)" },
-          riskAck: { en:"Tap to acknowledge risk", "zh-CN":"点这里确认风险", "zh-TW":"點這裡確認風險", fr:"Touchez pour accepter le risque", de:"Risiko bestätigen", es:"Toca para aceptar el riesgo", ja:"リスクを確認" },
+          riskAck: { en:"I understand the risk and want to continue.", "zh-CN":"我已了解风险,自愿继续此笔兑换。", "zh-TW":"我已了解風險,自願繼續此筆兌換。", fr:"Je comprends le risque et souhaite continuer.", de:"Ich verstehe das Risiko und möchte fortfahren.", es:"Entiendo el riesgo y quiero continuar.", ja:"リスクを理解し、このスワップを続行します。" },
           riskAcked: { en:"Risk acknowledged, you can continue", "zh-CN":"已确认风险,可以继续兑换", "zh-TW":"已確認風險,可以繼續兌換", fr:"Risque accepté, vous pouvez continuer", de:"Risiko bestätigt, Sie können fortfahren", es:"Riesgo aceptado, puedes continuar", ja:"リスク確認済み、続行できます" },
           ackRiskFirst: { en:"Please acknowledge the risk first", "zh-CN":"请先确认高风险交易", "zh-TW":"請先確認高風險交易", fr:"Veuillez d'abord accepter le risque", de:"Bitte zuerst das Risiko bestätigen", es:"Primero acepta el riesgo", ja:"先にリスクを確認してください" },
           submitted: { en:"Swap submitted", "zh-CN":"兑换已提交", "zh-TW":"兌換已提交", fr:"Échange envoyé", de:"Swap gesendet", es:"Intercambio enviado", ja:"スワップを送信しました" },
@@ -3384,15 +3384,18 @@ function enhancePrototypeSwapQuote() {
 	        if (percent >= 3) return "impact-mid";
 	        return "impact-low";
 	      }
+	      function riskySwapToken(token){
+	        if (!token) return false;
+	        var trust = String(token.trust || "").toLowerCase();
+	        var status = String(token.status || (token.safety && token.safety.status) || "").toLowerCase();
+	        return trust === "community" || status === "community" || status === "pending" || status === "unverified" || status === "rejected" || status === "high" || status === "danger";
+	      }
 	      function swapRiskText(){
 	        if (!latestSwapQuote) return "";
-	        var warnings = latestSwapQuote.warnings || [];
 	        var risky = [latestSwapQuote.tokens && latestSwapQuote.tokens.from, latestSwapQuote.tokens && latestSwapQuote.tokens.to].filter(function(token){
-	          return token && token.trust === "community";
+	          return riskySwapToken(token);
 	        });
 	        if (risky.length) return { title: swapCopy("communityRiskTitle") + ": " + risky[0].symbol, body: swapCopy("communityRiskBody") };
-	        if (warnings.indexOf("low_liquidity") >= 0) return { title: swapCopy("communityRiskTitle"), body: swapCopy("lowLiquidityRisk") };
-	        if (warnings.indexOf("price_anomaly") >= 0) return { title: swapCopy("communityRiskTitle"), body: swapCopy("priceAnomalyRisk") };
 	        return "";
 	      }
 	      function validateSwapSafety(){
@@ -3412,11 +3415,11 @@ function enhancePrototypeSwapQuote() {
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:swapCopy("limit") + " $" + swapMaxUsd + ". " + swapCopy("reduceAmount") };
 	        var riskText = swapRiskText();
-	        if (impact > 5) riskText = riskText || { title: swapCopy("communityRiskTitle"), body: swapCopy("impactRisk") };
 	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
 	      }
 	      function openSwapConfirm(state){
 	        return new Promise(function(resolve){
+	          highImpactAcknowledged = false;
 	          var old = document.getElementById("swapConfirmModal");
 	          if (old) old.remove();
 	          if (quoteCountdownTimer) { clearInterval(quoteCountdownTimer); quoteCountdownTimer = null; }
@@ -3432,7 +3435,7 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>' + swapCopy("minReceive") + '</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>' + swapCopy("platformFee") + '</span><b>' + platformFeeText(latestSwapQuote) + '</b></div>' +
 	              '</div>' +
-	              (state.riskText ? '<button type="button" class="swap-risk-card" id="swapHighImpactAck"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p><p>' + swapCopy("riskAck") + '</p></button>' : '') +
+	              (state.riskText ? '<div class="swap-risk-card"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p></div><button type="button" class="swap-risk-check" id="swapHighImpactAck"><span class="swap-risk-checkbox" aria-hidden="true"></span><span>' + swapCopy("riskAck") + '</span></button>' : '') +
 	              '<div class="earn-action-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
 	            '</div>';
 	          document.body.appendChild(modal);
@@ -3452,7 +3455,7 @@ function enhancePrototypeSwapQuote() {
 	          modal.onclick = function(event){ if (event.target === modal) done(false); };
 	          document.getElementById("swapConfirmCancel").onclick = function(){ done(false); };
 	          var high = document.getElementById("swapHighImpactAck");
-	          if (high) high.onclick = function(){ highImpactAcknowledged = true; high.classList.add("ack"); high.innerHTML = '<strong><span class="swap-risk-icon">✓</span><span>' + swapCopy("riskAcked") + '</span></strong>'; };
+	          if (high) high.onclick = function(){ highImpactAcknowledged = !highImpactAcknowledged; high.classList.toggle("ack", highImpactAcknowledged); };
 	          document.getElementById("swapConfirmOk").onclick = function(){
 	            if (state.riskText && !highImpactAcknowledged) { toast(swapCopy("ackRiskFirst")); return; }
 	            done(true);
