@@ -110,6 +110,7 @@ function syncBalancesToPrototype(
       cls: item.className,
       logo: item.logo,
       contractAddress: item.contractAddress ?? null,
+      address: item.contractAddress ?? null,
       custom: item.className === "custom",
       hasBalance: amount > 0,
     };
@@ -123,6 +124,7 @@ function syncBalancesToPrototype(
       cls: "btc",
       logo: "B",
       contractAddress: null,
+      address: null,
       custom: false,
       hasBalance: false,
     });
@@ -212,6 +214,7 @@ function syncBalancesToPrototype(
       document.querySelector(".balance-change").classList.toggle("down", ${JSON.stringify(weightedChangePct < 0)});
     }
     if (typeof renderMoney === "function") renderMoney();
+    if (typeof renderAssets === "function") renderAssets();
     if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
     if (typeof refreshSwapLabels === "function") refreshSwapLabels();
   `);

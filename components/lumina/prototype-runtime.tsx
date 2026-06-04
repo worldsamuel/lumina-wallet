@@ -1069,7 +1069,7 @@ function enhancePrototypeBuiltinTokenLogos() {
           }).map(function(sym){
             var badge = pickerVerifyBadge(sym);
             var color = sym === "WLD" ? "#000" : "#fff";
-            return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic coin ' + String(sym).toLowerCase() + '" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
+            return '<div class="tk-row" data-token-symbol="' + sym + '" onclick="pickToken(\\'' + sym + '\\')"><div class="ic coin ' + String(sym).toLowerCase() + '" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + badge + '</div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
           }).join('');
           document.getElementById("tokenModalList").innerHTML = rows || '<div class="import-load">No matching tokens. Paste a contract address to run safety checks.</div>';
         };
@@ -2033,7 +2033,7 @@ function enhancePrototypeTokens() {
         });
         document.getElementById("tokenModalList").innerHTML = rows.map(function(sym){
           var color = sym === "WLD" ? "#000" : "#fff";
-          return '<div class="tk-row" onclick="pickToken(\\'' + sym + '\\')"><div class="ic" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + (window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) : tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + '<span class="custom-badge">白名单</span></div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
+          return '<div class="tk-row" data-token-symbol="' + sym + '" onclick="pickToken(\\'' + sym + '\\')"><div class="ic" style="background:' + (dotColor[sym] || "var(--surface-2)") + ';color:' + color + '">' + (window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(sym, tokenLogo[sym]) : tokenLogo[sym]) + '</div><div class="mid"><div class="s">' + sym + '<span class="custom-badge">白名单</span></div><div class="f">' + (tokenFull[sym] || sym) + '</div></div><div class="bal">' + (balances[sym] || "0") + '</div></div>';
         }).join("") || '<div class="import-load">没有匹配的白名单代币</div>';
       };
       openTokenModal = function(target){
@@ -2406,6 +2406,10 @@ function enhancePrototypeHome() {
         if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         var index = row && row.getAttribute ? Number(row.getAttribute("data-home-index")) : NaN;
+        if (!symbol && row && row.querySelector) {
+          var symEl = row.querySelector(".sym");
+          symbol = symEl ? String(symEl.textContent || "").trim().toUpperCase() : "";
+        }
         if (symbol) {
           if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
           else openHomeAsset(symbol);
@@ -2416,7 +2420,7 @@ function enhancePrototypeHome() {
       if (!window.__luminaHomeAssetCaptureBound) {
         window.__luminaHomeAssetCaptureBound = true;
         document.addEventListener("click", function(event){
-          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .home-v2-asset") : null;
+          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .asset") : null;
           if (!row) return;
           window.__luminaOpenHomeRow(event, row);
         }, true);
@@ -3590,6 +3594,31 @@ function enhancePrototypeSwapQuote() {
       };
       if (!window.__luminaTokenModalKeyboardFix) {
         window.__luminaTokenModalKeyboardFix = true;
+        document.addEventListener("click", function(event){
+          var row = event.target && event.target.closest ? event.target.closest("#tokenModalList .tk-row") : null;
+          if (!row || !document.getElementById("tokenModalList")?.contains(row)) return;
+          if (event.__luminaTokenPicked) return;
+          event.__luminaTokenPicked = true;
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopPropagation) event.stopPropagation();
+          var symbol = row.getAttribute("data-token-symbol") || "";
+          if (!symbol) {
+            var symEl = row.querySelector(".s");
+            symbol = symEl ? String(symEl.textContent || "").replace(/白名单|已导入|Verified|High risk|Unverified/g, "").trim() : "";
+          }
+          symbol = String(symbol || "").toUpperCase();
+          if (symbol && typeof pickToken === "function") pickToken(symbol);
+        }, true);
+        document.addEventListener("click", function(event){
+          var picker = event.target && event.target.closest ? event.target.closest("#view-swap .swap-panel .tk") : null;
+          if (!picker) return;
+          if (event.__luminaSwapPickerOpened) return;
+          event.__luminaSwapPickerOpened = true;
+          if (event.preventDefault) event.preventDefault();
+          if (event.stopPropagation) event.stopPropagation();
+          var target = picker.querySelector("#buyDot, #buySym") ? "buy" : "sell";
+          if (typeof openTokenModal === "function") openTokenModal(target);
+        }, true);
         document.addEventListener("focusin", function(event){
           if (event.target && event.target.id === "tkSearch") {
             var modal = document.getElementById("tokenModal");
