@@ -981,7 +981,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         var trusted = trustedLogoUrl(sym);
         if (trusted) return logoImg(sym, trusted, ethTrustLogoUrl(sym));
         var fb = String(fallback || "");
-        if (fb.indexOf("<img") >= 0) return fb;
+        if (fb.indexOf("<img") >= 0) return initial(sym);
         return initial(sym);
       };
       window.__luminaRefreshTokenLogos = function(){
@@ -3829,6 +3829,70 @@ function enhancePrototypeActivity() {
         if (!value || /completed/i.test(String(value))) return activityCopy("completed");
         return value;
       }
+      function readJson(key, fallback){
+        try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; }
+      }
+      function writeJson(key, value){
+        try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
+      }
+      function tokenInitial(symbol){
+        symbol = String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase();
+        return symbol || "?";
+      }
+      function parseTokenAmount(value){
+        var match = String(value || "").replace(/,/g, "").match(/([+-]?\\d+(?:\\.\\d+)?)/);
+        if (!match) return 0;
+        var number = Number(match[1]);
+        return Number.isFinite(number) ? Math.abs(number) : 0;
+      }
+      function receivedSymbol(item){
+        var direct = String(item && (item.symbol || item.tokenSymbol || item.token) || "").toUpperCase();
+        if (direct) return direct;
+        var source = String((item && (item.tokenText || item.amount || item.title)) || "");
+        var titleMatch = String(item && item.title || "").match(/^Received\\s+([a-zA-Z0-9]{1,16})\\b/i);
+        if (titleMatch) return titleMatch[1].toUpperCase();
+        var amountMatch = source.match(/\\b([a-zA-Z][a-zA-Z0-9]{0,15})\\b\\s*$/);
+        return amountMatch ? amountMatch[1].toUpperCase() : "";
+      }
+      function rememberReceivedAssets(rows){
+        if (!Array.isArray(rows)) return;
+        var remembered = readJson("lumina_recent_swap_assets_v1", []);
+        if (!Array.isArray(remembered)) remembered = [];
+        var changed = false;
+        rows.forEach(function(item){
+          if (!item || item.type !== "in") return;
+          var title = String(item.title || "");
+          if (title && !/^Received\\b/i.test(title)) return;
+          var symbol = receivedSymbol(item);
+          if (!symbol || symbol === "WLD" || symbol === "USDC") return;
+          var amountNumber = Number(item.tokenAmount);
+          if (!Number.isFinite(amountNumber) || amountNumber <= 0) amountNumber = parseTokenAmount(item.tokenText || item.amount);
+          var amountText = amountNumber > 0 ? amountNumber.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "0";
+          var currentBalance = Number(String((balances && balances[symbol]) || "0").replace(/,/g, ""));
+          tokenFull[symbol] = tokenFull[symbol] || item.tokenName || symbol;
+          if (tokenLogo && window.__luminaTokenLogoHtml) tokenLogo[symbol] = window.__luminaTokenLogoHtml(symbol, tokenInitial(symbol));
+          else if (tokenLogo && !tokenLogo[symbol]) tokenLogo[symbol] = tokenInitial(symbol);
+          if (dotColor && !dotColor[symbol]) dotColor[symbol] = "linear-gradient(135deg,#1b231e,#26362b)";
+          if (prices && prices[symbol] === undefined) prices[symbol] = 0;
+          if (balances && (!(currentBalance > 0) && amountNumber > 0)) balances[symbol] = amountText;
+          if (availMap && (!availMap[symbol] || availMap[symbol] === "0 " + symbol)) availMap[symbol] = (balances && balances[symbol] ? balances[symbol] : amountText) + " " + symbol;
+          if (Array.isArray(assets)) {
+            var existing = assets.find(function(asset){ return String(asset && asset.sym || "").toUpperCase() === symbol; });
+            if (!existing) {
+              assets.push({ sym:symbol, full:tokenFull[symbol] || symbol, amt:(balances && balances[symbol] ? balances[symbol] : amountText) + " " + symbol, usdNum:0, cls:"custom", logo:tokenLogo && tokenLogo[symbol] || tokenInitial(symbol), recentSwapAsset:true, receivedAsset:true });
+            } else {
+              existing.recentSwapAsset = true;
+              existing.receivedAsset = true;
+              existing.full = existing.full || tokenFull[symbol] || symbol;
+              if (!(Number(String(existing.amt || "0").split(" ")[0].replace(/,/g, "")) > 0)) existing.amt = (balances && balances[symbol] ? balances[symbol] : amountText) + " " + symbol;
+            }
+          }
+          remembered = remembered.filter(function(token){ return String(token && token.symbol || "").toUpperCase() !== symbol; });
+          remembered.unshift({ symbol:symbol, name:tokenFull[symbol] || symbol, amount:balances && balances[symbol] ? balances[symbol] : amountText, usdNum:0, receivedAsset:true });
+          changed = true;
+        });
+        if (changed) writeJson("lumina_recent_swap_assets_v1", remembered.slice(0, 24));
+      }
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
@@ -3855,7 +3919,7 @@ function enhancePrototypeActivity() {
         }
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; renderActivity(); })
+          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = []; renderActivity(); });
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
