@@ -1,5 +1,6 @@
 import { formatUnits, isAddress, parseUnits, zeroAddress, type Address } from "viem";
 import { publicClient } from "@/lib/chain";
+import { db } from "@/lib/db";
 import { getWorldChainMarketCatalog } from "@/lib/market-data";
 import { quoteV3 } from "./v3-quoter";
 import { resolveCoreSwapToken, SWAP_TOKENS, VERIFIED_SWAP_TOKENS, type SwapToken } from "./tokens";
@@ -84,6 +85,10 @@ export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyRe
   if (!isAddress(input)) throw new Error("Invalid token contract");
   const address = input as Address;
   const lower = address.toLowerCase();
+
+  const configured = await resolveVerifiedAdminToken(address);
+  if (configured) return verifiedReport(configured, "verified");
+
   const cached = cache.get(lower);
   if (cached && cached.expiresAt > Date.now()) return cached.data;
 
@@ -169,6 +174,9 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
 async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> {
   const needle = value.trim();
   if (!needle) return null;
+  const configured = await resolveVerifiedAdminToken(needle);
+  if (configured) return { ...configured, safety: verifiedReport(configured, "verified") };
+
   const fallback = FALLBACK_MARKET_TOKENS.find((token) => {
     if (isAddress(needle)) return token.address.toLowerCase() === needle.toLowerCase();
     return token.symbol.toUpperCase() === needle.toUpperCase();
@@ -186,6 +194,8 @@ async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> 
     return String(token.symbol || "").toUpperCase() === needle.toUpperCase();
   });
   if (!market && catalog?.address && isAddress(catalog.address)) {
+    const configuredCatalog = await resolveVerifiedAdminToken(catalog.address);
+    if (configuredCatalog) return { ...configuredCatalog, safety: verifiedReport(configuredCatalog, "verified") };
     return {
       symbol: String(catalog.symbol || "TOKEN").slice(0, 24),
       name: String(catalog.name || catalog.symbol || "Token").slice(0, 80),
@@ -216,6 +226,9 @@ async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> 
     };
   }
   if (!market?.address) return null;
+  const configuredMarket = await resolveVerifiedAdminToken(market.address);
+  if (configuredMarket) return { ...configuredMarket, safety: verifiedReport(configuredMarket, "verified") };
+
   return {
     symbol: market.symbol,
     name: market.name || market.symbol,
@@ -248,6 +261,34 @@ async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> 
       },
     },
   };
+}
+
+async function resolveVerifiedAdminToken(value: string): Promise<SwapToken | null> {
+  const needle = value.trim();
+  if (!needle) return null;
+  try {
+    const match = await db.token.findFirst({
+      where: {
+        status: "verified",
+        canSwap: true,
+        ...(isAddress(needle)
+          ? { contractAddr: { equals: needle, mode: "insensitive" as const } }
+          : { symbol: { equals: needle, mode: "insensitive" as const } }),
+      },
+    });
+    if (!match?.contractAddr || !isAddress(match.contractAddr)) return null;
+    return {
+      symbol: match.symbol.toUpperCase(),
+      name: match.name || match.symbol.toUpperCase(),
+      address: match.contractAddr as Address,
+      decimals: match.decimals,
+      priceSymbol: "USDC",
+      trust: "audited",
+    };
+  } catch (error) {
+    console.error("Failed to resolve admin verified swap token", error);
+    return null;
+  }
 }
 
 function verifiedReport(token: SwapToken, status: "verified" | "community"): TokenSafetyReport {

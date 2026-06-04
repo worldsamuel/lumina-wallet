@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     return jsonResponse(report, {
       status: report.status === "rejected" ? 422 : 200,
       headers: {
-        "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
+        "Cache-Control": "no-store",
       },
     });
   } catch (error) {
@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
       {
         status: 400,
         headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=300",
+          "Cache-Control": "no-store",
         },
       },
     );
