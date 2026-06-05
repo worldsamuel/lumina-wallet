@@ -2445,7 +2445,7 @@ function enhancePrototypeHome() {
         var pinned = !!(item && item.pinned);
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
-            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><strong>Announcement</strong><span aria-hidden="true"></span></div>' +
+            '<button type="button" class="lumina-ann-back lumina-ann-floating-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button>' +
             '<section class="lumina-ann-article-card">' +
               '<div class="lumina-ann-article-head">' +
                 (pinned ? '<span class="lumina-ann-pin">Pinned</span>' : '<span class="lumina-ann-pin ghost">' + annEscape(annTagText(tag)) + '</span>') +

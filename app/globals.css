@@ -88,7 +88,7 @@
   #annModal .ann-item { border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; background: #101210; box-shadow: none; }
   #annModal .ann-item .ann-body { max-height: none; overflow-wrap: anywhere; }
   .lumina-ann-mask { align-items: stretch; justify-content: center; padding: 0; background: rgba(0,0,0,0.78); overflow: hidden; }
-  .lumina-ann-sheet { box-sizing: border-box; width: min(100%, var(--phone-max)); max-height: none; min-height: 100dvh; padding: max(20px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: #080a08; overflow: auto; overflow-x: hidden; position: relative; box-shadow: none; }
+  .lumina-ann-sheet { box-sizing: border-box; width: min(100%, var(--phone-max)); max-height: none; height: 100dvh; min-height: 0; padding: max(12px, env(safe-area-inset-top)) 14px max(28px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: #080a08; overflow-y: auto; overflow-x: hidden; position: relative; box-shadow: none; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
   .lumina-ann-sheet h3 { padding: 0; margin: 0; font-size: 28px; font-weight: 900; line-height: 1.12; }
   .lumina-ann-close, .lumina-ann-back, .lumina-ann-share { width: 44px; height: 44px; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; background: #171917; color: var(--text); display: inline-grid; place-items: center; cursor: pointer; box-shadow: none; }
   .lumina-ann-close { position: absolute; top: max(18px, env(safe-area-inset-top)); right: var(--pad-screen); z-index: 2; font-size: 24px; line-height: 1; }
@@ -98,9 +98,10 @@
   .lumina-ann-row .ann-title { margin-top: 14px; font-size: 18px; line-height: 1.25; }
   .lumina-ann-row .ann-body { display: -webkit-box; margin-top: 10px; color: #bfc5bf; font-size: 15px; line-height: 1.55; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 16px; padding-top: max(20px, calc(env(safe-area-inset-top) + 10px)); }
+  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 12px; padding-top: max(10px, env(safe-area-inset-top)); }
   .lumina-ann-detail-top { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 10px; min-height: 52px; padding: 0 2px 12px; }
   .lumina-ann-detail-top strong { color: var(--text); font-size: 18px; font-weight: 900; line-height: 1.1; text-align: center; }
+  .lumina-ann-floating-back { position: sticky; top: max(8px, env(safe-area-inset-top)); z-index: 3; margin: 0 0 -46px 0; }
   .lumina-ann-all { min-height: 36px; border: 0; background: transparent; color: var(--green); font-size: 13px; font-weight: 800; white-space: nowrap; }
   .lumina-ann-back svg, .lumina-ann-share svg { width: 22px; height: 22px; }
   .lumina-ann-hero { position: relative; padding: 2px 0 2px; min-height: 0; overflow: visible; text-align: center; }
@@ -117,7 +118,7 @@
   .lumina-ann-dots { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 8px; }
   .lumina-ann-dots i { width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.18); }
   .lumina-ann-dots i:first-child { width: 18px; background: var(--green); }
-  .lumina-ann-article-card { margin: 0 2px; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; background: linear-gradient(145deg, rgba(255,255,255,.046), rgba(255,255,255,.014)); overflow: hidden; }
+  .lumina-ann-article-card { margin: 42px 2px 0; border: 1px solid rgba(255,255,255,.1); border-radius: 20px; background: linear-gradient(145deg, rgba(255,255,255,.046), rgba(255,255,255,.014)); overflow: hidden; }
   .lumina-ann-article-head { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
   .lumina-ann-pin { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border: 1px solid rgba(105,255,137,.48); border-radius: 8px; color: var(--green); font-size: 13px; font-weight: 850; }
   .lumina-ann-pin.ghost { color: #c8cec8; border-color: rgba(255,255,255,.14); }
