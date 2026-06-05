@@ -150,10 +150,8 @@ async function submitBuiltSwap(
   const universalRouter = decodeUniversalRouterExecute(tx.data);
   const universalRouterCommands = universalRouter?.commands ?? null;
   const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
-  // Permit2 allowance expires 30 minutes from now.
-  // CRITICAL: expiration=0 means immediate expiry per Uniswap docs:
-  // https://docs.uniswap.org/contracts/permit2/reference/allowance-transfer
-  const permit2Expiration = Math.floor(Date.now() / 1000) + 30 * 60;
+  // World App MiniKit enforces Permit2 allowance expiration=0.
+  const permit2Expiration = 0;
   const permit2Param = {
     permitted: {
       token: quote.tokens.from.address,
