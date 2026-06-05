@@ -90,9 +90,11 @@
   .lumina-ann-mask, .lumina-ann-mask.open { align-items: stretch; justify-content: center; padding: 0; background: #080a08; overflow: hidden; }
   .lumina-ann-sheet { box-sizing: border-box; width: min(100%, var(--phone-max)); max-height: none; height: 100dvh; min-height: 0; padding: max(10px, env(safe-area-inset-top)) 10px max(18px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: #080a08; overflow: hidden; position: relative; box-shadow: none; overscroll-behavior: contain; }
   .lumina-ann-sheet h3 { padding: 0; margin: 0; font-size: 28px; font-weight: 900; line-height: 1.12; }
+  .lumina-ann-sheet:not(.lumina-ann-detail-sheet) { height: auto; min-height: 0; max-height: calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); margin-top: max(22px, env(safe-area-inset-top)); padding: 84px 0 22px; border: 1px solid rgba(255,255,255,.1); border-radius: 20px 20px 0 0; background: #101210; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+  .lumina-ann-title { padding: 0 72px 0 !important; text-align: center; }
   .lumina-ann-close, .lumina-ann-back, .lumina-ann-share { width: 44px; height: 44px; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; background: #171917; color: var(--text); display: inline-grid; place-items: center; cursor: pointer; box-shadow: none; }
-  .lumina-ann-close { position: absolute; top: max(18px, env(safe-area-inset-top)); right: var(--pad-screen); z-index: 2; font-size: 24px; line-height: 1; }
-  .lumina-ann-list { display: grid; gap: 12px; margin-top: 20px; }
+  .lumina-ann-close { position: absolute; top: 24px; right: 22px; z-index: 2; font-size: 24px; line-height: 1; }
+  .lumina-ann-list { display: grid; gap: 12px; margin-top: 34px; padding: 0 0 2px; }
   .lumina-ann-row { box-sizing: border-box; width: 100%; display: block; padding: 18px; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; background: #101210; text-align: left; cursor: pointer; box-shadow: none; }
   .lumina-ann-row:last-child { border-bottom: 1px solid rgba(255,255,255,0.08); }
   .lumina-ann-row .ann-title { margin-top: 14px; font-size: 18px; line-height: 1.25; }

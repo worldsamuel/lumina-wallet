@@ -2512,7 +2512,7 @@ function enhancePrototypeHome() {
         modal.innerHTML =
           '<div class="modal lumina-ann-sheet">' +
             '<button type="button" class="lumina-ann-close" id="luminaAnnClose" aria-label="Close">×</button>' +
-            '<div style="height:56px"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
+            '<h3 class="lumina-ann-title">' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
             '<div class="lumina-ann-list">' + rows + '</div>' +
           '</div>';
         document.body.appendChild(modal);
