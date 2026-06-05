@@ -10,6 +10,12 @@ import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
 import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
+import {
+  holdstationFeePercent,
+  holdstationFeeReceiver,
+  quoteHoldstation,
+  slippageBpsToPercent,
+} from "@/lib/swap/holdstation-client";
 
 type QuoteBody = {
   fromSymbol?: string;
@@ -17,6 +23,7 @@ type QuoteBody = {
   fromToken?: string;
   toToken?: string;
   fromAmount?: string;
+  slippageBps?: number;
 };
 
 type SourceQuote = {
@@ -24,6 +31,8 @@ type SourceQuote = {
   bestQuote: SwapQuoteResult | null;
   allQuotes: SwapQuoteSet["allQuotes"];
 };
+
+type HoldstationQuote = NonNullable<Awaited<ReturnType<typeof buildHoldstationQuote>>>;
 
 export function OPTIONS() {
   return optionsResponse();
@@ -45,7 +54,11 @@ export async function POST(req: NextRequest) {
   console.log("[SWAP] fee config:", platformFeeConfig);
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
-  const [v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
+  const [holdstation, v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
+    withTimeout(buildHoldstationQuote(parsed.from, parsed.to, parsed.amountText, parsed.slippageBps), 13_000).catch((error) => {
+      console.warn("[SWAP] Holdstation quote failed", error);
+      return null;
+    }),
     withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
       .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
       .catch(() => null),
@@ -60,25 +73,28 @@ export async function POST(req: NextRequest) {
   ]);
 
   const amountInNumber = Number(amountText);
-  const main = pickMainQuote(v3, v4);
+  const main = pickMainQuote(holdstation, v3, v4);
   const chainlinkRate = referenceRate(parsed.from, parsed.to, chainlink);
   const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
 
   if (!main || !main.quote || Number(main.quote.amountOut) <= 0) {
     return jsonResponse(
       {
-        error: "No executable Uniswap route for this pair.",
-        references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko),
+        error: "No executable swap route for this pair.",
+        references: buildReferences(parsed.from, parsed.to, amountInNumber, holdstation, v3, v4, chainlink, coingecko),
         warnings: ["low_liquidity"],
         blocked: true,
-        blockReason: "No executable Uniswap route for this pair.",
+        blockReason: "No executable swap route for this pair.",
       },
       { status: 404 },
     );
   }
 
   const grossAmountOutRaw = BigInt(main.quote.amountOutRaw);
-  const { netAmountOut, payload: platformFee } = applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
+  const { netAmountOut, payload: platformFee } =
+    main.source === "holdstation"
+      ? holdstationOutputFeePayload(parsed.to, grossAmountOutRaw, main.feeAmountOutRaw, platformFeeConfig)
+      : applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
   const amountOut = formatUnits(netAmountOut, parsed.to.decimals);
   const amountOutNumber = Number(amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
@@ -108,19 +124,21 @@ export async function POST(req: NextRequest) {
       gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
       feeTier: main.quote.fee,
       route: main.quote.route,
+      tx: main.source === "holdstation" ? main.tx : undefined,
+      addons: main.source === "holdstation" ? main.addons : undefined,
       platformFee,
       tokens: {
         from: tokenPayload(parsed.from),
         to: tokenPayload(parsed.to),
       },
-      references: buildReferences(parsed.from, parsed.to, amountInNumber, v3, v4, chainlink, coingecko, main.source),
+      references: buildReferences(parsed.from, parsed.to, amountInNumber, holdstation, v3, v4, chainlink, coingecko, main.source),
       warnings,
       blocked: false,
       blockReason: undefined,
     },
     {
       headers: {
-        "Cache-Control": "public, s-maxage=5, stale-while-revalidate=5",
+        "Cache-Control": "no-store",
       },
     },
   );
@@ -136,7 +154,13 @@ async function parseQuoteBody(body: QuoteBody | null) {
   if (!amountText || Number(amountText) <= 0) return { error: "Enter a valid amount." };
   try {
     parseUnits(amountText, from.decimals);
-    return { from, to, amountText };
+    const slippageBps = Number(body?.slippageBps ?? 50);
+    return {
+      from,
+      to,
+      amountText,
+      slippageBps: Number.isFinite(slippageBps) && slippageBps > 0 ? Math.min(Math.round(slippageBps), 1_000) : 50,
+    };
   } catch {
     return { error: "Invalid token amount." };
   }
@@ -153,7 +177,47 @@ function tokenPayload(token: SwapToken) {
   };
 }
 
-function pickMainQuote(v3: SourceQuote | null, v4: SourceQuote | null) {
+async function buildHoldstationQuote(from: SwapToken, to: SwapToken, amountText: string, slippageBps: number) {
+  const quote = await quoteHoldstation({
+    tokenIn: from.address,
+    tokenOut: to.address,
+    amountIn: amountText,
+    slippage: slippageBpsToPercent(slippageBps),
+    fee: holdstationFeePercent(),
+    feeReceiver: holdstationFeeReceiver(),
+  });
+  const amountOutRaw = parseUnitsSafe(String(quote.addons?.outAmount ?? "0"), to.decimals);
+  if (amountOutRaw <= 0n) return null;
+  return {
+    source: "holdstation" as const,
+    quote,
+    amountOutRaw,
+    amountOut: formatUnits(amountOutRaw, to.decimals),
+    feeAmountOutRaw: BigInt(quote.addons?.feeAmountOut ?? "0x0"),
+  };
+}
+
+function pickMainQuote(holdstation: HoldstationQuote | null, v3: SourceQuote | null, v4: SourceQuote | null) {
+  if (holdstation?.quote && holdstation.amountOutRaw > 0n) {
+    const netRaw = holdstation.amountOutRaw > holdstation.feeAmountOutRaw ? holdstation.amountOutRaw - holdstation.feeAmountOutRaw : holdstation.amountOutRaw;
+    return {
+      source: "holdstation" as const,
+      quote: {
+        amountOut: holdstation.amountOut,
+        amountOutRaw: holdstation.amountOutRaw.toString(),
+        fee: 0,
+        route: { tokens: [], fees: [] },
+        gasEstimate: "0",
+      },
+      tx: {
+        to: holdstation.quote.to,
+        data: holdstation.quote.data,
+        value: holdstation.quote.value ?? "0",
+      },
+      addons: holdstation.quote.addons,
+      feeAmountOutRaw: holdstation.feeAmountOutRaw,
+    };
+  }
   const candidates = [
     v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null,
     v4?.bestQuote ? { source: "uniswap-v4" as const, quote: v4.bestQuote } : null,
@@ -171,18 +235,56 @@ function buildReferences(
   from: SwapToken,
   to: SwapToken,
   amountIn: number,
+  holdstation: HoldstationQuote | null,
   v3: SourceQuote | null,
   v4: SourceQuote | null,
   chainlink: OnchainPricesResponse | null,
   coingecko: MarketPricesResponse | null,
-  selected?: "uniswap-v3" | "uniswap-v4",
+  selected?: "holdstation" | "uniswap-v3" | "uniswap-v4",
 ) {
   return {
+    holdstation: holdstationReference(holdstation, amountIn, selected === "holdstation"),
     uniswapV3: quoteReference(v3, amountIn, selected === "uniswap-v3"),
     uniswapV4: quoteReference(v4, amountIn, selected === "uniswap-v4"),
     chainlink: { rate: referenceRate(from, to, chainlink), updatedAt: chainlink?.updatedAt ?? null },
     coingecko: { rate: referenceRate(from, to, coingecko), updatedAt: coingecko?.updated_at ?? null },
   };
+}
+
+function holdstationReference(quote: HoldstationQuote | null, amountIn: number, selected: boolean) {
+  const amountOut = Number(quote?.amountOut ?? 0);
+  return {
+    rate: amountIn > 0 && amountOut > 0 ? amountOut / amountIn : null,
+    available: Boolean(quote?.quote && amountOut > 0),
+    selected,
+  };
+}
+
+function holdstationOutputFeePayload(
+  to: SwapToken,
+  grossAmountOut: bigint,
+  feeAmountOut: bigint,
+  config: ReturnType<typeof getSwapPlatformFeeConfig>,
+) {
+  if (!config || feeAmountOut <= 0n) return { netAmountOut: grossAmountOut, payload: null };
+  const netAmountOut = grossAmountOut > feeAmountOut ? grossAmountOut - feeAmountOut : grossAmountOut;
+  return {
+    netAmountOut,
+    payload: {
+      businessType: "swap" as const,
+      token: to.address,
+      recipient: config.recipient,
+      percent: config.percent,
+      bps: config.bps,
+      amountRaw: feeAmountOut.toString(),
+      amount: formatUnits(feeAmountOut, to.decimals),
+    },
+  };
+}
+
+function parseUnitsSafe(value: string, decimals: number) {
+  const [whole, fraction = ""] = String(value || "0").split(".");
+  return parseUnits(`${whole || "0"}${fraction ? `.${fraction.slice(0, decimals)}` : ""}`, decimals);
 }
 
 function quoteReference(quote: SourceQuote | null, amountIn: number, selected: boolean) {

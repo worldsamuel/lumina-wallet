@@ -1,6 +1,12 @@
 import { MiniKit } from "@worldcoin/minikit-js";
 import { decodeFunctionData, encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
+import {
+  ensureHoldstationModules,
+  holdstationFeePercent,
+  holdstationFeeReceiver,
+  hsSwapHelper,
+} from "./holdstation-client";
 
 type ExecuteSwapToken = {
   address: Address;
@@ -33,6 +39,18 @@ type QuoteResponse = {
   route?: {
     tokens: string[];
     fees: number[];
+  };
+  tx?: {
+    to: Address;
+    data: `0x${string}`;
+    value?: string;
+  };
+  addons?: {
+    outAmount?: string;
+    rateSwap?: string;
+    amountOutUsd?: string;
+    minReceived?: string;
+    feeAmountOut?: string;
   };
   priceImpactPercent?: number;
   gasEstimateUsd?: number;
@@ -95,10 +113,14 @@ export async function executeSwap(params: ExecuteSwapParams) {
   }
 
   const freshQuote = params.quote?.amountOutRaw ? params.quote : await fetchFreshQuote(params);
-  if (freshQuote.source !== "uniswap-v3") {
-    throw new Error("Phase 2 execution currently supports Uniswap V3 routes only.");
-  }
   if (freshQuote.blocked) throw new Error(freshQuote.blockReason || "Quote is blocked.");
+
+  if (freshQuote.source === "holdstation") {
+    return await submitHoldstationSwap(freshQuote, params);
+  }
+  if (freshQuote.source !== "uniswap-v3") {
+    throw new Error("Phase 2 execution currently supports Holdstation and Uniswap V3 routes only.");
+  }
 
   const built = await buildSwapTxOnServer({
     fromToken: freshQuote.tokens.from,
@@ -109,6 +131,85 @@ export async function executeSwap(params: ExecuteSwapParams) {
     quote: freshQuote,
   });
   return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
+}
+
+async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapParams) {
+  const tx = quote.tx;
+  if (!tx?.to || !tx?.data) throw new Error("Holdstation quote did not include executable transaction data.");
+  const debug = {
+    stage: "holdstation:submit",
+    fromToken: quote.tokens.from,
+    toToken: quote.tokens.to,
+    fromAmountHuman: params.fromAmountHuman,
+    expectedOut: quote.amountOut,
+    expectedOutRaw: quote.amountOutRaw,
+    tx,
+    addons: quote.addons ?? null,
+    platformFee: quote.platformFee ?? null,
+  };
+
+  console.log("[SWAP] Holdstation submit", debug);
+  await ensureHoldstationModules();
+  let result: Awaited<ReturnType<typeof hsSwapHelper.swap>>;
+  try {
+    result = await withTimeout(
+      hsSwapHelper.swap({
+        tokenIn: quote.tokens.from.address,
+        tokenOut: quote.tokens.to.address,
+        amountIn: params.fromAmountHuman.replace(/,/g, "").trim(),
+        fee: holdstationFeePercent(),
+        feeReceiver: holdstationFeeReceiver(),
+        tx: {
+          to: tx.to,
+          data: tx.data,
+          value: tx.value ?? "0",
+        },
+        feeAmountOut: quote.addons?.feeAmountOut,
+      }),
+      30_000,
+      "Holdstation swap timed out before returning userOpHash.",
+    );
+  } catch (error) {
+    throw attachSwapDebug(error, { ...debug, stage: "holdstation:throw" });
+  }
+
+  console.log("[SWAP] Holdstation result", result);
+  if (!result.success) {
+    throw attachSwapDebug(new Error(result.errorCode || "Holdstation swap was not submitted."), {
+      ...debug,
+      stage: "holdstation:error",
+      result,
+    });
+  }
+  const userOpHash = result.transactionId;
+  if (!userOpHash) {
+    throw attachSwapDebug(new Error(`No userOpHash returned: ${JSON.stringify(result)}`), {
+      ...debug,
+      stage: "holdstation:no_user_op",
+      result,
+    });
+  }
+  void recordClientActivity({
+    type: "swap",
+    address: params.userAddress,
+    hash: userOpHash,
+    amount: `${params.fromAmountHuman} ${quote.tokens.from.symbol} -> ${quote.amountOut} ${quote.tokens.to.symbol}`,
+    metadata: {
+      source: "holdstation",
+      fromToken: quote.tokens.from.symbol,
+      toToken: quote.tokens.to.symbol,
+      fromAmount: params.fromAmountHuman,
+      expectedOut: quote.amountOut,
+    },
+  });
+
+  return {
+    userOpHash,
+    expectedOut: quote.amountOut,
+    expectedOutRaw: quote.amountOutRaw,
+    minOut: quote.addons?.minReceived ?? formatUnits(applySlippage(BigInt(quote.amountOutRaw), params.slippageBps), quote.tokens.to.decimals),
+    quote,
+  };
 }
 
 const universalRouterExecuteAbi = [
