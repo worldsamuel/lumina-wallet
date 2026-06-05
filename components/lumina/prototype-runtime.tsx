@@ -59,6 +59,7 @@ declare global {
     __luminaApplyBalancePrivacy?: () => void;
     __luminaWalletBaseTotalUsd?: number;
     __luminaEarnTotalUsd?: number;
+    __luminaComputeEarnTotalUsd?: () => number;
     __luminaRecomputeTotalWithEarn?: () => void;
     __luminaRenderLightweightChart?: (container: HTMLElement, candles: MarketChartCandle[], range?: string) => boolean;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
@@ -1526,6 +1527,24 @@ function enhancePrototypeEarn() {
         if (!res.ok) throw new Error(data.error || "Unable to load vaults");
         morphoVaults = Array.isArray(data) ? data : [];
       }
+      function updateHomeEarnTotal(){
+        var compute = typeof window.__luminaComputeEarnTotalUsd === "function" ? window.__luminaComputeEarnTotalUsd : null;
+        if (compute) {
+          window.__luminaEarnTotalUsd = compute();
+        } else {
+          window.__luminaEarnTotalUsd = (morphoPositions || []).filter(nonZeroPosition).reduce(function(sum, pos){
+            var sym = pos.asset && pos.asset.symbol ? String(pos.asset.symbol).toUpperCase() : "";
+            var vault = morphoVaults.find(function(v){
+              return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
+            });
+            if (!sym && vault && vault.asset) sym = String(vault.asset.symbol || "").toUpperCase();
+            var price = sym === "USDC" || sym === "USDT" || sym === "EURC" ? 1 : Number(prices && prices[sym] || 0);
+            var amount = Number(pos.assetsFormatted || 0);
+            return sum + (Number.isFinite(amount) && price > 0 ? amount * price : 0);
+          }, 0);
+        }
+        if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
+      }
       async function loadMorphoPositions(){
         var address = window.__luminaUserAddress || "";
         if (!address) {
@@ -1538,8 +1557,7 @@ function enhancePrototypeEarn() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
         morphoPositions = Array.isArray(data.positions) ? data.positions : [];
-        window.__luminaEarnTotalUsd = earnPositionsUsdValue();
-        if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
+        updateHomeEarnTotal();
         console.log("[EARN] Positions address:", address);
         console.log("[EARN] Positions response:", data);
       }
@@ -2708,6 +2726,7 @@ function enhancePrototypeHome() {
           return sum + (Number.isFinite(amount) && price > 0 ? amount * price : 0);
         }, 0);
       }
+      window.__luminaComputeEarnTotalUsd = earnPositionsUsdValue;
       window.__luminaRecomputeTotalWithEarn = function(){
         var base = Number(window.__luminaWalletBaseTotalUsd || 0);
         var earn = Number(window.__luminaEarnTotalUsd || 0);
