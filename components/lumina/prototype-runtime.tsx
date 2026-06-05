@@ -2389,8 +2389,6 @@ function enhancePrototypeHome() {
       window.__luminaOpenHomeRow = function(event, row){
         if (event && event.__luminaHomeHandled) return;
         if (event) event.__luminaHomeHandled = true;
-        if (event && event.preventDefault) event.preventDefault();
-        if (event && event.stopPropagation) event.stopPropagation();
         var symbol = row && row.getAttribute ? (row.getAttribute("data-home-symbol") || "") : "";
         var index = row && row.getAttribute ? Number(row.getAttribute("data-home-index")) : NaN;
         if (!symbol && row && row.querySelector) {
@@ -2404,20 +2402,16 @@ function enhancePrototypeHome() {
         }
         if (Number.isInteger(index) && assets && assets[index]) openDetail(index);
       };
-      if (!window.__luminaHomeAssetCaptureBound) {
-        window.__luminaHomeAssetCaptureBound = true;
-        function handleHomeAssetActivate(event){
-          var row = event.target && event.target.closest ? event.target.closest("#view-home #assetList .asset") : null;
-          if (!row) return;
-          var now = Date.now();
-          if (window.__luminaLastHomeAssetTap && now - window.__luminaLastHomeAssetTap < 420) {
-            if (event.preventDefault) event.preventDefault();
-            return;
-          }
-          window.__luminaLastHomeAssetTap = now;
-          window.__luminaOpenHomeRow(event, row);
-        }
-        document.addEventListener("click", handleHomeAssetActivate, true);
+      function isCleanHomeTap(event){
+        var start = window.__luminaHomeTapStart || null;
+        if (!start || !event) return true;
+        var touch = event.changedTouches && event.changedTouches[0];
+        var x = touch ? touch.clientX : event.clientX;
+        var y = touch ? touch.clientY : event.clientY;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return true;
+        var dx = Math.abs(x - start.x);
+        var dy = Math.abs(y - start.y);
+        return dx <= 10 && dy <= 10;
       }
       window.toggleHomeChainMenu = function(){
         var menu = document.getElementById("homeChainMenu");
@@ -2488,7 +2482,7 @@ function enhancePrototypeHome() {
         var logoHtml = window.__luminaTokenLogoHtml ? window.__luminaTokenLogoHtml(asset.sym, logoSource) : logoSource;
         var usdValue = assetUsdValue(asset);
         if (asset && usdValue > 0) asset.usdNum = usdValue;
-        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '" onclick="window.__luminaOpenHomeRow && window.__luminaOpenHomeRow(event,this)">' +
+        return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
           '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
@@ -2508,12 +2502,23 @@ function enhancePrototypeHome() {
         var html = verified.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
+        list.ontouchstart = function(event){
+          var touch = event.touches && event.touches[0];
+          if (!touch) return;
+          window.__luminaHomeTapStart = { x: touch.clientX, y: touch.clientY };
+        };
+        list.ontouchmove = function(event){
+          if (!isCleanHomeTap(event)) window.__luminaHomeTapMoved = true;
+        };
         list.onclick = function(event){
           var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
           if (!row || !list.contains(row)) return;
-          var symbol = row.getAttribute("data-home-symbol") || "";
-          if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
-          else openHomeAsset(symbol);
+          if (window.__luminaHomeTapMoved || !isCleanHomeTap(event)) {
+            window.__luminaHomeTapMoved = false;
+            return;
+          }
+          window.__luminaHomeTapMoved = false;
+          window.__luminaOpenHomeRow(event, row);
         };
       };
       ensureHomeShell();
