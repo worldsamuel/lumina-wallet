@@ -2323,20 +2323,8 @@ function enhancePrototypeHome() {
         };
       }
       function ensureHomeDebugButton(){
-        if (document.getElementById("homeDebugBtn")) return;
-        var home = document.getElementById("view-home");
-        if (!home) return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "homeDebugBtn";
-        btn.className = "gear is-floating home-debug-btn";
-        btn.textContent = "DEBUG";
-        btn.onclick = function(event){
-          if (event && event.preventDefault) event.preventDefault();
-          if (event && event.stopPropagation) event.stopPropagation();
-          openHomeDebug();
-        };
-        home.appendChild(btn);
+        var old = document.getElementById("homeDebugBtn");
+        if (old) old.remove();
       }
       function fixSignedMoney(){
         window.__luminaApplyBalancePrivacy = function(){
