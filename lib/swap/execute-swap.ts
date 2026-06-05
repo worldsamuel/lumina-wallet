@@ -67,6 +67,7 @@ type BuildTxResponse = {
   platformFee?: PlatformFeePayload | null;
   permit2Spender?: Address;
   deadline: number;
+  debug?: unknown;
 };
 
 type MiniKitTransactionResult = {
@@ -99,6 +100,7 @@ export async function executeSwap(params: ExecuteSwapParams) {
   }
   if (freshQuote.blocked) throw new Error(freshQuote.blockReason || "Quote is blocked.");
 
+  const skipPlatformFeeForSell = shouldSkipPlatformFeeForSell(freshQuote.tokens.from, freshQuote.tokens.to);
   const built = await buildSwapTxOnServer({
     fromToken: freshQuote.tokens.from,
     toToken: freshQuote.tokens.to,
@@ -106,7 +108,14 @@ export async function executeSwap(params: ExecuteSwapParams) {
     slippageBps: params.slippageBps,
     userAddress: params.userAddress,
     quote: freshQuote,
+    skipPlatformFee: skipPlatformFeeForSell,
   });
+  if (skipPlatformFeeForSell) {
+    console.log("[SWAP DEBUG] skipping platform fee for sell direction", {
+      from: freshQuote.tokens.from.symbol,
+      to: freshQuote.tokens.to.symbol,
+    });
+  }
   try {
     return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
   } catch (error) {
@@ -213,6 +222,7 @@ async function submitBuiltSwap(
     executableAmountRaw: executableAmount.toString(),
     expectedOutRaw: expectedOut.toString(),
     platformFee: built.platformFee ?? null,
+    serverDebug: built.debug ?? null,
     feeConfig,
     universalRouterCommands,
     permit2Spender,
@@ -351,6 +361,10 @@ function getSwapMaxUsd() {
 
 function isSwapEnabled() {
   return process.env.NEXT_PUBLIC_SWAP_ENABLED === "true";
+}
+
+function shouldSkipPlatformFeeForSell(fromToken: ExecuteSwapToken, toToken: ExecuteSwapToken) {
+  return fromToken.symbol !== "WLD" && toToken.symbol === "WLD";
 }
 
 function applySlippage(amount: bigint, slippageBps: number) {

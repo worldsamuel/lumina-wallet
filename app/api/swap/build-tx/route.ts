@@ -107,6 +107,23 @@ export async function POST(req: NextRequest) {
     platformFee,
     permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
     deadline: parsed.deadline,
+    debug: {
+      direction: `${parsed.from.symbol}->${parsed.to.symbol}`,
+      inputToken: parsed.from.address,
+      outputToken: parsed.to.address,
+      amountInRaw: amountIn.toString(),
+      expectedAmountOutRaw: netAmountOut.toString(),
+      grossAmountOutRaw: grossAmountOutRaw.toString(),
+      feeTier: bestQuote.fee,
+      route: bestQuote.route,
+      platformFeeConfig,
+      platformFee,
+      permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
+      deadline: parsed.deadline,
+      txTo: tx.to,
+      txValue: tx.value,
+      txDataLength: tx.data.length,
+    },
   });
 }
 

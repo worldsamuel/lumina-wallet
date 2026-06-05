@@ -3270,7 +3270,18 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) existing.remove();
+        if (existing) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapDebugBtn";
+        btn.className = "swap-debug-btn";
+        btn.textContent = "DEBUG";
+        btn.onclick = function(event){
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          openSwapDebug();
+        };
+        document.body.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(value);
@@ -3826,6 +3837,7 @@ function enhancePrototypeSwapQuote() {
 	          setSwapDebug("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          toast(swapErrorToast(e));
+	          setTimeout(function(){ openSwapDebug(); }, 180);
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	        } finally {
 	          swapSubmitting = false;

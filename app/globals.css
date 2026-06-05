@@ -526,9 +526,9 @@
   .quote-muted { color: var(--text-mute); font-weight: 500; }
   .gear { margin-left: auto; cursor: pointer; color: var(--text-dim); display: inline-flex; }
   .gear.is-floating { position: fixed; right: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px)); top: max(84px, env(safe-area-inset-top)); z-index: 34; width: 46px; height: 46px; border-radius: 999px; align-items: center; justify-content: center; background: rgba(18,20,18,0.92); border: 1px solid var(--line); box-shadow: 0 12px 34px rgba(0,0,0,0.32); backdrop-filter: blur(10px); }
-  #swapDebugBtn, .swap-debug-btn, #homeDebugBtn, .home-debug-btn { display: none !important; }
+  #homeDebugBtn, .home-debug-btn { display: none !important; }
   .home-debug-btn { top: max(132px, calc(env(safe-area-inset-top) + 132px)); color: var(--green); font-size: 11px; font-weight: 950; letter-spacing: 0; }
-  .swap-debug-btn { top: max(132px, calc(env(safe-area-inset-top) + 132px)); color: var(--green); font-size: 11px; font-weight: 950; letter-spacing: 0; }
+  .swap-debug-btn { position: fixed; right: max(18px, calc((100vw - var(--phone-max)) / 2 + 18px)); top: max(132px, calc(env(safe-area-inset-top) + 132px)); z-index: 45; min-width: 62px; height: 34px; padding: 0 10px; border: 1px solid rgba(74,222,128,.34); border-radius: 999px; background: rgba(8,14,10,.88); color: var(--green); font-size: 11px; font-weight: 950; letter-spacing: 0; box-shadow: 0 12px 30px rgba(0,0,0,.34); backdrop-filter: blur(10px); }
   .swap-debug-sheet { width: calc(100vw - 24px); max-width: 430px; max-height: min(78vh, 680px); padding: 22px; border-radius: 24px; overflow: auto; }
   .swap-debug-sheet h3 { padding: 0 44px 12px 0; font-size: 22px; }
   .swap-debug-close { position: absolute; top: 14px; right: 14px; width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--text); font-size: 28px; line-height: 1; cursor: pointer; }
