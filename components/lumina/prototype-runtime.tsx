@@ -2987,14 +2987,26 @@ function enhancePrototypeSwapQuote() {
         return String(value);
       }
       function swapDebugContext(extra){
+        var sellSymbol = swapState && swapState.sell;
+        var buySymbol = swapState && swapState.buy;
+        var sellMeta = null;
+        var buyMeta = null;
+        try { sellMeta = sellSymbol ? tokenMeta(sellSymbol, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from) : null; } catch(e) {}
+        try { buyMeta = buySymbol ? tokenMeta(buySymbol, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.to) : null; } catch(e) {}
         return Object.assign({
           at: new Date().toISOString(),
           page: "swap",
-          sell: swapState && swapState.sell,
-          buy: swapState && swapState.buy,
+          sell: sellSymbol,
+          buy: buySymbol,
           amount: (document.getElementById("sellAmt") && document.getElementById("sellAmt").value) || "",
           receive: (document.getElementById("buyAmt") && document.getElementById("buyAmt").value) || "",
-          balance: swapState ? balanceNumber(swapState.sell) : 0,
+          balance: sellSymbol ? balanceNumber(sellSymbol) : 0,
+          sellToken: sellMeta,
+          buyToken: buyMeta,
+          balances: {
+            sell: sellSymbol ? balanceNumber(sellSymbol) : 0,
+            buy: buySymbol ? balanceNumber(buySymbol) : 0
+          },
           slippageBps: slippageBps(),
           userAddress: window.__luminaUserAddress || "",
           worldApp: !!window.MiniKit,
@@ -3078,7 +3090,23 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) existing.remove();
+        if (existing) return;
+        var view = document.getElementById("view-swap");
+        if (!view) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapDebugBtn";
+        btn.className = "gear is-floating swap-debug-btn";
+        btn.textContent = "DEBUG";
+        btn.onclick = function(event){
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          if (!readSwapDebug()) {
+            setSwapDebug("manual:open", { hint:"Select the token as Sell, quote it, then try Confirm swap. Failed sells will be stored here." });
+          }
+          openSwapDebug();
+        };
+        view.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(value);
