@@ -65,6 +65,7 @@ type BuildTxResponse = {
     gasEstimate?: string;
   };
   platformFee?: PlatformFeePayload | null;
+  permit2Spender?: Address;
   deadline: number;
 };
 
@@ -166,21 +167,39 @@ async function submitBuiltSwap(
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
   const feeConfig = built.platformFee ? { bps: built.platformFee.bps, recipient: built.platformFee.recipient } : null;
-  const universalRouterCommands = decodeUniversalRouterCommands(tx.data);
+  const universalRouter = decodeUniversalRouterExecute(tx.data);
+  const universalRouterCommands = universalRouter?.commands ?? null;
+  const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
+  const permit2Expiration = 0;
+  const permit2Param = {
+    permitted: {
+      token: quote.tokens.from.address,
+      amount: assertUint160(executableAmount),
+    },
+    spender: permit2Spender,
+    nonce: null,
+    deadline: permit2Expiration,
+    sigDeadline: null,
+  };
   console.log("[SWAP] fee config:", feeConfig);
-  console.log("[SWAP] universal router commands:", universalRouterCommands);
+  console.log("[SWAP DEBUG] sell direction:", quote.tokens.from.symbol !== "WLD" && quote.tokens.to.symbol === "WLD");
+  console.log(
+    "[SWAP DEBUG] permit2 param:",
+    JSON.stringify(permit2Param, (_key, value) => (typeof value === "bigint" ? value.toString() : value)),
+  );
+  console.log("[SWAP DEBUG] universal router commands:", universalRouterCommands);
+  console.log("[SWAP DEBUG] universal router inputs lengths:", universalRouter?.inputLengths ?? null);
   // World App rejects broad ERC20 approve flows for many tokens, so keep the
   // executable batch on the Permit2 + Universal Router path that is already
   // supported by MiniKit.
   // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
-  const permit2Expiration = 0;
   const transactions = [
     {
       to: PERMIT2_ADDRESS,
       data: encodeFunctionData({
         abi: [permit2Abi[0]],
         functionName: "approve",
-        args: [quote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(executableAmount), permit2Expiration],
+        args: [quote.tokens.from.address, permit2Spender, assertUint160(executableAmount), permit2Expiration],
       }),
       value: "0x0",
     },
@@ -196,7 +215,7 @@ async function submitBuiltSwap(
     platformFee: built.platformFee ?? null,
     feeConfig,
     universalRouterCommands,
-    permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
+    permit2Spender,
     transactions: transactions.map((item, index) => ({
       index,
       to: item.to,
@@ -250,10 +269,14 @@ async function submitBuiltSwap(
   };
 }
 
-function decodeUniversalRouterCommands(data: `0x${string}`) {
+function decodeUniversalRouterExecute(data: `0x${string}`) {
   try {
     const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
-    return String(decoded.args[0]);
+    const inputs = decoded.args[1] as readonly `0x${string}`[];
+    return {
+      commands: String(decoded.args[0]),
+      inputLengths: inputs.map((input) => input.length),
+    };
   } catch {
     return null;
   }
