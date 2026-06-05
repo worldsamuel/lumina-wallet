@@ -262,7 +262,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
   const handleSwapReceiptSuccess = useCallback(() => {
     setSwapUserOpHash("");
-    window.__luminaRefreshWalletData?.();
+    window.setTimeout(() => window.__luminaRefreshWalletData?.(), 6500);
     toastFromPrototype(prototypeText("swapSuccess"));
     window.dispatchEvent(new CustomEvent("lumina:swap-confirmed"));
   }, []);
@@ -1705,6 +1705,28 @@ function enhancePrototypeTokens() {
           return !address || !whitelist.has(address);
         });
       }
+      function isCleanSwapSymbol(symbol){
+        symbol = String(symbol || "").toUpperCase();
+        return !!symbol && symbol !== "23" && /[A-Z]/.test(symbol);
+      }
+      function sortedSwapSymbols(symbols){
+        var pinned = ["WLD","USDC","USDT","WETH","WBTC","EURC"];
+        var seen = new Set();
+        return (symbols || []).filter(function(sym){
+          sym = String(sym || "").toUpperCase();
+          if (!isCleanSwapSymbol(sym) || seen.has(sym)) return false;
+          seen.add(sym);
+          return true;
+        }).sort(function(a, b){
+          var ia = pinned.indexOf(a);
+          var ib = pinned.indexOf(b);
+          if (ia >= 0 || ib >= 0) return (ia >= 0 ? ia : 999) - (ib >= 0 ? ib : 999);
+          var ba = Number(String(balances && balances[a] || "0").replace(/,/g, "")) || 0;
+          var bb = Number(String(balances && balances[b] || "0").replace(/,/g, "")) || 0;
+          if (ba !== bb) return bb - ba;
+          return String(tokenFull[a] || a).localeCompare(String(tokenFull[b] || b));
+        });
+      }
       function whitelistedAddresses(){
         var out = new Set();
         ["ww_tokens", "ww_swap_tokens", "ww_top_tokens"].forEach(function(key){
@@ -1751,7 +1773,7 @@ function enhancePrototypeTokens() {
         var seen = new Set();
         return source.filter(function(token){
           var symbol = String(token && token.symbol || "").toUpperCase();
-          if (!symbol || symbol === "23") return false;
+          if (!isCleanSwapSymbol(symbol)) return false;
           var configured = backendBySymbol[symbol];
           if (configured) {
             token = Object.assign({}, token, configured);
@@ -2013,7 +2035,7 @@ function enhancePrototypeTokens() {
       }
       renderTokenList = function(filter){
         filter = String(filter || "").toLowerCase();
-        var rows = swapWhitelistTokens().map(function(token){ return registerBackendToken(token); }).filter(Boolean);
+        var rows = sortedSwapSymbols(swapWhitelistTokens().map(function(token){ return registerBackendToken(token); }).filter(Boolean));
         rows = rows.filter(function(sym){
           if (!filter) return true;
           return sym.toLowerCase().indexOf(filter) >= 0 || String(tokenFull[sym] || "").toLowerCase().indexOf(filter) >= 0;
@@ -2613,6 +2635,7 @@ function enhancePrototypeHome() {
         list.ontouchstart = function(event){
           var touch = event.touches && event.touches[0];
           if (!touch) return;
+          window.__luminaHomeTapMoved = false;
           window.__luminaHomeTapStart = { x: touch.clientX, y: touch.clientY };
           var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
           if (row && list.contains(row)) setHomeDebug("touchstart", { symbol:row.getAttribute("data-home-symbol"), x:touch.clientX, y:touch.clientY });
@@ -3749,7 +3772,9 @@ function enhancePrototypeSwapQuote() {
 	          optimisticallyApplySwapBalances();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
-	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+	          if (window.__luminaRefreshWalletData) {
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 6500);
+	          }
 	        } catch(e) {
 	          setSwapDebug("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
@@ -4924,14 +4949,6 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         var address = assetMarketAddress(asset);
-        if ((!market || !market.poolAddress) && address) {
-          if (!asset.__marketLookupStarted) {
-            renderMarketCard(asset);
-          }
-          chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingMarket") + '</div>';
-          updateRangeChange(null, range || "1D", asset);
-          return;
-        }
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
