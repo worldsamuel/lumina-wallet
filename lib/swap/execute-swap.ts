@@ -100,7 +100,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
   }
   if (freshQuote.blocked) throw new Error(freshQuote.blockReason || "Quote is blocked.");
 
-  const skipPlatformFeeForSell = shouldSkipPlatformFeeForSell(freshQuote.tokens.from, freshQuote.tokens.to);
   const built = await buildSwapTxOnServer({
     fromToken: freshQuote.tokens.from,
     toToken: freshQuote.tokens.to,
@@ -108,48 +107,8 @@ export async function executeSwap(params: ExecuteSwapParams) {
     slippageBps: params.slippageBps,
     userAddress: params.userAddress,
     quote: freshQuote,
-    skipPlatformFee: skipPlatformFeeForSell,
   });
-  if (skipPlatformFeeForSell) {
-    console.log("[SWAP DEBUG] skipping platform fee for sell direction", {
-      from: freshQuote.tokens.from.symbol,
-      to: freshQuote.tokens.to.symbol,
-    });
-  }
-  try {
-    return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
-  } catch (error) {
-    if (!built.platformFee || isUserCancellation(error)) throw error;
-    console.warn("[SWAP] MiniKit rejected fee-enabled tx, retrying without platform fee", error);
-    const fallbackQuote = {
-      ...freshQuote,
-      amountOut: freshQuote.grossAmountOut || freshQuote.amountOut,
-      amountOutRaw: freshQuote.grossAmountOutRaw || freshQuote.amountOutRaw,
-      platformFee: null,
-    };
-    const fallbackBuilt = await buildSwapTxOnServer({
-      fromToken: fallbackQuote.tokens.from,
-      toToken: fallbackQuote.tokens.to,
-      fromAmountHuman: params.fromAmountHuman,
-      slippageBps: params.slippageBps,
-      userAddress: params.userAddress,
-      quote: fallbackQuote,
-      skipPlatformFee: true,
-    });
-    return await submitBuiltSwap(
-      {
-        ...fallbackBuilt,
-        debug: {
-          fallbackBuild: fallbackBuilt.debug ?? null,
-          primaryError: serializeSwapError(error),
-        },
-      },
-      fallbackQuote,
-      params,
-      fromAmount,
-      "fee-fallback",
-    );
-  }
+  return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
 }
 
 const universalRouterExecuteAbi = [
@@ -181,7 +140,7 @@ async function submitBuiltSwap(
   quote: QuoteResponse,
   params: ExecuteSwapParams,
   fromAmount: bigint,
-  attempt: "primary" | "fee-fallback",
+  attempt: "primary",
 ) {
   const tx = built.tx;
   const executableQuote = built.quote;
@@ -191,7 +150,10 @@ async function submitBuiltSwap(
   const universalRouter = decodeUniversalRouterExecute(tx.data);
   const universalRouterCommands = universalRouter?.commands ?? null;
   const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
-  const permit2Expiration = 0;
+  // Permit2 allowance expires 30 minutes from now.
+  // CRITICAL: expiration=0 means immediate expiry per Uniswap docs:
+  // https://docs.uniswap.org/contracts/permit2/reference/allowance-transfer
+  const permit2Expiration = Math.floor(Date.now() / 1000) + 30 * 60;
   const permit2Param = {
     permitted: {
       token: quote.tokens.from.address,
@@ -213,7 +175,6 @@ async function submitBuiltSwap(
   // World App rejects broad ERC20 approve flows for many tokens, so keep the
   // executable batch on the Permit2 + Universal Router path that is already
   // supported by MiniKit.
-  // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
   const transactions = [
     {
       to: PERMIT2_ADDRESS,
@@ -324,7 +285,7 @@ async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse
   return data as QuoteResponse;
 }
 
-async function buildSwapTxOnServer(params: ExecuteSwapParams & { skipPlatformFee?: boolean }): Promise<BuildTxResponse> {
+async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxResponse> {
   const response = await fetch("/api/swap/build-tx", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -337,7 +298,6 @@ async function buildSwapTxOnServer(params: ExecuteSwapParams & { skipPlatformFee
       fromAmount: params.fromAmountHuman,
       slippageBps: params.slippageBps,
       userAddress: params.userAddress,
-      skipPlatformFee: params.skipPlatformFee,
       quote: params.quote
         ? {
             source: params.quote.source,
@@ -375,10 +335,6 @@ function isSwapEnabled() {
   return process.env.NEXT_PUBLIC_SWAP_ENABLED === "true";
 }
 
-function shouldSkipPlatformFeeForSell(fromToken: ExecuteSwapToken, _toToken: ExecuteSwapToken) {
-  return fromToken.symbol !== "WLD";
-}
-
 function applySlippage(amount: bigint, slippageBps: number) {
   return (amount * BigInt(10_000 - slippageBps)) / 10_000n;
 }
@@ -393,24 +349,6 @@ function attachSwapDebug(error: unknown, debug: unknown) {
   const err = error instanceof Error ? error : new Error(String(error || "Swap failed."));
   (err as Error & { debug?: unknown }).debug = debug;
   return err;
-}
-
-function serializeSwapError(error: unknown) {
-  if (!(error instanceof Error)) return { message: String(error || "") };
-  const extra = error as Error & { code?: unknown; error_code?: unknown; details?: unknown; debug?: unknown };
-  return {
-    name: error.name,
-    message: error.message,
-    code: extra.code,
-    error_code: extra.error_code,
-    details: extra.details,
-    debug: extra.debug,
-  };
-}
-
-function isUserCancellation(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error || "");
-  return /user_rejected|cancelled|canceled|rejected/i.test(message);
 }
 
 export function friendlySwapError(error: unknown) {

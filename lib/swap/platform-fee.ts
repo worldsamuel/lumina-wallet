@@ -21,6 +21,8 @@ export type SwapPlatformFeePayload = {
 };
 
 export function getSwapPlatformFeeConfig(): SwapPlatformFeeConfig | null {
+  if (process.env.NEXT_PUBLIC_SWAP_FEE_ENABLED !== "true") return null;
+
   const bps = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || DEFAULT_SWAP_FEE_BPS);
   if (!Number.isInteger(bps) || bps <= 0) return null;
   if (bps >= 10_000) throw new Error("Configured swap fee is too high.");

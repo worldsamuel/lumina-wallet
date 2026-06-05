@@ -35,7 +35,6 @@ type BuildSwapBody = {
       fees?: number[];
     };
   };
-  skipPlatformFee?: boolean;
 };
 
 export function OPTIONS() {
@@ -62,7 +61,7 @@ export async function POST(req: NextRequest) {
   }
 
   const amountIn = parsed.fromAmount;
-  const platformFeeConfig = body?.skipPlatformFee ? null : getSwapPlatformFeeConfig();
+  const platformFeeConfig = getSwapPlatformFeeConfig();
   console.log("[SWAP] fee config:", platformFeeConfig);
   const clientQuote = trustedClientQuote(body?.quote, parsed.from, parsed.to, amountIn);
   const bestQuote = clientQuote ?? (await quoteBestV3(parsed.from, parsed.to, amountIn)).bestQuote;
