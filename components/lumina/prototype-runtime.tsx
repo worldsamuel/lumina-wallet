@@ -2271,6 +2271,7 @@ function enhancePrototypeHome() {
         window.__luminaHomeDebug = data;
         try { localStorage.setItem("lumina_home_debug_v1", JSON.stringify(data)); } catch(e) {}
       }
+      window.__luminaSetHomeDebug = setHomeDebug;
       function readHomeDebug(){
         if (window.__luminaHomeDebug) return window.__luminaHomeDebug;
         try { return JSON.parse(localStorage.getItem("lumina_home_debug_v1") || "null"); } catch(e) { return null; }
@@ -5277,10 +5278,34 @@ function enhancePrototypeDetail() {
           currentDetailIdx = index;
           var asset = assets[index];
           if (!asset) return;
-          updateDetailContent(asset);
-          renderRange("1D");
-          updateExplorer();
           go("detail"); setTabByName(detailReturnTab(window.__luminaDetailReturnView));
+          try {
+            updateDetailContent(asset);
+            renderRange("1D");
+            updateExplorer();
+          } catch(e) {
+            try {
+              ensureDetailShell();
+              document.getElementById("detTitle").textContent = asset.sym;
+              document.getElementById("detName").textContent = asset.full || asset.sym;
+              document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
+              document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
+              var chart = document.getElementById("detChart");
+              if (chart) chart.innerHTML = '<div class="market-detail-state">' + detailCopy("noData") + '</div>';
+            } catch(inner) {}
+            try { console.error("[DETAIL] openDetail failed", e); } catch(logErr) {}
+          }
+          setTimeout(function(){
+            try {
+              if (window.__luminaHomeDebug && typeof window.__luminaSetHomeDebug === "function") {
+                window.__luminaSetHomeDebug("openDetail:after", {
+                  index:index,
+                  symbol:asset && asset.sym,
+                  activeViews:Array.from(document.querySelectorAll(".view.active")).map(function(view){ return view.id; })
+                });
+              }
+            } catch(e) {}
+          }, 0);
         };
       }
 
