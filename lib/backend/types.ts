@@ -6,6 +6,8 @@ export type BackendAnnouncement = {
   titleI18n: I18nText;
   bodyI18n: I18nText;
   publishedAt: string;
+  imageUrl?: string | null;
+  pinned?: boolean;
 };
 
 export type BackendCurrencyRate = {

@@ -158,6 +158,9 @@ export function useBackendConfigSync(enabled: boolean) {
             titleI18n: item.titleI18n,
             bodyI18n: item.bodyI18n,
             time: formatRelativeTime(item.publishedAt),
+            publishedAt: item.publishedAt,
+            imageUrl: item.imageUrl || null,
+            pinned: !!item.pinned,
           })),
         ),
       );

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, parseAbi, parseAbiItem, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { recordActivity } from "@/lib/admin/activity-store";
+import { getStoredActivities, recordActivity } from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
 
@@ -53,6 +53,23 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const address = url.searchParams.get("address") ?? "";
   if (!isAddress(address)) return jsonResponse([]);
+  const storedRows = await getStoredActivities(80)
+    .then((rows) =>
+      rows
+        .filter((row) => !row.address || row.address.toLowerCase() === address.toLowerCase())
+        .map((row) => ({
+          hash: row.hash,
+          type: row.type === "swap" ? "swap" : row.type === "send" ? "out" : "in",
+          title: row.type === "swap" ? "Swap" : row.type === "send" ? "Sent" : row.type === "earn" ? "Earn" : "Transaction",
+          subtitle: row.type === "earn" ? "Vault" : row.type === "swap" ? "Swap" : "Wallet",
+          amount: row.amount || "—",
+          status: row.status === "completed" ? "Completed" : row.status,
+          blockNumber: 0,
+          logIndex: row.id,
+          createdAt: row.createdAt.toISOString(),
+        })),
+    )
+    .catch(() => []);
 
   try {
     const latest = await publicClient.getBlockNumber();
@@ -107,11 +124,16 @@ export async function GET(req: NextRequest) {
     );
 
     const merged = mergeSwapActivity(logs);
-    merged.sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
-    return jsonResponse(merged.slice(0, 30));
+    const allRows = [...storedRows, ...merged];
+    allRows.sort((a, b) => {
+      const at = "createdAt" in a ? new Date(String(a.createdAt)).getTime() : 0;
+      const bt = "createdAt" in b ? new Date(String(b.createdAt)).getTime() : 0;
+      return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
+    });
+    return jsonResponse(allRows.slice(0, 30));
   } catch (error) {
     console.error("Failed to fetch real activity", error);
-    return jsonResponse([]);
+    return jsonResponse(storedRows.slice(0, 30));
   }
 }
 

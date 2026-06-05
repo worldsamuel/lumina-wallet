@@ -2408,6 +2408,11 @@ function enhancePrototypeHome() {
         var text = String(body || "").replace(/\\s+/g, " ").trim();
         return text.length > 92 ? text.slice(0, 92).replace(/[,.，。;；:]?\\s*$/, "") + "." : text;
       }
+      function annParagraphs(body){
+        var lines = String(body || "").split(/\\n+/).map(function(line){ return line.trim(); }).filter(Boolean);
+        if (!lines.length) return "";
+        return lines.map(function(line){ return '<p>' + annEscape(line) + '</p>'; }).join("");
+      }
       function closeLuminaAnnouncement(){
         var old = document.getElementById("luminaAnnouncementModal");
         if (old) { old.classList.remove("open"); setTimeout(function(){ old.remove(); }, 180); }
@@ -2420,20 +2425,33 @@ function enhancePrototypeHome() {
         var body = annPickText(item, "body");
         var time = String(item && item.time || "");
         var publisher = String(item && (item.author || item.createdBy || item.publisher) || "lumina-admin");
+        var imageUrl = String(item && item.imageUrl || "");
+        var pinned = !!(item && item.pinned);
+        var heroArt = imageUrl
+          ? '<img class="lumina-ann-hero-img" src="' + annEscape(imageUrl) + '" alt="">'
+          : '<div class="lumina-ann-default-art"><div class="lumina-ann-megaphone"><span></span></div></div>';
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
-            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><button type="button" class="lumina-ann-share" id="luminaAnnShare" aria-label="Share">' + annIcon("share") + '</button></div>' +
-            '<section class="lumina-ann-hero">' +
-              '<div class="lumina-ann-detail-kicker"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span></div>' +
-              '<h3>' + annEscape(title) + '</h3>' +
-              '<p class="lumina-ann-summary">' + annEscape(annSummary(body)) + '</p>' +
-              '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
+            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><strong>Announcement</strong><button type="button" class="lumina-ann-all" id="luminaAnnAll">All Announcements</button></div>' +
+            '<section class="lumina-ann-hero-card">' +
+              '<div class="lumina-ann-hero-copy"><h3>' + annEscape(title) + '</h3><p>' + annEscape(annSummary(body)) + '</p></div>' +
+              '<div class="lumina-ann-hero-art">' + heroArt + '</div>' +
+              '<div class="lumina-ann-dots"><i></i><i></i><i></i></div>' +
+            '</section>' +
+            '<section class="lumina-ann-article-card">' +
+              '<div class="lumina-ann-article-head">' +
+                (pinned ? '<span class="lumina-ann-pin">Pinned</span>' : '<span class="lumina-ann-pin ghost">' + annEscape(annTagText(tag)) + '</span>') +
+                '<h3>' + annEscape(title) + '</h3>' +
+                '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
+              '</div>' +
+              '<div class="lumina-ann-body">' + annParagraphs(body) + '</div>' +
+              '<div class="lumina-ann-help-row"><button type="button">' + annIcon("thumb") + '<span>Useful</span></button><button type="button">' + annIcon("thumbDown") + '<span>Not Useful</span></button></div>' +
             '</section>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
         if (back) back.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
-        var share = document.getElementById("luminaAnnShare");
-        if (share) share.onclick = function(event){ event.stopPropagation(); toast("Announcement copied"); };
+        var all = document.getElementById("luminaAnnAll");
+        if (all) all.onclick = function(event){ event.stopPropagation(); window.openAnnouncements(); };
       }
       window.openAnnouncements = function(){
         var list = annList().slice().sort(function(a, b){ return Number(b.id || 0) - Number(a.id || 0); });

@@ -98,18 +98,46 @@
   .lumina-ann-row .ann-title { margin-top: 14px; font-size: 18px; line-height: 1.25; }
   .lumina-ann-row .ann-body { display: -webkit-box; margin-top: 10px; color: #bfc5bf; font-size: 15px; line-height: 1.55; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 18px; padding-top: max(28px, calc(env(safe-area-inset-top) + 12px)); }
-  .lumina-ann-detail-top { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 4px 2px 8px; }
+  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 18px; padding-top: max(20px, calc(env(safe-area-inset-top) + 10px)); }
+  .lumina-ann-detail-top { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 0 0 10px; }
+  .lumina-ann-detail-top strong { color: var(--text); font-size: 18px; font-weight: 900; line-height: 1.1; text-align: center; }
+  .lumina-ann-all { min-height: 36px; border: 0; background: transparent; color: var(--green); font-size: 13px; font-weight: 800; white-space: nowrap; }
   .lumina-ann-back svg, .lumina-ann-share svg { width: 22px; height: 22px; }
   .lumina-ann-hero { position: relative; padding: 2px 0 2px; min-height: 0; overflow: visible; text-align: center; }
   .lumina-ann-orbit, .lumina-ann-shield, .lumina-ann-status-head, .lumina-ann-helpful { display: none !important; }
+  .lumina-ann-hero-card { position: relative; min-height: 178px; display: grid; grid-template-columns: minmax(0,1.05fr) minmax(112px,.95fr); align-items: center; gap: 10px; padding: 24px 18px 38px; border: 1px solid rgba(255,255,255,.1); border-radius: 22px; background: radial-gradient(110% 95% at 88% 42%, rgba(87,220,112,.2), transparent 56%), linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.015)); overflow: hidden; }
+  .lumina-ann-hero-card h3 { padding: 0; margin: 0; color: var(--text); font-size: 25px; line-height: 1.14; font-weight: 950; text-align: left; overflow-wrap: anywhere; }
+  .lumina-ann-hero-card p { margin: 12px 0 0; color: #c6cbc6; font-size: 14px; line-height: 1.45; font-weight: 650; text-align: left; overflow-wrap: anywhere; }
+  .lumina-ann-hero-art { min-width: 0; display: grid; place-items: center; }
+  .lumina-ann-hero-img { width: 100%; max-height: 138px; object-fit: contain; filter: drop-shadow(0 20px 34px rgba(74,222,128,.18)); }
+  .lumina-ann-default-art { width: 132px; height: 132px; border-radius: 50%; background: radial-gradient(circle, rgba(105,255,137,.28), rgba(105,255,137,.08) 44%, transparent 70%); display: grid; place-items: center; }
+  .lumina-ann-megaphone { position: relative; width: 74px; height: 54px; border: 3px solid rgba(105,255,137,.8); border-left-width: 14px; border-radius: 16px 28px 28px 16px; transform: rotate(-12deg); box-shadow: 0 0 30px rgba(74,222,128,.22); }
+  .lumina-ann-megaphone::before { content: ""; position: absolute; left: -25px; top: 15px; width: 18px; height: 22px; border-radius: 7px; background: rgba(105,255,137,.82); }
+  .lumina-ann-megaphone::after { content: ""; position: absolute; right: -15px; bottom: -24px; width: 14px; height: 32px; border-radius: 10px; background: rgba(105,255,137,.72); transform: rotate(28deg); }
+  .lumina-ann-dots { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 8px; }
+  .lumina-ann-dots i { width: 7px; height: 7px; border-radius: 999px; background: rgba(255,255,255,.18); }
+  .lumina-ann-dots i:first-child { width: 18px; background: var(--green); }
+  .lumina-ann-article-card { border: 1px solid rgba(255,255,255,.1); border-radius: 22px; background: linear-gradient(145deg, rgba(255,255,255,.045), rgba(255,255,255,.012)); overflow: hidden; }
+  .lumina-ann-article-head { padding: 22px 20px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .lumina-ann-pin { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border: 1px solid rgba(105,255,137,.48); border-radius: 8px; color: var(--green); font-size: 13px; font-weight: 850; }
+  .lumina-ann-pin.ghost { color: #c8cec8; border-color: rgba(255,255,255,.14); }
+  .lumina-ann-article-head h3 { padding: 14px 0 0; margin: 0; font-size: 24px; line-height: 1.18; text-align: left; overflow-wrap: anywhere; }
   .lumina-ann-detail-kicker { display: flex; justify-content: center; align-items: center; gap: 10px; width: 100%; color: var(--text-mute); font-size: 13px; font-weight: 800; }
   .lumina-ann-detail-kicker .ann-tag { display: inline-flex; width: fit-content; border-radius: 999px; padding: 7px 12px; border: 1px solid rgba(74,222,128,.2); }
   .lumina-ann-detail-sheet h3 { width: 100%; padding: 16px 0 0; margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: 0; overflow-wrap: anywhere; text-align: center; }
+  .lumina-ann-detail-sheet .lumina-ann-hero-card h3 { padding: 0; font-size: 25px; line-height: 1.14; text-align: left; }
+  .lumina-ann-detail-sheet .lumina-ann-article-head h3 { padding: 14px 0 0; font-size: 24px; line-height: 1.18; text-align: left; }
   .lumina-ann-summary { width: 100%; margin-top: 12px; color: #bfc5bf; font-size: 16px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; text-align: center; }
-  .lumina-ann-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px; margin-top: 18px; color: #9ca39c; font-size: 13px; font-weight: 700; }
+  .lumina-ann-meta { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 10px 14px; margin-top: 16px; color: #9ca39c; font-size: 13px; font-weight: 700; }
   .lumina-ann-meta span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
   .lumina-ann-meta svg { width: 16px; height: 16px; color: #b8beb8; }
+  .lumina-ann-body { padding: 22px 20px 24px; color: #d8ddd8; font-size: 16px; line-height: 1.7; overflow-wrap: anywhere; }
+  .lumina-ann-body p { margin: 0 0 16px; }
+  .lumina-ann-body p:last-child { margin-bottom: 0; }
+  .lumina-ann-help-row { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid rgba(255,255,255,.08); }
+  .lumina-ann-help-row button { min-height: 56px; border: 0; border-right: 1px solid rgba(255,255,255,.08); background: rgba(74,222,128,.035); color: var(--green); display: inline-flex; align-items: center; justify-content: center; gap: 9px; font-size: 15px; font-weight: 850; }
+  .lumina-ann-help-row button:last-child { border-right: 0; }
+  .lumina-ann-help-row svg { width: 22px; height: 22px; }
   .lumina-ann-status-card { margin-top: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; background: #101210; box-shadow: none; }
   .lumina-ann-status-head { display: grid; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 14px; padding: 24px; background: linear-gradient(140deg, rgba(74,222,128,.12), rgba(74,222,128,.02)); border-bottom: 1px solid rgba(255,255,255,.08); }
   .lumina-ann-status-icon { width: 58px; height: 58px; border-radius: 20px; display: grid; place-items: center; color: var(--green); background: rgba(74,222,128,.11); box-shadow: inset 0 0 0 1px rgba(74,222,128,.2); }
