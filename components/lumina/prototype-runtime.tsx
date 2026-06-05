@@ -2327,6 +2327,82 @@ function enhancePrototypeHome() {
         var old = document.getElementById("homeDebugBtn");
         if (old) old.remove();
       }
+      function annEscape(value){
+        return String(value == null ? "" : value).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
+      }
+      function annPickText(item, key){
+        var lang = typeof currentLang !== "undefined" ? currentLang : "en";
+        var map = item && item[key + "I18n"];
+        if (map && typeof map === "object") return map[lang] || map.en || map["zh-CN"] || Object.values(map)[0] || "";
+        return item && item[key] ? item[key] : "";
+      }
+      function annTagText(tag){
+        var lang = typeof currentLang !== "undefined" ? currentLang : "en";
+        var names = {
+          notice:{ en:"Notice", "zh-CN":"通知", "zh-TW":"通知", fr:"Avis", de:"Hinweis", es:"Aviso", ja:"通知" },
+          warning:{ en:"Warning", "zh-CN":"提醒", "zh-TW":"提醒", fr:"Alerte", de:"Warnung", es:"Aviso", ja:"警告" },
+          urgent:{ en:"Urgent", "zh-CN":"重要", "zh-TW":"重要", fr:"Urgent", de:"Dringend", es:"Urgente", ja:"重要" }
+        };
+        var item = names[tag] || names.notice;
+        return item[lang] || item.en;
+      }
+      function annList(){
+        try { return JSON.parse(localStorage.getItem("ww_announcements") || "[]"); } catch(e) { return []; }
+      }
+      function closeLuminaAnnouncement(){
+        var old = document.getElementById("luminaAnnouncementModal");
+        if (old) { old.classList.remove("open"); setTimeout(function(){ old.remove(); }, 180); }
+      }
+      function openAnnouncementDetail(item){
+        var old = document.getElementById("luminaAnnouncementModal");
+        if (!old) return;
+        var tag = String(item && item.tag || "notice");
+        old.innerHTML =
+          '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
+            '<button type="button" class="lumina-ann-close" id="luminaAnnBack" aria-label="Back">‹</button>' +
+            '<div class="modal-grip"></div>' +
+            '<span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span>' +
+            '<h3>' + annEscape(annPickText(item, "title")) + '</h3>' +
+            '<p class="lumina-ann-time">' + annEscape(item && item.time || "") + '</p>' +
+            '<div class="lumina-ann-content">' + annEscape(annPickText(item, "body")).replace(/\\n/g, "<br>") + '</div>' +
+          '</div>';
+        var back = document.getElementById("luminaAnnBack");
+        if (back) back.onclick = function(event){ event.stopPropagation(); window.openAnnouncements(); };
+      }
+      window.openAnnouncements = function(){
+        var list = annList().slice().sort(function(a, b){ return Number(b.id || 0) - Number(a.id || 0); });
+        var maxId = list.reduce(function(m, item){ return Math.max(m, Number(item && item.id || 0)); }, 0);
+        try { localStorage.setItem("ww_ann_last_read", String(maxId)); } catch(e) {}
+        if (typeof updateBellDot === "function") updateBellDot();
+        closeLuminaAnnouncement();
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open lumina-ann-mask";
+        modal.id = "luminaAnnouncementModal";
+        var rows = list.length ? list.map(function(item, index){
+          var tag = String(item && item.tag || "notice");
+          return '<button type="button" class="ann-item lumina-ann-row" data-ann-index="' + index + '">' +
+            '<span class="ann-top"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span><span class="ann-time">' + annEscape(item && item.time || "") + '</span></span>' +
+            '<strong class="ann-title">' + annEscape(annPickText(item, "title")) + '</strong>' +
+            '<span class="ann-body">' + annEscape(annPickText(item, "body")) + '</span>' +
+          '</button>';
+        }).join("") : '<div class="ann-empty">' + annEscape(typeof t === "function" ? t("noAnnouncements") : "No announcements") + '</div>';
+        modal.innerHTML =
+          '<div class="modal lumina-ann-sheet">' +
+            '<button type="button" class="lumina-ann-close" id="luminaAnnClose" aria-label="Close">×</button>' +
+            '<div class="modal-grip"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
+            '<div class="lumina-ann-list">' + rows + '</div>' +
+          '</div>';
+        document.body.appendChild(modal);
+        modal.onclick = function(event){ if (event.target === modal) closeLuminaAnnouncement(); };
+        var close = document.getElementById("luminaAnnClose");
+        if (close) close.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
+        modal.querySelectorAll(".lumina-ann-row").forEach(function(row){
+          row.addEventListener("click", function(event){
+            event.stopPropagation();
+            openAnnouncementDetail(list[Number(row.getAttribute("data-ann-index"))]);
+          });
+        });
+      };
       function fixSignedMoney(){
         window.__luminaApplyBalancePrivacy = function(){
           var isHidden = typeof hidden !== "undefined" && !!hidden;
@@ -3196,31 +3272,7 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        var view = document.getElementById("view-swap");
-        if (!view) return;
-        if (!window.__luminaSwapDebugObserver) {
-          window.__luminaSwapDebugObserver = new MutationObserver(function(){ ensureSwapDebugButton(); });
-          window.__luminaSwapDebugObserver.observe(view, { attributes:true, attributeFilter:["class"] });
-        }
-        if (!view.classList.contains("active")) {
-          if (existing) existing.remove();
-          return;
-        }
-        if (existing) return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "swapDebugBtn";
-        btn.className = "gear is-floating swap-debug-btn";
-        btn.textContent = "DEBUG";
-        btn.onclick = function(event){
-          if (event && event.preventDefault) event.preventDefault();
-          if (event && event.stopPropagation) event.stopPropagation();
-          if (!readSwapDebug()) {
-            setSwapDebug("manual:open", { hint:"Select the token as Sell, quote it, then try Confirm swap. Failed sells will be stored here." });
-          }
-          openSwapDebug();
-        };
-        view.appendChild(btn);
+        if (existing) existing.remove();
       }
       function formatMaxAmount(value){
         var n = Number(value);

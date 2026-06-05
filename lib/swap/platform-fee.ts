@@ -1,6 +1,9 @@
 import { formatUnits, isAddress, type Address } from "viem";
 import type { SwapToken } from "./tokens";
 
+const DEFAULT_SWAP_FEE_BPS = 40;
+const DEFAULT_SWAP_FEE_RECIPIENT = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
+
 export type SwapPlatformFeeConfig = {
   recipient: Address;
   percent: string;
@@ -18,19 +21,12 @@ export type SwapPlatformFeePayload = {
 };
 
 export function getSwapPlatformFeeConfig(): SwapPlatformFeeConfig | null {
-  const enabled = process.env.NEXT_PUBLIC_SWAP_FEE_ENABLED === "true";
-  if (!enabled) return null;
-
-  const bps = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || "0");
-  if (!Number.isInteger(bps) || bps <= 0) {
-    throw new Error("NEXT_PUBLIC_SWAP_FEE_ENABLED is true but NEXT_PUBLIC_SWAP_FEE_BPS is not a positive integer.");
-  }
+  const bps = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || DEFAULT_SWAP_FEE_BPS);
+  if (!Number.isInteger(bps) || bps <= 0) return null;
   if (bps >= 10_000) throw new Error("Configured swap fee is too high.");
 
-  const recipient = String(process.env.NEXT_PUBLIC_SWAP_FEE_RECIPIENT ?? "").trim();
-  if (!isAddress(recipient)) {
-    throw new Error("NEXT_PUBLIC_SWAP_FEE_ENABLED is true but NEXT_PUBLIC_SWAP_FEE_RECIPIENT is invalid.");
-  }
+  const recipient = String(process.env.NEXT_PUBLIC_SWAP_FEE_RECIPIENT ?? DEFAULT_SWAP_FEE_RECIPIENT).trim();
+  if (!isAddress(recipient)) return null;
 
   return {
     recipient: recipient as Address,

@@ -155,6 +155,8 @@ export function useBackendConfigSync(enabled: boolean) {
             tag: item.tag,
             title: pickText(item.titleI18n, lang),
             body: pickText(item.bodyI18n, lang),
+            titleI18n: item.titleI18n,
+            bodyI18n: item.bodyI18n,
             time: formatRelativeTime(item.publishedAt),
           })),
         ),
