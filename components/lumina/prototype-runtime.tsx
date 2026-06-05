@@ -2359,15 +2359,13 @@ function enhancePrototypeHome() {
         var tag = String(item && item.tag || "notice");
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
-            '<button type="button" class="lumina-ann-close" id="luminaAnnBack" aria-label="Back">‹</button>' +
-            '<div class="modal-grip"></div>' +
-            '<span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span>' +
+            '<button type="button" class="lumina-ann-close" id="luminaAnnBack" aria-label="Close">×</button>' +
+            '<div class="lumina-ann-detail-kicker"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span><span>' + annEscape(item && item.time || "") + '</span></div>' +
             '<h3>' + annEscape(annPickText(item, "title")) + '</h3>' +
-            '<p class="lumina-ann-time">' + annEscape(item && item.time || "") + '</p>' +
             '<div class="lumina-ann-content">' + annEscape(annPickText(item, "body")).replace(/\\n/g, "<br>") + '</div>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
-        if (back) back.onclick = function(event){ event.stopPropagation(); window.openAnnouncements(); };
+        if (back) back.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
       }
       window.openAnnouncements = function(){
         var list = annList().slice().sort(function(a, b){ return Number(b.id || 0) - Number(a.id || 0); });

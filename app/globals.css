@@ -89,12 +89,12 @@
   .lumina-ann-row:last-child { border-bottom: 0; }
   .lumina-ann-row .ann-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { padding: 10px var(--pad-screen) 22px; width: min(100%, 360px); }
-  .lumina-ann-detail-sheet .lumina-ann-close { left: 12px; right: auto; font-size: 34px; }
-  .lumina-ann-detail-sheet .ann-tag { display: inline-flex; width: fit-content; margin-top: 2px; }
-  .lumina-ann-detail-sheet h3 { padding: 14px 0 0; font-size: 24px; line-height: 1.18; }
-  .lumina-ann-time { margin-top: 8px; color: var(--text-mute); font-size: 13px; }
-  .lumina-ann-content { margin-top: 18px; color: #cbd0cb; font-size: 15px; line-height: 1.72; overflow-wrap: anywhere; }
+  .lumina-ann-detail-sheet { width: min(100%, 360px); padding: 22px; border-radius: 28px; overflow: visible; }
+  .lumina-ann-detail-sheet .lumina-ann-close { top: 16px; right: 16px; width: 38px; height: 38px; font-size: 26px; }
+  .lumina-ann-detail-kicker { min-height: 38px; padding-right: 48px; display: flex; align-items: center; gap: 10px; color: var(--text-mute); font-size: 13px; font-weight: 750; }
+  .lumina-ann-detail-kicker .ann-tag { display: inline-flex; width: fit-content; }
+  .lumina-ann-detail-sheet h3 { padding: 18px 0 0; margin: 0; font-size: 25px; line-height: 1.16; letter-spacing: 0; }
+  .lumina-ann-content { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: #cbd0cb; font-size: 15px; line-height: 1.72; overflow-wrap: anywhere; }
   /* Help / About 文章样式 */
   .article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; }
   .article h2 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }
