@@ -2241,6 +2241,80 @@ function enhancePrototypeHome() {
         if (name === "search") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
         return "";
       }
+      function homeDebugRows(){
+        return (assets || []).filter(function(asset){ return showOnHome(asset); }).map(function(asset){
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          var row = document.querySelector('#view-home #assetList .home-v2-asset[data-home-symbol="' + sym + '"]');
+          var rect = row ? row.getBoundingClientRect() : null;
+          return {
+            sym: sym,
+            amount: asset && asset.amt,
+            usdNum: asset && asset.usdNum,
+            hasRow: !!row,
+            rowText: row ? row.textContent : "",
+            rect: rect ? { x:Math.round(rect.x), y:Math.round(rect.y), w:Math.round(rect.width), h:Math.round(rect.height) } : null
+          };
+        });
+      }
+      function setHomeDebug(stage, detail){
+        var data = {
+          at: new Date().toISOString(),
+          stage: stage,
+          activeViews: Array.from(document.querySelectorAll(".view.active")).map(function(view){ return view.id; }),
+          currentDetailIdx: typeof currentDetailIdx !== "undefined" ? currentDetailIdx : null,
+          detailTitle: document.getElementById("detTitle") ? document.getElementById("detTitle").textContent : "",
+          tapStart: window.__luminaHomeTapStart || null,
+          tapMoved: !!window.__luminaHomeTapMoved,
+          rows: homeDebugRows(),
+          detail: detail || {}
+        };
+        window.__luminaHomeDebug = data;
+        try { localStorage.setItem("lumina_home_debug_v1", JSON.stringify(data)); } catch(e) {}
+      }
+      function readHomeDebug(){
+        if (window.__luminaHomeDebug) return window.__luminaHomeDebug;
+        try { return JSON.parse(localStorage.getItem("lumina_home_debug_v1") || "null"); } catch(e) { return null; }
+      }
+      function openHomeDebug(){
+        if (!readHomeDebug()) setHomeDebug("manual:open", { note:"Tap WLD or USDC, then open DEBUG again to inspect the latest click path." });
+        var old = document.getElementById("homeDebugModal");
+        if (old) old.remove();
+        var data = readHomeDebug();
+        var json = data ? JSON.stringify(data, null, 2) : "No home debug data yet.";
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open";
+        modal.id = "homeDebugModal";
+        modal.innerHTML =
+          '<div class="modal send-confirm-sheet swap-debug-sheet">' +
+            '<button type="button" class="swap-debug-close" id="homeDebugClose" aria-label="Close">×</button>' +
+            '<div class="modal-grip"></div><h3>Home debug</h3>' +
+            '<pre class="swap-debug-pre">' + String(json).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; }) + '</pre>' +
+            '<button type="button" class="btn-primary swap-debug-copy" id="homeDebugCopy">Copy debug</button>' +
+          '</div>';
+        document.body.appendChild(modal);
+        function close(){ modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); }
+        modal.onclick = function(event){ if (event.target === modal) close(); };
+        document.getElementById("homeDebugClose").onclick = close;
+        document.getElementById("homeDebugCopy").onclick = async function(){
+          try { await navigator.clipboard.writeText(json); toast("Debug copied"); } catch(e) {}
+        };
+      }
+      function ensureHomeDebugButton(){
+        if (document.getElementById("homeDebugBtn")) return;
+        var home = document.getElementById("view-home");
+        if (!home) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "homeDebugBtn";
+        btn.className = "gear is-floating home-debug-btn";
+        btn.textContent = "DEBUG";
+        btn.onclick = function(event){
+          if (event && event.preventDefault) event.preventDefault();
+          if (event && event.stopPropagation) event.stopPropagation();
+          openHomeDebug();
+        };
+        home.appendChild(btn);
+      }
       function fixSignedMoney(){
         window.__luminaApplyBalancePrivacy = function(){
           var isHidden = typeof hidden !== "undefined" && !!hidden;
@@ -2367,6 +2441,7 @@ function enhancePrototypeHome() {
       }
       window.openHomeAsset = function(sym){
         sym = String(sym || "").toUpperCase();
+        setHomeDebug("openHomeAsset:start", { sym:sym });
         var idx = (assets || []).findIndex(function(a){ return String(a && a.sym || "").toUpperCase() === sym; });
         if (idx < 0 && fixedHomeTokens.has(sym)) {
           var meta = fixedHomeTokenMeta(sym);
@@ -2384,7 +2459,12 @@ function enhancePrototypeHome() {
             poolAddress: meta.poolAddress || null
           });
         }
-        if (idx >= 0) openDetail(idx);
+        if (idx >= 0) {
+          setHomeDebug("openHomeAsset:openDetail", { sym:sym, index:idx, asset:assets && assets[idx] });
+          openDetail(idx);
+        } else {
+          setHomeDebug("openHomeAsset:notFound", { sym:sym });
+        }
       };
       window.__luminaOpenHomeRow = function(event, row){
         if (event && event.__luminaHomeHandled) return;
@@ -2396,11 +2476,15 @@ function enhancePrototypeHome() {
           symbol = symEl ? String(symEl.textContent || "").trim().toUpperCase() : "";
         }
         if (symbol) {
+          setHomeDebug("row:activate", { symbol:symbol, index:index, imported:row.getAttribute("data-home-imported"), target:event && event.target && event.target.className });
           if (row.getAttribute("data-home-imported") === "1") openImportedTokenHome(symbol);
           else openHomeAsset(symbol);
           return;
         }
-        if (Number.isInteger(index) && assets && assets[index]) openDetail(index);
+        if (Number.isInteger(index) && assets && assets[index]) {
+          setHomeDebug("row:activate-index", { index:index, asset:assets[index] });
+          openDetail(index);
+        }
       };
       function isCleanHomeTap(event){
         var start = window.__luminaHomeTapStart || null;
@@ -2529,22 +2613,31 @@ function enhancePrototypeHome() {
           var touch = event.touches && event.touches[0];
           if (!touch) return;
           window.__luminaHomeTapStart = { x: touch.clientX, y: touch.clientY };
+          var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
+          if (row && list.contains(row)) setHomeDebug("touchstart", { symbol:row.getAttribute("data-home-symbol"), x:touch.clientX, y:touch.clientY });
         };
         list.ontouchmove = function(event){
-          if (!isCleanHomeTap(event)) window.__luminaHomeTapMoved = true;
+          if (!isCleanHomeTap(event)) {
+            window.__luminaHomeTapMoved = true;
+            var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
+            if (row && list.contains(row)) setHomeDebug("touchmove:block-click", { symbol:row.getAttribute("data-home-symbol") });
+          }
         };
         list.onclick = function(event){
           var row = event.target && event.target.closest ? event.target.closest(".home-v2-asset") : null;
           if (!row || !list.contains(row)) return;
           if (window.__luminaHomeTapMoved || !isCleanHomeTap(event)) {
+            setHomeDebug("click:blocked-by-move", { symbol:row.getAttribute("data-home-symbol"), tapMoved:!!window.__luminaHomeTapMoved });
             window.__luminaHomeTapMoved = false;
             return;
           }
           window.__luminaHomeTapMoved = false;
+          setHomeDebug("click:open-row", { symbol:row.getAttribute("data-home-symbol"), target:event && event.target && event.target.className });
           window.__luminaOpenHomeRow(event, row);
         };
       };
       ensureHomeShell();
+      ensureHomeDebugButton();
       renderAssets();
     })();
   `;
