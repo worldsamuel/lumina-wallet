@@ -63,6 +63,7 @@ declare global {
     __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
+    __luminaSwapDebugObserver?: MutationObserver;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -3195,9 +3196,17 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) return;
         var view = document.getElementById("view-swap");
         if (!view) return;
+        if (!window.__luminaSwapDebugObserver) {
+          window.__luminaSwapDebugObserver = new MutationObserver(function(){ ensureSwapDebugButton(); });
+          window.__luminaSwapDebugObserver.observe(view, { attributes:true, attributeFilter:["class"] });
+        }
+        if (!view.classList.contains("active")) {
+          if (existing) existing.remove();
+          return;
+        }
+        if (existing) return;
         var btn = document.createElement("button");
         btn.type = "button";
         btn.id = "swapDebugBtn";
