@@ -1,4 +1,5 @@
 import { formatUnits, parseAbi, parseAbiItem, type Address } from "viem";
+import { getStoredActivities } from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
 
@@ -88,7 +89,31 @@ export type AdminActivityRow = {
 };
 
 export async function getRecentUserActivity(addresses: Address[], maxRows = 80) {
-  if (!addresses.length) return [];
+  const stored = await getStoredActivities(maxRows).catch((error) => {
+    console.error("Failed to load stored admin activity", error);
+    return [];
+  });
+  const storedRows: AdminActivityRow[] = stored.map((row) => ({
+    id: `stored-${row.id}`,
+    cat: row.type,
+    type: row.type,
+    typeT: row.type === "swap" ? "Swap" : row.type === "earn" ? "Earn" : row.type === "send" ? "Send" : row.type,
+    user: row.address ? shortAddress(row.address) : "Unknown",
+    amount: row.amount || "—",
+    hash: row.hash,
+    time: formatTxTime(row.createdAt.toISOString()),
+    status: row.status,
+    statusT: row.status === "completed" ? "Completed" : row.status,
+    createdAt: row.createdAt.toISOString(),
+    blockNumber: 0,
+    logIndex: row.id,
+    direction: row.type === "send" ? "out" : "in",
+    tokenSymbol: "",
+    tokenAmount: 0,
+    feeNative: 0,
+  }));
+
+  if (!addresses.length) return storedRows.slice(0, maxRows);
 
   const latest = await publicClient.getBlockNumber();
   const fromBlock = latest > 200_000n ? latest - 200_000n : 0n;
@@ -159,6 +184,7 @@ export async function getRecentUserActivity(addresses: Address[], maxRows = 80) 
     }),
   );
 
-  rows.sort((a, b) => b.blockNumber - a.blockNumber || b.logIndex - a.logIndex);
-  return rows.slice(0, maxRows);
+  const merged = [...storedRows, ...rows];
+  merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() || b.logIndex - a.logIndex);
+  return merged.slice(0, maxRows);
 }

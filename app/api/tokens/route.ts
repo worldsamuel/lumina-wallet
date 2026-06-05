@@ -24,9 +24,10 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Failed to load public tokens, using core fallback", error);
   }
-  const configuredBySymbol = new Map(tokens.map((token) => [token.symbol.toUpperCase(), token]));
+  const allConfigured = await db.token.findMany().catch(() => tokens);
+  const configuredBySymbol = new Map(allConfigured.map((token) => [token.symbol.toUpperCase(), token]));
   const configuredByAddress = new Set(
-    tokens
+    allConfigured
       .map((token) => token.contractAddr?.toLowerCase())
       .filter((address): address is string => Boolean(address)),
   );

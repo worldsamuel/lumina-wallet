@@ -55,12 +55,20 @@ export async function ensureCoreTokens() {
       const nextContractAddr = shouldRefreshCoreContract(token.symbol, existingBySymbol.contractAddr, contractAddr)
         ? contractAddr
         : existingBySymbol.contractAddr;
+      const updateData = normalizeTokenFields({
+        symbol: token.symbol,
+        name: token.name,
+        contractAddr: nextContractAddr,
+        poolAddress: coreTokenPoolAddress(token.symbol),
+        decimals: token.decimals,
+        tier: existingBySymbol.tier || "core",
+      });
       try {
-        await db.token.update({ where: { id: existingBySymbol.id }, data: { ...data, contractAddr: nextContractAddr } });
+        await db.token.update({ where: { id: existingBySymbol.id }, data: updateData });
       } catch {
         await db.token.update({
           where: { id: existingBySymbol.id },
-          data: normalizeTokenFields({ ...data, contractAddr: existingBySymbol.contractAddr }),
+          data: normalizeTokenFields({ ...updateData, contractAddr: existingBySymbol.contractAddr }),
         });
       }
       continue;
@@ -68,7 +76,17 @@ export async function ensureCoreTokens() {
 
     const existingByContract = contractAddr ? await db.token.findUnique({ where: { contractAddr } }) : null;
     if (existingByContract) {
-      await db.token.update({ where: { id: existingByContract.id }, data });
+      await db.token.update({
+        where: { id: existingByContract.id },
+        data: normalizeTokenFields({
+          symbol: token.symbol,
+          name: token.name,
+          contractAddr,
+          poolAddress: coreTokenPoolAddress(token.symbol),
+          decimals: token.decimals,
+          tier: existingByContract.tier || "core",
+        }),
+      });
       continue;
     }
 

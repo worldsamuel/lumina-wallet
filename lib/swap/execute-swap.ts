@@ -242,6 +242,18 @@ async function submitBuiltSwap(
       result,
     });
   }
+  void recordClientActivity({
+    type: "swap",
+    address: params.userAddress,
+    hash: userOpHash,
+    amount: `${params.fromAmountHuman} ${quote.tokens.from.symbol} -> ${executableQuote.amountOut} ${quote.tokens.to.symbol}`,
+    metadata: {
+      fromToken: quote.tokens.from.symbol,
+      toToken: quote.tokens.to.symbol,
+      fromAmount: params.fromAmountHuman,
+      expectedOut: executableQuote.amountOut,
+    },
+  });
 
   return {
     userOpHash,
@@ -250,6 +262,20 @@ async function submitBuiltSwap(
     minOut: formatUnits(applySlippage(expectedOut, params.slippageBps), executableQuote.tokens.to.decimals),
     quote: executableQuote,
   };
+}
+
+function recordClientActivity(input: {
+  type: string;
+  address: string;
+  hash: string;
+  amount: string;
+  metadata?: unknown;
+}) {
+  return fetch("/api/activity", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...input, status: "completed" }),
+  }).catch((error) => console.warn("[ACTIVITY] Failed to record swap", error));
 }
 
 function decodeUniversalRouterExecute(data: `0x${string}`) {

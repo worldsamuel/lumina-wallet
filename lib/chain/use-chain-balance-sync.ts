@@ -169,7 +169,8 @@ function syncBalancesToPrototype(
     availMap = ${JSON.stringify(availableMap)};
     prices = ${JSON.stringify(priceMap)};
     marketPrices = ${JSON.stringify(marketPriceMap)};
-    totalUsdNum = ${JSON.stringify(totalUsd)};
+    window.__luminaWalletBaseTotalUsd = ${JSON.stringify(totalUsd)};
+    totalUsdNum = window.__luminaWalletBaseTotalUsd + (Number(window.__luminaEarnTotalUsd || 0) || 0);
     change24hUsdNum = ${JSON.stringify(changeUsd)};
     tokenChanges24h = ${JSON.stringify(changeMap)};
     tokenMarketCaps = ${JSON.stringify(marketCapMap)};

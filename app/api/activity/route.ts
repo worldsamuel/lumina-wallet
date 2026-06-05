@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, parseAbi, parseAbiItem, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { recordActivity } from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
 
@@ -111,6 +112,38 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("Failed to fetch real activity", error);
     return jsonResponse([]);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  if (!rateLimit(req, "public:activity-write", 60).ok) {
+    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+  }
+
+  const body = (await req.json().catch(() => null)) as {
+    type?: string;
+    address?: string;
+    amount?: string;
+    hash?: string;
+    status?: string;
+    metadata?: unknown;
+  } | null;
+  const hash = String(body?.hash || "").trim();
+  if (!/^0x[a-fA-F0-9]{16,}$/.test(hash) && !hash.startsWith("0xmock")) {
+    return jsonResponse({ error: "Invalid transaction hash." }, { status: 400 });
+  }
+
+  const address = body?.address && isAddress(body.address) ? body.address : null;
+  const type = String(body?.type || "transaction").slice(0, 40);
+  const status = String(body?.status || "completed").slice(0, 40);
+  const amount = body?.amount ? String(body.amount).slice(0, 140) : null;
+
+  try {
+    await recordActivity({ type, address, amount, hash, status, metadata: body?.metadata ?? {} });
+    return jsonResponse({ ok: true });
+  } catch (error) {
+    console.error("Failed to record activity", error);
+    return jsonResponse({ error: "Failed to record activity." }, { status: 500 });
   }
 }
 

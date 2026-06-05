@@ -56,7 +56,10 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const current = await db.token.findFirst({ where: { OR: [{ id: params.id }, { symbol: params.id.toUpperCase() }] } });
   if (!current) return jsonResponse({ error: "Token not found." }, { status: 404 });
-  await db.token.delete({ where: { id: current.id } });
+  await db.token.update({
+    where: { id: current.id },
+    data: { status: "disabled", canTransfer: false, canSwap: false, onTopRanking: false },
+  });
   await auditLog(admin.id, "delete_token", params.id);
   return jsonResponse({ ok: true });
 }

@@ -57,6 +57,9 @@ declare global {
     __luminaRefreshActivity?: () => void;
     __luminaRefreshImportedTokens?: () => void;
     __luminaApplyBalancePrivacy?: () => void;
+    __luminaWalletBaseTotalUsd?: number;
+    __luminaEarnTotalUsd?: number;
+    __luminaRecomputeTotalWithEarn?: () => void;
     __luminaRenderLightweightChart?: (container: HTMLElement, candles: MarketChartCandle[], range?: string) => boolean;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
@@ -618,6 +621,18 @@ function exposeMorphoTransactions() {
     if (!userOpHash) {
       throw new Error(`No userOpHash returned: ${JSON.stringify(result)}`);
     }
+    void fetch("/api/activity", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        type: "earn",
+        address: window.__luminaUserAddress || null,
+        hash: userOpHash,
+        amount: action,
+        status: "completed",
+        metadata: { action },
+      }),
+    }).catch((error) => console.warn("[ACTIVITY] Failed to record earn", error));
     window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash, action } }));
     return result;
   };
@@ -1513,11 +1528,18 @@ function enhancePrototypeEarn() {
       }
       async function loadMorphoPositions(){
         var address = window.__luminaUserAddress || "";
-        if (!address) { morphoPositions = []; return; }
+        if (!address) {
+          morphoPositions = [];
+          window.__luminaEarnTotalUsd = 0;
+          if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
+          return;
+        }
         var res = await fetch("/api/morpho/position/" + address, { cache: "no-store" });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
         morphoPositions = Array.isArray(data.positions) ? data.positions : [];
+        window.__luminaEarnTotalUsd = earnPositionsUsdValue();
+        if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
         console.log("[EARN] Positions address:", address);
         console.log("[EARN] Positions response:", data);
       }
@@ -2380,7 +2402,6 @@ function enhancePrototypeHome() {
         var body = annPickText(item, "body");
         var time = String(item && item.time || "");
         var publisher = String(item && (item.author || item.createdBy || item.publisher) || "lumina-admin");
-        var annId = item && item.id ? "#ANN-" + String(item.id).padStart(6, "0") : "#ANN";
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
             '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><button type="button" class="lumina-ann-share" id="luminaAnnShare" aria-label="Share">' + annIcon("share") + '</button></div>' +
@@ -2389,17 +2410,6 @@ function enhancePrototypeHome() {
               '<h3>' + annEscape(title) + '</h3>' +
               '<p class="lumina-ann-summary">' + annEscape(annSummary(body)) + '</p>' +
               '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
-            '</section>' +
-            '<section class="lumina-ann-status-card">' +
-              '<div class="lumina-ann-content"><div class="lumina-ann-content-title">What happened</div>' + annEscape(body).replace(/\\n/g, "<br>") +
-                '<div class="lumina-ann-facts">' +
-                  '<div class="lumina-ann-fact">' + annIcon("box") + '<span>Announcement ID</span><b>' + annEscape(annId) + '</b></div>' +
-                  '<div class="lumina-ann-fact">' + annIcon("user") + '<span>Published by</span><b>' + annEscape(publisher) + '</b></div>' +
-                  '<div class="lumina-ann-fact">' + annIcon("clock") + '<span>Published at</span><b>' + annEscape(time) + '</b></div>' +
-                  '<div class="lumina-ann-fact">' + annIcon("tag") + '<span>Category</span><b>' + annEscape(annTagText(tag)) + '</b></div>' +
-                  '<div class="lumina-ann-fact">' + annIcon("world") + '<span>Network</span><b>World Chain</b></div>' +
-                '</div>' +
-              '</div>' +
             '</section>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
@@ -2686,6 +2696,26 @@ function enhancePrototypeHome() {
         if (amount > 0 && price > 0) return amount * price;
         return Number(asset && asset.usdNum || 0);
       }
+      function earnPositionsUsdValue(){
+        return (morphoPositions || []).filter(nonZeroPosition).reduce(function(sum, pos){
+          var sym = pos.asset && pos.asset.symbol ? String(pos.asset.symbol).toUpperCase() : "";
+          var vault = morphoVaults.find(function(v){
+            return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
+          });
+          if (!sym && vault && vault.asset) sym = String(vault.asset.symbol || "").toUpperCase();
+          var price = priceForHome(sym);
+          var amount = Number(pos.assetsFormatted || 0);
+          return sum + (Number.isFinite(amount) && price > 0 ? amount * price : 0);
+        }, 0);
+      }
+      window.__luminaRecomputeTotalWithEarn = function(){
+        var base = Number(window.__luminaWalletBaseTotalUsd || 0);
+        var earn = Number(window.__luminaEarnTotalUsd || 0);
+        totalUsdNum = base + (Number.isFinite(earn) ? earn : 0);
+        var balEl = document.getElementById("balAmt");
+        if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);
+        if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
+      };
       function refreshHomeTotalFromAssets(homeAssets){
         var rows = Array.isArray(homeAssets) ? homeAssets : (assets || []).filter(showOnHome);
         var total = rows.reduce(function(sum, asset){ return sum + assetUsdValue(asset); }, 0);
@@ -2696,7 +2726,9 @@ function enhancePrototypeHome() {
           try { pct = Number(tokenChanges24h && tokenChanges24h[sym]); } catch(e) { pct = 0; }
           return sum + (Number.isFinite(pct) ? value * pct / 100 : 0);
         }, 0);
-        totalUsdNum = total;
+        window.__luminaWalletBaseTotalUsd = total;
+        window.__luminaEarnTotalUsd = earnPositionsUsdValue();
+        totalUsdNum = total + window.__luminaEarnTotalUsd;
         change24hUsdNum = change;
         var balEl = document.getElementById("balAmt");
         if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);

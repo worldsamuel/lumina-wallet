@@ -292,12 +292,22 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
       return { status: "failed", error: payload.error_code };
     }
 
+    const txHash = payToken
+      ? extractPayTransactionId(payload)
+      : ((payload as MiniKitTransactionResult).transaction_id ??
+        (payload as MiniKitTransactionResult).userOpHash);
+    if (txHash) {
+      void recordClientActivity({
+        type: "send",
+        address: params.userAddress,
+        hash: txHash,
+        amount: `${params.amountHuman} ${params.tokenSymbol}`,
+        metadata: { tokenSymbol: params.tokenSymbol, recipient: params.recipient },
+      });
+    }
     return {
       status: "success",
-      txHash: payToken
-        ? extractPayTransactionId(payload)
-        : ((payload as MiniKitTransactionResult).transaction_id ??
-          (payload as MiniKitTransactionResult).userOpHash),
+      txHash,
     };
   } catch (error) {
     const err = error as {
@@ -320,4 +330,18 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     if (code === "user_rejected") return { status: "user_rejected" };
     return { status: "failed", error: code };
   }
+}
+
+function recordClientActivity(input: {
+  type: string;
+  address?: string;
+  hash: string;
+  amount: string;
+  metadata?: unknown;
+}) {
+  return fetch("/api/activity", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...input, status: "completed" }),
+  }).catch((error) => console.warn("[ACTIVITY] Failed to record send", error));
 }

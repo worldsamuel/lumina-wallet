@@ -98,16 +98,16 @@
   .lumina-ann-row .ann-title { margin-top: 14px; font-size: 18px; line-height: 1.25; }
   .lumina-ann-row .ann-body { display: -webkit-box; margin-top: 10px; color: #bfc5bf; font-size: 15px; line-height: 1.55; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 20px; }
-  .lumina-ann-detail-top { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 18px; padding-top: max(28px, calc(env(safe-area-inset-top) + 12px)); }
+  .lumina-ann-detail-top { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 4px 2px 8px; }
   .lumina-ann-back svg, .lumina-ann-share svg { width: 22px; height: 22px; }
-  .lumina-ann-hero { position: relative; padding: 8px 0 2px; min-height: 0; overflow: visible; }
+  .lumina-ann-hero { position: relative; padding: 2px 0 2px; min-height: 0; overflow: visible; text-align: center; }
   .lumina-ann-orbit, .lumina-ann-shield, .lumina-ann-status-head, .lumina-ann-helpful { display: none !important; }
-  .lumina-ann-detail-kicker { display: inline-flex; align-items: center; gap: 10px; color: var(--text-mute); font-size: 13px; font-weight: 800; }
+  .lumina-ann-detail-kicker { display: flex; justify-content: center; align-items: center; gap: 10px; width: 100%; color: var(--text-mute); font-size: 13px; font-weight: 800; }
   .lumina-ann-detail-kicker .ann-tag { display: inline-flex; width: fit-content; border-radius: 999px; padding: 7px 12px; border: 1px solid rgba(74,222,128,.2); }
-  .lumina-ann-detail-sheet h3 { width: 100%; padding: 16px 0 0; margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: 0; overflow-wrap: anywhere; }
-  .lumina-ann-summary { width: 100%; margin-top: 12px; color: #bfc5bf; font-size: 16px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; }
-  .lumina-ann-meta { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 18px; color: #9ca39c; font-size: 13px; font-weight: 700; }
+  .lumina-ann-detail-sheet h3 { width: 100%; padding: 16px 0 0; margin: 0; font-size: 30px; line-height: 1.15; letter-spacing: 0; overflow-wrap: anywhere; text-align: center; }
+  .lumina-ann-summary { width: 100%; margin-top: 12px; color: #bfc5bf; font-size: 16px; line-height: 1.5; font-weight: 600; overflow-wrap: anywhere; text-align: center; }
+  .lumina-ann-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 14px; margin-top: 18px; color: #9ca39c; font-size: 13px; font-weight: 700; }
   .lumina-ann-meta span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
   .lumina-ann-meta svg { width: 16px; height: 16px; color: #b8beb8; }
   .lumina-ann-status-card { margin-top: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; background: #101210; box-shadow: none; }

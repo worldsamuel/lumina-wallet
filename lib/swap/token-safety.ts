@@ -157,6 +157,7 @@ export async function checkSwapTokenSafety(input: string): Promise<TokenSafetyRe
 }
 
 export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | null> {
+  if (await isAdminSwapDisabled(value)) return null;
   const core = resolveCoreSwapToken(value);
   if (core) return core;
   const text = String(value ?? "").trim();
@@ -174,6 +175,23 @@ export async function resolveSafeSwapToken(value: unknown): Promise<SwapToken | 
     trust: report.status === "verified" ? "audited" : "community",
     safety: report,
   };
+}
+
+async function isAdminSwapDisabled(value: unknown) {
+  const needle = String(value ?? "").trim();
+  if (!needle) return false;
+  try {
+    const match = await db.token.findFirst({
+      where: isAddress(needle)
+        ? { contractAddr: { equals: needle, mode: "insensitive" as const } }
+        : { symbol: { equals: needle, mode: "insensitive" as const } },
+      select: { status: true, canSwap: true },
+    });
+    return !!match && (match.status === "disabled" || match.canSwap === false);
+  } catch (error) {
+    console.error("Failed to read admin swap gate", error);
+    return false;
+  }
 }
 
 async function resolveMarketSwapToken(value: string): Promise<SwapToken | null> {
