@@ -269,10 +269,11 @@ function renderBalanceSkeleton() {
 }
 
 function renderBalanceError() {
-  const list = document.getElementById("assetList");
-  if (list) {
-    list.innerHTML = '<div class="article-empty">无法读取链上数据,请稍后重试</div>';
-  }
+  runInPrototypeScope(`
+    (function(){
+      if (typeof toast === "function") toast("Unable to read on-chain data. Please try again.");
+    })();
+  `);
 }
 
 function formatTokenAmount(value: string) {

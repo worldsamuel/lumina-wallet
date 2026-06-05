@@ -80,8 +80,8 @@
   .ann-item .ann-title { color: var(--text); font-weight: 800; font-size: 16px; margin-top: 11px; }
   .ann-item .ann-body { color: #c6cbc6; font-size: 15px; line-height: 1.65; margin-top: 8px; }
   .ann-empty { padding: 40px var(--pad-screen); text-align: center; color: #b9beb9; font-size: 14px; }
-  .lumina-ann-mask { align-items: flex-end; padding: 0 12px max(10px, env(safe-area-inset-bottom)); }
-  .lumina-ann-sheet { width: min(100%, 390px); max-height: min(62dvh, 560px); padding: 10px 0 14px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.12); background: #101210; overflow: auto; position: relative; }
+  .lumina-ann-mask { align-items: center; padding: max(18px, env(safe-area-inset-top)) 22px max(18px, env(safe-area-inset-bottom)); }
+  .lumina-ann-sheet { width: min(100%, 360px); max-height: min(70dvh, 560px); padding: 10px 0 14px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.12); background: #101210; overflow: auto; position: relative; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
   .lumina-ann-sheet h3 { padding: 0 54px 12px var(--pad-screen); font-size: 24px; font-weight: 950; }
   .lumina-ann-close { position: absolute; top: 10px; right: 12px; z-index: 2; width: 36px; height: 36px; border: 0; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--text); font-size: 24px; line-height: 1; cursor: pointer; }
   .lumina-ann-list { display: grid; gap: 0; }
@@ -89,7 +89,7 @@
   .lumina-ann-row:last-child { border-bottom: 0; }
   .lumina-ann-row .ann-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { padding: 10px var(--pad-screen) 22px; }
+  .lumina-ann-detail-sheet { padding: 10px var(--pad-screen) 22px; width: min(100%, 360px); }
   .lumina-ann-detail-sheet .lumina-ann-close { left: 12px; right: auto; font-size: 34px; }
   .lumina-ann-detail-sheet .ann-tag { display: inline-flex; width: fit-content; margin-top: 2px; }
   .lumina-ann-detail-sheet h3 { padding: 14px 0 0; font-size: 24px; line-height: 1.18; }
