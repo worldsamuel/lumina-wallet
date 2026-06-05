@@ -17,7 +17,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { buildSwapTransaction } from "../lib/swap/build-swap-tx";
-import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi, swapErc20Abi } from "../lib/swap/contracts";
+import { UNISWAP_V3_SWAP_ROUTER_02, WORLD_CHAIN_ID, swapErc20Abi } from "../lib/swap/contracts";
 import { SWAP_TOKENS } from "../lib/swap/tokens";
 import { quoteBestV3 } from "../lib/swap/v3-quoter";
 
@@ -67,7 +67,6 @@ type TestResult = TestCase & {
   txUrl?: string;
   gasUsed?: bigint;
   userReceivedRaw?: string;
-  feeReceivedRaw?: string;
   error?: string;
   actualError?: string;
   revertReason?: string;
@@ -78,8 +77,6 @@ const account = privateKeyToAccount(normalizePrivateKey(requiredEnv("TEST_PRIVAT
 const TEST_USER = account.address;
 const EXPLORER_BASE_URL = process.env.TENDERLY_EXPLORER_BASE_URL?.trim() || "";
 const SKIP_TENDERLY_FUNDING = process.env.SKIP_TENDERLY_FUNDING === "true";
-const FEE_BPS = Number(process.env.NEXT_PUBLIC_SWAP_FEE_BPS || "0");
-const FEE_RECIPIENT = requiredAddressEnv("NEXT_PUBLIC_SWAP_FEE_RECIPIENT");
 
 const TOKENS = {
   WLD: SWAP_TOKENS.WLD,
@@ -149,7 +146,7 @@ const TESTS: TestCase[] = [
     deadlineOffset: -300,
     expect: "revert",
     expectedRevertReason: "TransactionDeadlinePassed | DeadlineExpired",
-    description: "deadline 已过期, Universal Router 必须 revert",
+    description: "deadline 已过期, V3 SwapRouter 必须 revert",
   },
 ];
 
@@ -213,9 +210,8 @@ async function runTest(test: TestCase): Promise<TestResult> {
       throw new Error(`Quote failed: ${JSON.stringify(quote)}`);
     }
 
-    const approveHash = await approvePermit2(fromToken.address, fromAmount);
+    const approveHash = await approveV3SwapRouter(fromToken.address, fromAmount);
     const deadline = Math.floor(Date.now() / 1000) + test.deadlineOffset;
-    await approveUniversalRouterWithPermit2(fromToken.address, fromAmount, Math.floor(Date.now() / 1000) + 1800);
     const expectedAmountOut =
       test.name === "5_slippage_protection" ? (BigInt(quote.amountOutRaw) * 11_000n) / 10_000n : BigInt(quote.amountOutRaw);
     const tx = await buildSwapTransaction({
@@ -228,19 +224,13 @@ async function runTest(test: TestCase): Promise<TestResult> {
       slippageBps: test.slippageBps,
       userAddress: TEST_USER,
       deadline,
-      platformFee: {
-        recipient: FEE_RECIPIENT,
-        bps: FEE_BPS,
-      },
+      platformFee: null,
     });
 
     const userOutputBefore = await erc20Balance(toToken.address, TEST_USER);
-    const feeOutputBefore = await erc20Balance(toToken.address, FEE_RECIPIENT);
     const receipt = await sendSwap(tx.to, tx.data, BigInt(tx.value));
     const userOutputAfter = await erc20Balance(toToken.address, TEST_USER);
-    const feeOutputAfter = await erc20Balance(toToken.address, FEE_RECIPIENT);
     const userReceived = userOutputAfter - userOutputBefore;
-    const feeReceived = feeOutputAfter - feeOutputBefore;
     const txUrl = tenderlyTxUrl(receipt.transactionHash);
     const succeeded = receipt.status === "success";
 
@@ -250,8 +240,8 @@ async function runTest(test: TestCase): Promise<TestResult> {
         console.log(`FAIL: expected success but reverted: ${error}`);
         return { ...test, quote, approveHash, txHash: receipt.transactionHash, txUrl, gasUsed: receipt.gasUsed, result: "FAIL", error };
       }
-      if (feeReceived <= 0n) {
-        const error = `Fee vault did not receive output token fee. feeReceivedRaw=${feeReceived}`;
+      if (userReceived <= 0n) {
+        const error = `User did not receive output token. userReceivedRaw=${userReceived}`;
         console.log(`FAIL: ${error}`);
         return {
           ...test,
@@ -261,12 +251,11 @@ async function runTest(test: TestCase): Promise<TestResult> {
           txUrl,
           gasUsed: receipt.gasUsed,
           userReceivedRaw: userReceived.toString(),
-          feeReceivedRaw: feeReceived.toString(),
           result: "FAIL",
           error,
         };
       }
-      console.log(`PASS: swap succeeded, gas=${receipt.gasUsed}, userReceived=${userReceived}, feeReceived=${feeReceived}`);
+      console.log(`PASS: swap succeeded, gas=${receipt.gasUsed}, userReceived=${userReceived}`);
       return {
         ...test,
         quote,
@@ -275,7 +264,6 @@ async function runTest(test: TestCase): Promise<TestResult> {
         txUrl,
         gasUsed: receipt.gasUsed,
         userReceivedRaw: userReceived.toString(),
-        feeReceivedRaw: feeReceived.toString(),
         result: "PASS",
       };
     }
@@ -349,31 +337,21 @@ async function fetchQuote(test: TestCase): Promise<QuoteResponse> {
   if (!quote) throw new Error(`No V3 quote for ${test.from} -> ${test.to}`);
 
   const grossAmountOutRaw = BigInt(quote.amountOutRaw);
-  const feeAmount = (grossAmountOutRaw * BigInt(FEE_BPS)) / 10_000n;
-  const netAmountOutRaw = grossAmountOutRaw - feeAmount;
   const data: QuoteResponse = {
     source: "uniswap-v3",
-    amountOut: formatUnits(netAmountOutRaw, toToken.decimals),
-    amountOutRaw: netAmountOutRaw.toString(),
+    amountOut: quote.amountOut,
+    amountOutRaw: grossAmountOutRaw.toString(),
     grossAmountOut: quote.amountOut,
     grossAmountOutRaw: grossAmountOutRaw.toString(),
     feeTier: quote.fee,
     route: quote.route,
-    platformFee: {
-      recipient: FEE_RECIPIENT,
-      token: toToken.address,
-      bps: FEE_BPS,
-      amountRaw: feeAmount.toString(),
-      amount: formatUnits(feeAmount, toToken.decimals),
-    },
+    platformFee: null,
   };
-  console.log(
-    `Quote: ${test.amount} ${test.from} -> gross ${quote.amountOut} ${test.to}, net ${data.amountOut} ${test.to}, fee=${data.feeTier}`,
-  );
+  console.log(`Quote: ${test.amount} ${test.from} -> ${data.amountOut} ${test.to}, fee=${data.feeTier}`);
   return data;
 }
 
-async function approvePermit2(token: Address, amount: bigint) {
+async function approveV3SwapRouter(token: Address, amount: bigint) {
   const hash = await walletClient.sendTransaction({
     account,
     chain: worldChainFork,
@@ -381,13 +359,13 @@ async function approvePermit2(token: Address, amount: bigint) {
     data: encodeFunctionData({
       abi: [swapErc20Abi[2]],
       functionName: "approve",
-      args: [PERMIT2_ADDRESS, amount],
+      args: [UNISWAP_V3_SWAP_ROUTER_02, amount],
     }),
     value: 0n,
     gas: 100_000n,
   });
   const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-  assert(receipt.status === "success", `Permit2 approve failed for ${token}`);
+  assert(receipt.status === "success", `V3 SwapRouter approve failed for ${token}`);
   return hash;
 }
 
@@ -398,24 +376,6 @@ async function erc20Balance(token: Address, owner: Address) {
     functionName: "balanceOf",
     args: [owner],
   });
-}
-
-async function approveUniversalRouterWithPermit2(token: Address, amount: bigint, expiration: number) {
-  const hash = await walletClient.sendTransaction({
-    account,
-    chain: worldChainFork,
-    to: PERMIT2_ADDRESS,
-    data: encodeFunctionData({
-      abi: [permit2Abi[0]],
-      functionName: "approve",
-      args: [token, UNIVERSAL_ROUTER_ADDRESS, assertUint160(amount), expiration],
-    }),
-    value: 0n,
-    gas: 100_000n,
-  });
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
-  assert(receipt.status === "success", `Permit2 Universal Router allowance failed for ${token}`);
-  return hash;
 }
 
 async function sendSwap(to: Address, data: Hex, value: bigint): Promise<TransactionReceipt> {
@@ -505,9 +465,9 @@ ${failed === 0 && warn === 0 ? "✅ **ALL TESTS PASSED** - Safe to proceed to ma
 
 ## Notes
 
-- The configured \`TEST_PRIVATE_KEY\` derives to \`${TEST_USER}\`; tests use Permit2 allowance transfers instead of typed-data signatures.
+- The configured \`TEST_PRIVATE_KEY\` derives to \`${TEST_USER}\`; tests use standard ERC-20 approve calls before V3 SwapRouter execution.
 - The prompt-listed fixed wallet \`0x0f3b31df2fa6781de2103588da675f02599b2b26\` was not used because the local test private key does not control it.
-- Case 5 intentionally raised \`expectedAmountOut\` by 10% before building calldata, creating a deterministic stale/over-optimistic minOut condition that validates the Universal Router slippage guard.
+- Case 5 intentionally raised \`expectedAmountOut\` by 10% before building calldata, creating a deterministic stale/over-optimistic minOut condition that validates the V3 router slippage guard.
 - \`NEXT_PUBLIC_SWAP_ENABLED\` remains false in the example/test environment.
 `;
 }
@@ -522,12 +482,11 @@ function renderResult(result: TestResult) {
 - **Result**: **${result.result}**
 ${result.quote ? `- **Quote**: ${result.quote.amountOut} ${result.to} (raw ${result.quote.amountOutRaw}, fee ${result.quote.feeTier}, source ${result.quote.source})` : ""}
 ${result.quote?.blocked ? `- **Quote blocked**: ${result.quote.blockReason || "true"}` : ""}
-${result.approveHash ? `- **Permit2 approve tx**: \`${result.approveHash}\`` : ""}
+${result.approveHash ? `- **ERC20 approve tx**: \`${result.approveHash}\`` : ""}
 ${result.txHash ? `- **Swap tx**: \`${result.txHash}\`` : ""}
 ${result.txUrl ? `- **Tenderly**: [View trace](${result.txUrl})` : ""}
 ${result.gasUsed ? `- **Gas used**: ${result.gasUsed}` : ""}
 ${result.userReceivedRaw ? `- **User received raw**: ${result.userReceivedRaw}` : ""}
-${result.feeReceivedRaw ? `- **Fee vault received raw**: ${result.feeReceivedRaw}` : ""}
 ${result.error ? `- **Error**: \`${escapeBackticks(result.error)}\`` : ""}
 ${result.actualError ? `- **Actual revert**: \`${escapeBackticks(result.actualError)}\`` : ""}
 ${result.revertReason ? `- **Revert reason**: \`${escapeBackticks(result.revertReason)}\`` : ""}
@@ -574,12 +533,6 @@ function redactRpc(value: string) {
 
 function escapeBackticks(value: string) {
   return value.replace(/`/g, "\\`");
-}
-
-function assertUint160(amount: bigint) {
-  const maxUint160 = (1n << 160n) - 1n;
-  if (amount > maxUint160) throw new Error("Amount exceeds Permit2 uint160 allowance limit.");
-  return amount;
 }
 
 function normalizeErrorMessage(error: unknown) {

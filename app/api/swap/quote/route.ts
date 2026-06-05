@@ -9,7 +9,6 @@ import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
-import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
 
 type QuoteBody = {
   fromSymbol?: string;
@@ -41,7 +40,7 @@ export async function POST(req: NextRequest) {
   const grossAmountIn = parseUnits(parsed.amountText, parsed.from.decimals);
   const amountIn = grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
-  const platformFeeConfig = getSwapPlatformFeeConfig();
+  const platformFeeConfig = null;
   console.log("[SWAP] fee config:", platformFeeConfig);
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
@@ -78,7 +77,8 @@ export async function POST(req: NextRequest) {
   }
 
   const grossAmountOutRaw = BigInt(main.quote.amountOutRaw);
-  const { netAmountOut, payload: platformFee } = applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
+  const netAmountOut = grossAmountOutRaw;
+  const platformFee = null;
   const amountOut = formatUnits(netAmountOut, parsed.to.decimals);
   const amountOutNumber = Number(amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
