@@ -99,7 +99,7 @@
   .lumina-ann-row .ann-body { display: -webkit-box; margin-top: 10px; color: #bfc5bf; font-size: 15px; line-height: 1.55; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
   .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 18px; padding-top: max(20px, calc(env(safe-area-inset-top) + 10px)); }
-  .lumina-ann-detail-top { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 0 0 10px; }
+  .lumina-ann-detail-top { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 10px; min-height: 52px; padding: 0 0 10px; }
   .lumina-ann-detail-top strong { color: var(--text); font-size: 18px; font-weight: 900; line-height: 1.1; text-align: center; }
   .lumina-ann-all { min-height: 36px; border: 0; background: transparent; color: var(--green); font-size: 13px; font-weight: 800; white-space: nowrap; }
   .lumina-ann-back svg, .lumina-ann-share svg { width: 22px; height: 22px; }
@@ -135,8 +135,10 @@
   .lumina-ann-body p { margin: 0 0 16px; }
   .lumina-ann-body p:last-child { margin-bottom: 0; }
   .lumina-ann-help-row { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid rgba(255,255,255,.08); }
-  .lumina-ann-help-row button { min-height: 56px; border: 0; border-right: 1px solid rgba(255,255,255,.08); background: rgba(74,222,128,.035); color: var(--green); display: inline-flex; align-items: center; justify-content: center; gap: 9px; font-size: 15px; font-weight: 850; }
+  .lumina-ann-help-row button { min-height: 56px; border: 0; border-right: 1px solid rgba(255,255,255,.08); background: rgba(74,222,128,.035); color: var(--green); display: inline-flex; align-items: center; justify-content: center; gap: 9px; font-size: 15px; font-weight: 850; transition: background .16s ease, color .16s ease; }
   .lumina-ann-help-row button:last-child { border-right: 0; }
+  .lumina-ann-help-row button.selected { background: rgba(74,222,128,.14); color: #8cffaa; }
+  .lumina-ann-help-row button b { min-width: 12px; color: currentColor; font-size: 13px; font-weight: 850; }
   .lumina-ann-help-row svg { width: 22px; height: 22px; }
   .lumina-ann-status-card { margin-top: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; background: #101210; box-shadow: none; }
   .lumina-ann-status-head { display: grid; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 14px; padding: 24px; background: linear-gradient(140deg, rgba(74,222,128,.12), rgba(74,222,128,.02)); border-bottom: 1px solid rgba(255,255,255,.08); }

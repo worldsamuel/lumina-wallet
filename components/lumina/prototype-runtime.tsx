@@ -55,6 +55,15 @@ declare global {
     __luminaFriendlySwapError?: (error?: unknown) => string;
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
+    __luminaAddLocalActivity?: (item: {
+      type?: string;
+      title?: string;
+      subtitle?: string;
+      amount?: string;
+      status?: string;
+      hash?: string;
+      createdAt?: string;
+    }) => void;
     __luminaRefreshImportedTokens?: () => void;
     __luminaApplyBalancePrivacy?: () => void;
     __luminaWalletBaseTotalUsd?: number;
@@ -634,6 +643,14 @@ function exposeMorphoTransactions() {
         metadata: { action },
       }),
     }).catch((error) => console.warn("[ACTIVITY] Failed to record earn", error));
+    window.__luminaAddLocalActivity?.({
+      type: "in",
+      title: "Earn",
+      subtitle: "Vault",
+      amount: action,
+      status: "Completed",
+      hash: userOpHash,
+    });
     window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash, action } }));
     return result;
   };
@@ -2432,7 +2449,7 @@ function enhancePrototypeHome() {
           : '<div class="lumina-ann-default-art"><div class="lumina-ann-megaphone"><span></span></div></div>';
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
-            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><strong>Announcement</strong><button type="button" class="lumina-ann-all" id="luminaAnnAll">All Announcements</button></div>' +
+            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><strong>Announcement</strong><span aria-hidden="true"></span></div>' +
             '<section class="lumina-ann-hero-card">' +
               '<div class="lumina-ann-hero-copy"><h3>' + annEscape(title) + '</h3><p>' + annEscape(annSummary(body)) + '</p></div>' +
               '<div class="lumina-ann-hero-art">' + heroArt + '</div>' +
@@ -2445,13 +2462,44 @@ function enhancePrototypeHome() {
                 '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
               '</div>' +
               '<div class="lumina-ann-body">' + annParagraphs(body) + '</div>' +
-              '<div class="lumina-ann-help-row"><button type="button">' + annIcon("thumb") + '<span>Useful</span></button><button type="button">' + annIcon("thumbDown") + '<span>Not Useful</span></button></div>' +
+              '<div class="lumina-ann-help-row" data-ann-id="' + annEscape(item && item.id || title) + '"><button type="button" data-ann-vote="useful">' + annIcon("thumb") + '<span>Useful</span><b>0</b></button><button type="button" data-ann-vote="notUseful">' + annIcon("thumbDown") + '<span>Not Useful</span><b>0</b></button></div>' +
             '</section>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
         if (back) back.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
-        var all = document.getElementById("luminaAnnAll");
-        if (all) all.onclick = function(event){ event.stopPropagation(); window.openAnnouncements(); };
+        var help = old.querySelector(".lumina-ann-help-row");
+        if (help) {
+          var voteKey = "lumina_ann_votes_v1";
+          var annId = help.getAttribute("data-ann-id") || title;
+          function readVotes(){ try { return JSON.parse(localStorage.getItem(voteKey) || "{}"); } catch(e) { return {}; } }
+          function writeVotes(value){ try { localStorage.setItem(voteKey, JSON.stringify(value)); } catch(e) {} }
+          function renderVotes(){
+            var votes = readVotes();
+            var itemVotes = votes[annId] || { useful:0, notUseful:0, selected:"" };
+            help.querySelectorAll("button").forEach(function(btn){
+              var type = btn.getAttribute("data-ann-vote") || "";
+              btn.classList.toggle("selected", itemVotes.selected === type);
+              var count = btn.querySelector("b");
+              if (count) count.textContent = String(Number(itemVotes[type] || 0));
+            });
+          }
+          help.querySelectorAll("button").forEach(function(btn){
+            btn.onclick = function(event){
+              event.stopPropagation();
+              var type = btn.getAttribute("data-ann-vote") || "";
+              var votes = readVotes();
+              var itemVotes = votes[annId] || { useful:0, notUseful:0, selected:"" };
+              if (itemVotes.selected === type) return;
+              if (itemVotes.selected && itemVotes[itemVotes.selected] > 0) itemVotes[itemVotes.selected] -= 1;
+              itemVotes[type] = Number(itemVotes[type] || 0) + 1;
+              itemVotes.selected = type;
+              votes[annId] = itemVotes;
+              writeVotes(votes);
+              renderVotes();
+            };
+          });
+          renderVotes();
+        }
       }
       window.openAnnouncements = function(){
         var list = annList().slice().sort(function(a, b){ return Number(b.id || 0) - Number(a.id || 0); });
@@ -3937,6 +3985,14 @@ function enhancePrototypeSwapQuote() {
 	          var result = await promise;
 	          setSwapDebug("execute:submitted", result);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
+	          if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
+	            type: "swap",
+	            title: "Swap " + swapState.sell + " → " + swapState.buy,
+	            subtitle: "Swap",
+	            amount: state.amountText + " " + swapState.sell,
+	            status: "Completed",
+	            hash: result.userOpHash || result.transactionHash || ("pending-" + Date.now())
+	          });
 	          optimisticallyApplySwapBalances();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
@@ -4300,7 +4356,14 @@ function enhancePrototypeSend() {
           });
           if (result.status === "success") {
             var hash = result.txHash || "";
-            try { localStorage.removeItem("lumina_local_activity"); } catch(e) {}
+            if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
+              type: "out",
+              title: "Sent " + state.token.symbol,
+              subtitle: state.recipient,
+              amount: "-" + state.amountText + " " + state.token.symbol,
+              status: "Completed",
+              hash: hash || ("pending-" + Date.now())
+            });
             showTransactionSubmitted(hash);
             if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
             setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 1500);
@@ -4363,7 +4426,6 @@ function enhancePrototypeActivity() {
   const source = `
     (function(){
       var activityItems = [];
-      try { localStorage.removeItem("lumina_local_activity"); } catch(e) {}
       function emptyActivity(message){
         return '<div style="text-align:center;color:var(--text-mute);padding:42px var(--pad-screen);font-size:14px;line-height:1.5;">' + message + '</div>';
       }
@@ -4392,6 +4454,46 @@ function enhancePrototypeActivity() {
       function writeJson(key, value){
         try { localStorage.setItem(key, JSON.stringify(value)); } catch(e) {}
       }
+      function localActivity(){
+        var rows = readJson("lumina_local_activity", []);
+        return Array.isArray(rows) ? rows : [];
+      }
+      function saveLocalActivity(rows){
+        writeJson("lumina_local_activity", Array.isArray(rows) ? rows.slice(0, 50) : []);
+      }
+      function normalizeActivityItem(item){
+        return {
+          type: item && item.type || "swap",
+          title: item && item.title || "Transaction",
+          subtitle: item && item.subtitle || "",
+          amount: item && item.amount || "—",
+          status: item && item.status || "Completed",
+          hash: item && item.hash || ("pending-" + Date.now()),
+          createdAt: item && item.createdAt || new Date().toISOString()
+        };
+      }
+      function mergeActivityRows(localRows, remoteRows){
+        var seen = {};
+        return []
+          .concat(Array.isArray(localRows) ? localRows : [])
+          .concat(Array.isArray(remoteRows) ? remoteRows : [])
+          .map(normalizeActivityItem)
+          .filter(function(item){
+            var key = String(item.hash || "") || (item.title + item.amount + item.createdAt);
+            if (seen[key]) return false;
+            seen[key] = true;
+            return true;
+          })
+          .sort(function(a, b){ return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(); });
+      }
+      window.__luminaAddLocalActivity = function(item){
+        var next = normalizeActivityItem(item || {});
+        var rows = localActivity().filter(function(row){ return String(row && row.hash || "") !== String(next.hash || ""); });
+        rows.unshift(next);
+        saveLocalActivity(rows);
+        activityItems = mergeActivityRows(rows, activityItems);
+        renderActivity();
+      };
       function tokenInitial(symbol){
         symbol = String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase();
         return symbol || "?";
@@ -4468,16 +4570,17 @@ function enhancePrototypeActivity() {
       window.__luminaRefreshActivity = function(){
         var box = document.getElementById("actList");
         if (box && !activityItems.length && !box.children.length) box.innerHTML = emptyActivity(activityCopy("loading"));
+        var localRows = localActivity();
         var address = window.__luminaUserAddress || "";
         if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-          activityItems = [];
+          activityItems = mergeActivityRows(localRows, []);
           renderActivity();
           return;
         }
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){ activityItems = Array.isArray(rows) ? rows : []; rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
-          .catch(function(){ activityItems = []; renderActivity(); });
+          .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
+          .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
         window.__luminaActivityGoWrapped = true;
