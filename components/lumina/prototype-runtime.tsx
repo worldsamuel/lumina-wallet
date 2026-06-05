@@ -2476,6 +2476,28 @@ function enhancePrototypeHome() {
         if (amount > 0 && price > 0) return amount * price;
         return Number(asset && asset.usdNum || 0);
       }
+      function refreshHomeTotalFromAssets(homeAssets){
+        var rows = Array.isArray(homeAssets) ? homeAssets : (assets || []).filter(showOnHome);
+        var total = rows.reduce(function(sum, asset){ return sum + assetUsdValue(asset); }, 0);
+        var change = rows.reduce(function(sum, asset){
+          var value = assetUsdValue(asset);
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          var pct = 0;
+          try { pct = Number(tokenChanges24h && tokenChanges24h[sym]); } catch(e) { pct = 0; }
+          return sum + (Number.isFinite(pct) ? value * pct / 100 : 0);
+        }, 0);
+        totalUsdNum = total;
+        change24hUsdNum = change;
+        var balEl = document.getElementById("balAmt");
+        if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);
+        var subEl = document.getElementById("balSub");
+        if (subEl) {
+          var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
+          subEl.textContent = sign + formatMoney(change24hUsdNum) + " (24h)";
+        }
+        if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
+      }
+      window.__luminaRefreshHomeTotalFromAssets = refreshHomeTotalFromAssets;
       function rowHtml(asset, index, imported){
         var symbol = String(asset.sym || "").toUpperCase();
         var logoSource = asset.logo || (tokenLogo && tokenLogo[symbol]) || tokenInitialHome(asset.sym);
@@ -2500,6 +2522,7 @@ function enhancePrototypeHome() {
           return showOnHome(a) && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
         });
         var html = verified.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
+        refreshHomeTotalFromAssets();
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
         list.ontouchstart = function(event){
@@ -3331,6 +3354,34 @@ function enhancePrototypeSwapQuote() {
 	        var n = Number(raw.replace(/,/g, ""));
 	        return Number.isFinite(n) ? n : 0;
 	      }
+	      function updateAssetAmount(symbol, amount){
+	        symbol = String(symbol || "").toUpperCase();
+	        var amountText = shortAmount(Math.max(0, Number(amount) || 0));
+	        balances[symbol] = amountText;
+	        availMap[symbol] = amountText + " " + symbol;
+	        var asset = (assets || []).find(function(item){ return String(item && item.sym || "").toUpperCase() === symbol; });
+	        if (!asset) return;
+	        asset.amt = amountText + " " + symbol;
+	        var price = Number(tokenMeta(symbol).priceUsd || prices[symbol] || 0);
+	        if (!(price > 0) && (symbol === "USDC" || symbol === "USDT" || symbol === "EURC")) price = 1;
+	        if (price > 0) asset.usdNum = (Number(amount) || 0) * price;
+	      }
+	      function optimisticallyApplySwapBalances(){
+	        if (!latestSwapQuote) return;
+	        var sell = String(swapState.sell || "").toUpperCase();
+	        var buy = String(swapState.buy || "").toUpperCase();
+	        var amountIn = Number(latestSwapQuote.amountIn || 0);
+	        var amountOut = Number(latestSwapQuote.amountOut || 0);
+	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
+	        var previousBuyBalance = balanceNumber(buy);
+	        updateAssetAmount(sell, balanceNumber(sell) - amountIn);
+	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
+	        updateAssetAmount(buy, previousBuyBalance + amountOut);
+	        syncSwapQuotePriceToHome();
+	        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+	        if (typeof renderAssets === "function") renderAssets();
+	        if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
+	      }
 	      function readableSwapError(error){
 	        if (!error) return { message:"Unknown swap error" };
 	        var out = {
@@ -3572,8 +3623,7 @@ function enhancePrototypeSwapQuote() {
 	          var result = await promise;
 	          setSwapDebug("execute:submitted", result);
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
-	          upsertRecentSwapHomeAsset(swapState.buy, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.to, latestSwapQuote && latestSwapQuote.amountOut);
-	          syncSwapQuotePriceToHome();
+	          optimisticallyApplySwapBalances();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
