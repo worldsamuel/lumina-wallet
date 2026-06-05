@@ -2442,19 +2442,10 @@ function enhancePrototypeHome() {
         var body = annPickText(item, "body");
         var time = String(item && item.time || "");
         var publisher = String(item && (item.author || item.createdBy || item.publisher) || "lumina-admin");
-        var imageUrl = String(item && item.imageUrl || "");
         var pinned = !!(item && item.pinned);
-        var heroArt = imageUrl
-          ? '<img class="lumina-ann-hero-img" src="' + annEscape(imageUrl) + '" alt="">'
-          : '<div class="lumina-ann-default-art"><div class="lumina-ann-megaphone"><span></span></div></div>';
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
             '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><strong>Announcement</strong><span aria-hidden="true"></span></div>' +
-            '<section class="lumina-ann-hero-card">' +
-              '<div class="lumina-ann-hero-copy"><h3>' + annEscape(title) + '</h3><p>' + annEscape(annSummary(body)) + '</p></div>' +
-              '<div class="lumina-ann-hero-art">' + heroArt + '</div>' +
-              '<div class="lumina-ann-dots"><i></i><i></i><i></i></div>' +
-            '</section>' +
             '<section class="lumina-ann-article-card">' +
               '<div class="lumina-ann-article-head">' +
                 (pinned ? '<span class="lumina-ann-pin">Pinned</span>' : '<span class="lumina-ann-pin ghost">' + annEscape(annTagText(tag)) + '</span>') +
