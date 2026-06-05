@@ -138,6 +138,7 @@
   .lumina-ann-help-row button { min-height: 56px; border: 0; border-right: 1px solid rgba(255,255,255,.08); background: rgba(74,222,128,.035); color: var(--green); display: inline-flex; align-items: center; justify-content: center; gap: 9px; font-size: 15px; font-weight: 850; transition: background .16s ease, color .16s ease; }
   .lumina-ann-help-row button:last-child { border-right: 0; }
   .lumina-ann-help-row button.selected { background: rgba(74,222,128,.14); color: #8cffaa; }
+  .lumina-ann-help-row button:disabled { color: rgba(130,255,166,.48); cursor: default; }
   .lumina-ann-help-row button b { min-width: 12px; color: currentColor; font-size: 13px; font-weight: 850; }
   .lumina-ann-help-row svg { width: 22px; height: 22px; }
   .lumina-ann-status-card { margin-top: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; overflow: hidden; background: #101210; box-shadow: none; }

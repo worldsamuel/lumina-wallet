@@ -2470,6 +2470,7 @@ function enhancePrototypeHome() {
             help.querySelectorAll("button").forEach(function(btn){
               var type = btn.getAttribute("data-ann-vote") || "";
               btn.classList.toggle("selected", itemVotes.selected === type);
+              btn.disabled = !!itemVotes.selected && itemVotes.selected !== type;
               var count = btn.querySelector("b");
               if (count) count.textContent = String(Number(itemVotes[type] || 0));
             });
@@ -2480,8 +2481,7 @@ function enhancePrototypeHome() {
               var type = btn.getAttribute("data-ann-vote") || "";
               var votes = readVotes();
               var itemVotes = votes[annId] || { useful:0, notUseful:0, selected:"" };
-              if (itemVotes.selected === type) return;
-              if (itemVotes.selected && itemVotes[itemVotes.selected] > 0) itemVotes[itemVotes.selected] -= 1;
+              if (itemVotes.selected) return;
               itemVotes[type] = Number(itemVotes[type] || 0) + 1;
               itemVotes.selected = type;
               votes[annId] = itemVotes;
