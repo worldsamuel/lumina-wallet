@@ -189,7 +189,7 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         {
           title: "Fees",
           body: [
-            "Lumina may charge a 0.3% fee on Swap activity and a 0.5% Earn withdrawal fee. The exact fee shown inside the App at the time of use controls.",
+            "Lumina may charge a 0.4% fee on Swap activity and a 0.4% Earn withdrawal fee. The exact fee shown inside the App at the time of use controls.",
           ],
         },
         {
@@ -252,7 +252,7 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         },
         {
           title: "手续费",
-          body: ["Lumina 可能对 Swap 收取 0.3% 手续费，对 Earn 提现收取 0.5% 手续费。具体费用以你使用时 App 内显示为准。"],
+          body: ["Lumina 可能对 Swap 收取 0.4% 手续费，对 Earn 提现收取 0.4% 手续费。具体费用以你使用时 App 内显示为准。"],
         },
         {
           title: "禁止行为",

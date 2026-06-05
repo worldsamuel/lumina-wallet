@@ -62,8 +62,8 @@ async function main() {
   await Promise.all([
     prisma.feeConfig.upsert({
       where: { businessType: "swap" },
-      update: { percent: "0.0030" },
-      create: { businessType: "swap", percent: "0.0030" },
+      update: { percent: "0.0040" },
+      create: { businessType: "swap", percent: "0.0040" },
     }),
     prisma.feeConfig.upsert({
       where: { businessType: "send" },
@@ -72,8 +72,8 @@ async function main() {
     }),
     prisma.feeConfig.upsert({
       where: { businessType: "earn" },
-      update: { percent: "0.0050" },
-      create: { businessType: "earn", percent: "0.0050" },
+      update: { percent: "0.0040" },
+      create: { businessType: "earn", percent: "0.0040" },
     }),
   ]);
 

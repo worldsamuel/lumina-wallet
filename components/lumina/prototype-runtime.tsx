@@ -2300,6 +2300,7 @@ function enhancePrototypeHome() {
         try { return JSON.parse(localStorage.getItem("lumina_home_debug_v1") || "null"); } catch(e) { return null; }
       }
       function openHomeDebug(){
+        return;
         if (!readHomeDebug()) setHomeDebug("manual:open", { note:"Tap WLD or USDC, then open DEBUG again to inspect the latest click path." });
         var old = document.getElementById("homeDebugModal");
         if (old) old.remove();
@@ -2384,15 +2385,12 @@ function enhancePrototypeHome() {
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
             '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><button type="button" class="lumina-ann-share" id="luminaAnnShare" aria-label="Share">' + annIcon("share") + '</button></div>' +
             '<section class="lumina-ann-hero">' +
-              '<div class="lumina-ann-orbit"></div>' +
-              '<svg class="lumina-ann-shield" viewBox="0 0 120 140" fill="none"><path d="M60 8l42 16v34c0 31-17 56-42 72-25-16-42-41-42-72V24L60 8z" fill="rgba(74,222,128,.12)" stroke="currentColor" stroke-width="4"/><path d="M38 69l16 16 31-35" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
               '<div class="lumina-ann-detail-kicker"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span></div>' +
               '<h3>' + annEscape(title) + '</h3>' +
               '<p class="lumina-ann-summary">' + annEscape(annSummary(body)) + '</p>' +
               '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
             '</section>' +
             '<section class="lumina-ann-status-card">' +
-              '<div class="lumina-ann-status-head"><div class="lumina-ann-status-icon">' + annIcon("check") + '</div><div><strong>Status</strong><b>Successful</b></div></div>' +
               '<div class="lumina-ann-content"><div class="lumina-ann-content-title">What happened</div>' + annEscape(body).replace(/\\n/g, "<br>") +
                 '<div class="lumina-ann-facts">' +
                   '<div class="lumina-ann-fact">' + annIcon("box") + '<span>Announcement ID</span><b>' + annEscape(annId) + '</b></div>' +
@@ -2403,7 +2401,6 @@ function enhancePrototypeHome() {
                 '</div>' +
               '</div>' +
             '</section>' +
-            '<div class="lumina-ann-helpful"><span>Was this announcement helpful?</span><button type="button">' + annIcon("thumb") + '</button><button type="button">' + annIcon("thumbDown") + '</button></div>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
         if (back) back.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
@@ -2430,8 +2427,7 @@ function enhancePrototypeHome() {
         modal.innerHTML =
           '<div class="modal lumina-ann-sheet">' +
             '<button type="button" class="lumina-ann-close" id="luminaAnnClose" aria-label="Close">×</button>' +
-            '<div style="height:46px"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
-            '<p class="lumina-ann-summary" style="width:auto;margin:12px 0 0;color:#aeb5ae;">Latest operational notices from Lumina.</p>' +
+            '<div style="height:56px"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
             '<div class="lumina-ann-list">' + rows + '</div>' +
           '</div>';
         document.body.appendChild(modal);
@@ -3278,6 +3274,9 @@ function enhancePrototypeSwapQuote() {
         return null;
       }
       function openSwapDebug(){
+        var existingModal = document.getElementById("swapDebugModal");
+        if (existingModal) existingModal.remove();
+        return;
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
         var data = readSwapDebug();
@@ -3314,7 +3313,8 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) return;
+        if (existing) existing.remove();
+        return;
         var btn = document.createElement("button");
         btn.type = "button";
         btn.id = "swapDebugBtn";
@@ -3891,7 +3891,6 @@ function enhancePrototypeSwapQuote() {
 	          setSwapDebug("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
 	          toast(swapErrorToast(e));
-	          setTimeout(function(){ openSwapDebug(); }, 180);
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	        } finally {
 	          swapSubmitting = false;

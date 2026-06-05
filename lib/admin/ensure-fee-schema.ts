@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
 
 export const DEFAULT_FEE_CONFIGS = [
-  { businessType: "swap", percent: "0.003", recipient: null },
-  { businessType: "earn", percent: "0.005", recipient: null },
+  { businessType: "swap", percent: "0.004", recipient: null },
+  { businessType: "earn", percent: "0.004", recipient: null },
 ] as const;
 
 let ensured: Promise<void> | null = null;
