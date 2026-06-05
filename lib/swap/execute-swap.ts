@@ -136,7 +136,19 @@ export async function executeSwap(params: ExecuteSwapParams) {
       quote: fallbackQuote,
       skipPlatformFee: true,
     });
-    return await submitBuiltSwap(fallbackBuilt, fallbackQuote, params, fromAmount, "fee-fallback");
+    return await submitBuiltSwap(
+      {
+        ...fallbackBuilt,
+        debug: {
+          fallbackBuild: fallbackBuilt.debug ?? null,
+          primaryError: serializeSwapError(error),
+        },
+      },
+      fallbackQuote,
+      params,
+      fromAmount,
+      "fee-fallback",
+    );
   }
 }
 
@@ -363,8 +375,8 @@ function isSwapEnabled() {
   return process.env.NEXT_PUBLIC_SWAP_ENABLED === "true";
 }
 
-function shouldSkipPlatformFeeForSell(fromToken: ExecuteSwapToken, toToken: ExecuteSwapToken) {
-  return fromToken.symbol !== "WLD" && toToken.symbol === "WLD";
+function shouldSkipPlatformFeeForSell(fromToken: ExecuteSwapToken, _toToken: ExecuteSwapToken) {
+  return fromToken.symbol !== "WLD";
 }
 
 function applySlippage(amount: bigint, slippageBps: number) {
@@ -381,6 +393,19 @@ function attachSwapDebug(error: unknown, debug: unknown) {
   const err = error instanceof Error ? error : new Error(String(error || "Swap failed."));
   (err as Error & { debug?: unknown }).debug = debug;
   return err;
+}
+
+function serializeSwapError(error: unknown) {
+  if (!(error instanceof Error)) return { message: String(error || "") };
+  const extra = error as Error & { code?: unknown; error_code?: unknown; details?: unknown; debug?: unknown };
+  return {
+    name: error.name,
+    message: error.message,
+    code: extra.code,
+    error_code: extra.error_code,
+    details: extra.details,
+    debug: extra.debug,
+  };
 }
 
 function isUserCancellation(error: unknown) {

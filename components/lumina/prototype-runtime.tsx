@@ -3693,6 +3693,16 @@ function enhancePrototypeSwapQuote() {
 	        var status = String(token.status || (token.safety && token.safety.status) || "").toLowerCase();
 	        return trust === "community" || status === "community" || status === "pending" || status === "unverified" || status === "rejected" || status === "high" || status === "danger";
 	      }
+	      function normalizeSellPair(){
+	        if (!swapState) return;
+	        var sell = String(swapState.sell || "").toUpperCase();
+	        var buy = String(swapState.buy || "").toUpperCase();
+	        if (sell && sell !== "WLD" && buy !== "WLD") {
+	          swapState.buy = "WLD";
+	          return;
+	        }
+	        if (sell === "WLD" && buy === "WLD") swapState.buy = "USDC";
+	      }
 	      function swapRiskText(){
 	        if (!latestSwapQuote) return "";
 	        var risky = [latestSwapQuote.tokens && latestSwapQuote.tokens.from, latestSwapQuote.tokens && latestSwapQuote.tokens.to].filter(function(token){
@@ -3867,6 +3877,15 @@ function enhancePrototypeSwapQuote() {
       };
       if (!window.__luminaTokenModalKeyboardFix) {
         window.__luminaTokenModalKeyboardFix = true;
+        if (typeof pickToken === "function" && !window.__luminaPickTokenWrappedForSellPair) {
+          window.__luminaPickTokenWrappedForSellPair = true;
+          var previousPickToken = pickToken;
+          pickToken = function(symbol){
+            previousPickToken(symbol);
+            normalizeSellPair();
+            if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+          };
+        }
         function handleTokenRowActivate(event){
           var row = event.target && event.target.closest ? event.target.closest("#tokenModalList .tk-row") : null;
           var list = document.getElementById("tokenModalList");
@@ -3927,6 +3946,7 @@ function enhancePrototypeSwapQuote() {
         var nextBuy = swapState.sell;
         swapState.sell = nextSell;
         swapState.buy = nextBuy;
+        normalizeSellPair();
         highImpactAcknowledged = false;
         if (typeof refreshSwapLabels === "function") refreshSwapLabels();
         toast(typeof t === "function" ? t("tFlipped") : "已对调买卖方向");
@@ -5217,7 +5237,8 @@ function enhancePrototypeDetail() {
         var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
         if (asset && typeof swapState !== "undefined") {
           swapState.sell = asset.sym;
-          if (swapState.buy === asset.sym) swapState.buy = asset.sym === "WLD" ? "USDC" : "WLD";
+          if (asset.sym !== "WLD") swapState.buy = "WLD";
+          else if (swapState.buy === asset.sym) swapState.buy = "USDC";
           if (typeof refreshSwapLabels === "function") refreshSwapLabels();
         }
         go("swap");
