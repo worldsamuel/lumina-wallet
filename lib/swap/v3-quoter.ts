@@ -1,10 +1,17 @@
 import { encodePacked, formatUnits, type Address } from "viem";
 import { publicClient } from "@/lib/chain";
 import type { SwapQuoteResult, SwapQuoteSet } from "./quote-types";
-import type { SwapToken } from "./tokens";
+import { SWAP_TOKENS, type SwapToken } from "./tokens";
 
 const UNISWAP_V3_QUOTER_V2 = "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c" as Address;
 const FEE_TIERS = [500, 3000, 10000] as const;
+const COMMON_TWO_HOP_FEES = [
+  [3000, 3000],
+  [10000, 3000],
+  [3000, 10000],
+  [500, 3000],
+  [3000, 500],
+] as const;
 
 type V3RouteCandidate = { tokens: SwapToken[]; fees: number[] };
 
@@ -159,6 +166,21 @@ function pickBestQuote(quotes: Awaited<ReturnType<typeof quoteRoutes>>) {
 function buildRouteCandidates(fromToken: SwapToken, toToken: SwapToken) {
   const routes: V3RouteCandidate[] = [];
   for (const fee of FEE_TIERS) routes.push({ tokens: [fromToken, toToken], fees: [fee] });
+
+  const intermediates = [SWAP_TOKENS.USDC, SWAP_TOKENS.WLD, SWAP_TOKENS.WETH].filter(
+    (token, index, list) =>
+      token.address.toLowerCase() !== fromToken.address.toLowerCase() &&
+      token.address.toLowerCase() !== toToken.address.toLowerCase() &&
+      list.findIndex((item) => item.address.toLowerCase() === token.address.toLowerCase()) === index,
+  );
+  for (const mid of intermediates) {
+    for (const fees of COMMON_TWO_HOP_FEES) {
+      routes.push({ tokens: [fromToken, mid, toToken], fees: [...fees] });
+    }
+    for (const firstFee of FEE_TIERS) {
+      for (const secondFee of FEE_TIERS) routes.push({ tokens: [fromToken, mid, toToken], fees: [firstFee, secondFee] });
+    }
+  }
   return dedupeRoutes(routes);
 }
 

@@ -1,6 +1,6 @@
 import { MiniKit } from "@worldcoin/minikit-js";
-import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
-import { UNISWAP_V3_SWAP_ROUTER_02, WORLD_CHAIN_ID, swapErc20Abi } from "./contracts";
+import { decodeFunctionData, encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
+import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
 
 type ExecuteSwapToken = {
   address: Address;
@@ -65,6 +65,7 @@ type BuildTxResponse = {
     gasEstimate?: string;
   };
   platformFee?: PlatformFeePayload | null;
+  permit2Spender?: Address;
   deadline: number;
   debug?: unknown;
 };
@@ -110,6 +111,30 @@ export async function executeSwap(params: ExecuteSwapParams) {
   return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
 }
 
+const universalRouterExecuteAbi = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+    ],
+    outputs: [],
+  },
+] as const;
+
 async function submitBuiltSwap(
   built: BuildTxResponse,
   quote: QuoteResponse,
@@ -122,23 +147,41 @@ async function submitBuiltSwap(
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
   const feeConfig = built.platformFee ? { bps: built.platformFee.bps, recipient: built.platformFee.recipient } : null;
+  const universalRouter = decodeUniversalRouterExecute(tx.data);
+  const universalRouterCommands = universalRouter?.commands ?? null;
+  const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
+  // World App 强制 Permit2 approve expiration = 0
+  // 文档表述容易误导, 但实测 limit=0 是 World App 硬性要求
+  // 不要因为 Uniswap docs 说 0 = 立刻过期就改 - World App 有特殊语义
+  const permit2Expiration = 0;
+  const permit2Param = {
+    permitted: {
+      token: quote.tokens.from.address,
+      amount: assertUint160(executableAmount),
+    },
+    spender: permit2Spender,
+    nonce: null,
+    deadline: permit2Expiration,
+    sigDeadline: null,
+  };
   console.log("[SWAP] fee config:", feeConfig);
   console.log("[SWAP DEBUG] sell direction:", quote.tokens.from.symbol !== "WLD" && quote.tokens.to.symbol === "WLD");
-  console.log("[SWAP DEBUG] permit2 param:", null);
-  console.log("[SWAP DEBUG] universal router commands:", null);
-  console.log("[SWAP DEBUG] universal router inputs lengths:", null);
-  console.log("[SWAP DEBUG] v3 router approve:", {
-    token: quote.tokens.from.address,
-    spender: UNISWAP_V3_SWAP_ROUTER_02,
-    amount: executableAmount.toString(),
-  });
+  console.log(
+    "[SWAP DEBUG] permit2 param:",
+    JSON.stringify(permit2Param, (_key, value) => (typeof value === "bigint" ? value.toString() : value)),
+  );
+  console.log("[SWAP DEBUG] universal router commands:", universalRouterCommands);
+  console.log("[SWAP DEBUG] universal router inputs lengths:", universalRouter?.inputLengths ?? null);
+  // World App rejects broad ERC20 approve flows for many tokens, so keep the
+  // executable batch on the Permit2 + Universal Router path that is already
+  // supported by MiniKit.
   const transactions = [
     {
-      to: quote.tokens.from.address,
+      to: PERMIT2_ADDRESS,
       data: encodeFunctionData({
-        abi: [swapErc20Abi[2]],
+        abi: [permit2Abi[0]],
         functionName: "approve",
-        args: [UNISWAP_V3_SWAP_ROUTER_02, executableAmount],
+        args: [quote.tokens.from.address, permit2Spender, assertUint160(executableAmount), permit2Expiration],
       }),
       value: "0x0",
     },
@@ -154,7 +197,8 @@ async function submitBuiltSwap(
     platformFee: built.platformFee ?? null,
     serverDebug: built.debug ?? null,
     feeConfig,
-    router: UNISWAP_V3_SWAP_ROUTER_02,
+    universalRouterCommands,
+    permit2Spender,
     transactions: transactions.map((item, index) => ({
       index,
       to: item.to,
@@ -206,6 +250,19 @@ async function submitBuiltSwap(
     minOut: formatUnits(applySlippage(expectedOut, params.slippageBps), executableQuote.tokens.to.decimals),
     quote: executableQuote,
   };
+}
+
+function decodeUniversalRouterExecute(data: `0x${string}`) {
+  try {
+    const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
+    const inputs = decoded.args[1] as readonly `0x${string}`[];
+    return {
+      commands: String(decoded.args[0]),
+      inputLengths: inputs.map((input) => input.length),
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse> {
@@ -282,6 +339,12 @@ function applySlippage(amount: bigint, slippageBps: number) {
   return (amount * BigInt(10_000 - slippageBps)) / 10_000n;
 }
 
+function assertUint160(amount: bigint) {
+  const maxUint160 = (1n << 160n) - 1n;
+  if (amount > maxUint160) throw new Error("Swap amount exceeds Permit2 allowance limit.");
+  return amount;
+}
+
 function attachSwapDebug(error: unknown, debug: unknown) {
   const err = error instanceof Error ? error : new Error(String(error || "Swap failed."));
   (err as Error & { debug?: unknown }).debug = debug;
@@ -290,7 +353,7 @@ function attachSwapDebug(error: unknown, debug: unknown) {
 
 export function friendlySwapError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "Swap failed.");
-  if (/invalid_token/i.test(message)) return "Token not active in World App";
+  if (/invalid_token/i.test(message)) return "Token not active in World App Permit2 list";
   if (/invalid_contract/i.test(message)) return "Token not supported";
   if (/disallowed_operation/i.test(message)) return "Blocked by World App";
   if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(message)) return "Approval failed";

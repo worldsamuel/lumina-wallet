@@ -5,8 +5,9 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { getWorldChainMarketForToken } from "@/lib/market-data";
 import type { OnchainPricesResponse } from "@/lib/prices";
 import { buildSwapTransaction } from "@/lib/swap/build-swap-tx";
-import { UNISWAP_V3_SWAP_ROUTER_02 } from "@/lib/swap/contracts";
+import { UNIVERSAL_ROUTER_ADDRESS } from "@/lib/swap/contracts";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
+import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
 import type { SwapQuoteResult } from "@/lib/swap/quote-types";
 import type { SwapToken } from "@/lib/swap/tokens";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
   }
 
   const amountIn = parsed.fromAmount;
-  const platformFeeConfig = null;
+  const platformFeeConfig = getSwapPlatformFeeConfig();
   console.log("[SWAP] fee config:", platformFeeConfig);
   const clientQuote = trustedClientQuote(body?.quote, parsed.from, parsed.to, amountIn);
   const bestQuote = clientQuote ?? (await quoteBestV3(parsed.from, parsed.to, amountIn)).bestQuote;
@@ -68,8 +69,7 @@ export async function POST(req: NextRequest) {
     return jsonResponse({ error: "No executable Uniswap V3 route for this pair." }, { status: 404 });
   }
   const grossAmountOutRaw = BigInt(bestQuote.amountOutRaw);
-  const netAmountOut = grossAmountOutRaw;
-  const platformFee = null;
+  const { netAmountOut, payload: platformFee } = applySwapOutputFee(parsed.to, grossAmountOutRaw, platformFeeConfig);
 
   const tx = await buildSwapTransaction({
     fromToken: parsed.from,
@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
       },
     },
     platformFee,
+    permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
     deadline: parsed.deadline,
     debug: {
       direction: `${parsed.from.symbol}->${parsed.to.symbol}`,
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
       route: bestQuote.route,
       platformFeeConfig,
       platformFee,
-      router: UNISWAP_V3_SWAP_ROUTER_02,
+      permit2Spender: UNIVERSAL_ROUTER_ADDRESS,
       deadline: parsed.deadline,
       txTo: tx.to,
       txValue: tx.value,

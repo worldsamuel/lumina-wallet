@@ -1,7 +1,8 @@
 import { type Address } from "viem";
 
 export const WORLD_CHAIN_ID = 480;
-export const UNISWAP_V3_SWAP_ROUTER_02 = "0x091AD9e2e6e5eD44c1c66dB50e49A601F9f36cF6" as Address;
+export const UNIVERSAL_ROUTER_ADDRESS = "0x8ac7bee993bb44dab564ea4bc9ea67bf9eb5e743" as Address;
+export const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3" as Address;
 export const UNISWAP_V3_QUOTER_V2 = "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c" as Address;
 export const UNISWAP_V3_FACTORY = "0x7a5028BDa40e7B173C278C5342087826455ea25a" as Address;
 
@@ -35,27 +36,33 @@ export const swapErc20Abi = [
   },
 ] as const;
 
-export const v3SwapRouterAbi = [
+export const permit2Abi = [
   {
     type: "function",
-    name: "exactInputSingle",
-    stateMutability: "payable",
+    name: "approve",
+    stateMutability: "nonpayable",
     inputs: [
-      {
-        name: "params",
-        type: "tuple",
-        components: [
-          { name: "tokenIn", type: "address" },
-          { name: "tokenOut", type: "address" },
-          { name: "fee", type: "uint24" },
-          { name: "recipient", type: "address" },
-          { name: "amountIn", type: "uint256" },
-          { name: "amountOutMinimum", type: "uint256" },
-          { name: "sqrtPriceLimitX96", type: "uint160" },
-        ],
-      },
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
     ],
-    outputs: [{ name: "amountOut", type: "uint256" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "token", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [
+      { name: "amount", type: "uint160" },
+      { name: "expiration", type: "uint48" },
+      { name: "nonce", type: "uint48" },
+    ],
   },
 ] as const;
 
