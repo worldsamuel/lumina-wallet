@@ -2714,19 +2714,6 @@ function enhancePrototypeHome() {
         if (amount > 0 && price > 0) return amount * price;
         return Number(asset && asset.usdNum || 0);
       }
-      function earnPositionsUsdValue(){
-        return (morphoPositions || []).filter(nonZeroPosition).reduce(function(sum, pos){
-          var sym = pos.asset && pos.asset.symbol ? String(pos.asset.symbol).toUpperCase() : "";
-          var vault = morphoVaults.find(function(v){
-            return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
-          });
-          if (!sym && vault && vault.asset) sym = String(vault.asset.symbol || "").toUpperCase();
-          var price = priceForHome(sym);
-          var amount = Number(pos.assetsFormatted || 0);
-          return sum + (Number.isFinite(amount) && price > 0 ? amount * price : 0);
-        }, 0);
-      }
-      window.__luminaComputeEarnTotalUsd = earnPositionsUsdValue;
       window.__luminaRecomputeTotalWithEarn = function(){
         var base = Number(window.__luminaWalletBaseTotalUsd || 0);
         var earn = Number(window.__luminaEarnTotalUsd || 0);
@@ -2745,9 +2732,9 @@ function enhancePrototypeHome() {
           try { pct = Number(tokenChanges24h && tokenChanges24h[sym]); } catch(e) { pct = 0; }
           return sum + (Number.isFinite(pct) ? value * pct / 100 : 0);
         }, 0);
+        var earnTotal = Number(window.__luminaEarnTotalUsd || 0);
         window.__luminaWalletBaseTotalUsd = total;
-        window.__luminaEarnTotalUsd = earnPositionsUsdValue();
-        totalUsdNum = total + window.__luminaEarnTotalUsd;
+        totalUsdNum = total + (Number.isFinite(earnTotal) ? earnTotal : 0);
         change24hUsdNum = change;
         var balEl = document.getElementById("balAmt");
         if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);
