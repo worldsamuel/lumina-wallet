@@ -77,24 +77,57 @@
   .ann-item .ann-tag.warning { background: rgba(245,196,81,0.18); color: #ffd56b; }
   .ann-item .ann-tag.urgent { background: rgba(248,113,113,0.18); color: #ff8a8a; }
   .ann-item .ann-time { margin-left: auto; color: #a8aea8; font-size: 12px; }
-  .ann-item .ann-title { color: var(--text); font-weight: 800; font-size: 16px; margin-top: 11px; }
+  .ann-item .ann-title { display: block; color: var(--text); font-weight: 800; font-size: 16px; margin-top: 11px; }
   .ann-item .ann-body { color: #c6cbc6; font-size: 15px; line-height: 1.65; margin-top: 8px; }
   .ann-empty { padding: 40px var(--pad-screen); text-align: center; color: #b9beb9; font-size: 14px; }
-  .lumina-ann-mask { align-items: center; padding: max(18px, env(safe-area-inset-top)) 22px max(18px, env(safe-area-inset-bottom)); }
-  .lumina-ann-sheet { width: min(100%, 360px); max-height: min(70dvh, 560px); padding: 10px 0 14px; border-radius: 24px; border: 1px solid rgba(255,255,255,0.12); background: #101210; overflow: auto; position: relative; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
-  .lumina-ann-sheet h3 { padding: 0 54px 12px var(--pad-screen); font-size: 24px; font-weight: 950; }
-  .lumina-ann-close { position: absolute; top: 10px; right: 12px; z-index: 2; width: 36px; height: 36px; border: 0; border-radius: 999px; background: rgba(255,255,255,0.08); color: var(--text); font-size: 24px; line-height: 1; cursor: pointer; }
-  .lumina-ann-list { display: grid; gap: 0; }
-  .lumina-ann-row { width: 100%; display: block; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; cursor: pointer; }
-  .lumina-ann-row:last-child { border-bottom: 0; }
+  #annModal.open { align-items: stretch; justify-content: center; padding: 0; background: rgba(0,0,0,0.78); }
+  #annModal > .modal { width: min(100%, var(--phone-max)); max-height: none; min-height: 100dvh; border: 0; border-radius: 0; padding: max(20px, env(safe-area-inset-top)) var(--pad-screen) max(30px, env(safe-area-inset-bottom)); background: radial-gradient(82% 30% at 82% 17%, rgba(74,222,128,.16), transparent 68%), radial-gradient(70% 26% at 10% 0%, rgba(74,222,128,.06), transparent 70%), #000; overflow: auto; box-shadow: none; }
+  #annModal .modal-grip { display: none; }
+  #annModal h3 { padding: 46px 0 18px; font-size: 34px; line-height: 1.05; font-weight: 950; }
+  #annModal #annList { display: grid; gap: 12px; padding-bottom: 12px; }
+  #annModal .ann-item { border: 1px solid rgba(255,255,255,0.08); border-radius: 22px; background: linear-gradient(145deg, rgba(18,21,18,.96), rgba(7,8,7,.96)); box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 44px rgba(0,0,0,.2); }
+  #annModal .ann-item .ann-body { max-height: none; overflow-wrap: anywhere; }
+  .lumina-ann-mask { align-items: stretch; justify-content: center; padding: 0; background: rgba(0,0,0,0.78); }
+  .lumina-ann-sheet { width: min(100%, var(--phone-max)); max-height: none; min-height: 100dvh; padding: max(18px, env(safe-area-inset-top)) var(--pad-screen) max(28px, env(safe-area-inset-bottom)); border: 0; border-radius: 0; background: radial-gradient(82% 30% at 82% 17%, rgba(74,222,128,.16), transparent 68%), radial-gradient(70% 26% at 10% 0%, rgba(74,222,128,.06), transparent 70%), #000; overflow: auto; position: relative; box-shadow: none; }
+  .lumina-ann-sheet h3 { padding: 0; font-size: 28px; font-weight: 950; line-height: 1.08; }
+  .lumina-ann-close, .lumina-ann-back, .lumina-ann-share { width: 46px; height: 46px; border: 1px solid rgba(255,255,255,0.08); border-radius: 999px; background: rgba(24,26,24,0.84); color: var(--text); display: inline-grid; place-items: center; cursor: pointer; box-shadow: 0 12px 34px rgba(0,0,0,.34); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  .lumina-ann-close { position: absolute; top: max(18px, env(safe-area-inset-top)); right: var(--pad-screen); z-index: 2; font-size: 24px; line-height: 1; }
+  .lumina-ann-list { display: grid; gap: 12px; margin-top: 18px; }
+  .lumina-ann-row { width: 100%; display: block; border: 1px solid rgba(255,255,255,0.08); border-radius: 22px; background: linear-gradient(145deg, rgba(18,21,18,.96), rgba(7,8,7,.96)); text-align: left; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 18px 44px rgba(0,0,0,.2); }
+  .lumina-ann-row:last-child { border-bottom: 1px solid rgba(255,255,255,0.08); }
   .lumina-ann-row .ann-body { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .lumina-ann-row:active { background: rgba(255,255,255,0.04); }
-  .lumina-ann-detail-sheet { width: min(100%, 360px); padding: 22px; border-radius: 28px; overflow: visible; }
-  .lumina-ann-detail-sheet .lumina-ann-close { top: 16px; right: 16px; width: 38px; height: 38px; font-size: 26px; }
-  .lumina-ann-detail-kicker { min-height: 38px; padding-right: 48px; display: flex; align-items: center; gap: 10px; color: var(--text-mute); font-size: 13px; font-weight: 750; }
-  .lumina-ann-detail-kicker .ann-tag { display: inline-flex; width: fit-content; }
-  .lumina-ann-detail-sheet h3 { padding: 18px 0 0; margin: 0; font-size: 25px; line-height: 1.16; letter-spacing: 0; }
-  .lumina-ann-content { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); color: #cbd0cb; font-size: 15px; line-height: 1.72; overflow-wrap: anywhere; }
+  .lumina-ann-row:active { transform: scale(.99); background: rgba(255,255,255,0.04); }
+  .lumina-ann-detail-sheet { display: flex; flex-direction: column; gap: 0; }
+  .lumina-ann-detail-top { display: flex; align-items: center; justify-content: space-between; min-height: 52px; }
+  .lumina-ann-back svg, .lumina-ann-share svg { width: 22px; height: 22px; }
+  .lumina-ann-hero { position: relative; padding: 38px 0 24px; min-height: 290px; overflow: hidden; }
+  .lumina-ann-orbit { position: absolute; right: -44px; top: 72px; width: 210px; height: 154px; border-radius: 50%; border: 1px solid rgba(74,222,128,.34); transform: rotate(-9deg); box-shadow: 0 0 48px rgba(74,222,128,.13), inset 0 0 42px rgba(74,222,128,.08); }
+  .lumina-ann-orbit::before, .lumina-ann-orbit::after { content: ""; position: absolute; inset: 28px; border: 1px solid rgba(74,222,128,.2); border-radius: 50%; }
+  .lumina-ann-orbit::after { inset: 58px; background: radial-gradient(circle, rgba(74,222,128,.45), transparent 58%); filter: blur(.2px); }
+  .lumina-ann-shield { position: absolute; right: 34px; top: 88px; width: 94px; height: 112px; color: var(--green); filter: drop-shadow(0 18px 34px rgba(74,222,128,.24)); opacity: .92; }
+  .lumina-ann-detail-kicker { min-height: 38px; display: inline-flex; align-items: center; gap: 10px; color: var(--text-mute); font-size: 13px; font-weight: 800; }
+  .lumina-ann-detail-kicker .ann-tag { display: inline-flex; width: fit-content; border-radius: 999px; padding: 9px 14px; border: 1px solid rgba(74,222,128,.2); }
+  .lumina-ann-detail-sheet h3 { position: relative; z-index: 1; width: min(100%, 300px); padding: 28px 0 0; margin: 0; font-size: 39px; line-height: 1.05; letter-spacing: 0; }
+  .lumina-ann-summary { position: relative; z-index: 1; width: min(100%, 290px); margin-top: 18px; color: #c9cfc9; font-size: 18px; line-height: 1.45; font-weight: 650; }
+  .lumina-ann-meta { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 24px; color: #a8aea8; font-size: 13px; font-weight: 750; }
+  .lumina-ann-meta span { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+  .lumina-ann-meta svg { width: 16px; height: 16px; color: #b8beb8; }
+  .lumina-ann-status-card { margin-top: 2px; border: 1px solid rgba(255,255,255,.09); border-radius: 26px; overflow: hidden; background: linear-gradient(145deg, rgba(15,18,15,.96), rgba(4,5,4,.98)); box-shadow: 0 22px 70px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.05); }
+  .lumina-ann-status-head { display: grid; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 14px; padding: 24px; background: linear-gradient(140deg, rgba(74,222,128,.12), rgba(74,222,128,.02)); border-bottom: 1px solid rgba(255,255,255,.08); }
+  .lumina-ann-status-icon { width: 58px; height: 58px; border-radius: 20px; display: grid; place-items: center; color: var(--green); background: rgba(74,222,128,.11); box-shadow: inset 0 0 0 1px rgba(74,222,128,.2); }
+  .lumina-ann-status-head strong { display: block; color: var(--text); font-size: 18px; line-height: 1.2; }
+  .lumina-ann-status-head b { display: block; margin-top: 7px; color: var(--green); font-size: 17px; }
+  .lumina-ann-content { padding: 26px 22px 24px; color: #d5dbd5; font-size: 17px; line-height: 1.72; overflow-wrap: anywhere; white-space: normal; }
+  .lumina-ann-content-title { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; color: var(--text); font-size: 20px; font-weight: 900; }
+  .lumina-ann-content-title::before { content: ""; width: 6px; height: 32px; border-radius: 999px; background: var(--green); box-shadow: 0 0 18px rgba(74,222,128,.38); }
+  .lumina-ann-facts { margin: 20px 0 4px; padding: 8px 18px; border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.035); }
+  .lumina-ann-fact { display: grid; grid-template-columns: 28px minmax(0,1fr) minmax(0,1.25fr); align-items: center; gap: 10px; min-height: 54px; border-bottom: 1px solid rgba(255,255,255,.07); color: #e4e9e4; font-size: 14px; }
+  .lumina-ann-fact:last-child { border-bottom: 0; }
+  .lumina-ann-fact svg { width: 20px; height: 20px; color: #bff6d0; }
+  .lumina-ann-fact span { color: #cbd0cb; }
+  .lumina-ann-fact b { min-width: 0; text-align: right; font-weight: 750; overflow-wrap: anywhere; }
+  .lumina-ann-helpful { display: grid; grid-template-columns: minmax(0,1fr) 54px 54px; align-items: center; gap: 10px; margin-top: 22px; padding: 16px; border-radius: 24px; border: 1px solid rgba(74,222,128,.16); background: linear-gradient(145deg, rgba(74,222,128,.1), rgba(255,255,255,.035)); color: var(--text); font-size: 15px; font-weight: 850; }
+  .lumina-ann-helpful button { width: 54px; height: 54px; border: 1px solid rgba(255,255,255,.09); border-radius: 999px; background: rgba(255,255,255,.06); color: var(--text); display: grid; place-items: center; }
   /* Help / About 文章样式 */
   .article { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-card); padding: 22px; }
   .article h2 { font-size: 18px; font-weight: 700; margin-bottom: 14px; }

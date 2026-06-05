@@ -2349,6 +2349,24 @@ function enhancePrototypeHome() {
       function annList(){
         try { return JSON.parse(localStorage.getItem("ww_announcements") || "[]"); } catch(e) { return []; }
       }
+      function annIcon(name){
+        if (name === "back") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 18l-6-6 6-6"/></svg>';
+        if (name === "share") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/></svg>';
+        if (name === "check") return '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><circle cx="12" cy="12" r="9"/><path d="M8 12.4l2.6 2.6L16.5 9"/></svg>';
+        if (name === "calendar") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
+        if (name === "user") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>';
+        if (name === "tag") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 13l-7 7L4 11V4h7l9 9z"/><path d="M7.5 7.5h.01"/></svg>';
+        if (name === "world") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 010 18M12 3a15 15 0 000 18"/></svg>';
+        if (name === "box") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8l-9-5-9 5v8l9 5 9-5z"/><path d="M3.5 8.5L12 13l8.5-4.5M12 13v8"/></svg>';
+        if (name === "clock") return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+        if (name === "thumb") return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 11v10H4a2 2 0 01-2-2v-6a2 2 0 012-2h3z"/><path d="M7 11l4-8a3 3 0 013 3v3h5a2 2 0 012 2l-1 7a3 3 0 01-3 3H7"/></svg>';
+        if (name === "thumbDown") return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 13V3h3a2 2 0 012 2v6a2 2 0 01-2 2h-3z"/><path d="M17 13l-4 8a3 3 0 01-3-3v-3H5a2 2 0 01-2-2l1-7a3 3 0 013-3h10"/></svg>';
+        return "";
+      }
+      function annSummary(body){
+        var text = String(body || "").replace(/\\s+/g, " ").trim();
+        return text.length > 92 ? text.slice(0, 92).replace(/[,.，。;；:]?\\s*$/, "") + "." : text;
+      }
       function closeLuminaAnnouncement(){
         var old = document.getElementById("luminaAnnouncementModal");
         if (old) { old.classList.remove("open"); setTimeout(function(){ old.remove(); }, 180); }
@@ -2357,15 +2375,40 @@ function enhancePrototypeHome() {
         var old = document.getElementById("luminaAnnouncementModal");
         if (!old) return;
         var tag = String(item && item.tag || "notice");
+        var title = annPickText(item, "title");
+        var body = annPickText(item, "body");
+        var time = String(item && item.time || "");
+        var publisher = String(item && (item.author || item.createdBy || item.publisher) || "lumina-admin");
+        var annId = item && item.id ? "#ANN-" + String(item.id).padStart(6, "0") : "#ANN";
         old.innerHTML =
           '<div class="modal lumina-ann-sheet lumina-ann-detail-sheet">' +
-            '<button type="button" class="lumina-ann-close" id="luminaAnnBack" aria-label="Close">×</button>' +
-            '<div class="lumina-ann-detail-kicker"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span><span>' + annEscape(item && item.time || "") + '</span></div>' +
-            '<h3>' + annEscape(annPickText(item, "title")) + '</h3>' +
-            '<div class="lumina-ann-content">' + annEscape(annPickText(item, "body")).replace(/\\n/g, "<br>") + '</div>' +
+            '<div class="lumina-ann-detail-top"><button type="button" class="lumina-ann-back" id="luminaAnnBack" aria-label="Back">' + annIcon("back") + '</button><button type="button" class="lumina-ann-share" id="luminaAnnShare" aria-label="Share">' + annIcon("share") + '</button></div>' +
+            '<section class="lumina-ann-hero">' +
+              '<div class="lumina-ann-orbit"></div>' +
+              '<svg class="lumina-ann-shield" viewBox="0 0 120 140" fill="none"><path d="M60 8l42 16v34c0 31-17 56-42 72-25-16-42-41-42-72V24L60 8z" fill="rgba(74,222,128,.12)" stroke="currentColor" stroke-width="4"/><path d="M38 69l16 16 31-35" stroke="currentColor" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+              '<div class="lumina-ann-detail-kicker"><span class="ann-tag ' + annEscape(tag) + '">' + annEscape(annTagText(tag)) + '</span></div>' +
+              '<h3>' + annEscape(title) + '</h3>' +
+              '<p class="lumina-ann-summary">' + annEscape(annSummary(body)) + '</p>' +
+              '<div class="lumina-ann-meta"><span>' + annIcon("calendar") + annEscape(time) + '</span><span>' + annIcon("user") + annEscape(publisher) + '</span><span>' + annIcon("tag") + annEscape(annTagText(tag)) + '</span></div>' +
+            '</section>' +
+            '<section class="lumina-ann-status-card">' +
+              '<div class="lumina-ann-status-head"><div class="lumina-ann-status-icon">' + annIcon("check") + '</div><div><strong>Status</strong><b>Successful</b></div></div>' +
+              '<div class="lumina-ann-content"><div class="lumina-ann-content-title">What happened</div>' + annEscape(body).replace(/\\n/g, "<br>") +
+                '<div class="lumina-ann-facts">' +
+                  '<div class="lumina-ann-fact">' + annIcon("box") + '<span>Announcement ID</span><b>' + annEscape(annId) + '</b></div>' +
+                  '<div class="lumina-ann-fact">' + annIcon("user") + '<span>Published by</span><b>' + annEscape(publisher) + '</b></div>' +
+                  '<div class="lumina-ann-fact">' + annIcon("clock") + '<span>Published at</span><b>' + annEscape(time) + '</b></div>' +
+                  '<div class="lumina-ann-fact">' + annIcon("tag") + '<span>Category</span><b>' + annEscape(annTagText(tag)) + '</b></div>' +
+                  '<div class="lumina-ann-fact">' + annIcon("world") + '<span>Network</span><b>World Chain</b></div>' +
+                '</div>' +
+              '</div>' +
+            '</section>' +
+            '<div class="lumina-ann-helpful"><span>Was this announcement helpful?</span><button type="button">' + annIcon("thumb") + '</button><button type="button">' + annIcon("thumbDown") + '</button></div>' +
           '</div>';
         var back = document.getElementById("luminaAnnBack");
         if (back) back.onclick = function(event){ event.stopPropagation(); closeLuminaAnnouncement(); };
+        var share = document.getElementById("luminaAnnShare");
+        if (share) share.onclick = function(event){ event.stopPropagation(); toast("Announcement copied"); };
       }
       window.openAnnouncements = function(){
         var list = annList().slice().sort(function(a, b){ return Number(b.id || 0) - Number(a.id || 0); });
@@ -2387,7 +2430,8 @@ function enhancePrototypeHome() {
         modal.innerHTML =
           '<div class="modal lumina-ann-sheet">' +
             '<button type="button" class="lumina-ann-close" id="luminaAnnClose" aria-label="Close">×</button>' +
-            '<div class="modal-grip"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
+            '<div style="height:46px"></div><h3>' + annEscape(typeof t === "function" ? t("announcements") : "Announcements") + '</h3>' +
+            '<p class="lumina-ann-summary" style="width:auto;margin:12px 0 0;color:#aeb5ae;">Latest operational notices from Lumina.</p>' +
             '<div class="lumina-ann-list">' + rows + '</div>' +
           '</div>';
         document.body.appendChild(modal);
