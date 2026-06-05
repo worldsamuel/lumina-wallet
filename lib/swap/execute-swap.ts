@@ -317,6 +317,7 @@ function attachSwapDebug(error: unknown, debug: unknown) {
 
 export function friendlySwapError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "Swap failed.");
+  if (/invalid_token/i.test(message)) return "Token not active in World App Permit2 list";
   if (/invalid_contract/i.test(message)) return "Token not supported";
   if (/disallowed_operation/i.test(message)) return "Blocked by World App";
   if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(message)) return "Approval failed";

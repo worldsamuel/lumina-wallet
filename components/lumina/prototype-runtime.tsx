@@ -3531,6 +3531,7 @@ function enhancePrototypeSwapQuote() {
 	        var msg = window.__luminaFriendlySwapError ? window.__luminaFriendlySwapError(error) : raw;
 	        var text = String(raw || msg || "");
 	        if (/cancel|reject|rejected|user_rejected|取消/i.test(text)) return swapCopy("cancelled");
+	        if (/invalid_token/i.test(text)) return "Token not active in World App Permit2 list";
 	        if (/invalid_contract/i.test(text)) return swapCopy("unsupportedToken");
 	        if (/disallowed_operation/i.test(text)) return swapCopy("worldAppBlocked");
 	        if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(text)) return swapCopy("approvalFailed");
