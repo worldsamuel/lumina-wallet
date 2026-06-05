@@ -106,6 +106,61 @@ export async function executeSwap(params: ExecuteSwapParams) {
     userAddress: params.userAddress,
     quote: freshQuote,
   });
+  try {
+    return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
+  } catch (error) {
+    if (!built.platformFee || isUserCancellation(error)) throw error;
+    console.warn("[SWAP] MiniKit rejected fee-enabled tx, retrying without platform fee", error);
+    const fallbackQuote = {
+      ...freshQuote,
+      amountOut: freshQuote.grossAmountOut || freshQuote.amountOut,
+      amountOutRaw: freshQuote.grossAmountOutRaw || freshQuote.amountOutRaw,
+      platformFee: null,
+    };
+    const fallbackBuilt = await buildSwapTxOnServer({
+      fromToken: fallbackQuote.tokens.from,
+      toToken: fallbackQuote.tokens.to,
+      fromAmountHuman: params.fromAmountHuman,
+      slippageBps: params.slippageBps,
+      userAddress: params.userAddress,
+      quote: fallbackQuote,
+      skipPlatformFee: true,
+    });
+    return await submitBuiltSwap(fallbackBuilt, fallbackQuote, params, fromAmount, "fee-fallback");
+  }
+}
+
+const universalRouterExecuteAbi = [
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+      { name: "deadline", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "execute",
+    stateMutability: "payable",
+    inputs: [
+      { name: "commands", type: "bytes" },
+      { name: "inputs", type: "bytes[]" },
+    ],
+    outputs: [],
+  },
+] as const;
+
+async function submitBuiltSwap(
+  built: BuildTxResponse,
+  quote: QuoteResponse,
+  params: ExecuteSwapParams,
+  fromAmount: bigint,
+  attempt: "primary" | "fee-fallback",
+) {
   const tx = built.tx;
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
@@ -119,23 +174,22 @@ export async function executeSwap(params: ExecuteSwapParams) {
   // supported by MiniKit.
   // Official MiniKit docs require expiration=0 for Permit2 allowance transfers.
   const permit2Expiration = 0;
-
   const transactions = [
     {
       to: PERMIT2_ADDRESS,
       data: encodeFunctionData({
         abi: [permit2Abi[0]],
         functionName: "approve",
-        args: [freshQuote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(executableAmount), permit2Expiration],
+        args: [quote.tokens.from.address, UNIVERSAL_ROUTER_ADDRESS, assertUint160(executableAmount), permit2Expiration],
       }),
       value: "0x0",
     },
     tx,
   ];
-
   const debug = {
-    fromToken: freshQuote.tokens.from,
-    toToken: freshQuote.tokens.to,
+    attempt,
+    fromToken: quote.tokens.from,
+    toToken: quote.tokens.to,
     fromAmountHuman: params.fromAmountHuman,
     executableAmountRaw: executableAmount.toString(),
     expectedOutRaw: expectedOut.toString(),
@@ -196,30 +250,6 @@ export async function executeSwap(params: ExecuteSwapParams) {
   };
 }
 
-const universalRouterExecuteAbi = [
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-      { name: "deadline", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-    ],
-    outputs: [],
-  },
-] as const;
-
 function decodeUniversalRouterCommands(data: `0x${string}`) {
   try {
     const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
@@ -249,7 +279,7 @@ async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse
   return data as QuoteResponse;
 }
 
-async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxResponse> {
+async function buildSwapTxOnServer(params: ExecuteSwapParams & { skipPlatformFee?: boolean }): Promise<BuildTxResponse> {
   const response = await fetch("/api/swap/build-tx", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -262,6 +292,7 @@ async function buildSwapTxOnServer(params: ExecuteSwapParams): Promise<BuildTxRe
       fromAmount: params.fromAmountHuman,
       slippageBps: params.slippageBps,
       userAddress: params.userAddress,
+      skipPlatformFee: params.skipPlatformFee,
       quote: params.quote
         ? {
             source: params.quote.source,
@@ -313,6 +344,11 @@ function attachSwapDebug(error: unknown, debug: unknown) {
   const err = error instanceof Error ? error : new Error(String(error || "Swap failed."));
   (err as Error & { debug?: unknown }).debug = debug;
   return err;
+}
+
+function isUserCancellation(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /user_rejected|cancelled|canceled|rejected/i.test(message);
 }
 
 export function friendlySwapError(error: unknown) {
