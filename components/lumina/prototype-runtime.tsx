@@ -4950,16 +4950,12 @@ function enhancePrototypeDetail() {
               updateRangeChangeFromMarket(asset, range || "1D");
             });
         }
-        if (address) {
-          renderHistory(!market || !market.poolAddress ? detailCopy("noDexPool") : null);
-          return;
-        }
         if (!market || !market.poolAddress) {
           renderHistory(detailCopy("noDexPool"));
           return;
         }
         chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
-        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
+        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || ""), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
@@ -4967,21 +4963,11 @@ function enhancePrototypeDetail() {
               renderCandlesChart(chart, candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
-              if (address) {
-                chart.innerHTML = liveMarketSummary(asset, range || "1D", detailCopy("emptyOhlcv"));
-                updateRangeChangeFromMarket(asset, range || "1D");
-              } else {
-                renderHistory(detailCopy("emptyOhlcv"));
-              }
+              renderHistory(detailCopy("emptyOhlcv"));
             }
           })
           .catch(function(){
-            if (address) {
-              chart.innerHTML = liveMarketSummary(asset, range || "1D", detailCopy("ohlcvFailed"));
-              updateRangeChangeFromMarket(asset, range || "1D");
-            } else {
-              renderHistory(detailCopy("ohlcvFailed"));
-            }
+            renderHistory(detailCopy("ohlcvFailed"));
           });
       }
       function updateRangeChange(candles, range, asset){

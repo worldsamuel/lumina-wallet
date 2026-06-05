@@ -16,6 +16,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const pool = url.searchParams.get("pool") ?? "";
+  const token = url.searchParams.get("token") ?? "";
   const range = (url.searchParams.get("range") ?? "1D").toUpperCase();
   const configs =
     range === "1H"
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   try {
     for (const config of configs) {
-      const candles = await getPoolOhlcv(pool, config.timeframe, config.aggregate, config.limit);
+      const candles = await getPoolOhlcv(pool, config.timeframe, config.aggregate, config.limit, token);
       if (candles.length) return jsonResponse({ pool, range, candles });
     }
     return jsonResponse({ pool, range, candles: [] });
