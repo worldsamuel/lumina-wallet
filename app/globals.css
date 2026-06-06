@@ -853,6 +853,8 @@
   .me-row:last-child { border-bottom: none; }
   .me-row:active { background: var(--surface-2); }
   .me-row .ic { width: 36px; height: 36px; border-radius: 10px; background: var(--surface-2); display: grid; place-items: center; color: var(--green); flex-shrink: 0; }
+  .me-row .feedback-ic { position: relative; }
+  .me-row .feedback-ic b { position: absolute; left: -5px; top: -5px; min-width: 17px; height: 17px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; border: 2px solid var(--surface); display: none; place-items: center; font-size: 10px; font-weight: 800; line-height: 1; }
   .me-row .lbl { flex: 1; font-size: 15px; font-weight: 500; }
   .me-row .val { color: var(--text-mute); font-size: 14px; }
   .me-row .chev { color: var(--text-mute); display: inline-flex; }

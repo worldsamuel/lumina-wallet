@@ -4599,6 +4599,9 @@ function enhancePrototypeMe() {
       function row(icon, label, value, action, extra) {
         return '<div class="me-row" ' + (action ? 'onclick="' + action + '"' : '') + '><span class="ic">' + meIcon(icon) + '</span><span class="lbl">' + label + '</span>' + (value ? '<span class="val">' + value + '</span>' : '') + (extra || '<span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span>') + '</div>';
       }
+      function feedbackRow(label) {
+        return '<div class="me-row" onclick="openFeedback()"><span class="ic feedback-ic">' + meIcon("feedback") + '<b id="feedbackUnreadDot">1</b></span><span class="lbl">' + label + '</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>';
+      }
       function toggleHtml(){
         return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
       }
@@ -4728,6 +4731,27 @@ function enhancePrototypeMe() {
         if (contact) contact.setAttribute("placeholder", c.contactPlaceholder);
         if (btn && !btn.disabled) btn.textContent = c.send;
       }
+      function feedbackReadKey(){
+        return "lumina_feedback_read_at_" + (window.__luminaUserAddress || "guest").toLowerCase();
+      }
+      function getFeedbackReadAt(){
+        try { return Number(localStorage.getItem(feedbackReadKey()) || "0"); } catch(e) { return 0; }
+      }
+      function setFeedbackReadAt(value){
+        try { localStorage.setItem(feedbackReadKey(), String(value || Date.now())); } catch(e) {}
+      }
+      function replyTime(item){
+        var at = item && item.repliedAt ? new Date(item.repliedAt).getTime() : 0;
+        return Number.isFinite(at) ? at : 0;
+      }
+      function updateFeedbackUnread(rows){
+        var dot = document.getElementById("feedbackUnreadDot");
+        if (!dot) return;
+        var readAt = getFeedbackReadAt();
+        var count = (rows || []).filter(function(item){ return item && item.reply && replyTime(item) > readAt; }).length;
+        dot.textContent = String(Math.min(count, 9));
+        dot.style.display = count > 0 ? "grid" : "none";
+      }
       function ensureFeedbackModal(){
         if (document.getElementById("feedbackModal")) { updateFeedbackCopy(); return; }
         var modal = document.createElement("div");
@@ -4744,13 +4768,18 @@ function enhancePrototypeMe() {
         document.body.appendChild(modal);
         updateFeedbackCopy();
       }
-      window.loadFeedbackReplies = async function(){
+      window.loadFeedbackReplies = async function(markRead){
         var box = document.getElementById("feedbackReplies");
         if (!box || !window.__luminaUserAddress) return;
         try {
           var res = await fetch("/api/feedback?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
           var rows = await res.json().catch(function(){ return []; });
-          if (!res.ok || !Array.isArray(rows) || !rows.length) { box.innerHTML = ""; return; }
+          if (!res.ok || !Array.isArray(rows) || !rows.length) { box.innerHTML = ""; updateFeedbackUnread([]); return; }
+          if (markRead) {
+            var latestReplyAt = rows.reduce(function(max, item){ return Math.max(max, replyTime(item)); }, 0);
+            if (latestReplyAt) setFeedbackReadAt(latestReplyAt);
+          }
+          updateFeedbackUnread(rows);
           box.innerHTML = '<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px;">Team replies</div>' + rows.map(function(item){
             var reply = item.reply ? '<div style="margin-top:8px;padding:10px;border-radius:12px;background:rgba(74,222,128,.12);color:var(--text);"><strong>Lumina:</strong> ' + escapeHtml(item.reply) + '</div>' : '';
             return '<div style="border-top:1px solid var(--line);padding:10px 0;font-size:13px;line-height:1.5;"><div style="color:var(--text-dim);">' + escapeHtml(item.message) + '</div>' + reply + '</div>';
@@ -4765,7 +4794,7 @@ function enhancePrototypeMe() {
         document.getElementById("feedbackText").value = "";
         document.getElementById("feedbackContact").value = "";
         document.getElementById("feedbackModal").classList.add("open");
-        if (typeof loadFeedbackReplies === "function") loadFeedbackReplies();
+        if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(true);
       };
       window.closeFeedback = function(){
         var modal = document.getElementById("feedbackModal");
@@ -4840,7 +4869,7 @@ function enhancePrototypeMe() {
           '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
           '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">' + name + ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>' + short + '</span>' + (address ? '<button type="button" class="me-copy-btn" onclick="copyMeAddress(event)" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>' : '') + '</div><span class="me-orb">' + c.connected + '</span></div><button type="button" class="me-points-chip" onclick="openPointsCenter()"><b id="mePointsBadge">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b><span>' + c.points + '</span></button></div>' +
           '<div class="me-group-label">' + c.support + '</div><div class="me-group">' +
-            row("feedback", c.feedback, "", "openFeedback()") +
+            feedbackRow(c.feedback) +
           '</div>' +
           '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
             row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
@@ -4859,6 +4888,7 @@ function enhancePrototypeMe() {
         ensureFeedbackModal();
         ensureMediaModal();
         refreshPoints();
+        if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
       window.openPointsCenter = function(){
         var c = meCopy();
