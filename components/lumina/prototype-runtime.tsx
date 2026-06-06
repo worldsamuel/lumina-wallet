@@ -2515,6 +2515,16 @@ function enhancePrototypeHome() {
         });
       };
       function fixSignedMoney(){
+        function formatHomeBalanceMoney(value){
+          var n = Number(value);
+          if (!Number.isFinite(n)) return typeof formatMoney === "function" ? formatMoney(value) : "—";
+          var c = typeof curObj === "function" ? curObj() : { symbol:"$", code:"USD", rate:1 };
+          var converted = Math.abs(n) * Number(c.rate || 1);
+          return (n < 0 ? "-" : "") + c.symbol + converted.toLocaleString(undefined, {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1
+          });
+        }
         function setAnimatedHomeBalance(value, immediate){
           var balEl = document.getElementById("balAmt");
           if (!balEl || typeof formatMoney !== "function") return;
@@ -2524,7 +2534,7 @@ function enhancePrototypeHome() {
             return;
           }
           var nextValue = Number(value);
-          var nextText = formatMoney(nextValue);
+          var nextText = formatHomeBalanceMoney(nextValue);
           var previousValue = Number(balEl.getAttribute("data-balance-value"));
           var previousText = balEl.getAttribute("data-balance-text") || balEl.textContent || "";
           balEl.setAttribute("data-balance-value", String(Number.isFinite(nextValue) ? nextValue : 0));
@@ -2533,19 +2543,32 @@ function enhancePrototypeHome() {
             balEl.textContent = nextText;
             return;
           }
-          function escRollText(text){
+          function escFlipText(text){
             return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
           }
           var direction = nextValue >= previousValue ? "up" : "down";
-          balEl.innerHTML = '<span class="balance-roll-stack ' + direction + '"><span class="old">' + escRollText(previousText) + '</span><span class="new">' + escRollText(nextText) + '</span></span>';
+          var previousChars = String(previousText).split("");
+          var nextChars = String(nextText).split("");
+          var maxLen = Math.max(previousChars.length, nextChars.length);
+          while (previousChars.length < maxLen) previousChars.unshift(" ");
+          while (nextChars.length < maxLen) nextChars.unshift(" ");
+          var html = nextChars.map(function(nextChar, index){
+            var oldChar = previousChars[index] || " ";
+            var changed = oldChar !== nextChar && /[0-9]/.test(oldChar + nextChar);
+            var kind = /[0-9]/.test(nextChar) ? "num" : (nextChar === " " ? "spacer" : "mark");
+            var safeNext = nextChar === " " ? "&nbsp;" : escFlipText(nextChar);
+            var safeOld = oldChar === " " ? "&nbsp;" : escFlipText(oldChar);
+            if (!changed) return '<span class="balance-digit static ' + kind + '">' + safeNext + '</span>';
+            return '<span class="balance-digit flip num ' + direction + '"><span class="old">' + safeOld + '</span><span class="new">' + safeNext + '</span></span>';
+          }).join("");
+          balEl.innerHTML = '<span class="balance-flip-row">' + html + '</span>';
           window.clearTimeout(window.__luminaBalanceRollTimer);
           window.__luminaBalanceRollTimer = window.setTimeout(function(){
-            balEl.classList.remove("rolling-up", "rolling-down");
+            balEl.classList.remove("digits-flipping");
             balEl.textContent = nextText;
           }, 980);
           window.requestAnimationFrame(function(){
-            balEl.classList.remove("rolling-up", "rolling-down");
-            balEl.classList.add(direction === "up" ? "rolling-up" : "rolling-down");
+            balEl.classList.add("digits-flipping");
           });
         }
         window.__luminaSetAnimatedHomeBalance = setAnimatedHomeBalance;
@@ -2877,7 +2900,7 @@ function enhancePrototypeHome() {
         var html = visible.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         refreshHomeTotalFromAssets();
         if (!filter && verified.length > 10) {
-          html += '<button class="home-asset-fold-row" type="button" onclick="toggleHomeAssetFold()"><span>' + (expanded ? "−" : "+") + '</span>' + (expanded ? "收起代币" : "展开 " + hiddenCount + " 个代币") + '</button>';
+          html += '<button class="home-asset-fold-row" type="button" onclick="toggleHomeAssetFold()"><span>' + (expanded ? "−" : "+") + '</span>' + (expanded ? "Hide tokens" : "Show " + hiddenCount + " more tokens") + '</button>';
         }
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
