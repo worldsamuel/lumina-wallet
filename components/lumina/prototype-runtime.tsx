@@ -3776,11 +3776,12 @@ function enhancePrototypeSwapQuote() {
 	        if (!swapState) return;
 	        var sell = String(swapState.sell || "").toUpperCase();
 	        var buy = String(swapState.buy || "").toUpperCase();
-	        if (sell && sell !== "WLD" && buy !== "WLD") {
-	          swapState.buy = "WLD";
-	          return;
+	        if (!sell || !buy || sell !== buy) return;
+	        var fallback = sell === "WLD" ? "USDC" : "WLD";
+	        if (prices && !prices[fallback]) {
+	          fallback = Object.keys(prices).filter(function(sym){ return String(sym).toUpperCase() !== sell; })[0] || fallback;
 	        }
-	        if (sell === "WLD" && buy === "WLD") swapState.buy = "USDC";
+	        swapState.buy = fallback;
 	      }
 	      function swapRiskText(){
 	        if (!latestSwapQuote) return "";
