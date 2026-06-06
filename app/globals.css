@@ -259,7 +259,7 @@
   #view-home .home-round.verified { color: var(--green); }
   #view-home .home-round.bell em { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px #101210; }
   #view-home .balance-card { min-height: 194px; margin: 0 var(--pad-screen); padding: 28px 22px 22px; border-radius: 24px; border-color: rgba(255,255,255,0.12); background: radial-gradient(80% 120% at 108% 44%, rgba(74,222,128,0.22), rgba(74,222,128,0.05) 38%, transparent 64%), linear-gradient(100deg, #0c0d0c 0%, #101410 54%, #081009 100%); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.05), 0 22px 70px rgba(0,0,0,0.24); }
-  #view-home .balance-card .globe { right: -88px; top: 8px; width: 244px; height: 244px; opacity: .92; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.24) 0 8%, rgba(74,222,128,0.11) 9% 24%, transparent 54%); -webkit-mask: radial-gradient(circle at 55% 42%, #000 50%, transparent 76%); mask: radial-gradient(circle at 55% 42%, #000 50%, transparent 76%); animation: luminaGlobeBreathe 8.8s ease-in-out infinite; }
+  #view-home .balance-card .globe { right: -122px; top: 8px; width: 244px; height: 244px; opacity: .92; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.26) 0 9%, rgba(74,222,128,0.12) 10% 25%, transparent 56%); -webkit-mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); animation: luminaGlobeBreathe 8.8s ease-in-out infinite; }
   #view-home .balance-card .globe-ripple { position: absolute; inset: 88px; border: 1.4px solid rgba(82,246,130,0.5); border-radius: 50%; box-shadow: 0 0 16px rgba(74,222,128,0.24), inset 0 0 14px rgba(74,222,128,0.12); opacity: 0; transform: scale(.35); animation: luminaRipple 7.2s cubic-bezier(.25,.1,.2,1) infinite; }
   #view-home .balance-card .globe-ripple.r2 { animation-delay: 1.8s; border-color: rgba(82,246,130,0.42); }
   #view-home .balance-card .globe-ripple.r3 { animation-delay: 3.6s; border-color: rgba(74,222,128,0.34); }
@@ -284,6 +284,15 @@
   #view-home .balance-label { color: #a9afa9; font-size: 15px; font-weight: 600; gap: 10px; }
   #view-home .balance-label .eye { color: #8f958f; }
   #view-home .balance-amount { position: relative; z-index: 1; max-width: min(100%, 520px); margin: 16px 0 9px; font-size: clamp(40px, 12.4vw, 58px); line-height: .98; font-weight: 950; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+  #view-home .balance-amount .balance-roll-stack { display: grid; transition: transform .9s cubic-bezier(.22,.78,.18,1); will-change: transform; }
+  #view-home .balance-amount .balance-roll-stack .old,
+  #view-home .balance-amount .balance-roll-stack .new { grid-column: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #view-home .balance-amount .balance-roll-stack.up .new { grid-row: 2; }
+  #view-home .balance-amount .balance-roll-stack.down { transform: translateY(-100%); }
+  #view-home .balance-amount .balance-roll-stack.down .new { grid-row: 1; }
+  #view-home .balance-amount .balance-roll-stack.down .old { grid-row: 2; }
+  #view-home .balance-amount.rolling-up .balance-roll-stack.up { transform: translateY(-100%); }
+  #view-home .balance-amount.rolling-down .balance-roll-stack.down { transform: translateY(0); }
   #view-home .balance-change { position: relative; z-index: 1; font-size: 16px; font-weight: 800; color: var(--green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   #view-home .balance-change .sub { color: var(--green); font-weight: 800; margin-left: 8px; }
   #view-home .balance-change.down,
@@ -357,6 +366,8 @@
   #view-home .home-asset-chev { color: #787f78; font-size: 32px; line-height: 1; transform: translateY(-1px); }
   #view-home .home-add-token-row { width: calc(100% - 24px); min-height: 52px; margin: 12px; border: 1px dashed rgba(255,255,255,0.12); border-radius: 16px; background: transparent; color: var(--green); display: flex; align-items: center; justify-content: center; gap: 12px; font-size: 15px; font-weight: 850; cursor: pointer; }
   #view-home .home-add-token-row span { font-size: 25px; line-height: 1; transform: translateY(-1px); }
+  #view-home .home-asset-fold-row { width: calc(100% - 24px); min-height: 46px; margin: 12px 12px 0; border: 1px solid rgba(74,222,128,0.16); border-radius: 15px; background: rgba(74,222,128,0.06); color: #87efa8; display: flex; align-items: center; justify-content: center; gap: 9px; font-size: 14px; font-weight: 850; cursor: pointer; }
+  #view-home .home-asset-fold-row span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,0.14); color: var(--green); font-size: 17px; line-height: 1; }
   .asset-risk { display: inline-flex; align-items: center; vertical-align: middle; margin-left: 6px; padding: 2px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; }
   .asset-risk.low { background: rgba(74,222,128,0.13); color: var(--green); }
   .asset-risk.mid { background: rgba(245,196,81,0.13); color: #f5c451; }

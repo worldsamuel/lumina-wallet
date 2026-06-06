@@ -2515,6 +2515,40 @@ function enhancePrototypeHome() {
         });
       };
       function fixSignedMoney(){
+        function setAnimatedHomeBalance(value, immediate){
+          var balEl = document.getElementById("balAmt");
+          if (!balEl || typeof formatMoney !== "function") return;
+          if (typeof hidden !== "undefined" && hidden) {
+            balEl.textContent = "••••••";
+            balEl.removeAttribute("data-balance-value");
+            return;
+          }
+          var nextValue = Number(value);
+          var nextText = formatMoney(nextValue);
+          var previousValue = Number(balEl.getAttribute("data-balance-value"));
+          var previousText = balEl.getAttribute("data-balance-text") || balEl.textContent || "";
+          balEl.setAttribute("data-balance-value", String(Number.isFinite(nextValue) ? nextValue : 0));
+          balEl.setAttribute("data-balance-text", nextText);
+          if (immediate || !previousText || previousText === "—" || previousText === nextText || !Number.isFinite(previousValue)) {
+            balEl.textContent = nextText;
+            return;
+          }
+          function escRollText(text){
+            return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
+          }
+          var direction = nextValue >= previousValue ? "up" : "down";
+          balEl.innerHTML = '<span class="balance-roll-stack ' + direction + '"><span class="old">' + escRollText(previousText) + '</span><span class="new">' + escRollText(nextText) + '</span></span>';
+          window.clearTimeout(window.__luminaBalanceRollTimer);
+          window.__luminaBalanceRollTimer = window.setTimeout(function(){
+            balEl.classList.remove("rolling-up", "rolling-down");
+            balEl.textContent = nextText;
+          }, 980);
+          window.requestAnimationFrame(function(){
+            balEl.classList.remove("rolling-up", "rolling-down");
+            balEl.classList.add(direction === "up" ? "rolling-up" : "rolling-down");
+          });
+        }
+        window.__luminaSetAnimatedHomeBalance = setAnimatedHomeBalance;
         window.__luminaApplyBalancePrivacy = function(){
           var isHidden = typeof hidden !== "undefined" && !!hidden;
           var balEl = document.getElementById("balAmt");
@@ -2531,8 +2565,12 @@ function enhancePrototypeHome() {
           if (eye) {
             eye.onclick = function(){
               hidden = !hidden;
-              var balEl = document.getElementById("balAmt");
-              if (balEl) balEl.textContent = hidden ? "••••••" : formatMoney(totalUsdNum);
+              if (hidden) {
+                var balEl = document.getElementById("balAmt");
+                if (balEl) balEl.textContent = "••••••";
+              } else {
+                setAnimatedHomeBalance(totalUsdNum, true);
+              }
               window.__luminaApplyBalancePrivacy();
             };
           }
@@ -2646,11 +2684,9 @@ function enhancePrototypeHome() {
       function hasVisibleHomeBalance(asset){
         var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
         var n = Number(raw);
-        return Number.isFinite(n) && n > 0;
+        return Number.isFinite(n) && n >= 0.001;
       }
       function showOnHome(asset){
-        var sym = String(asset && asset.sym || "").toUpperCase();
-        if (fixedHomeTokens.has(sym)) return true;
         return !!(asset && hasVisibleHomeBalance(asset));
       }
       window.openHomeAsset = function(sym){
@@ -2786,8 +2822,7 @@ function enhancePrototypeHome() {
         var base = Number(window.__luminaWalletBaseTotalUsd || 0);
         var earn = Number(window.__luminaEarnTotalUsd || 0);
         totalUsdNum = base + (Number.isFinite(earn) ? earn : 0);
-        var balEl = document.getElementById("balAmt");
-        if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);
+        if (typeof window.__luminaSetAnimatedHomeBalance === "function") window.__luminaSetAnimatedHomeBalance(totalUsdNum);
         if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
       };
       function refreshHomeTotalFromAssets(homeAssets){
@@ -2804,8 +2839,7 @@ function enhancePrototypeHome() {
         window.__luminaWalletBaseTotalUsd = total;
         totalUsdNum = total + (Number.isFinite(earnTotal) ? earnTotal : 0);
         change24hUsdNum = change;
-        var balEl = document.getElementById("balAmt");
-        if (balEl && !(typeof hidden !== "undefined" && hidden)) balEl.textContent = formatMoney(totalUsdNum);
+        if (typeof window.__luminaSetAnimatedHomeBalance === "function") window.__luminaSetAnimatedHomeBalance(totalUsdNum);
         var subEl = document.getElementById("balSub");
         if (subEl) {
           var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
@@ -2837,8 +2871,14 @@ function enhancePrototypeHome() {
         var verified = (assets || []).filter(function(a){
           return showOnHome(a) && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
         });
-        var html = verified.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
+        var expanded = localStorage.getItem("lumina_home_assets_expanded") === "1";
+        var visible = filter || expanded ? verified : verified.slice(0, 10);
+        var hiddenCount = Math.max(0, verified.length - visible.length);
+        var html = visible.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         refreshHomeTotalFromAssets();
+        if (!filter && verified.length > 10) {
+          html += '<button class="home-asset-fold-row" type="button" onclick="toggleHomeAssetFold()"><span>' + (expanded ? "−" : "+") + '</span>' + (expanded ? "收起代币" : "展开 " + hiddenCount + " 个代币") + '</button>';
+        }
         html += '<button class="home-add-token-row" type="button" onclick="openTokenModal(\\'buy\\')"><span>＋</span> Add Token</button>';
         list.innerHTML = html || '<div class="article-empty">No assets detected yet</div>';
         list.ontouchstart = function(event){
@@ -2868,6 +2908,11 @@ function enhancePrototypeHome() {
           setHomeDebug("click:open-row", { symbol:row.getAttribute("data-home-symbol"), target:event && event.target && event.target.className });
           window.__luminaOpenHomeRow(event, row);
         };
+      };
+      window.toggleHomeAssetFold = function(){
+        var expanded = localStorage.getItem("lumina_home_assets_expanded") === "1";
+        localStorage.setItem("lumina_home_assets_expanded", expanded ? "0" : "1");
+        if (typeof renderAssets === "function") renderAssets();
       };
       ensureHomeShell();
       ensureHomeDebugButton();
