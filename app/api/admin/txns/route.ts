@@ -14,7 +14,7 @@ export async function GET() {
 
   const users = await db.user.findMany({
     orderBy: { lastLoginAt: "desc" },
-    take: 40,
+    take: 200,
     select: { address: true },
   });
   const addresses = users

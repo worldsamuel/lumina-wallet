@@ -25,6 +25,12 @@ function formatTokenAmount(value: bigint, decimals: number) {
   return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
+function isValidActivityHash(value: string) {
+  if (/^0x[a-fA-F0-9]{16,}$/.test(value)) return true;
+  if (value.startsWith("0xmock")) return true;
+  return /^[a-zA-Z0-9:_-]{8,160}$/.test(value);
+}
+
 async function getTokenMeta(address: Address) {
   const key = address.toLowerCase();
   const configured = ERC20_TOKENS.find((token) => token.contractAddress.toLowerCase() === key);
@@ -151,7 +157,7 @@ export async function POST(req: NextRequest) {
     metadata?: unknown;
   } | null;
   const hash = String(body?.hash || "").trim();
-  if (!/^0x[a-fA-F0-9]{16,}$/.test(hash) && !hash.startsWith("0xmock")) {
+  if (!isValidActivityHash(hash)) {
     return jsonResponse({ error: "Invalid transaction hash." }, { status: 400 });
   }
 

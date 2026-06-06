@@ -21,7 +21,7 @@ export async function GET() {
     db.user.count({ where: { createdAt: { gte: today } } }),
     db.user.findMany({
       orderBy: { lastLoginAt: "desc" },
-      take: 30,
+      take: 200,
       select: { address: true },
     }),
   ]);

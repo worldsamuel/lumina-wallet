@@ -19,6 +19,16 @@ function formatTokenAmount(value: bigint, decimals: number) {
   return trimmed ? `${whole}.${trimmed}` : whole;
 }
 
+function parseStoredAmount(amount?: string | null) {
+  const match = String(amount || "").match(/([+-]?\d[\d,]*(?:\.\d+)?)\s+([A-Za-z][A-Za-z0-9]{0,15})/);
+  if (!match) return { tokenSymbol: "", tokenAmount: 0 };
+  const tokenAmount = Math.abs(Number(match[1].replace(/,/g, "")));
+  return {
+    tokenSymbol: match[2].toUpperCase(),
+    tokenAmount: Number.isFinite(tokenAmount) ? tokenAmount : 0,
+  };
+}
+
 async function getTokenMeta(address: Address) {
   const key = address.toLowerCase();
   const configured = ERC20_TOKENS.find((token) => token.contractAddress.toLowerCase() === key);
@@ -93,54 +103,64 @@ export async function getRecentUserActivity(addresses: Address[], maxRows = 80) 
     console.error("Failed to load stored admin activity", error);
     return [];
   });
-  const storedRows: AdminActivityRow[] = stored.map((row) => ({
-    id: `stored-${row.id}`,
-    cat: row.type,
-    type: row.type,
-    typeT: row.type === "swap" ? "Swap" : row.type === "earn" ? "Earn" : row.type === "send" ? "Send" : row.type,
-    user: row.address ? shortAddress(row.address) : "Unknown",
-    amount: row.amount || "—",
-    hash: row.hash,
-    time: formatTxTime(row.createdAt.toISOString()),
-    status: row.status,
-    statusT: row.status === "completed" ? "Completed" : row.status,
-    createdAt: row.createdAt.toISOString(),
-    blockNumber: 0,
-    logIndex: row.id,
-    direction: row.type === "send" ? "out" : "in",
-    tokenSymbol: "",
-    tokenAmount: 0,
-    feeNative: 0,
-  }));
+  const storedRows: AdminActivityRow[] = stored.map((row) => {
+    const parsedAmount = parseStoredAmount(row.amount);
+    return {
+      id: `stored-${row.id}`,
+      cat: row.type,
+      type: row.type,
+      typeT: row.type === "swap" ? "Swap" : row.type === "earn" ? "Earn" : row.type === "send" ? "Send" : row.type,
+      user: row.address ? shortAddress(row.address) : "Unknown",
+      amount: row.amount || "—",
+      hash: row.hash,
+      time: formatTxTime(row.createdAt.toISOString()),
+      status: row.status,
+      statusT: row.status === "completed" ? "Completed" : row.status,
+      createdAt: row.createdAt.toISOString(),
+      blockNumber: 0,
+      logIndex: row.id,
+      direction: row.type === "send" ? "out" : "in",
+      tokenSymbol: parsedAmount.tokenSymbol,
+      tokenAmount: parsedAmount.tokenAmount,
+      feeNative: 0,
+    };
+  });
 
   if (!addresses.length) return storedRows.slice(0, maxRows);
 
-  const latest = await publicClient.getBlockNumber();
+  let latest: bigint;
+  try {
+    latest = await publicClient.getBlockNumber();
+  } catch (error) {
+    console.error("Failed to read latest block for admin activity", error);
+    return storedRows.slice(0, maxRows);
+  }
   const fromBlock = latest > 200_000n ? latest - 200_000n : 0n;
   const unique = Array.from(new Set(addresses.map((address) => address.toLowerCase())));
   const seen = new Set<string>();
   const rows: AdminActivityRow[] = [];
 
   await Promise.all(
-    unique.slice(0, 40).map(async (lower) => {
-      const address = lower as Address;
-      const [incoming, outgoing] = await Promise.all([
-        publicClient.getLogs({
-          event: transferEvent,
-          args: { to: address },
-          fromBlock,
-          toBlock: "latest",
-        }),
-        publicClient.getLogs({
-          event: transferEvent,
-          args: { from: address },
-          fromBlock,
-          toBlock: "latest",
-        }),
-      ]);
+    unique.slice(0, 200).map(async (lower) => {
+      try {
+        const address = lower as Address;
+        const [incoming, outgoing] = await Promise.all([
+          publicClient.getLogs({
+            event: transferEvent,
+            args: { to: address },
+            fromBlock,
+            toBlock: "latest",
+          }),
+          publicClient.getLogs({
+            event: transferEvent,
+            args: { from: address },
+            fromBlock,
+            toBlock: "latest",
+          }),
+        ]);
 
-      await Promise.all(
-        [...incoming, ...outgoing].map(async (log) => {
+        await Promise.all(
+          [...incoming, ...outgoing].map(async (log) => {
           const value = log.args.value ?? 0n;
           if (value <= 0n) return;
           const key = `${log.transactionHash}-${log.logIndex}`;
@@ -179,8 +199,11 @@ export async function getRecentUserActivity(addresses: Address[], maxRows = 80) 
             tokenAmount: Number.isFinite(tokenAmount) ? tokenAmount : 0,
             feeNative,
           });
-        }),
-      );
+          }),
+        );
+      } catch (error) {
+        console.error(`Failed to load admin activity for ${shortAddress(lower)}`, error);
+      }
     }),
   );
 
