@@ -259,19 +259,26 @@
   #view-home .home-round.verified { color: var(--green); }
   #view-home .home-round.bell em { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px #101210; }
   #view-home .balance-card { min-height: 194px; margin: 0 var(--pad-screen); padding: 28px 22px 22px; border-radius: 24px; border-color: rgba(255,255,255,0.12); background: radial-gradient(80% 120% at 108% 44%, rgba(74,222,128,0.22), rgba(74,222,128,0.05) 38%, transparent 64%), linear-gradient(100deg, #0c0d0c 0%, #101410 54%, #081009 100%); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.05), 0 22px 70px rgba(0,0,0,0.24); }
-  #view-home .balance-card .globe { right: -112px; top: 8px; width: 244px; height: 244px; opacity: .88; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.18) 0 8%, rgba(74,222,128,0.08) 9% 24%, transparent 38%), radial-gradient(circle at 50% 50%, transparent 50%, rgba(82,246,130,0.58) 50.5%, transparent 52%), repeating-radial-gradient(circle at 50% 50%, transparent 0 28px, rgba(74,222,128,0.075) 29px 31px, transparent 32px 46px); -webkit-mask: radial-gradient(circle at 55% 42%, #000 47%, transparent 74%); mask: radial-gradient(circle at 55% 42%, #000 47%, transparent 74%); animation: luminaGlobeBreathe 4.8s ease-in-out infinite; }
-  #view-home .balance-card .globe::before,
-  #view-home .balance-card .globe::after { content: ""; position: absolute; inset: 76px; border: 1.5px solid rgba(82,246,130,0.48); border-radius: 50%; box-shadow: 0 0 18px rgba(74,222,128,0.22), inset 0 0 18px rgba(74,222,128,0.14); opacity: 0; transform: scale(.58); animation: luminaRipple 3.4s cubic-bezier(.18,.62,.2,1) infinite; }
-  #view-home .balance-card .globe::after { inset: 66px; animation-delay: 1.35s; border-color: rgba(74,222,128,0.34); }
+  #view-home .balance-card .globe { right: -88px; top: 8px; width: 244px; height: 244px; opacity: .92; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.24) 0 8%, rgba(74,222,128,0.11) 9% 24%, transparent 54%); -webkit-mask: radial-gradient(circle at 55% 42%, #000 50%, transparent 76%); mask: radial-gradient(circle at 55% 42%, #000 50%, transparent 76%); animation: luminaGlobeBreathe 8.8s ease-in-out infinite; }
+  #view-home .balance-card .globe-ripple { position: absolute; inset: 88px; border: 1.4px solid rgba(82,246,130,0.5); border-radius: 50%; box-shadow: 0 0 16px rgba(74,222,128,0.24), inset 0 0 14px rgba(74,222,128,0.12); opacity: 0; transform: scale(.35); animation: luminaRipple 7.2s cubic-bezier(.25,.1,.2,1) infinite; }
+  #view-home .balance-card .globe-ripple.r2 { animation-delay: 1.8s; border-color: rgba(82,246,130,0.42); }
+  #view-home .balance-card .globe-ripple.r3 { animation-delay: 3.6s; border-color: rgba(74,222,128,0.34); }
+  #view-home .balance-card .globe-ripple.r4 { animation-delay: 5.4s; border-color: rgba(74,222,128,0.28); }
+  #view-home .balance-card .globe-shield { position: absolute; left: 50%; top: 50%; width: 42px; height: 42px; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; background: rgba(74,222,128,0.18); box-shadow: 0 0 0 1px rgba(82,246,130,0.28), 0 0 24px rgba(74,222,128,0.36); color: #5cff94; z-index: 2; animation: luminaShieldPulse 5.6s ease-in-out infinite; }
+  #view-home .balance-card .globe-shield svg { width: 25px; height: 25px; fill: rgba(74,222,128,0.92); stroke: #061b0c; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
   @keyframes luminaRipple {
-    0% { opacity: 0; transform: scale(.55); }
-    14% { opacity: .82; }
-    68% { opacity: .2; }
-    100% { opacity: 0; transform: scale(2.65); }
+    0% { opacity: 0; transform: scale(.35); }
+    12% { opacity: .88; }
+    72% { opacity: .22; }
+    100% { opacity: 0; transform: scale(3.05); }
   }
   @keyframes luminaGlobeBreathe {
     0%, 100% { filter: drop-shadow(0 0 8px rgba(74,222,128,0.16)); transform: scale(1); }
     50% { filter: drop-shadow(0 0 20px rgba(74,222,128,0.28)); transform: scale(1.015); }
+  }
+  @keyframes luminaShieldPulse {
+    0%, 100% { box-shadow: 0 0 0 1px rgba(82,246,130,0.26), 0 0 18px rgba(74,222,128,0.26); }
+    50% { box-shadow: 0 0 0 1px rgba(82,246,130,0.42), 0 0 30px rgba(74,222,128,0.46); }
   }
   #view-home .balance-top { display: block; position: relative; z-index: 1; }
   #view-home .balance-label { color: #a9afa9; font-size: 15px; font-weight: 600; gap: 10px; }

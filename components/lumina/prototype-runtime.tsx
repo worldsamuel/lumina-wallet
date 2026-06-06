@@ -2576,6 +2576,12 @@ function enhancePrototypeHome() {
         if (!home || home.dataset.luminaHomeV2 === "1") return;
         home.dataset.luminaHomeV2 = "1";
         var balanceCard = home.querySelector(".balance-card");
+        var globe = balanceCard && balanceCard.querySelector(".globe");
+        if (globe && !globe.querySelector(".globe-shield")) {
+          globe.innerHTML =
+            '<span class="globe-ripple r1"></span><span class="globe-ripple r2"></span><span class="globe-ripple r3"></span><span class="globe-ripple r4"></span>' +
+            '<span class="globe-shield"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l7 3v5.4c0 4.7-2.8 8.8-7 10.6-4.2-1.8-7-5.9-7-10.6V5.5l7-3z"/><path d="M8.7 12.1l2.1 2.1 4.8-5"/></svg></span>';
+        }
         var chainTag = balanceCard && balanceCard.querySelector(".chain-tag");
         var balanceChange = balanceCard && balanceCard.querySelector(".balance-change");
         if (chainTag && balanceChange) balanceChange.insertAdjacentElement("afterend", chainTag);
