@@ -259,7 +259,7 @@
   #view-home .home-round.verified { color: var(--green); }
   #view-home .home-round.bell em { position: absolute; right: 4px; top: 3px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px #101210; }
   #view-home .balance-card { min-height: 194px; margin: 0 var(--pad-screen); padding: 28px 22px 22px; border-radius: 24px; border-color: rgba(255,255,255,0.12); background: radial-gradient(80% 120% at 108% 44%, rgba(74,222,128,0.22), rgba(74,222,128,0.05) 38%, transparent 64%), linear-gradient(100deg, #0c0d0c 0%, #101410 54%, #081009 100%); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.05), 0 22px 70px rgba(0,0,0,0.24); }
-  #view-home .balance-card .globe { right: -122px; top: -25px; width: 244px; height: 244px; opacity: .92; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.26) 0 9%, rgba(74,222,128,0.12) 10% 25%, transparent 56%); -webkit-mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); animation: luminaGlobeBreathe 8.8s ease-in-out infinite; }
+  #view-home .balance-card .globe { right: -52px; top: -25px; width: 244px; height: 244px; opacity: .92; background: radial-gradient(circle at 50% 50%, rgba(82,246,130,0.26) 0 9%, rgba(74,222,128,0.12) 10% 25%, transparent 56%); -webkit-mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); mask: radial-gradient(circle at 50% 50%, #000 52%, transparent 78%); animation: luminaGlobeBreathe 8.8s ease-in-out infinite; }
   #view-home .balance-card .globe-ripple { position: absolute; inset: 88px; border: 1.4px solid rgba(82,246,130,0.5); border-radius: 50%; box-shadow: 0 0 16px rgba(74,222,128,0.24), inset 0 0 14px rgba(74,222,128,0.12); opacity: 0; transform: scale(.35); animation: luminaRipple 7.2s cubic-bezier(.25,.1,.2,1) infinite; }
   #view-home .balance-card .globe-ripple.r2 { animation-delay: 1.8s; border-color: rgba(82,246,130,0.42); }
   #view-home .balance-card .globe-ripple.r3 { animation-delay: 3.6s; border-color: rgba(74,222,128,0.34); }
@@ -285,8 +285,8 @@
   #view-home .balance-label .eye { color: #8f958f; }
   #view-home .balance-amount { position: relative; z-index: 1; max-width: min(100%, 520px); margin: 16px 0 9px; font-size: clamp(40px, 12.4vw, 58px); line-height: .98; font-weight: 950; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
   #view-home .balance-amount .balance-flip-row { display: inline-flex; align-items: baseline; max-width: 100%; white-space: nowrap; }
-  #view-home .balance-amount .balance-digit { display: inline-block; height: 1em; line-height: 1em; text-align: center; vertical-align: baseline; overflow: hidden; }
-  #view-home .balance-amount .balance-digit.num { min-width: .58em; }
+  #view-home .balance-amount .balance-digit { display: inline-block; height: 1.06em; line-height: 1.06em; text-align: center; vertical-align: baseline; overflow-x: visible; overflow-y: clip; }
+  #view-home .balance-amount .balance-digit.num { min-width: .68em; }
   #view-home .balance-amount .balance-digit.mark { min-width: auto; }
   #view-home .balance-amount .balance-digit.spacer { min-width: .28em; }
   #view-home .balance-amount .balance-digit.flip { position: relative; perspective: 360px; }

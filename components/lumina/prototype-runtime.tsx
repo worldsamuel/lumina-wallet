@@ -892,6 +892,7 @@ function stableReceiveQr(address: string) {
 }
 
 function renderPrototypeReceive(address?: string | null) {
+  (window as any).__luminaCopyTextToClipboard = copyTextToClipboard;
   const actual = address || window.__luminaUserAddress || "";
   const qr = document.getElementById("qrBox");
   if (qr && actual) {
@@ -909,7 +910,52 @@ function renderPrototypeReceive(address?: string | null) {
   const note = document.querySelector<HTMLElement>(".recv-note");
   if (note) note.innerHTML = "Send only World Chain assets to this address.<br />Assets sent from other networks may be lost.";
   const copy = document.querySelector<HTMLButtonElement>(".copy-btn");
-  if (copy) copy.textContent = "Copy address";
+  if (copy) {
+    copy.textContent = "Copy address";
+    copy.onclick = () => {
+      const latest = window.__luminaUserAddress || actual || addr?.textContent || "";
+      copyTextToClipboard(latest, "Address copied");
+    };
+  }
+}
+
+function copyTextToClipboard(value: string, successMessage = "Copied") {
+  const text = String(value || "").trim();
+  const showToast = (message: string, type?: string) => (window as any).toast?.(message, type);
+  if (!text) {
+    showToast("No address connected");
+    return;
+  }
+  const fallback = () => {
+    const input = document.createElement("textarea");
+    input.value = text;
+    input.setAttribute("readonly", "readonly");
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+    input.style.top = "0";
+    document.body.appendChild(input);
+    input.focus();
+    input.select();
+    document.execCommand("copy");
+    input.remove();
+  };
+  try {
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(
+        () => showToast(successMessage, "success"),
+        () => {
+          fallback();
+          showToast(successMessage, "success");
+        }
+      );
+      return;
+    }
+    fallback();
+    showToast(successMessage, "success");
+  } catch(e) {
+    try { fallback(); } catch(_) {}
+    showToast(successMessage, "success");
+  }
 }
 
 /**
@@ -4909,26 +4955,7 @@ function enhancePrototypeMe() {
       window.copyMeAddress = function(event){
         if (event) event.stopPropagation();
         var address = window.__luminaUserAddress || "";
-        if (!address) {
-          toast("No address connected");
-          return;
-        }
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(address);
-          } else {
-            var input = document.createElement("textarea");
-            input.value = address;
-            input.setAttribute("readonly", "readonly");
-            input.style.position = "fixed";
-            input.style.left = "-9999px";
-            document.body.appendChild(input);
-            input.select();
-            document.execCommand("copy");
-            input.remove();
-          }
-        } catch(e) {}
-        toast("Address copied", "success");
+        if (window.__luminaCopyTextToClipboard) window.__luminaCopyTextToClipboard(address, "Address copied");
       };
       function renderMe(){
         var c = meCopy();
