@@ -2230,8 +2230,25 @@ function enhancePrototypeTokens() {
       function renderAllAssets(){
         ensureAllAssetsView();
         var hidden = hiddenSet();
+        var keepZero = new Set(["WLD","USDC","WBTC","USDT","WETH","EURC"]);
+        function allAssetAmountNumber(asset){
+          var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
+          var n = Number(raw);
+          return Number.isFinite(n) ? n : 0;
+        }
+        function showAllAssetRow(asset){
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          return keepZero.has(sym) || allAssetAmountNumber(asset) > 0;
+        }
+        function displayAllAssetAmount(asset){
+          var amount = allAssetAmountNumber(asset);
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          if (!(amount > 0)) return "0 " + sym;
+          if (amount < 0.01) return "<0.01 " + sym;
+          return amount.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " " + sym;
+        }
         var verifiedRows = (assets || []).filter(function(a){
-          return a && ["BTC", "WBTC"].indexOf(String(a.sym || "").toUpperCase()) < 0;
+          return a && showAllAssetRow(a) && String(a.sym || "").toUpperCase() !== "BTC";
         }).map(function(a){
           var i = assets.indexOf(a);
           var status = String(a.status || "").toLowerCase();
@@ -2240,9 +2257,12 @@ function enhancePrototypeTokens() {
           return '<div class="asset all-asset-row" onclick="openDetail(' + i + ')">' +
             assetIconHtml(a.sym, a.cls, a.logo) +
             '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk ' + cls + '">' + label + '</span></div><div class="full">' + a.full + '</div></div>' +
-            '<div></div><div class="vals"><div class="amt">' + a.amt + '</div><div class="usd">' + formatMoney(a.usdNum || 0) + '</div></div></div>';
+            '<div></div><div class="vals"><div class="amt">' + displayAllAssetAmount(a) + '</div><div class="usd">' + formatMoney(a.usdNum || 0) + '</div></div></div>';
         });
-        var importedRows = importedList().map(function(token){
+        var importedRows = importedList().filter(function(token){
+          var amount = Number(String((balances && balances[token.symbol]) || token.formatted || "0").replace(/,/g, ""));
+          return Number.isFinite(amount) && amount > 0;
+        }).map(function(token){
           return importedAssetRow(token, hidden.has(String(token.address).toLowerCase()));
         });
         document.getElementById("allAssetList").innerHTML = verifiedRows.concat(importedRows).join("") || '<div class="article-empty">No assets detected yet</div>';
@@ -2593,15 +2613,15 @@ function enhancePrototypeHome() {
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
-      var fixedHomeTokens = new Set(["WLD","USDC","WETH","EURC","WBTC","USOL"]);
+      var fixedHomeTokens = new Set(["WLD","USDC","WBTC","USDT","WETH","EURC"]);
       function fixedHomeTokenMeta(sym){
         var defaults = {
           WLD: { full: tokenFull.WLD || "Worldcoin", decimals: 18, cls: "wld", logo: tokenLogo.WLD || "", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
           USDC: { full: tokenFull.USDC || "USD Coin", decimals: 6, cls: "usdc", logo: tokenLogo.USDC || "", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+          USDT: { full: tokenFull.USDT || "Tether USD", decimals: 6, cls: "usdt", logo: tokenLogo.USDT || "T", address: "0x102d758f688a4c1c5a80b116bd945d4455460282" },
           WETH: { full: tokenFull.WETH || "WETH", decimals: 18, cls: "custom", logo: tokenLogo.WETH || "W", address: "0x4200000000000000000000000000000000000006" },
           EURC: { full: tokenFull.EURC || "EURC", decimals: 6, cls: "custom", logo: tokenLogo.EURC || "E", address: "0xE75D0fB2C24A55cA1e3F96781a2bCC7bdba058F0" },
-          WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" },
-          USOL: { full: tokenFull.USOL || "Wrapped Solana (Universal)", decimals: 18, cls: "custom", logo: tokenLogo.USOL || "S", address: "0x9B8Df6E244526ab5F6e6400d331DB28C8fdDdb55" }
+          WBTC: { full: tokenFull.WBTC || "Wrapped Bitcoin", decimals: 8, cls: "custom", logo: tokenLogo.WBTC || "B", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
         };
         var meta = defaults[sym] || null;
         var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];
@@ -2625,7 +2645,6 @@ function enhancePrototypeHome() {
       function showOnHome(asset){
         var sym = String(asset && asset.sym || "").toUpperCase();
         if (fixedHomeTokens.has(sym)) return true;
-        if (asset && asset.recentSwapAsset) return true;
         return !!(asset && hasVisibleHomeBalance(asset));
       }
       window.openHomeAsset = function(sym){
@@ -2743,6 +2762,13 @@ function enhancePrototypeHome() {
         var n = Number(raw);
         return Number.isFinite(n) ? n : 0;
       }
+      function formatHomeAssetAmount(asset){
+        var amount = assetAmountNumber(asset);
+        var symbol = String(asset && asset.sym || "").toUpperCase();
+        if (!Number.isFinite(amount) || amount <= 0) return "0 " + symbol;
+        if (amount < 0.01) return "<0.01 " + symbol;
+        return amount.toLocaleString("en-US", { maximumFractionDigits: 2 }) + " " + symbol;
+      }
       function assetUsdValue(asset){
         if (asset && Number(asset.portfolioUsdNum) > 0) return Number(asset.portfolioUsdNum);
         var amount = assetAmountNumber(asset);
@@ -2791,7 +2817,7 @@ function enhancePrototypeHome() {
         return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
-          '<div class="vals"><div class="amt">' + asset.amt + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
+          '<div class="vals"><div class="amt">' + formatHomeAssetAmount(asset) + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
           '<span class="home-asset-chev">›</span>' +
         '</div>';
       }
