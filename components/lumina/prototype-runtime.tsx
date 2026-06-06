@@ -176,6 +176,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     const scriptEl = document.createElement("script");
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
+    window.__luminaUserAddress = address ?? "";
     resetPrototypePortfolio();
     installLegalSheet(host);
     exposeTokenTransfer(address, mutate);
@@ -678,20 +679,31 @@ function exposeTokenTransfer(
  */
 function resetPrototypePortfolio() {
   const source = `
-    assets = [
-      { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
-      { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
-      { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$", address: "0x102d758f688a4c1c5a80b116bd945d4455460282" },
-      { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E", address: "0x4200000000000000000000000000000000000006" },
-      { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true, address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
-    ];
-    balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0", BTC: "0" };
-    availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH", BTC: "0 BTC" };
-    totalUsdNum = 0;
-    change24hUsdNum = 0;
+    var snapshotKey = "lumina_home_snapshot_v1_" + String(window.__luminaUserAddress || "guest").toLowerCase();
+    var cachedSnapshot = null;
+    try { cachedSnapshot = JSON.parse(localStorage.getItem(snapshotKey) || localStorage.getItem("lumina_home_snapshot_v1") || "null"); } catch(e) {}
+    if (cachedSnapshot && Array.isArray(cachedSnapshot.assets) && cachedSnapshot.assets.length) {
+      assets = cachedSnapshot.assets;
+      balances = cachedSnapshot.balances || {};
+      availMap = cachedSnapshot.availMap || {};
+      totalUsdNum = Number(cachedSnapshot.totalUsdNum || 0);
+      change24hUsdNum = Number(cachedSnapshot.change24hUsdNum || 0);
+    } else {
+      assets = [
+        { sym: "WLD", full: "Worldcoin", amt: "0 WLD", usdNum: 0, cls: "wld", logo: "", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" },
+        { sym: "USDC", full: "USD Coin", amt: "0 USDC", usdNum: 0, cls: "usdc", logo: "", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" },
+        { sym: "USDT", full: "Tether USD", amt: "0 USDT", usdNum: 0, cls: "usdt", logo: "$", address: "0x102d758f688a4c1c5a80b116bd945d4455460282" },
+        { sym: "ETH", full: "Ether", amt: "0 ETH", usdNum: 0, cls: "eth", logo: "E", address: "0x4200000000000000000000000000000000000006" },
+        { sym: "BTC", full: "Bitcoin", amt: "0 BTC", usdNum: 0, cls: "btc", logo: "B", marketOnly: true, address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" }
+      ];
+      balances = { WLD: "0", USDC: "0", USDT: "0", ETH: "0", BTC: "0" };
+      availMap = { WLD: "0 WLD", USDC: "0 USDC", USDT: "0 USDT", ETH: "0 ETH", BTC: "0 BTC" };
+      totalUsdNum = 0;
+      change24hUsdNum = 0;
+    }
     if (document.querySelector(".balance-change")) {
-      document.querySelector(".balance-change").childNodes[0].textContent = "+0.00% ";
-      document.querySelector(".balance-change").classList.remove("down");
+      document.querySelector(".balance-change").childNodes[0].textContent = (change24hUsdNum < 0 ? "-" : "+") + "0.00% ";
+      document.querySelector(".balance-change").classList.toggle("down", change24hUsdNum < 0);
     }
     if (typeof renderMoney === "function") renderMoney();
     var subEl = document.getElementById("balSub");
@@ -2605,7 +2617,7 @@ function enhancePrototypeHome() {
             var safeNext = nextChar === " " ? "&nbsp;" : escFlipText(nextChar);
             var safeOld = oldChar === " " ? "&nbsp;" : escFlipText(oldChar);
             if (!changed) return '<span class="balance-digit static ' + kind + '">' + safeNext + '</span>';
-            return '<span class="balance-digit flip num ' + direction + '"><span class="old">' + safeOld + '</span><span class="new">' + safeNext + '</span></span>';
+            return '<span class="balance-digit flip num ' + direction + '"><span class="balance-digit-track"><span class="old">' + safeOld + '</span><span class="new">' + safeNext + '</span></span></span>';
           }).join("");
           balEl.innerHTML = '<span class="balance-flip-row">' + html + '</span>';
           window.clearTimeout(window.__luminaBalanceRollTimer);
@@ -2887,6 +2899,29 @@ function enhancePrototypeHome() {
         if (amount > 0 && price > 0) return amount * price;
         return Number(asset && asset.usdNum || 0);
       }
+      function formatHomeAssetUsd(value){
+        var n = Number(value);
+        if (!(n > 0)) return "—";
+        var c = typeof curObj === "function" ? curObj() : { symbol:"$", code:"USD", rate:1 };
+        return c.symbol + (Math.abs(n) * Number(c.rate || 1)).toLocaleString(undefined, {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1
+        });
+      }
+      function cacheHomeSnapshot(homeAssets){
+        try {
+          var key = "lumina_home_snapshot_v1_" + String(window.__luminaUserAddress || "guest").toLowerCase();
+          localStorage.setItem(key, JSON.stringify({
+            assets: Array.isArray(homeAssets) ? homeAssets : (assets || []).filter(showOnHome),
+            balances: balances || {},
+            availMap: availMap || {},
+            totalUsdNum: Number(totalUsdNum || 0),
+            change24hUsdNum: Number(change24hUsdNum || 0),
+            ts: Date.now()
+          }));
+          localStorage.setItem("lumina_home_snapshot_v1", localStorage.getItem(key) || "");
+        } catch(e) {}
+      }
       window.__luminaRecomputeTotalWithEarn = function(){
         var base = Number(window.__luminaWalletBaseTotalUsd || 0);
         var earn = Number(window.__luminaEarnTotalUsd || 0);
@@ -2926,7 +2961,7 @@ function enhancePrototypeHome() {
         return '<div class="asset home-v2-asset" data-home-symbol="' + symbol + '" data-home-index="' + index + '" data-home-imported="' + (imported ? "1" : "0") + '">' +
           '<div class="coin ' + (asset.cls || "custom") + '">' + logoHtml + '</div>' +
           '<div class="name"><div class="sym">' + asset.sym + '</div><div class="full">' + asset.full + '</div></div>' +
-          '<div class="vals"><div class="amt">' + formatHomeAssetAmount(asset) + '</div><div class="usd">' + (usdValue > 0 && typeof formatMoney === "function" ? formatMoney(usdValue) : "—") + '</div></div>' +
+          '<div class="vals"><div class="amt">' + formatHomeAssetAmount(asset) + '</div><div class="usd">' + formatHomeAssetUsd(usdValue) + '</div></div>' +
           '<span class="home-asset-chev">›</span>' +
         '</div>';
       }
@@ -2945,6 +2980,7 @@ function enhancePrototypeHome() {
         var hiddenCount = Math.max(0, verified.length - visible.length);
         var html = visible.map(function(a){ return rowHtml(a, (assets || []).indexOf(a), false); }).join("");
         refreshHomeTotalFromAssets();
+        if (verified.length) cacheHomeSnapshot(verified);
         if (!filter && verified.length > 10) {
           html += '<button class="home-asset-fold-row" type="button" onclick="toggleHomeAssetFold()"><span>' + (expanded ? "−" : "+") + '</span>' + (expanded ? "Hide tokens" : "Show " + hiddenCount + " more tokens") + '</button>';
         }
