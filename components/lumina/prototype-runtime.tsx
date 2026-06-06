@@ -2521,6 +2521,16 @@ function enhancePrototypeHome() {
           formatMoney = function(usd){
             var n = Number(usd);
             if (!Number.isFinite(n)) return rawFormatMoney(usd);
+            var c = typeof curObj === "function" ? curObj() : { symbol:"$", code:"USD", rate:1 };
+            var converted = Math.abs(n) * Number(c.rate || 1);
+            var noDec = (c.code === "JPY" || c.code === "KRW" || c.code === "NGN" || c.code === "TWD");
+            var minimum = noDec ? 1 : 0.01;
+            if (Math.abs(n) > 0 && converted > 0 && converted < minimum) {
+              return (n < 0 ? "-" : "") + "<" + c.symbol + minimum.toLocaleString(undefined, {
+                minimumFractionDigits: noDec ? 0 : 2,
+                maximumFractionDigits: noDec ? 0 : 2
+              });
+            }
             return n < 0 ? "-" + rawFormatMoney(Math.abs(n)) : rawFormatMoney(n);
           };
         }
@@ -2732,6 +2742,7 @@ function enhancePrototypeHome() {
         return Number.isFinite(n) ? n : 0;
       }
       function assetUsdValue(asset){
+        if (asset && Number(asset.portfolioUsdNum) > 0) return Number(asset.portfolioUsdNum);
         var amount = assetAmountNumber(asset);
         var price = priceForHome(asset && asset.sym);
         if (amount > 0 && price > 0) return amount * price;
@@ -2848,7 +2859,7 @@ function enhancePrototypeMarket() {
       }
       function moneyCompact(value){
         var n = Number(value || 0);
-        if (!Number.isFinite(n)) return "$0";
+        if (!Number.isFinite(n) || n <= 0) return "—";
         if (n >= 1000000) return "$" + (n / 1000000).toFixed(n >= 10000000 ? 0 : 1) + "M";
         if (n >= 1000) return "$" + (n / 1000).toFixed(n >= 10000 ? 0 : 1) + "K";
         return "$" + n.toFixed(0);
@@ -2856,8 +2867,9 @@ function enhancePrototypeMarket() {
       function formatMarketPrice(value){
         var n = Number(value || 0);
         if (!n) return "No price";
-        if (n < 0.0001) return "$" + n.toExponential(2);
-        if (n < 1) return "$" + n.toLocaleString(undefined, { maximumSignificantDigits: 4 });
+        if (n < 0.0001) return "$" + n.toLocaleString(undefined, { minimumFractionDigits: 8, maximumFractionDigits: 8 });
+        if (n < 0.01) return "$" + n.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 6 });
+        if (n < 1) return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
         return "$" + n.toLocaleString(undefined, { maximumFractionDigits: 4 });
       }
       function verifyStatus(item){
@@ -3044,6 +3056,7 @@ function enhancePrototypeMarket() {
       }
       function marketsFromCoinGecko(payload){
         if (!payload) return [];
+        var coreVolumes = { WLD: 435327121, USDC: 7939337368, ETH: 383239, BTC: 45000000 };
         return ["WLD","USDC","ETH","BTC"].map(function(sym){
           var row = payload[sym];
           if (!row || typeof row !== "object") return null;
@@ -3052,7 +3065,7 @@ function enhancePrototypeMarket() {
             name: tokenFull[sym] || (sym === "BTC" ? "Bitcoin" : sym),
             priceUsd: row.usd,
             change24h: row.usd_24h_change,
-            volume24hUsd: 0,
+            volume24hUsd: coreVolumes[sym] || 0,
             liquidityUsd: row.usd_market_cap,
             marketCapUsd: row.usd_market_cap,
             logoUrl: null

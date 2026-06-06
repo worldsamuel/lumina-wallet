@@ -29,6 +29,13 @@ export function formatMoney(usd: number, code = getPreferredCurrency()) {
   const currency = currencies.find((item) => item.code === code) ?? currencies[0];
   const value = usd * currency.rate;
   const noDecimals = ["JPY", "KRW", "NGN", "TWD"].includes(currency.code);
+  const minimumDisplay = noDecimals ? 1 : 0.01;
+  if (usd > 0 && value > 0 && value < minimumDisplay) {
+    return `<${currency.symbol}${minimumDisplay.toLocaleString(undefined, {
+      minimumFractionDigits: noDecimals ? 0 : 2,
+      maximumFractionDigits: noDecimals ? 0 : 2,
+    })}`;
+  }
   const formatted = noDecimals
     ? Math.round(value).toLocaleString()
     : value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });

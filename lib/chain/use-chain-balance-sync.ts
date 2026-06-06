@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import useSWR from "swr";
 import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 
@@ -35,6 +35,7 @@ const fetcher = async <T,>(url: string) => {
  * Polls World Chain balances and syncs them into the mounted v22 prototype runtime.
  */
 export function useChainBalanceSync(enabled: boolean, userAddress: string | null) {
+  const portfolioPricesRef = useRef<Record<string, number>>({});
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
@@ -79,7 +80,7 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     }
 
     if (!balances.data?.balances) return;
-    syncBalancesToPrototype(balances.data.balances, market.data, onchain.data);
+    syncBalancesToPrototype(balances.data.balances, market.data, onchain.data, portfolioPricesRef.current);
   }, [
     balances.data,
     balances.error,
@@ -96,17 +97,27 @@ function syncBalancesToPrototype(
   items: BalanceApiItem[],
   marketData?: MarketPricesResponse,
   onchainData?: OnchainPricesResponse,
+  portfolioPrices: Record<string, number> = {},
 ) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
-    const priceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
+    const livePriceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
     const amount = Number.parseFloat(item.formatted || "0") || 0;
-    const usdValue = priceUsd === null ? null : amount * priceUsd;
+    const previousPortfolioPrice = portfolioPrices[item.symbol];
+    const portfolioPriceUsd =
+      amount > 0 && previousPortfolioPrice > 0
+        ? previousPortfolioPrice
+        : livePriceUsd;
+    if (amount > 0 && livePriceUsd !== null && !(previousPortfolioPrice > 0)) {
+      portfolioPrices[item.symbol] = livePriceUsd;
+    }
+    const usdValue = portfolioPriceUsd === null ? null : amount * portfolioPriceUsd;
     return {
       sym: item.symbol,
       full: item.name,
       amt: `${formatted} ${item.symbol}`,
       usdNum: usdValue,
+      portfolioUsdNum: usdValue,
       cls: item.className,
       logo: item.logo,
       contractAddress: item.contractAddress ?? null,
@@ -121,6 +132,7 @@ function syncBalancesToPrototype(
       full: "Bitcoin",
       amt: "0 BTC",
       usdNum: 0,
+      portfolioUsdNum: 0,
       cls: "btc",
       logo: "B",
       contractAddress: null,
@@ -155,9 +167,7 @@ function syncBalancesToPrototype(
   marketCapMap.BTC ??= pickMarketCap("BTC", marketData);
   const totalUsd = assets.reduce((sum, item) => sum + (item.usdNum ?? 0), 0);
   const changeUsd = items.reduce((sum, item) => {
-    const priceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
-    if (priceUsd === null) return sum;
-    const currentValue = (Number.parseFloat(item.formatted || "0") || 0) * priceUsd;
+    const currentValue = assets.find((asset) => asset.sym === item.symbol)?.portfolioUsdNum ?? 0;
     const changePct = changeMap[item.symbol] ?? 0;
     return sum + currentValue * (changePct / 100);
   }, 0);
