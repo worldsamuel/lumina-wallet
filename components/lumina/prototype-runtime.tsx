@@ -1752,7 +1752,9 @@ function enhancePrototypeTokens() {
       function formatImportedAmount(value){
         var n = Number.parseFloat(String(value || "0"));
         if (!Number.isFinite(n) || n === 0) return "0";
-        return n.toLocaleString(undefined, { maximumFractionDigits: 3 });
+        var digits = Math.abs(n) < 0.00001 ? 12 : Math.abs(n) < 1 ? 8 : 6;
+        var display = n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: digits });
+        return display === "0" ? String(value).replace(/,/g, "").replace(/(\\.\\d*?[1-9])0+$/, "$1").replace(/\\.0+$/, "") : display;
       }
       function importedList(){
         var list = readJson(importStoreKey, []);
@@ -3229,9 +3231,13 @@ function enhancePrototypeSwapQuote() {
         }
       }
       function shortAmount(value){
-        var n = Number(value);
+        var raw = String(value == null ? "" : value).replace(/,/g, "").trim();
+        var n = Number(raw);
         if (!Number.isFinite(n)) return "—";
-        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 8 : 6 });
+        if (n === 0) return "0";
+        var digits = Math.abs(n) < 0.00001 ? 12 : Math.abs(n) < 1 ? 8 : 6;
+        var display = n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: digits });
+        return display === "0" ? raw.replace(/(\\.\\d*?[1-9])0+$/, "$1").replace(/\\.0+$/, "") : display;
       }
       function slippageBps(){
         var txt = (document.getElementById("slipTxt") && document.getElementById("slipTxt").textContent || "0.5%").replace("%", "");
@@ -3332,9 +3338,9 @@ function enhancePrototypeSwapQuote() {
         if (existing) existing.remove();
       }
       function formatMaxAmount(value){
-        var n = Number(value);
+        var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
         if (!Number.isFinite(n) || n <= 0) return "0";
-        return n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: n < 1 ? 8 : 6 });
+        return shortAmount(n);
       }
       function fillSwapMax(){
         var sell = document.getElementById("sellAmt");
@@ -3418,9 +3424,10 @@ function enhancePrototypeSwapQuote() {
         if (warn) { warn.classList.remove("show"); warn.textContent = ""; }
       }
       function formatRate(value){
-        var n = Number(value);
+        var n = Number(String(value == null ? "" : value).replace(/,/g, ""));
         if (!Number.isFinite(n) || n <= 0) return "—";
-        return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 8 : 6 });
+        var digits = n < 0.00001 ? 12 : n < 1 ? 8 : 6;
+        return n.toLocaleString("en-US", { maximumFractionDigits: digits });
       }
       function referenceRow(label, ref, suffix){
         var available = ref && ref.available !== false && ref.rate;
@@ -3601,7 +3608,7 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      function balanceNumber(symbol){
 	        var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
-	        var n = Number(raw.replace(/,/g, ""));
+	        var n = Number(raw.replace(/,/g, "").replace(/^</, ""));
 	        return Number.isFinite(n) ? n : 0;
 	      }
 	      function updateAssetAmount(symbol, amount){
@@ -4131,7 +4138,7 @@ function enhancePrototypeSend() {
       }
       function balanceNumber(symbol){
         var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
-        var n = Number(raw.replace(/,/g, ""));
+        var n = Number(raw.replace(/,/g, "").replace(/^</, ""));
         return Number.isFinite(n) ? n : 0;
       }
       function setButtonLoading(active){
@@ -4424,7 +4431,13 @@ function enhancePrototypeActivity() {
           if (!symbol || symbol === "WLD" || symbol === "USDC") return;
           var amountNumber = Number(item.tokenAmount);
           if (!Number.isFinite(amountNumber) || amountNumber <= 0) amountNumber = parseTokenAmount(item.tokenText || item.amount);
-          var amountText = amountNumber > 0 ? amountNumber.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "0";
+          var amountText = amountNumber > 0
+            ? (function(n){
+                var digits = n < 0.00001 ? 12 : n < 1 ? 8 : 6;
+                var display = n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: digits });
+                return display === "0" ? String(item.tokenAmount || item.tokenText || item.amount || n).replace(/,/g, "").replace(/(\\.\\d*?[1-9])0+$/, "$1").replace(/\\.0+$/, "") : display;
+              })(amountNumber)
+            : "0";
           var currentBalance = Number(String((balances && balances[symbol]) || "0").replace(/,/g, ""));
           tokenFull[symbol] = tokenFull[symbol] || item.tokenName || symbol;
           if (tokenLogo && window.__luminaTokenLogoHtml) tokenLogo[symbol] = window.__luminaTokenLogoHtml(symbol, tokenInitial(symbol));

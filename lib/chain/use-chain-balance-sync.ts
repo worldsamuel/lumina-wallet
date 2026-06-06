@@ -288,10 +288,14 @@ function renderBalanceError() {
 }
 
 function formatTokenAmount(value: string) {
-  const [integer, fraction = ""] = value.split(".");
-  const trimmedFraction = fraction.slice(0, 3).replace(/0+$/, "");
-  const body = trimmedFraction ? `${integer}.${trimmedFraction}` : integer;
-  return Number(body).toLocaleString(undefined, { maximumFractionDigits: 3 });
+  const normalized = value.replace(/,/g, "").trim();
+  const parsed = Number.parseFloat(normalized);
+  if (!Number.isFinite(parsed) || parsed <= 0) return "0";
+  if (parsed >= 1000) return parsed.toLocaleString("en-US", { maximumFractionDigits: 3 });
+  const maximumFractionDigits = parsed < 0.00001 ? 12 : parsed < 1 ? 8 : 6;
+  const display = parsed.toLocaleString("en-US", { useGrouping: false, maximumFractionDigits });
+  if (display !== "0") return display;
+  return normalized.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
 }
 
 function runInPrototypeScope(source: string) {
