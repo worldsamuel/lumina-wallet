@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
   const amountIn = grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
   const platformFeeConfig = getSwapPlatformFeeConfig();
-  console.log("[SWAP] fee config:", platformFeeConfig);
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
   const [holdstation, v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([

@@ -1,5 +1,5 @@
 import { MiniKit } from "@worldcoin/minikit-js";
-import { decodeFunctionData, encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
+import { encodeFunctionData, formatUnits, isAddress, parseUnits, type Address } from "viem";
 import { PERMIT2_ADDRESS, UNIVERSAL_ROUTER_ADDRESS, WORLD_CHAIN_ID, permit2Abi } from "./contracts";
 import {
   ensureHoldstationModules,
@@ -148,7 +148,6 @@ async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapPa
     platformFee: quote.platformFee ?? null,
   };
 
-  console.log("[SWAP] Holdstation submit", debug);
   await ensureHoldstationModules();
   let result: Awaited<ReturnType<typeof hsSwapHelper.swap>>;
   try {
@@ -173,7 +172,6 @@ async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapPa
     throw attachSwapDebug(error, { ...debug, stage: "holdstation:throw" });
   }
 
-  console.log("[SWAP] Holdstation result", result);
   if (!result.success) {
     throw attachSwapDebug(new Error(result.errorCode || "Holdstation swap was not submitted."), {
       ...debug,
@@ -212,30 +210,6 @@ async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapPa
   };
 }
 
-const universalRouterExecuteAbi = [
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-      { name: "deadline", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-    ],
-    outputs: [],
-  },
-] as const;
-
 async function submitBuiltSwap(
   built: BuildTxResponse,
   quote: QuoteResponse,
@@ -247,9 +221,6 @@ async function submitBuiltSwap(
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
-  const feeConfig = built.platformFee ? { bps: built.platformFee.bps, recipient: built.platformFee.recipient } : null;
-  const universalRouter = decodeUniversalRouterExecute(tx.data);
-  const universalRouterCommands = universalRouter?.commands ?? null;
   const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
   // World App 强制 Permit2 approve expiration = 0
   // 文档表述容易误导, 但实测 limit=0 是 World App 硬性要求
@@ -265,14 +236,6 @@ async function submitBuiltSwap(
     deadline: permit2Expiration,
     sigDeadline: null,
   };
-  console.log("[SWAP] fee config:", feeConfig);
-  console.log("[SWAP DEBUG] sell direction:", quote.tokens.from.symbol !== "WLD" && quote.tokens.to.symbol === "WLD");
-  console.log(
-    "[SWAP DEBUG] permit2 param:",
-    JSON.stringify(permit2Param, (_key, value) => (typeof value === "bigint" ? value.toString() : value)),
-  );
-  console.log("[SWAP DEBUG] universal router commands:", universalRouterCommands);
-  console.log("[SWAP DEBUG] universal router inputs lengths:", universalRouter?.inputLengths ?? null);
   // World App rejects broad ERC20 approve flows for many tokens, so keep the
   // executable batch on the Permit2 + Universal Router path that is already
   // supported by MiniKit.
@@ -296,9 +259,6 @@ async function submitBuiltSwap(
     executableAmountRaw: executableAmount.toString(),
     expectedOutRaw: expectedOut.toString(),
     platformFee: built.platformFee ?? null,
-    serverDebug: built.debug ?? null,
-    feeConfig,
-    universalRouterCommands,
     permit2Spender,
     transactions: transactions.map((item, index) => ({
       index,
@@ -324,7 +284,6 @@ async function submitBuiltSwap(
   }
 
   const payload = result.data;
-  console.log("[SWAP] MiniKit.sendTransaction result", result);
   if (payload?.status && payload.status !== "success") {
     throw attachSwapDebug(new Error(payload.error_code || payload.message || "Swap was not submitted."), {
       ...debug,
@@ -377,19 +336,6 @@ function recordClientActivity(input: {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ ...input, status: "completed" }),
   }).catch((error) => console.warn("[ACTIVITY] Failed to record swap", error));
-}
-
-function decodeUniversalRouterExecute(data: `0x${string}`) {
-  try {
-    const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
-    const inputs = decoded.args[1] as readonly `0x${string}`[];
-    return {
-      commands: String(decoded.args[0]),
-      inputLengths: inputs.map((input) => input.length),
-    };
-  } catch {
-    return null;
-  }
 }
 
 async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse> {

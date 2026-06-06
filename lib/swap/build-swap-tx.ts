@@ -2,7 +2,7 @@ import { Trade as RouterTrade } from "@uniswap/router-sdk";
 import { SwapRouter } from "@uniswap/universal-router-sdk";
 import { Pool, Route } from "@uniswap/v3-sdk";
 import { CurrencyAmount, Percent, Token, TradeType } from "@uniswap/sdk-core";
-import { decodeFunctionData, isAddress, type Address } from "viem";
+import { isAddress, type Address } from "viem";
 import { publicClient } from "@/lib/chain";
 import {
   UNIVERSAL_ROUTER_ADDRESS,
@@ -77,7 +77,6 @@ export async function buildSwapTransaction({
   });
 
   const feeConfig = platformFee && platformFee.bps > 0 ? platformFee : null;
-  console.log("[SWAP] fee config:", feeConfig);
 
   const { calldata, value } = SwapRouter.swapCallParameters(trade, {
     recipient: userAddress,
@@ -92,16 +91,6 @@ export async function buildSwapTransaction({
           }
         : undefined,
   });
-
-  const decoded = decodeUniversalRouterExecute(calldata as `0x${string}`);
-  console.log("[SWAP DEBUG] build route:", {
-    from: fromToken.symbol,
-    to: toToken.symbol,
-    routeTokens: routeTokens.map((token) => token.address),
-    routeFees,
-  });
-  console.log("[SWAP DEBUG] universal router commands:", decoded?.commands ?? null);
-  console.log("[SWAP DEBUG] universal router inputs lengths:", decoded?.inputLengths ?? null);
 
   return {
     to: UNIVERSAL_ROUTER_ADDRESS,
@@ -148,41 +137,4 @@ function resolveRouteTokens(fromToken: SwapTokenLike, toToken: SwapTokenLike, qu
     throw new Error("Swap route output mismatch.");
   }
   return routeTokens;
-}
-
-const universalRouterExecuteAbi = [
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-      { name: "deadline", type: "uint256" },
-    ],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "execute",
-    stateMutability: "payable",
-    inputs: [
-      { name: "commands", type: "bytes" },
-      { name: "inputs", type: "bytes[]" },
-    ],
-    outputs: [],
-  },
-] as const;
-
-function decodeUniversalRouterExecute(data: `0x${string}`) {
-  try {
-    const decoded = decodeFunctionData({ abi: universalRouterExecuteAbi, data });
-    const inputs = decoded.args[1] as readonly `0x${string}`[];
-    return {
-      commands: String(decoded.args[0]),
-      inputLengths: inputs.map((input) => input.length),
-    };
-  } catch {
-    return null;
-  }
 }

@@ -2337,49 +2337,15 @@ function enhancePrototypeHome() {
         });
       }
       function setHomeDebug(stage, detail){
-        var data = {
-          at: new Date().toISOString(),
-          stage: stage,
-          activeViews: Array.from(document.querySelectorAll(".view.active")).map(function(view){ return view.id; }),
-          currentDetailIdx: typeof currentDetailIdx !== "undefined" ? currentDetailIdx : null,
-          detailTitle: document.getElementById("detTitle") ? document.getElementById("detTitle").textContent : "",
-          tapStart: window.__luminaHomeTapStart || null,
-          tapMoved: !!window.__luminaHomeTapMoved,
-          rows: homeDebugRows(),
-          detail: detail || {}
-        };
-        window.__luminaHomeDebug = data;
-        try { localStorage.setItem("lumina_home_debug_v1", JSON.stringify(data)); } catch(e) {}
+        return;
       }
-      window.__luminaSetHomeDebug = setHomeDebug;
+      window.__luminaSetHomeDebug = null;
       function readHomeDebug(){
-        if (window.__luminaHomeDebug) return window.__luminaHomeDebug;
-        try { return JSON.parse(localStorage.getItem("lumina_home_debug_v1") || "null"); } catch(e) { return null; }
+        return null;
       }
       function openHomeDebug(){
-        return;
-        if (!readHomeDebug()) setHomeDebug("manual:open", { note:"Tap WLD or USDC, then open DEBUG again to inspect the latest click path." });
         var old = document.getElementById("homeDebugModal");
         if (old) old.remove();
-        var data = readHomeDebug();
-        var json = data ? JSON.stringify(data, null, 2) : "No home debug data yet.";
-        var modal = document.createElement("div");
-        modal.className = "modal-mask open";
-        modal.id = "homeDebugModal";
-        modal.innerHTML =
-          '<div class="modal send-confirm-sheet swap-debug-sheet">' +
-            '<button type="button" class="swap-debug-close" id="homeDebugClose" aria-label="Close">×</button>' +
-            '<div class="modal-grip"></div><h3>Home debug</h3>' +
-            '<pre class="swap-debug-pre">' + String(json).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; }) + '</pre>' +
-            '<button type="button" class="btn-primary swap-debug-copy" id="homeDebugCopy">Copy debug</button>' +
-          '</div>';
-        document.body.appendChild(modal);
-        function close(){ modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); }
-        modal.onclick = function(event){ if (event.target === modal) close(); };
-        document.getElementById("homeDebugClose").onclick = close;
-        document.getElementById("homeDebugCopy").onclick = async function(){
-          try { await navigator.clipboard.writeText(json); toast("Debug copied"); } catch(e) {}
-        };
       }
       function ensureHomeDebugButton(){
         var old = document.getElementById("homeDebugBtn");
@@ -3153,10 +3119,6 @@ function enhancePrototypeSwapQuote() {
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
 	      var swapMaxUsd = ${JSON.stringify(Number(process.env.NEXT_PUBLIC_SWAP_MAX_USD || "100000") || 100000)};
 	      var configuredNetworkFeeLabel = "";
-	      var swapDebugStorageKey = "lumina_swap_debug_v1";
-	      var swapExecutionDebugStorageKey = "lumina_swap_execution_debug_v1";
-	      var latestSwapDebug = null;
-	      var latestSwapExecutionDebug = null;
       function swapLang(){
         return window.currentLang || "en";
       }
@@ -3207,10 +3169,6 @@ function enhancePrototypeSwapQuote() {
           ,sellRestricted: { en:"Sell may be restricted", "zh-CN":"可能限制卖出", "zh-TW":"可能限制賣出", fr:"Vente peut être limitée", de:"Verkauf evtl. eingeschränkt", es:"Venta posiblemente limitada", ja:"売却制限の可能性" }
           ,refreshQuoteShort: { en:"Refresh quote", "zh-CN":"请刷新报价", "zh-TW":"請刷新報價", fr:"Actualisez le devis", de:"Angebot aktualisieren", es:"Actualiza cotización", ja:"見積もりを更新" }
           ,quoteExpiredShort: { en:"Quote expired", "zh-CN":"报价已过期", "zh-TW":"報價已過期", fr:"Devis expiré", de:"Angebot abgelaufen", es:"Cotización vencida", ja:"見積期限切れ" }
-          ,debugTitle: { en:"Swap debug", "zh-CN":"Swap 调试", "zh-TW":"Swap 調試", fr:"Debug swap", de:"Swap debug", es:"Debug swap", ja:"Swap debug" }
-          ,debugEmpty: { en:"No swap debug data yet. Try quoting or signing once.", "zh-CN":"还没有调试数据。先报价或签名一次。", "zh-TW":"還沒有調試資料。先報價或簽名一次。", fr:"Aucune donnée de debug.", de:"Noch keine Debug-Daten.", es:"No hay datos de debug.", ja:"Debug データはまだありません。" }
-          ,copyDebug: { en:"Copy debug", "zh-CN":"复制调试信息", "zh-TW":"複製調試資訊", fr:"Copier debug", de:"Debug kopieren", es:"Copiar debug", ja:"Debug をコピー" }
-          ,debugCopied: { en:"Debug copied", "zh-CN":"调试信息已复制", "zh-TW":"調試資訊已複製", fr:"Debug copié", de:"Debug kopiert", es:"Debug copiado", ja:"コピーしました" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || (typeof t === "function" ? t(key) : key);
       }
@@ -3345,82 +3303,20 @@ function enhancePrototypeSwapQuote() {
         }, extra || {});
       }
       function setSwapDebug(stage, detail){
-        latestSwapDebug = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
-        window.__luminaSwapDebug = latestSwapDebug;
-        try { localStorage.setItem(swapDebugStorageKey, JSON.stringify(latestSwapDebug)); } catch(e) {}
-        if (/^(execute|validate|confirm):/.test(String(stage || ""))) {
-          latestSwapExecutionDebug = latestSwapDebug;
-          window.__luminaSwapExecutionDebug = latestSwapExecutionDebug;
-          try { localStorage.setItem(swapExecutionDebugStorageKey, JSON.stringify(latestSwapExecutionDebug)); } catch(e) {}
-        }
-        try { console.info("[SWAP DEBUG]", latestSwapDebug); } catch(e) {}
+        return;
       }
       function readSwapDebug(){
-        try {
-          var exec = latestSwapExecutionDebug || JSON.parse(localStorage.getItem(swapExecutionDebugStorageKey) || "null");
-          var currentStage = latestSwapDebug && latestSwapDebug.stage ? String(latestSwapDebug.stage) : "";
-          if (exec && (/^execute:error/.test(String(exec.stage || "")) || /^quote:/.test(currentStage))) return exec;
-        } catch(e) {}
-        if (latestSwapDebug) return latestSwapDebug;
-        try {
-          var saved = JSON.parse(localStorage.getItem(swapDebugStorageKey) || "null");
-          if (saved) return saved;
-        } catch(e) {}
         return null;
       }
       function openSwapDebug(){
         var existingModal = document.getElementById("swapDebugModal");
         if (existingModal) existingModal.remove();
-        return;
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
-        var data = readSwapDebug();
-        var json = data ? JSON.stringify(data, null, 2) : swapCopy("debugEmpty");
-        var modal = document.createElement("div");
-        modal.className = "modal-mask open";
-        modal.id = "swapDebugModal";
-        modal.innerHTML =
-          '<div class="modal send-confirm-sheet swap-debug-sheet">' +
-            '<button type="button" class="swap-debug-close" id="swapDebugClose" aria-label="Close">×</button>' +
-            '<div class="modal-grip"></div><h3>' + swapCopy("debugTitle") + '</h3>' +
-            (data ? '<div class="swap-debug-grid"><span>Stage</span><b>' + escapeDebugHtml(data.stage || "—") + '</b><span>Pair</span><b>' + escapeDebugHtml((data.sell || "?") + " → " + (data.buy || "?")) + '</b><span>Amount</span><b>' + escapeDebugHtml(data.amount || "—") + '</b><span>Route</span><b>' + escapeDebugHtml((data.quote && data.quote.routeSymbols && data.quote.routeSymbols.join(" → ")) || data.quote && data.quote.source || "—") + '</b></div>' : '<p class="swap-debug-empty">' + swapCopy("debugEmpty") + '</p>') +
-            '<pre class="swap-debug-pre">' + escapeDebugHtml(json) + '</pre>' +
-            '<button type="button" class="btn-primary swap-debug-copy" id="swapDebugCopy">' + swapCopy("copyDebug") + '</button>' +
-          '</div>';
-        document.body.appendChild(modal);
-        function close(){ modal.classList.remove("open"); setTimeout(function(){ modal.remove(); }, 180); }
-        modal.onclick = function(event){ if (event.target === modal) close(); };
-        document.getElementById("swapDebugClose").onclick = close;
-        document.getElementById("swapDebugCopy").onclick = async function(){
-          try {
-            await navigator.clipboard.writeText(json);
-            toast(swapCopy("debugCopied"));
-          } catch(e) {
-            var pre = modal.querySelector(".swap-debug-pre");
-            if (pre) {
-              var range = document.createRange();
-              range.selectNodeContents(pre);
-              var sel = window.getSelection();
-              if (sel) { sel.removeAllRanges(); sel.addRange(range); }
-            }
-          }
-        };
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
         if (existing) existing.remove();
-        return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "swapDebugBtn";
-        btn.className = "swap-debug-btn";
-        btn.textContent = "DEBUG";
-        btn.onclick = function(event){
-          if (event && event.preventDefault) event.preventDefault();
-          if (event && event.stopPropagation) event.stopPropagation();
-          openSwapDebug();
-        };
-        document.body.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(value);
@@ -3536,7 +3432,6 @@ function enhancePrototypeSwapQuote() {
 	        latestSwapQuote = data;
 	        latestQuoteAt = Date.now();
 	        highImpactAcknowledged = false;
-	        try { console.log("[SWAP] fee config:", data && data.platformFee ? { bps: data.platformFee.bps, recipient: data.platformFee.recipient } : null); } catch(e) {}
 	        var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
@@ -3733,7 +3628,6 @@ function enhancePrototypeSwapQuote() {
 	          error_code: error.error_code,
 	          data: error.data,
 	          details: error.details,
-	          debug: error.debug,
 	          cause: error.cause && (error.cause.message || error.cause.data || error.cause.code || error.cause.error_code)
 	        };
 	        try { out.serialized = JSON.stringify(error); } catch(e) {}
