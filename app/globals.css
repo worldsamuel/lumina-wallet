@@ -877,16 +877,25 @@
   .lumina-mark.lg i { width: 3px; height: 17px; bottom: 7px; }
   .lumina-dot { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--green); color: var(--green); display: inline-grid; place-items: center; font-size: 10px; font-weight: 950; line-height: 1; box-shadow: 0 0 16px rgba(74,222,128,.28); flex: 0 0 auto; }
   .points-balance-card { margin-top: 20px; min-height: 122px; padding: 28px 22px; border: 1px solid rgba(74,222,128,.22); border-radius: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; background: radial-gradient(78% 100% at 74% -12%, rgba(74,222,128,.18), transparent 56%), radial-gradient(80% 120% at 90% 102%, rgba(74,222,128,.28), transparent 58%), linear-gradient(135deg, #0b0f0b, #060706); overflow: hidden; }
-  .points-card-title { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 17px; font-weight: 900; }
+  .points-balance-card.vip { position: relative; min-height: 174px; margin-top: 16px; padding: 26px 24px 24px; border-radius: 26px; background: radial-gradient(100% 130% at 92% 22%, rgba(91,255,131,.32), transparent 48%), radial-gradient(85% 120% at 18% 104%, rgba(116,255,170,.12), transparent 58%), linear-gradient(128deg, #070907 0%, #101b12 52%, #071008 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 22px 70px rgba(0,0,0,.34); }
+  .points-balance-card.vip::before { content: ""; position: absolute; inset: 14px; border-radius: 22px; border: 1px solid rgba(114,255,150,.12); pointer-events: none; }
+  .points-balance-card.vip::after { content: "LUMINA"; position: absolute; right: 20px; bottom: 14px; color: rgba(255,255,255,.035); font-size: 34px; line-height: 1; font-weight: 950; letter-spacing: 3px; }
+  .points-vip-glow { position: absolute; width: 180px; height: 180px; right: -48px; top: -42px; border-radius: 50%; border: 1px solid rgba(95,240,131,.2); background: radial-gradient(circle, rgba(95,240,131,.2), transparent 60%); filter: blur(1px); opacity: .9; }
+  .points-vip-main { position: relative; z-index: 1; display: grid; align-content: space-between; min-height: 126px; }
+  .points-vip-main small { color: rgba(216,255,225,.58); font-size: 12px; font-weight: 750; text-transform: uppercase; letter-spacing: 1px; }
+  .points-card-title { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; color: #fff; font-size: 18px; font-weight: 900; }
+  .points-card-title em { color: rgba(194,255,207,.68); font-size: 12px; font-style: normal; font-weight: 850; letter-spacing: .6px; text-transform: uppercase; }
   .points-big { margin-top: 20px; border: none; background: transparent; color: #fff; display: inline-flex; align-items: center; gap: 10px; padding: 0; font-size: 42px; line-height: 1; font-weight: 950; }
   .points-big i { font-style: normal; color: #fff; font-size: 32px; transform: translateY(-1px); }
-  .coupon-card { min-width: 118px; height: 54px; border: 1px solid rgba(74,222,128,.24); border-radius: 18px; background: linear-gradient(135deg, rgba(74,222,128,.16), rgba(5,16,8,.68)); color: var(--green); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 0 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+  .coupon-card { position: relative; z-index: 1; min-width: 124px; height: 64px; border: 1px solid rgba(118,255,155,.26); border-radius: 20px; background: linear-gradient(135deg, rgba(74,222,128,.16), rgba(5,16,8,.72)); color: var(--green); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 0 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
   .coupon-card span { color: #b7ffc8; font-size: 12px; font-weight: 850; text-align: left; }
   .coupon-card b { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,.16); color: #fff; font-size: 14px; }
   .points-shop-panel { margin: 2px -16px 0; padding: 24px 16px 0; border-radius: 26px 26px 0 0; background: #020302; box-shadow: 0 -18px 50px rgba(0,0,0,.44); }
   .points-shop-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .points-shop-title h2 { margin: 0; font-size: 24px; line-height: 1.1; }
-  .points-region { border: none; background: transparent; color: #fff; font-size: 15px; font-weight: 850; white-space: nowrap; }
+  .points-region { border: none; background: transparent; color: #fff; font-size: 15px; font-weight: 850; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .points-region select { max-width: 128px; border: none; outline: none; background: transparent; color: #fff; font: inherit; font-weight: 900; appearance: none; padding-right: 12px; }
+  .points-region select option { color: #111; background: #fff; }
   .points-tabs { margin-top: 22px; display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
   .points-tabs::-webkit-scrollbar { display: none; }
   .points-tabs button { min-width: max-content; height: 38px; border: none; border-radius: 999px; background: transparent; color: #8f958f; padding: 0 14px; font-size: 17px; font-weight: 800; }

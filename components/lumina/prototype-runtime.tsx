@@ -4912,15 +4912,33 @@ function enhancePrototypeMe() {
       function refreshPoints(){
         var badge = document.getElementById("mePointsBadge");
         var center = document.getElementById("pointsCenterValue");
+        var profile = window.__luminaPointsProfile || {};
+        var adjustmentTotal = Math.floor(Number(profile.adjustmentTotal || 0));
+        var basePoints = Math.floor(Number(window.__luminaBasePoints || window.__luminaPoints || 0));
         function setValue(value){
-          window.__luminaPoints = Math.max(0, Math.floor(Number(value || 0) - pointsSpentTotal()));
+          basePoints = Math.max(0, Math.floor(Number(value || 0)));
+          window.__luminaBasePoints = basePoints;
+          adjustmentTotal = Math.floor(Number((window.__luminaPointsProfile || {}).adjustmentTotal || adjustmentTotal || 0));
+          window.__luminaPoints = Math.max(0, Math.floor(basePoints + adjustmentTotal - pointsSpentTotal()));
           if (!Array.isArray(window.__luminaPointRecords)) window.__luminaPointRecords = [];
           if (badge) badge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           if (center) center.textContent = Number(window.__luminaPoints || 0).toLocaleString();
+          var shopBadge = document.getElementById("pointsShopBalance");
+          if (shopBadge) shopBadge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
+          var vipNo = document.getElementById("pointsVipNo");
+          if (vipNo) vipNo.textContent = (window.__luminaPointsProfile && window.__luminaPointsProfile.luminaNo) ? ("Lumina No." + window.__luminaPointsProfile.luminaNo) : "Lumina VIP";
         }
         setValue(Number(window.__luminaPoints || 0));
         var address = window.__luminaUserAddress || "";
         if (!address) return;
+        fetch("/api/points-profile?address=" + encodeURIComponent(address), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : null; })
+          .then(function(data){
+            if (!data) return;
+            window.__luminaPointsProfile = data;
+            setValue(basePoints);
+          })
+          .catch(function(){});
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ setValue(pointsFromActivity(Array.isArray(rows) ? rows : [])); })
@@ -5094,6 +5112,17 @@ function enhancePrototypeMe() {
           var map = { all:"All", shop:"Shop", travel:"Travel", fitness:"Fitness", dining:"Dining", cash:"Cash" };
           return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
         }
+        function countryLabel(key){
+          var map = { global:"Global", us:"United States", cn:"China", jp:"Japan", kr:"Korea", sg:"Singapore", hk:"Hong Kong", eu:"Europe", ae:"UAE" };
+          return map[key] || key.toUpperCase();
+        }
+        function productCountries(product){
+          return Array.isArray(product.countries) && product.countries.length ? product.countries.map(function(x){ return String(x || "").toLowerCase(); }) : ["global"];
+        }
+        function productMatchesRegion(product, region){
+          var countries = productCountries(product);
+          return region === "global" || countries.indexOf("global") >= 0 || countries.indexOf(region) >= 0;
+        }
         function purchaseKey(id){ return "lumina_points_purchase_" + String(id || ""); }
         function purchasedCount(id){
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
@@ -5219,13 +5248,14 @@ function enhancePrototypeMe() {
         window.__luminaOpenPointsProduct = renderProductDetail;
         window.__luminaOpenPointsLedger = function(){
           var earnRows = (window.__luminaPointRecords || []).map(function(row){ return '<div class="points-ledger-row"><span><b>Earned from ' + escapeAttr(row.symbol || "activity") + '</b><small>' + escapeAttr(row.date || "") + '</small></span><strong>+' + Number(row.points || 0).toLocaleString() + '</strong></div>'; }).join("");
+          var adminRows = (((window.__luminaPointsProfile || {}).adjustments) || []).map(function(row){ var pts = Number(row.points || 0); return '<div class="points-ledger-row ' + (pts < 0 ? "spend" : "") + '"><span><b>' + escapeAttr(row.note || "Admin points adjustment") + '</b><small>' + escapeAttr(row.createdAt || "") + '</small></span><strong>' + (pts >= 0 ? "+" : "") + pts.toLocaleString() + '</strong></div>'; }).join("");
           var spendRows = pointsLocalRows("lumina_points_ledger_v1").map(function(row){ return '<div class="points-ledger-row spend"><span><b>' + escapeAttr(row.title || "Redeemed") + '</b><small>' + escapeAttr(row.date || "") + '</small></span><strong>-' + Number(row.points || 0).toLocaleString() + '</strong></div>'; }).join("");
           var old = document.getElementById("pointsLedgerSheet"); if (old) old.remove();
           var sheet = document.createElement("div");
           sheet.id = "pointsLedgerSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsLedgerSheet\\').remove()">×</button><h3>Points history</h3>' + (earnRows || spendRows ? earnRows + spendRows : '<p class="points-empty">No points records yet.</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsLedgerSheet\\').remove()">×</button><h3>Points history</h3>' + (earnRows || adminRows || spendRows ? earnRows + adminRows + spendRows : '<p class="points-empty">No points records yet.</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         window.__luminaOpenCoupons = function(){
@@ -5239,7 +5269,8 @@ function enhancePrototypeMe() {
           document.body.appendChild(sheet);
         };
         function renderProducts(products, active){
-          var list = products.filter(function(item){ return active === "all" || String(item.category || "shop") === active; });
+          var region = window.__luminaPointsRegion || "global";
+          var list = products.filter(function(item){ return productMatchesRegion(item, region) && (active === "all" || String(item.category || "shop") === active); });
           var box = modal.querySelector("#pointsProductGrid");
           if (!box) return;
           box.innerHTML = list.length ? list.map(function(product){
@@ -5251,14 +5282,24 @@ function enhancePrototypeMe() {
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
+        var countries = ["global", "us", "cn", "jp", "kr", "sg", "hk", "eu", "ae"];
         function renderShop(){
+          var profile = window.__luminaPointsProfile || {};
+          var vipNo = profile.luminaNo ? ("Lumina No." + profile.luminaNo) : "Lumina VIP";
+          var selectedRegion = window.__luminaPointsRegion || "global";
           modal.innerHTML =
             '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><button type="button" data-points-close="1" class="points-close">×</button></div>' +
-            '<div class="points-balance-card"><div><div class="points-card-title"><b>Lumina Points</b></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Coupons</span><b>' + pointsCoupons().length + '</b></button></div>' +
-            '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><button type="button" class="points-region">◎ Global⌄</button></div><div class="points-tabs">' +
+            '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>Priority member card</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Coupons</span><b>' + pointsCoupons().length + '</b></button></div>' +
+            '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><label class="points-region"><span>◎</span><select id="pointsRegionSelect">' + countries.map(function(key){ return '<option value="' + key + '"' + (key === selectedRegion ? " selected" : "") + '>' + countryLabel(key) + '</option>'; }).join("") + '</select></label></div><div class="points-tabs">' +
             categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
             '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
           renderProducts(products, "all");
+          var regionSelect = modal.querySelector("#pointsRegionSelect");
+          if (regionSelect) regionSelect.addEventListener("change", function(){
+            window.__luminaPointsRegion = regionSelect.value || "global";
+            var active = (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") : "all";
+            renderProducts(products, active || "all");
+          });
           modal.querySelectorAll("[data-points-cat]").forEach(function(btn){
             btn.addEventListener("click", function(){
               modal.querySelectorAll("[data-points-cat]").forEach(function(item){ item.classList.remove("sel"); });
@@ -5274,6 +5315,15 @@ function enhancePrototypeMe() {
         window.__luminaPointsOrders = [];
         renderShop();
         try {
+          if (window.__luminaUserAddress) {
+            var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
+            var profileData = await profileRes.json().catch(function(){ return null; });
+            if (profileRes.ok && profileData) {
+              window.__luminaPointsProfile = profileData;
+              refreshPoints();
+              renderShop();
+            }
+          }
           var res = await fetch("/api/points-products", { cache: "no-store" });
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {

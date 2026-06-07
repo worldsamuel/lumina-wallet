@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 
 const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_ORDERS_KEY = "points_orders";
+const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
 
 export type PointsProductConfig = {
   id: string;
@@ -14,6 +15,7 @@ export type PointsProductConfig = {
   imageUrl?: string | null;
   imageText?: string | null;
   badge?: string | null;
+  countries?: string[];
   stock: number;
   enabled: boolean;
   sortOrder: number;
@@ -42,6 +44,15 @@ export type PointsOrderConfig = {
   openedAt?: string | null;
 };
 
+export type PointsAdjustmentConfig = {
+  id: string;
+  address: string;
+  points: number;
+  note?: string | null;
+  createdAt: string;
+  createdBy?: string | null;
+};
+
 function defaultProducts(): PointsProductConfig[] {
   return [
     {
@@ -53,6 +64,7 @@ function defaultProducts(): PointsProductConfig[] {
       originalPoints: 17500,
       imageText: "$50",
       badge: "Hot",
+      countries: ["global"],
       stock: 99,
       enabled: true,
       sortOrder: 1,
@@ -71,6 +83,7 @@ function defaultProducts(): PointsProductConfig[] {
       points: 9,
       imageText: "umy",
       badge: null,
+      countries: ["global"],
       stock: 200,
       enabled: true,
       sortOrder: 2,
@@ -83,6 +96,7 @@ function defaultProducts(): PointsProductConfig[] {
       category: "cash",
       points: 17500,
       imageText: "$50",
+      countries: ["global"],
       stock: 50,
       enabled: true,
       sortOrder: 3,
@@ -95,6 +109,7 @@ function defaultProducts(): PointsProductConfig[] {
       category: "dining",
       points: 9,
       imageText: "Vintage Fine Wines",
+      countries: ["global"],
       stock: 120,
       enabled: true,
       sortOrder: 4,
@@ -133,6 +148,9 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
     imageUrl: typeof input.imageUrl === "string" && input.imageUrl.trim() ? input.imageUrl.trim() : null,
     imageText: typeof input.imageText === "string" && input.imageText.trim() ? input.imageText.trim() : null,
     badge: typeof input.badge === "string" && input.badge.trim() ? input.badge.trim() : null,
+    countries: Array.isArray(input.countries) && input.countries.length
+      ? Array.from(new Set(input.countries.map((country) => String(country || "").trim().toLowerCase()).filter(Boolean)))
+      : ["global"],
     stock: Math.max(0, Math.floor(Number(input.stock ?? 0))),
     enabled: input.enabled !== false,
     sortOrder: Number(input.sortOrder ?? index + 1),
@@ -206,6 +224,36 @@ async function writeStoredOrders(orders: PointsOrderConfig[]) {
   return trimmed;
 }
 
+function parseAdjustments(value: unknown): PointsAdjustmentConfig[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Partial<PointsAdjustmentConfig> => !!item && typeof item === "object")
+    .map((item): PointsAdjustmentConfig => ({
+      id: String(item.id || `points-${Date.now()}`),
+      address: String(item.address || "").toLowerCase(),
+      points: Math.floor(Number(item.points || 0)),
+      note: typeof item.note === "string" && item.note.trim() ? item.note.trim() : null,
+      createdAt: String(item.createdAt || new Date().toISOString()),
+      createdBy: typeof item.createdBy === "string" && item.createdBy.trim() ? item.createdBy.trim() : null,
+    }))
+    .filter((item) => item.address && item.points !== 0);
+}
+
+async function readStoredAdjustments() {
+  const page = await db.contentPage.findUnique({ where: { key: POINTS_ADJUSTMENTS_KEY } });
+  return parseAdjustments(page?.bodyI18n);
+}
+
+async function writeStoredAdjustments(rows: PointsAdjustmentConfig[]) {
+  const trimmed = rows.slice(0, 1000);
+  await db.contentPage.upsert({
+    where: { key: POINTS_ADJUSTMENTS_KEY },
+    update: { bodyI18n: trimmed as unknown as Prisma.InputJsonValue },
+    create: { key: POINTS_ADJUSTMENTS_KEY, bodyI18n: trimmed as unknown as Prisma.InputJsonValue },
+  });
+  return trimmed;
+}
+
 export async function getPointsProducts() {
   return readStoredProducts();
 }
@@ -217,6 +265,36 @@ export async function getPublicPointsProducts() {
 export async function getPointsOrders(address: string) {
   const normalized = address.toLowerCase();
   return (await readStoredOrders()).filter((order) => order.address === normalized);
+}
+
+export async function getPointsAdjustments(address?: string) {
+  const rows = await readStoredAdjustments();
+  if (!address) return rows;
+  const normalized = address.toLowerCase();
+  return rows.filter((row) => row.address === normalized);
+}
+
+export async function getPointsAdjustmentTotal(address: string) {
+  return (await getPointsAdjustments(address)).reduce((sum, row) => sum + Math.floor(Number(row.points || 0)), 0);
+}
+
+export async function addPointsAdjustment(input: { address: string; points: number; note?: string | null; createdBy?: string | null }) {
+  const address = String(input.address || "").toLowerCase();
+  const points = Math.floor(Number(input.points || 0));
+  if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
+  if (!points) throw new Error("Points must not be 0.");
+  const row: PointsAdjustmentConfig = {
+    id: `points-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    address,
+    points,
+    note: input.note || null,
+    createdBy: input.createdBy || null,
+    createdAt: new Date().toISOString(),
+  };
+  const rows = await readStoredAdjustments();
+  rows.unshift(row);
+  await writeStoredAdjustments(rows);
+  return row;
 }
 
 function pickBlindReward(product: PointsProductConfig) {

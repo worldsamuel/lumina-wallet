@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
+import { getPointsAdjustments, getPointsAdjustmentTotal } from "@/lib/admin/points-products";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -14,5 +15,17 @@ export async function GET() {
     orderBy: { createdAt: "desc" },
     take: 200,
   });
-  return jsonResponse(users);
+  const enriched = await Promise.all(users.map(async (user) => {
+    const [adjustments, adjustmentTotal] = await Promise.all([
+      getPointsAdjustments(user.address),
+      getPointsAdjustmentTotal(user.address),
+    ]);
+    return {
+      ...user,
+      luminaNo: await db.user.count({ where: { createdAt: { lte: user.createdAt } } }),
+      pointsAdjustmentTotal: adjustmentTotal,
+      pointsAdjustments: adjustments.slice(0, 12),
+    };
+  }));
+  return jsonResponse(enriched);
 }
