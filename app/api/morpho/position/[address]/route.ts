@@ -48,7 +48,10 @@ export async function GET(
       },
     ]);
 
-    const baseResults = await publicClient.multicall({ allowFailure: true, contracts });
+    const baseResults = await publicClient.multicall({ allowFailure: true, contracts }).catch((error) => {
+      console.error("Failed to read Morpho base positions", error);
+      return [];
+    });
     const assetContracts = vaults.map((vault, index) => {
       const shares = resultBigInt(baseResults[index * 3]);
       return {
@@ -58,7 +61,10 @@ export async function GET(
         args: [shares],
       };
     });
-    const assetResults = await publicClient.multicall({ allowFailure: true, contracts: assetContracts });
+    const assetResults = await publicClient.multicall({ allowFailure: true, contracts: assetContracts }).catch((error) => {
+      console.error("Failed to convert Morpho shares", error);
+      return [];
+    });
 
     const positions = vaults.map((vault, index) => {
       const shares = resultBigInt(baseResults[index * 3]);

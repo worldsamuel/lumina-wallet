@@ -139,29 +139,39 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
 export async function fetchBalances(userAddress: Address) {
   const ethToken = TOKENS.find((token) => token.native);
   const balanceTokens = await getBalanceTokens();
-  const [nativeBalance, erc20Results, discoveredBalances] = await Promise.all([
-    publicClient.getBalance({ address: userAddress }),
-    publicClient.multicall({
-      allowFailure: true,
-      contracts: balanceTokens.map((token) => ({
-        address: token.contractAddress,
-        abi: erc20BalanceAbi,
-        functionName: "balanceOf",
-        args: [userAddress],
-      })),
-    }),
-    fetchDiscoveredTokenBalances(userAddress).catch(() => [] as ChainBalance[]),
+  const [nativeResult, erc20Result, alchemyBalances] = await Promise.all([
+    publicClient.getBalance({ address: userAddress }).catch(() => 0n),
+    publicClient
+      .multicall({
+        allowFailure: true,
+        contracts: balanceTokens.map((token) => ({
+          address: token.contractAddress,
+          abi: erc20BalanceAbi,
+          functionName: "balanceOf",
+          args: [userAddress],
+        })),
+      })
+      .catch(() => []),
+    fetchAllAlchemyTokenBalances(userAddress).catch(() => []),
   ]);
+  const discoveredBalances = await fetchDiscoveredTokenBalances(userAddress, alchemyBalances).catch(() => [] as ChainBalance[]);
+  const alchemyByAddress = new Map(
+    alchemyBalances
+      .filter((item) => item.contractAddress && item.tokenBalance && !item.error)
+      .map((item) => [String(item.contractAddress).toLowerCase(), parseAlchemyBalance(String(item.tokenBalance))]),
+  );
 
   const rawConfiguredBalances = balanceTokens.map((token, index) => {
-    const result = erc20Results[index];
-    return toBalance(token, result?.status === "success" ? result.result : 0n);
+    const result = erc20Result[index];
+    const rpcBalance = result?.status === "success" ? result.result : 0n;
+    const alchemyBalance = alchemyByAddress.get(token.contractAddress.toLowerCase()) ?? 0n;
+    return toBalance(token, alchemyBalance > rpcBalance ? alchemyBalance : rpcBalance);
   });
   const erc20Balances = mergeAliasBalances(rawConfiguredBalances);
 
   const configured = [
     ...erc20Balances,
-    ...(ethToken ? [toBalance(ethToken, nativeBalance)] : []),
+    ...(ethToken ? [toBalance(ethToken, nativeResult)] : []),
   ];
   const configuredAddresses = new Set(
     configured.map((item) => item.contractAddress?.toLowerCase()).filter(Boolean),
@@ -211,8 +221,8 @@ async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
   });
 }
 
-async function fetchDiscoveredTokenBalances(userAddress: Address) {
-  const balances = await fetchAllAlchemyTokenBalances(userAddress);
+async function fetchDiscoveredTokenBalances(userAddress: Address, preloadedBalances?: AlchemyTokenBalance[]) {
+  const balances = preloadedBalances ?? (await fetchAllAlchemyTokenBalances(userAddress));
   const catalog = worldChainTokenCatalog as CatalogToken[];
   const catalogByAddress = new Map(
     catalog
@@ -252,7 +262,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
   const out: AlchemyTokenBalance[] = [];
   let pageKey: string | undefined;
 
-  for (let page = 0; page < 8; page += 1) {
+  for (let page = 0; page < 3; page += 1) {
     const params = [...baseParams];
     if (pageKey) params.push({ pageKey });
     const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
@@ -264,7 +274,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
         method: "alchemy_getTokenBalances",
         params,
       }),
-      signal: AbortSignal.timeout(6_000),
+      signal: AbortSignal.timeout(3_500),
     });
     if (!response.ok) break;
 
