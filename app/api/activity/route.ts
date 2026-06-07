@@ -5,6 +5,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { getStoredActivities, recordActivity } from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
+import { VERIFIED_SWAP_TOKENS } from "@/lib/swap/tokens";
 
 const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
 const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
@@ -12,6 +13,14 @@ const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
+const activityTokenAddresses = Array.from(
+  new Set(
+    [
+      ...ERC20_TOKENS.map((token) => token.contractAddress),
+      ...Object.values(VERIFIED_SWAP_TOKENS).map((token) => token.address),
+    ].map((address) => address.toLowerCase()),
+  ),
+) as Address[];
 
 export function OPTIONS() {
   return optionsResponse();
@@ -38,6 +47,8 @@ async function getTokenMeta(address: Address) {
   const key = address.toLowerCase();
   const configured = ERC20_TOKENS.find((token) => token.contractAddress.toLowerCase() === key);
   if (configured) return { symbol: configured.symbol, decimals: configured.decimals };
+  const swapConfigured = Object.values(VERIFIED_SWAP_TOKENS).find((token) => token.address.toLowerCase() === key);
+  if (swapConfigured) return { symbol: swapConfigured.symbol, decimals: swapConfigured.decimals };
   const cached = tokenMetaCache.get(key);
   if (cached) return cached;
 
@@ -80,13 +91,30 @@ async function getTransferLogsForAddress(address: Address, latest: bigint, direc
     if (fromBlock < minBlock) fromBlock = minBlock;
 
     try {
-      const chunk = await publicClient.getLogs({
-        event: transferEvent,
-        args: direction === "in" ? { to: address } : { from: address },
-        fromBlock,
-        toBlock,
-      });
-      logs.push(...chunk);
+      const chunks = await Promise.all(
+        activityTokenAddresses.map((tokenAddress) =>
+          publicClient
+            .getLogs({
+              address: tokenAddress,
+              event: transferEvent,
+              args: direction === "in" ? { to: address } : { from: address },
+              fromBlock,
+              toBlock,
+            })
+            .catch((error) => {
+              console.error("Failed to fetch token activity logs", {
+                tokenAddress,
+                address,
+                direction,
+                fromBlock: fromBlock.toString(),
+                toBlock: toBlock.toString(),
+                error,
+              });
+              return [];
+            }),
+        ),
+      );
+      logs.push(...chunks.flat());
     } catch (error) {
       console.error("Failed to fetch activity log chunk", { address, direction, fromBlock: fromBlock.toString(), toBlock: toBlock.toString(), error });
     }
