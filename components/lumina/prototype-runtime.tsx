@@ -3593,7 +3593,6 @@ function enhancePrototypeSwapQuote() {
           waiting: { en:"Waiting for on-chain confirmation. Expected receive about", "zh-CN":"等待区块链确认中。预计收到约", "zh-TW":"等待區塊鏈確認中。預計收到約", fr:"En attente de confirmation on-chain. Réception prévue environ", de:"Warten auf On-chain-Bestätigung. Erwartet etwa", es:"Esperando confirmación on-chain. Recibirás aprox.", ja:"オンチェーン確認待ち。受取予定" },
           viewActivity: { en:"View Activity", "zh-CN":"查看活动", "zh-TW":"查看活動", fr:"Voir l'activité", de:"Aktivität anzeigen", es:"Ver actividad", ja:"Activity を見る" },
           networkFee: { en:"Network fee", "zh-CN":"网络费", "zh-TW":"網絡費", fr:"Frais réseau", de:"Netzwerkgebühr", es:"Comisión de red", ja:"ネットワーク手数料" },
-          platformFee: { en:"Platform fee", "zh-CN":"平台手续费", "zh-TW":"平台手續費", fr:"Frais plateforme", de:"Plattformgebühr", es:"Comisión de plataforma", ja:"プラットフォーム手数料" },
           free: { en:"Free", "zh-CN":"免费", "zh-TW":"免費", fr:"Gratuit", de:"Kostenlos", es:"Gratis", ja:"無料" },
           enterAmount: { en:"Enter an amount to get a quote", "zh-CN":"输入金额后获取报价", "zh-TW":"輸入金額後取得報價", fr:"Saisissez un montant pour obtenir un devis", de:"Betrag eingeben, um ein Angebot zu erhalten", es:"Ingresa un importe para cotizar", ja:"金額を入力して見積もり" },
           readingRoute: { en:"Reading DEX route...", "zh-CN":"正在读取兑换路由...", "zh-TW":"正在讀取兌換路由...", fr:"Lecture de la route DEX...", de:"DEX-Route wird gelesen...", es:"Leyendo ruta DEX...", ja:"DEX ルートを読み込み中..." },
@@ -3641,14 +3640,6 @@ function enhancePrototypeSwapQuote() {
         if (!value && Number.isFinite(Number(fallbackUsd))) value = "~$" + Number(fallbackUsd).toFixed(2);
         if (!value) value = "—";
         return /fee\\s*:/i.test(value) || /网络费[:：]|網絡費[:：]/.test(value) ? value : swapCopy("networkFee") + ": " + value;
-      }
-      function platformFeeText(quote){
-        var fee = quote && quote.platformFee ? quote.platformFee : null;
-        if (!fee) return swapCopy("free");
-        var bps = Number(fee.bps);
-        var pct = Number.isFinite(bps) ? (bps / 100).toFixed(bps % 100 === 0 ? 0 : 2) + "%" : String(fee.percent || "");
-        var amount = fee.amount ? shortAmount(fee.amount) + " " + swapState.buy : "";
-        return amount ? pct + " (" + amount + ")" : pct;
       }
       window.__luminaApplySwapSystemConfig = function(){
         readSwapSystemConfig();
@@ -4241,7 +4232,6 @@ function enhancePrototypeSwapQuote() {
 	                '<div class="ln"><span>' + swapCopy("youPay") + '</span><b>' + state.amountText + ' ' + swapState.sell + '</b></div>' +
 	                '<div class="ln"><span>' + swapCopy("youReceiveApprox") + '</span><b>' + shortAmount(latestSwapQuote.amountOut) + ' ' + swapState.buy + '</b></div>' +
 	                '<div class="ln"><span>' + swapCopy("minReceive") + '</span><b>' + minOutText() + ' ' + swapState.buy + '</b></div>' +
-	                '<div class="ln"><span>' + swapCopy("platformFee") + '</span><b>' + platformFeeText(latestSwapQuote) + '</b></div>' +
 	              '</div>' +
 	              (state.riskText ? '<div class="swap-risk-wrap"><div class="swap-risk-card"><strong><span class="swap-risk-icon">!</span><span>' + (state.riskText.title || swapCopy("communityRiskTitle")) + '</span></strong><p>' + (state.riskText.body || state.riskText) + '</p></div><button type="button" class="swap-risk-check" id="swapHighImpactAck"><span class="swap-risk-checkbox" aria-hidden="true"></span><span class="swap-risk-check-text">' + swapCopy("riskAck") + '</span></button></div>' : '') +
 	              '<div class="earn-action-row swap-confirm-actions"><button class="btn-ghost" id="swapConfirmCancel">' + swapCopy("cancel") + '</button><button class="btn-primary" id="swapConfirmOk">' + swapCopy("confirmSwap") + '</button></div>' +
