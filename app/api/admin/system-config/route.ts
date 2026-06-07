@@ -24,6 +24,7 @@ export async function PATCH(req: NextRequest) {
     adminLogoUrl?: string | null;
     faviconUrl?: string | null;
     swapNetworkFeeLabel?: string | null;
+    welcomeBox?: unknown;
     socialLinks?: {
       x?: unknown;
       telegram?: unknown;
@@ -43,6 +44,7 @@ export async function PATCH(req: NextRequest) {
       typeof body.swapNetworkFeeLabel === "string" || body.swapNetworkFeeLabel === null
         ? body.swapNetworkFeeLabel
         : undefined,
+    welcomeBox: typeof body.welcomeBox === "object" && body.welcomeBox !== null ? body.welcomeBox : undefined,
     socialLinks: typeof body.socialLinks === "object" && body.socialLinks !== null ? body.socialLinks : undefined,
   });
   await auditLog(admin.id, "update_system_config", "system_config", body);

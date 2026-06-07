@@ -6,6 +6,12 @@ export type SystemConfig = {
   adminLogoUrl: string | null;
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
+  welcomeBox: {
+    enabled: boolean;
+    totalCount: number;
+    minPoints: number;
+    maxPoints: number;
+  };
   socialLinks: {
     x: SocialLinkConfig;
     telegram: SocialLinkConfig;
@@ -26,6 +32,12 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   adminLogoUrl: null,
   faviconUrl: null,
   swapNetworkFeeLabel: "~$0.00",
+  welcomeBox: {
+    enabled: true,
+    totalCount: 1000,
+    minPoints: 50,
+    maxPoints: 500,
+  },
   socialLinks: {
     x: { url: null, logoUrl: null },
     telegram: { url: null, logoUrl: null },
@@ -54,7 +66,20 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
       typeof source.swapNetworkFeeLabel === "string" && source.swapNetworkFeeLabel.trim()
         ? source.swapNetworkFeeLabel.trim()
         : DEFAULT_SYSTEM_CONFIG.swapNetworkFeeLabel,
+    welcomeBox: normalizeWelcomeBox(source.welcomeBox),
     socialLinks: normalizeSocialLinks(source.socialLinks),
+  };
+}
+
+function normalizeWelcomeBox(value: unknown): SystemConfig["welcomeBox"] {
+  const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["welcomeBox"]> : {};
+  const minPoints = Math.max(0, Math.floor(Number(source.minPoints ?? DEFAULT_SYSTEM_CONFIG.welcomeBox.minPoints)));
+  const maxPoints = Math.max(minPoints, Math.floor(Number(source.maxPoints ?? DEFAULT_SYSTEM_CONFIG.welcomeBox.maxPoints)));
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : DEFAULT_SYSTEM_CONFIG.welcomeBox.enabled,
+    totalCount: Math.max(0, Math.floor(Number(source.totalCount ?? DEFAULT_SYSTEM_CONFIG.welcomeBox.totalCount))),
+    minPoints,
+    maxPoints,
   };
 }
 
@@ -90,7 +115,7 @@ export async function getSystemConfig() {
 }
 
 export async function updateSystemConfig(
-  patch: Partial<Omit<SystemConfig, "socialLinks">> & { socialLinks?: unknown },
+  patch: Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox">> & { socialLinks?: unknown; welcomeBox?: unknown },
 ) {
   const current = await getSystemConfig();
   const next = normalizeSystemConfig({ ...current, ...patch });

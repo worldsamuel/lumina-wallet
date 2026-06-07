@@ -2757,7 +2757,84 @@ function enhancePrototypeHome() {
           search.innerHTML = '<span>' + homeIcon("search") + '</span><input id="homeTokenSearch" placeholder="Search token" oninput="renderAssets()" />';
           section.insertAdjacentElement("afterend", search);
         }
+        window.setTimeout(function(){ maybeOpenWelcomeBox(); }, 650);
       }
+      function welcomeBoxKey(){
+        return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
+      }
+      function welcomeBoxConfig(){
+        var cfg = systemConfig();
+        var box = cfg && cfg.welcomeBox ? cfg.welcomeBox : {};
+        return {
+          enabled: box.enabled !== false,
+          totalCount: Math.max(0, Math.floor(Number(box.totalCount == null ? 1000 : box.totalCount))),
+          minPoints: Math.max(0, Math.floor(Number(box.minPoints == null ? 50 : box.minPoints))),
+          maxPoints: Math.max(0, Math.floor(Number(box.maxPoints == null ? 500 : box.maxPoints)))
+        };
+      }
+      function maybeOpenWelcomeBox(){
+        if (!window.__luminaUserAddress || document.getElementById("welcomeBoxModal")) return;
+        var box = welcomeBoxConfig();
+        if (!box.enabled || box.totalCount <= 0) return;
+        try { if (localStorage.getItem(welcomeBoxKey()) === "done") return; } catch(e) {}
+        fetch("/api/welcome-box?address=" + encodeURIComponent(window.__luminaUserAddress), { cache:"no-store" })
+          .then(function(res){ return res.ok ? res.json() : null; })
+          .then(function(data){
+            if (!data || data.claimed || !data.config || data.config.enabled === false || Number(data.config.totalCount || 0) <= 0) {
+              try { if (data && data.claimed) localStorage.setItem(welcomeBoxKey(), "done"); } catch(e) {}
+              return;
+            }
+            openWelcomeBox(data.config);
+          })
+          .catch(function(){ openWelcomeBox(box); });
+      }
+      function openWelcomeBox(box){
+        if (document.getElementById("welcomeBoxModal")) return;
+        var rewards = [box.minPoints || 50, Math.max(box.minPoints || 50, Math.round(((box.minPoints || 50) + (box.maxPoints || 500)) / 3)), Math.max(box.minPoints || 50, Math.round(((box.minPoints || 50) + (box.maxPoints || 500)) * 2 / 3)), box.maxPoints || 500];
+        var modal = document.createElement("div");
+        modal.id = "welcomeBoxModal";
+        modal.className = "welcome-box-modal open";
+        modal.innerHTML =
+          '<div class="welcome-box-card">' +
+            '<button type="button" class="welcome-box-close" onclick="window.__luminaCloseWelcomeBox && window.__luminaCloseWelcomeBox()">×</button>' +
+            '<div class="welcome-star top"></div><h2>Welcome to <b>Lumina</b></h2><p>Open your first mystery box<br>and earn Lumina Points</p>' +
+            '<button type="button" class="welcome-cube" onclick="window.__luminaClaimWelcomeBox && window.__luminaClaimWelcomeBox()"><span></span><i>✦</i></button>' +
+            '<div class="welcome-rewards"><strong>Possible Rewards</strong><div>' + rewards.map(function(n){ return '<span><i>✦</i><b>' + Number(n || 0).toLocaleString() + '</b><small>Points</small></span>'; }).join("") + '<span><i>?</i><b>?</b><small>Mystery</small></span></div></div>' +
+            '<button type="button" class="welcome-open-btn" onclick="window.__luminaClaimWelcomeBox && window.__luminaClaimWelcomeBox()">Open Now</button>' +
+            '<button type="button" class="welcome-later-btn" onclick="window.__luminaCloseWelcomeBox && window.__luminaCloseWelcomeBox()">Maybe Later</button>' +
+          '</div>';
+        document.body.appendChild(modal);
+      }
+      window.__luminaCloseWelcomeBox = function(){
+        var modal = document.getElementById("welcomeBoxModal");
+        if (modal) modal.remove();
+      };
+      window.__luminaClaimWelcomeBox = async function(){
+        var modal = document.getElementById("welcomeBoxModal");
+        if (!modal || modal.classList.contains("opening")) return;
+        modal.classList.add("opening");
+        try {
+          var res = await fetch("/api/welcome-box", {
+            method:"POST",
+            headers:{ "content-type":"application/json" },
+            body: JSON.stringify({ address: window.__luminaUserAddress || "" })
+          });
+          var data = await res.json().catch(function(){ return null; });
+          if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+          try { localStorage.setItem(welcomeBoxKey(), "done"); } catch(e) {}
+          var result = modal.querySelector(".welcome-box-card");
+          if (result) {
+            result.innerHTML =
+              '<div class="welcome-star top won"></div><h2>You got <b>' + Number(data.points || 0).toLocaleString() + '</b></h2><p>Lumina Points have been credited<br>to your account.</p>' +
+              '<div class="welcome-win-points"><span>✦</span><strong>+' + Number(data.points || 0).toLocaleString() + '</strong><small>Points</small></div>' +
+              '<button type="button" class="welcome-open-btn" onclick="window.__luminaCloseWelcomeBox && window.__luminaCloseWelcomeBox()">Done</button>';
+          }
+          if (typeof refreshPoints === "function") refreshPoints();
+        } catch(e) {
+          modal.classList.remove("opening");
+          toast(e && e.message ? e.message : "Open failed");
+        }
+      };
       function tokenInitialHome(symbol){
         return String(symbol || "?").replace(/[^a-zA-Z0-9]/g, "").slice(0, 1).toUpperCase() || "?";
       }
