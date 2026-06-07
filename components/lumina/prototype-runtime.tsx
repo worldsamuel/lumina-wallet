@@ -4969,6 +4969,15 @@ function enhancePrototypeMe() {
           return sum + (row && row.type === "spend" ? Math.max(0, Number(row.points || 0)) : 0);
         }, 0);
       }
+      function pointsActivityKey(){
+        return "lumina_points_activity_total_" + String(window.__luminaUserAddress || "guest").toLowerCase();
+      }
+      function storedActivityPoints(){
+        try { return Math.max(0, Math.floor(Number(localStorage.getItem(pointsActivityKey()) || 0))); } catch(e) { return 0; }
+      }
+      function storeActivityPoints(value){
+        try { localStorage.setItem(pointsActivityKey(), String(Math.max(0, Math.floor(Number(value || 0))))); } catch(e) {}
+      }
       function pointsCoupons(){
         return pointsLocalRows("lumina_points_coupons_v1");
       }
@@ -5009,11 +5018,17 @@ function enhancePrototypeMe() {
         var center = document.getElementById("pointsCenterValue");
         var profile = window.__luminaPointsProfile || {};
         var adjustmentTotal = Math.floor(Number(profile.adjustmentTotal || 0));
-        var basePoints = Math.floor(Number(window.__luminaBasePoints || window.__luminaPoints || 0));
+        var basePoints = Number.isFinite(Number(window.__luminaActivityPoints)) ? Math.max(0, Math.floor(Number(window.__luminaActivityPoints))) : storedActivityPoints();
+        if (!basePoints && Number(window.__luminaPoints || 0) > adjustmentTotal) {
+          basePoints = Math.max(0, Math.floor(Number(window.__luminaPoints || 0) - adjustmentTotal));
+        }
         function setValue(value){
-          basePoints = Math.max(0, Math.floor(Number(value || 0)));
-          window.__luminaBasePoints = basePoints;
-          adjustmentTotal = Math.floor(Number((window.__luminaPointsProfile || {}).adjustmentTotal || adjustmentTotal || 0));
+          if (value != null) {
+            basePoints = Math.max(0, Math.floor(Number(value || 0)));
+            window.__luminaActivityPoints = basePoints;
+            storeActivityPoints(basePoints);
+          }
+          adjustmentTotal = Math.floor(Number((window.__luminaPointsProfile || {}).adjustmentTotal || 0));
           window.__luminaPoints = Math.max(0, Math.floor(basePoints + adjustmentTotal - pointsSpentTotal()));
           if (!Array.isArray(window.__luminaPointRecords)) window.__luminaPointRecords = [];
           if (badge) badge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
@@ -5023,7 +5038,7 @@ function enhancePrototypeMe() {
           var vipNo = document.getElementById("pointsVipNo");
           if (vipNo) vipNo.textContent = (window.__luminaPointsProfile && window.__luminaPointsProfile.luminaNo) ? ("Lumina No." + window.__luminaPointsProfile.luminaNo) : "Lumina VIP";
         }
-        setValue(Number(window.__luminaPoints || 0));
+        setValue();
         var address = window.__luminaUserAddress || "";
         if (!address) return;
         fetch("/api/points-profile?address=" + encodeURIComponent(address), { cache: "no-store" })
@@ -5031,7 +5046,7 @@ function enhancePrototypeMe() {
           .then(function(data){
             if (!data) return;
             window.__luminaPointsProfile = data;
-            setValue(basePoints);
+            setValue();
           })
           .catch(function(){});
         fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
@@ -5195,6 +5210,9 @@ function enhancePrototypeMe() {
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
       window.openPointsCenter = async function(){
+        if (typeof window.__luminaMaybeOpenWelcomeBox === "function") {
+          window.setTimeout(function(){ window.__luminaMaybeOpenWelcomeBox(); }, 120);
+        }
         var c = meCopy();
         var old = document.getElementById("pointsModal");
         if (old) old.remove();
@@ -5331,7 +5349,7 @@ function enhancePrototypeMe() {
           var subtitle = isBlind ? "Buy first, then open the mystery box." : "Redeem this reward with Lumina Points.";
           var description = product.description || (isBlind ? "Use Lumina Points to buy this mystery box. After purchase, open it for a chance to reveal one reward from the prize pool." : "Use Lumina Points to redeem this reward. Your coupon will be added after redemption.");
           modal.innerHTML =
-            '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+            '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
             '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product) + '</div>' +
             '<div class="points-detail-title">' + luminaMark("lg") + '<div><h2>' + escapeAttr(product.title) + '</h2><p>' + subtitle + '</p></div></div>' +
             '<span class="points-policy">Non-refundable</span>' +
@@ -5354,13 +5372,20 @@ function enhancePrototypeMe() {
           document.body.appendChild(sheet);
         };
         window.__luminaOpenCoupons = function(){
-          var rows = pointsCoupons().map(function(row){ return '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(row.title || "Lumina coupon") + '</b><small>' + escapeAttr(row.value || row.source || "Ready to use") + '</small></div><em>' + escapeAttr(row.status || "Active") + '</em></div>'; }).join("");
+          var serverRows = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).map(function(order){
+            var reward = order.reward || {};
+            var title = order.status === "opened" ? (reward.name || "Opened mystery box") : "Unopened mystery box";
+            var detail = order.status === "opened" ? (reward.value || order.productTitle || "Reward revealed") : (order.productTitle || "Ready to open");
+            return '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(detail) + '</small></div><em>' + escapeAttr(order.status === "opened" ? "Opened" : "Ready") + '</em></div>';
+          }).join("");
+          var localRows = pointsCoupons().map(function(row){ return '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(row.title || "Lumina box") + '</b><small>' + escapeAttr(row.value || row.source || "Reward record") + '</small></div><em>' + escapeAttr(row.status || "Opened") + '</em></div>'; }).join("");
+          var rows = serverRows + localRows;
           var old = document.getElementById("pointsCouponsSheet"); if (old) old.remove();
           var sheet = document.createElement("div");
           sheet.id = "pointsCouponsSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsCouponsSheet\\').remove()">×</button><h3>My coupons</h3>' + (rows || '<p class="points-empty">No coupons yet. Redeem a product or open a box to get one.</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsCouponsSheet\\').remove()">×</button><h3>Box</h3>' + (rows || '<p class="points-empty">No box records yet. Buy or open a mystery box to see it here.</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         function renderProducts(products, active){
@@ -5383,8 +5408,8 @@ function enhancePrototypeMe() {
           var vipNo = profile.luminaNo ? ("Lumina No." + profile.luminaNo) : "Lumina VIP";
           var selectedRegion = window.__luminaPointsRegion || "global";
           modal.innerHTML =
-            '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><button type="button" data-points-close="1" class="points-close">×</button></div>' +
-            '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>Priority member card</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Coupons</span><b>' + pointsCoupons().length + '</b></button></div>' +
+            '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><span></span></div>' +
+            '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>Priority member card</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Box</span><b>' + ((window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).length + pointsCoupons().length) + '</b></button></div>' +
             '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><label class="points-region"><span>◎</span><select id="pointsRegionSelect">' + countries.map(function(key){ return '<option value="' + key + '"' + (key === selectedRegion ? " selected" : "") + '>' + countryLabel(key) + '</option>'; }).join("") + '</select></label></div><div class="points-tabs">' +
             categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
             '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
@@ -5433,6 +5458,7 @@ function enhancePrototypeMe() {
             var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
             var orderData = await orderRes.json().catch(function(){ return []; });
             window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
+            renderShop();
           }
         } catch(e) {}
       };
