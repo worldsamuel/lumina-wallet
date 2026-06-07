@@ -5094,14 +5094,6 @@ function enhancePrototypeMe() {
           var map = { all:"All", shop:"Shop", travel:"Travel", fitness:"Fitness", dining:"Dining", cash:"Cash" };
           return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
         }
-        function fallbackProducts(){
-          return [
-            { id:"cash-surprise-50", type:"blind_box", title:"Win up to US$50 cash back", category:"cash", points:500, originalPoints:17500, imageText:"$50", badge:"Hot", stock:99, enabled:true, sortOrder:1, rewards:[{name:"US$50 cash back", value:"$50", odds:1}, {name:"US$10 cash back", value:"$10", odds:9}, {name:"US$1 cash back", value:"$1", odds:90}] },
-            { id:"umy-silver", type:"product", title:"Upgrade to Umy Silver membership", category:"shop", points:9, imageText:"umy", stock:200, enabled:true, sortOrder:2 },
-            { id:"cashback-50", type:"product", title:"$50 cash back", category:"cash", points:17500, imageText:"$50", stock:50, enabled:true, sortOrder:3 },
-            { id:"wine-discount", type:"product", title:"Vintage Fine Wines order discount", category:"dining", points:9, imageText:"Vintage Fine Wines", stock:120, enabled:true, sortOrder:4 }
-          ];
-        }
         function purchaseKey(id){ return "lumina_points_purchase_" + String(id || ""); }
         function purchasedCount(id){
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
@@ -5215,7 +5207,7 @@ function enhancePrototypeMe() {
           var subtitle = isBlind ? "Buy first, then open the mystery box." : "Redeem this reward with Lumina Points.";
           var description = product.description || (isBlind ? "Use Lumina Points to buy this mystery box. After purchase, open it for a chance to reveal one reward from the prize pool." : "Use Lumina Points to redeem this reward. Your coupon will be added after redemption.");
           modal.innerHTML =
-            '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><div class="points-shop-brand">' + luminaMark() + '<b>LUMINA</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+            '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><button type="button" data-points-close="1" class="points-close">×</button></div>' +
             '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product) + '</div>' +
             '<div class="points-detail-title">' + luminaMark("lg") + '<div><h2>' + escapeAttr(product.title) + '</h2><p>' + subtitle + '</p></div></div>' +
             '<span class="points-policy">Non-refundable</span>' +
@@ -5261,8 +5253,8 @@ function enhancePrototypeMe() {
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
         function renderShop(){
           modal.innerHTML =
-            '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><div class="points-shop-brand">' + luminaMark() + '<b>Lumina</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
-            '<div class="points-balance-card"><div><div class="points-card-title">' + luminaMark() + '<b>Lumina Points</b></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Coupons</span><b>' + pointsCoupons().length + '</b></button></div>' +
+            '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+            '<div class="points-balance-card"><div><div class="points-card-title"><b>Lumina Points</b></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Coupons</span><b>' + pointsCoupons().length + '</b></button></div>' +
             '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><button type="button" class="points-region">◎ Global⌄</button></div><div class="points-tabs">' +
             categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
             '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
@@ -5277,7 +5269,7 @@ function enhancePrototypeMe() {
         }
         window.__luminaRenderPointsShop = renderShop;
         document.body.appendChild(modal);
-        var products = fallbackProducts();
+        var products = [];
         window.__luminaPointsProducts = products;
         window.__luminaPointsOrders = [];
         renderShop();
