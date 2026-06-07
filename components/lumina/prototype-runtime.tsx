@@ -4729,12 +4729,12 @@ function enhancePrototypeMe() {
           support: { en:"Support", fr:"Assistance", de:"Support", es:"Soporte", ja:"サポート", "zh-CN":"支持", "zh-TW":"支援" },
           feedback: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
           points: { en:"Points", fr:"Points", de:"Punkte", es:"Puntos", ja:"ポイント", "zh-CN":"积分", "zh-TW":"積分" },
-          pointsCenter: { en:"Points Center", fr:"Centre de points", de:"Punktezentrum", es:"Centro de puntos", ja:"ポイントセンター", "zh-CN":"积分中心", "zh-TW":"積分中心" },
+          pointsCenter: { en:"Lumina Points", fr:"Lumina Points", de:"Lumina Points", es:"Lumina Points", ja:"Lumina Points", "zh-CN":"Lumina Points", "zh-TW":"Lumina Points" },
           pointsRule: { en:"Earn 1 point for every $1 traded.", fr:"Gagnez 1 point par 1 $ échangé.", de:"1 Punkt pro gehandeltem $1.", es:"Gana 1 punto por cada $1 negociado.", ja:"取引 $1 ごとに 1 ポイント獲得。", "zh-CN":"交易 1 美元获得 1 积分。", "zh-TW":"交易 1 美元獲得 1 積分。" },
           lifetimePoints: { en:"Lifetime points", fr:"Points cumulés", de:"Gesamtpunkte", es:"Puntos totales", ja:"累計ポイント", "zh-CN":"累计积分", "zh-TW":"累計積分" },
           pointsHistory: { en:"Points history", fr:"Historique des points", de:"Punkteverlauf", es:"Historial de puntos", ja:"ポイント履歴", "zh-CN":"积分记录", "zh-TW":"積分記錄" },
           tradeLabel: { en:"Trade", fr:"Transaction", de:"Transaktion", es:"Operación", ja:"取引", "zh-CN":"交易", "zh-TW":"交易" },
-          noPoints: { en:"No points records yet.", fr:"Aucun point pour le moment.", de:"Noch keine Punkte.", es:"Aún no hay puntos.", ja:"ポイント履歴はまだありません。", "zh-CN":"暂无积分记录。", "zh-TW":"暫無積分記錄。" },
+          noPoints: { en:"Rewards are loading.", fr:"Chargement des récompenses.", de:"Rewards werden geladen.", es:"Cargando recompensas.", ja:"リワードを読み込み中。", "zh-CN":"Rewards are loading.", "zh-TW":"Rewards are loading." },
           mediaCenter: { en:"Media Center", fr:"Centre média", de:"Medienzentrum", es:"Centro multimedia", ja:"メディアセンター", "zh-CN":"媒体中心", "zh-TW":"媒體中心" },
           mediaHint: { en:"Follow Lumina official channels.", fr:"Suivez les canaux officiels Lumina.", de:"Folgen Sie den offiziellen Lumina-Kanälen.", es:"Sigue los canales oficiales de Lumina.", ja:"Lumina 公式チャンネルをフォロー。", "zh-CN":"查看 Lumina 官方媒体链接。", "zh-TW":"查看 Lumina 官方媒體連結。" },
           noMedia: { en:"No media links configured yet.", fr:"Aucun lien média configuré.", de:"Noch keine Medienlinks konfiguriert.", es:"Aún no hay enlaces configurados.", ja:"メディアリンクは未設定です。", "zh-CN":"后台还没有配置媒体链接。", "zh-TW":"後台還沒有配置媒體連結。" },
@@ -5051,27 +5051,92 @@ function enhancePrototypeMe() {
         refreshPoints();
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
-      window.openPointsCenter = function(){
+      window.openPointsCenter = async function(){
         var c = meCopy();
         var old = document.getElementById("pointsModal");
         if (old) old.remove();
         var modal = document.createElement("div");
-        modal.className = "modal-mask open";
+        modal.className = "points-shop-screen open";
         modal.id = "pointsModal";
-        modal.onclick = function(event){ if(event.target === modal) modal.remove(); };
-        function dateText(raw){
-          var d = raw ? new Date(raw) : null;
-          if (!d || isNaN(d.getTime())) d = new Date();
-          return d.getFullYear() + "." + (d.getMonth() + 1) + "." + d.getDate();
+        modal.onclick = function(event){ if(event.target && event.target.getAttribute && event.target.getAttribute("data-points-close") === "1") modal.remove(); };
+        function escapeAttr(text){ return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; }); }
+        function categoryLabel(key){
+          var map = { all:"All", shop:"Shop", travel:"Travel", fitness:"Fitness", dining:"Dining", cash:"Cash" };
+          return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
         }
-        var records = (window.__luminaPointRecords || []).slice(0, 20);
-        var list = records.length ? records.map(function(item){
-          var usd = Number(item.usd || 0);
-          var usdText = "$" + (usd >= 10 ? usd.toFixed(0) : usd.toFixed(2)).replace(/\\.00$/, "");
-          return '<div class="points-record"><div><strong>' + dateText(item.date) + '</strong><span>' + c.tradeLabel + ' ' + usdText + '</span></div><b>+' + Number(item.points || 0).toLocaleString() + '</b></div>';
-        }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
-        modal.innerHTML = '<div class="modal points-sheet"><div class="modal-grip"></div><h3>' + c.pointsCenter + '</h3><div class="points-hero"><strong>' + Number(window.__luminaPoints || 0).toLocaleString() + '</strong><span>' + c.lifetimePoints + '</span></div><div class="points-rule">' + c.pointsRule + '</div><div class="points-history-title">' + c.pointsHistory + '</div><div class="points-records">' + list + '</div></div>';
+        function fallbackProducts(){
+          return [
+            { id:"cash-surprise-50", type:"blind_box", title:"Win up to US$50 cash back", category:"cash", points:500, originalPoints:17500, imageText:"$50", badge:"Hot", stock:99, enabled:true, sortOrder:1, rewards:[{name:"US$50 cash back", value:"$50", odds:1}, {name:"US$10 cash back", value:"$10", odds:9}, {name:"US$1 cash back", value:"$1", odds:90}] },
+            { id:"umy-silver", type:"product", title:"Upgrade to Umy Silver membership", category:"shop", points:9, imageText:"umy", stock:200, enabled:true, sortOrder:2 },
+            { id:"cashback-50", type:"product", title:"$50 cash back", category:"cash", points:17500, imageText:"$50", stock:50, enabled:true, sortOrder:3 },
+            { id:"wine-discount", type:"product", title:"Vintage Fine Wines order discount", category:"dining", points:9, imageText:"Vintage Fine Wines", stock:120, enabled:true, sortOrder:4 }
+          ];
+        }
+        window.__luminaOpenBlindBox = function(productId){
+          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          if (!product) return;
+          var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
+          var total = rewards.reduce(function(sum, item){ return sum + Math.max(0, Number(item.odds || 0)); }, 0) || rewards.length;
+          var pick = Math.random() * total;
+          var won = rewards[0];
+          for (var i = 0; i < rewards.length; i++) {
+            pick -= Math.max(0, Number(rewards[i].odds || 0)) || 1;
+            if (pick <= 0) { won = rewards[i]; break; }
+          }
+          var old = document.getElementById("blindBoxModal");
+          if (old) old.remove();
+          var box = document.createElement("div");
+          box.id = "blindBoxModal";
+          box.className = "blind-box-modal open";
+          box.onclick = function(event){ if (event.target === box) box.remove(); };
+          box.innerHTML = '<div class="blind-box-stage"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result"><small>You got</small><strong>' + escapeAttr(won.name || "Lumina reward") + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">Done</button></div></div>';
+          document.body.appendChild(box);
+        };
+        function productArt(product){
+          if (product.imageUrl) return '<img src="' + escapeAttr(product.imageUrl) + '" alt="" />';
+          var text = escapeAttr(product.imageText || product.title || "Lumina");
+          return '<span>' + text + '</span>';
+        }
+        function renderProducts(products, active){
+          var list = products.filter(function(item){ return active === "all" || String(item.category || "shop") === active; });
+          var box = modal.querySelector("#pointsProductGrid");
+          if (!box) return;
+          box.innerHTML = list.length ? list.map(function(product){
+            var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
+            var badgeText = product.badge || (product.type === "blind_box" ? "Blind Box" : "");
+            var badge = badgeText ? '<em>' + escapeAttr(badgeText) + '</em>' : "";
+            var action = product.type === "blind_box" ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "toast('Coming soon')";
+            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(product.title) + '</strong><div class="points-product-cost"><span class="lumina-dot">L</span><b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div></div></button>';
+          }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
+        }
+        var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
+        modal.innerHTML =
+          '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><div class="points-shop-brand"><span class="lumina-dot">L</span><b>Lumina</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+          '<div class="points-balance-card"><div><div class="points-card-title"><span class="lumina-dot">L</span><b>Lumina Points</b></div><button type="button" class="points-big" onclick="toast(\\'' + c.pointsRule.replace(/'/g, "\\\\'") + '\\')">' + Number(window.__luminaPoints || 0).toLocaleString() + '<i>›</i></button></div><button type="button" class="coupon-pill">My coupons <b>0</b></button></div>' +
+          '<div class="points-shop-panel"><div class="points-shop-title"><h2>Rewards</h2><button type="button" class="points-region">◎ Global⌄</button></div><div class="points-tabs">' +
+          categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
+          '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
         document.body.appendChild(modal);
+        var products = fallbackProducts();
+        window.__luminaPointsProducts = products;
+        renderProducts(products, "all");
+        modal.querySelectorAll("[data-points-cat]").forEach(function(btn){
+          btn.addEventListener("click", function(){
+            modal.querySelectorAll("[data-points-cat]").forEach(function(item){ item.classList.remove("sel"); });
+            btn.classList.add("sel");
+            renderProducts(products, btn.getAttribute("data-points-cat") || "all");
+          });
+        });
+        try {
+          var res = await fetch("/api/points-products", { cache: "no-store" });
+          var data = await res.json().catch(function(){ return null; });
+          if (res.ok && Array.isArray(data) && data.length) {
+            products = data;
+            window.__luminaPointsProducts = products;
+            var active = (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") : "all";
+            renderProducts(products, active || "all");
+          }
+        } catch(e) {}
       };
       window.__luminaRenderMe = renderMe;
       if (!window.__luminaMeLangPatch && typeof applyLang === "function") {
