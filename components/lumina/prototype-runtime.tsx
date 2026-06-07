@@ -74,6 +74,7 @@ declare global {
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
     __luminaMaybeOpenWelcomeBox?: () => void;
+    __luminaForceWelcomeBoxCheck?: (address?: string | null) => void;
     __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
@@ -152,6 +153,83 @@ const tabByView: Record<string, string> = {
   about: "Me",
 };
 
+type WelcomeBoxConfig = {
+  enabled?: boolean;
+  totalCount?: number;
+  minPoints?: number;
+  maxPoints?: number;
+};
+
+function openWelcomeBoxFallback(config: WelcomeBoxConfig, address: string) {
+  if (typeof document === "undefined" || document.getElementById("welcomeBoxModal")) return;
+  const min = Math.max(0, Math.floor(Number(config.minPoints ?? 50)));
+  const max = Math.max(min, Math.floor(Number(config.maxPoints ?? 500)));
+  const rewards = [min, Math.max(min, Math.round((min + max) / 3)), Math.max(min, Math.round(((min + max) * 2) / 3)), max];
+  const modal = document.createElement("div");
+  modal.id = "welcomeBoxModal";
+  modal.className = "welcome-box-modal open";
+  modal.innerHTML =
+    '<div class="welcome-box-card">' +
+      '<button type="button" class="welcome-box-close" data-welcome-close="1">x</button>' +
+      '<div class="welcome-star top"></div><h2>Welcome to <b>Lumina</b></h2><p>Open your first mystery box<br>and earn Lumina Points</p>' +
+      '<button type="button" class="welcome-cube" data-welcome-claim="1"><span></span><i>*</i></button>' +
+      '<div class="welcome-rewards"><strong>Possible Rewards</strong><div>' +
+        rewards.map((n) => '<span><i>*</i><b>' + Number(n || 0).toLocaleString() + '</b><small>Points</small></span>').join("") +
+        '<span><i>?</i><b>?</b><small>Mystery</small></span></div></div>' +
+      '<button type="button" class="welcome-open-btn" data-welcome-claim="1">Open Now</button>' +
+      '<button type="button" class="welcome-later-btn" data-welcome-close="1">Maybe Later</button>' +
+    '</div>';
+  modal.addEventListener("click", async (event) => {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    if (target.closest("[data-welcome-close]")) {
+      modal.remove();
+      return;
+    }
+    if (!target.closest("[data-welcome-claim]") || modal.classList.contains("opening")) return;
+    modal.classList.add("opening");
+    try {
+      const res = await fetch("/api/welcome-box", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+      const result = modal.querySelector(".welcome-box-card");
+      if (result) {
+        result.innerHTML =
+          '<div class="welcome-star top won"></div><h2>You got <b>' + Number(data.points || 0).toLocaleString() + '</b></h2><p>Lumina Points have been credited<br>to your account.</p>' +
+          '<div class="welcome-win-points"><span>*</span><strong>+' + Number(data.points || 0).toLocaleString() + '</strong><small>Points</small></div>' +
+          '<button type="button" class="welcome-open-btn" data-welcome-close="1">Done</button>';
+      }
+      window.__luminaForceWelcomeBoxCheck = undefined;
+    } catch (error) {
+      modal.classList.remove("opening");
+      window.alert(error instanceof Error ? error.message : "Open failed");
+    }
+  });
+  document.body.appendChild(modal);
+}
+
+async function forceWelcomeBoxCheck(address?: string | null) {
+  if (typeof window === "undefined") return;
+  const wallet = String(address || window.__luminaUserAddress || "").toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(wallet) || document.getElementById("welcomeBoxModal")) return;
+  window.__luminaMaybeOpenWelcomeBox?.();
+  window.setTimeout(async () => {
+    if (document.getElementById("welcomeBoxModal")) return;
+    try {
+      const res = await fetch("/api/welcome-box?address=" + encodeURIComponent(wallet), { cache: "no-store" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.claimed || !data.config || data.config.enabled === false || Number(data.config.totalCount || 0) <= 0) return;
+      openWelcomeBoxFallback(data.config, wallet);
+    } catch {
+      // The in-prototype checker remains the fallback when the direct probe fails.
+    }
+  }, 320);
+}
+
 /**
  * Mounts the v22 prototype inside React while preserving the original Mini App visuals and interactions.
  */
@@ -178,6 +256,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
     window.__luminaUserAddress = address ?? "";
+    window.__luminaForceWelcomeBoxCheck = forceWelcomeBoxCheck;
     resetPrototypePortfolio();
     installLegalSheet(host);
     exposeTokenTransfer(address, mutate);
@@ -245,10 +324,19 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   useEffect(() => {
     if (status !== "authenticated" || !prototypeReady || !address) return;
     const timers = [250, 1000, 2500, 5000, 9000].map((delay) =>
-      window.setTimeout(() => window.__luminaMaybeOpenWelcomeBox?.(), delay),
+      window.setTimeout(() => void forceWelcomeBoxCheck(address), delay),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [address, prototypeReady, status]);
+
+  useEffect(() => {
+    if (status !== "authenticated" || !address) return;
+    window.__luminaForceWelcomeBoxCheck = forceWelcomeBoxCheck;
+    const timers = [600, 1800, 4200, 7800, 12000].map((delay) =>
+      window.setTimeout(() => void forceWelcomeBoxCheck(address), delay),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [address, status]);
 
   useEffect(() => {
     const handleEarnUserOp = (event: Event) => {
@@ -5210,8 +5298,8 @@ function enhancePrototypeMe() {
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
       window.openPointsCenter = async function(){
-        if (typeof window.__luminaMaybeOpenWelcomeBox === "function") {
-          window.setTimeout(function(){ window.__luminaMaybeOpenWelcomeBox(); }, 120);
+        if (typeof window.__luminaForceWelcomeBoxCheck === "function") {
+          window.setTimeout(function(){ window.__luminaForceWelcomeBoxCheck(window.__luminaUserAddress); }, 120);
         }
         var c = meCopy();
         var old = document.getElementById("pointsModal");
@@ -5360,15 +5448,18 @@ function enhancePrototypeMe() {
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
         window.__luminaOpenPointsLedger = function(){
-          var earnRows = (window.__luminaPointRecords || []).map(function(row){ return '<div class="points-ledger-row"><span><b>Earned from ' + escapeAttr(row.symbol || "activity") + '</b><small>' + escapeAttr(row.date || "") + '</small></span><strong>+' + Number(row.points || 0).toLocaleString() + '</strong></div>'; }).join("");
-          var adminRows = (((window.__luminaPointsProfile || {}).adjustments) || []).map(function(row){ var pts = Number(row.points || 0); return '<div class="points-ledger-row ' + (pts < 0 ? "spend" : "") + '"><span><b>' + escapeAttr(row.note || "Admin points adjustment") + '</b><small>' + escapeAttr(row.createdAt || "") + '</small></span><strong>' + (pts >= 0 ? "+" : "") + pts.toLocaleString() + '</strong></div>'; }).join("");
-          var spendRows = pointsLocalRows("lumina_points_ledger_v1").map(function(row){ return '<div class="points-ledger-row spend"><span><b>' + escapeAttr(row.title || "Redeemed") + '</b><small>' + escapeAttr(row.date || "") + '</small></span><strong>-' + Number(row.points || 0).toLocaleString() + '</strong></div>'; }).join("");
+          var ledgerRows = [];
+          (window.__luminaPointRecords || []).forEach(function(row){ ledgerRows.push({ title:"Earned from " + (row.symbol || "activity"), date:row.date || "", points:Number(row.points || 0) }); });
+          (((window.__luminaPointsProfile || {}).adjustments) || []).forEach(function(row){ ledgerRows.push({ title:row.note || "Admin points adjustment", date:row.createdAt || "", points:Number(row.points || 0) }); });
+          pointsLocalRows("lumina_points_ledger_v1").forEach(function(row){ ledgerRows.push({ title:row.title || "Redeemed", date:row.date || "", points:-Math.abs(Number(row.points || 0)) }); });
+          ledgerRows.sort(function(a,b){ return (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0); });
+          var rows = ledgerRows.map(function(row){ var pts = Number(row.points || 0); return '<div class="points-ledger-row ' + (pts < 0 ? "spend" : "") + '"><span><b>' + escapeAttr(row.title) + '</b><small>' + escapeAttr(row.date || "") + '</small></span><strong>' + (pts >= 0 ? "+" : "") + pts.toLocaleString() + '</strong></div>'; }).join("");
           var old = document.getElementById("pointsLedgerSheet"); if (old) old.remove();
           var sheet = document.createElement("div");
           sheet.id = "pointsLedgerSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsLedgerSheet\\').remove()">×</button><h3>Points history</h3>' + (earnRows || adminRows || spendRows ? earnRows + adminRows + spendRows : '<p class="points-empty">No points records yet.</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsLedgerSheet\\').remove()">×</button><h3>Points history</h3>' + (rows || '<p class="points-empty">No points records yet.</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         window.__luminaOpenCoupons = function(){
