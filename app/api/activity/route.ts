@@ -10,6 +10,8 @@ const transferEvent = parseAbiItem("event Transfer(address indexed from, address
 const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
+const activityLookbackBlocks = 1_000_000n;
+const activityLogChunkBlocks = 200_000n;
 
 export function OPTIONS() {
   return optionsResponse();
@@ -69,6 +71,33 @@ async function getBlockTime(blockNumber: bigint) {
   }
 }
 
+async function getTransferLogsForAddress(address: Address, latest: bigint, direction: "in" | "out") {
+  const minBlock = latest > activityLookbackBlocks ? latest - activityLookbackBlocks : 0n;
+  const logs = [];
+
+  for (let toBlock = latest; toBlock >= minBlock; ) {
+    let fromBlock = toBlock > activityLogChunkBlocks ? toBlock - activityLogChunkBlocks + 1n : 0n;
+    if (fromBlock < minBlock) fromBlock = minBlock;
+
+    try {
+      const chunk = await publicClient.getLogs({
+        event: transferEvent,
+        args: direction === "in" ? { to: address } : { from: address },
+        fromBlock,
+        toBlock,
+      });
+      logs.push(...chunk);
+    } catch (error) {
+      console.error("Failed to fetch activity log chunk", { address, direction, fromBlock: fromBlock.toString(), toBlock: toBlock.toString(), error });
+    }
+
+    if (fromBlock === 0n || fromBlock === minBlock) break;
+    toBlock = fromBlock - 1n;
+  }
+
+  return logs;
+}
+
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:activity", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
@@ -97,21 +126,10 @@ export async function GET(req: NextRequest) {
 
   try {
     const latest = await publicClient.getBlockNumber();
-    const fromBlock = latest > 1_000_000n ? latest - 1_000_000n : 0n;
     const lower = address.toLowerCase();
     const [incoming, outgoing] = await Promise.all([
-      publicClient.getLogs({
-        event: transferEvent,
-        args: { to: address as Address },
-        fromBlock,
-        toBlock: "latest",
-      }),
-      publicClient.getLogs({
-        event: transferEvent,
-        args: { from: address as Address },
-        fromBlock,
-        toBlock: "latest",
-      }),
+      getTransferLogsForAddress(address as Address, latest, "in"),
+      getTransferLogsForAddress(address as Address, latest, "out"),
     ]);
     const seen = new Set<string>();
     const logs = await Promise.all(
