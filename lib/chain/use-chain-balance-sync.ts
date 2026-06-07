@@ -280,11 +280,8 @@ function renderBalanceSkeleton() {
 }
 
 function renderBalanceError() {
-  runInPrototypeScope(`
-    (function(){
-      if (typeof toast === "function") toast("Unable to read on-chain data. Please try again.");
-    })();
-  `);
+  // Keep the last rendered balances on transient RPC/API failures.
+  // A global toast here appears on Home, Earn, and Swap every refresh cycle.
 }
 
 function formatTokenAmount(value: string) {
