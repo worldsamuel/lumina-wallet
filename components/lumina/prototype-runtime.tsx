@@ -73,6 +73,7 @@ declare global {
     __luminaRenderLightweightChart?: (container: HTMLElement, candles: MarketChartCandle[], range?: string) => boolean;
     __luminaOpenLegal?: (kind: LegalPageKind) => void;
     __luminaCloseLegal?: () => void;
+    __luminaMaybeOpenWelcomeBox?: () => void;
     __luminaOpenReceive?: () => void;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
@@ -771,6 +772,9 @@ function AuthError({ message, onRetry }: { message: string; onRetry: () => void 
 
 function updatePrototypeAddress(host: HTMLDivElement, address: string | null, username?: string | null) {
   window.__luminaUserAddress = address ?? "";
+  if (window.__luminaUserAddress && typeof window.__luminaMaybeOpenWelcomeBox === "function") {
+    window.setTimeout(() => window.__luminaMaybeOpenWelcomeBox?.(), 250);
+  }
   window.__luminaUsername = username ?? "";
   const label = shortenAddress(address);
   const displayName = username || label;
@@ -2772,10 +2776,14 @@ function enhancePrototypeHome() {
           maxPoints: Math.max(0, Math.floor(Number(box.maxPoints == null ? 500 : box.maxPoints)))
         };
       }
-      function maybeOpenWelcomeBox(){
-        if (!window.__luminaUserAddress || document.getElementById("welcomeBoxModal")) return;
+      function maybeOpenWelcomeBox(attempt){
+        var tries = Number(attempt || 0);
+        if (document.getElementById("welcomeBoxModal")) return;
+        if (!window.__luminaUserAddress) {
+          if (tries < 30) window.setTimeout(function(){ maybeOpenWelcomeBox(tries + 1); }, 500);
+          return;
+        }
         var box = welcomeBoxConfig();
-        if (!box.enabled || box.totalCount <= 0) return;
         fetch("/api/welcome-box?address=" + encodeURIComponent(window.__luminaUserAddress), { cache:"no-store" })
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){
@@ -2785,8 +2793,11 @@ function enhancePrototypeHome() {
             }
             openWelcomeBox(data.config);
           })
-          .catch(function(){ openWelcomeBox(box); });
+          .catch(function(){
+            if (box.enabled && box.totalCount > 0) openWelcomeBox(box);
+          });
       }
+      window.__luminaMaybeOpenWelcomeBox = maybeOpenWelcomeBox;
       function openWelcomeBox(box){
         if (document.getElementById("welcomeBoxModal")) return;
         var rewards = [box.minPoints || 50, Math.max(box.minPoints || 50, Math.round(((box.minPoints || 50) + (box.maxPoints || 500)) / 3)), Math.max(box.minPoints || 50, Math.round(((box.minPoints || 50) + (box.maxPoints || 500)) * 2 / 3)), box.maxPoints || 500];
