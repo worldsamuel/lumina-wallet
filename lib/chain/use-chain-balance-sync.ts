@@ -20,6 +20,8 @@ export type BalanceApiItem = {
 type BalancesResponse = {
   balances: BalanceApiItem[];
   cached: boolean;
+  stale?: boolean;
+  warning?: string;
 };
 
 const fetcher = async <T,>(url: string) => {
@@ -70,22 +72,39 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     if (!enabled) return;
 
     if (balances.isLoading && !balances.data) {
+      const snapshot = readBalanceSnapshot(userAddress);
+      if (snapshot?.balances?.length) {
+        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, portfolioPricesRef.current, true);
+        return;
+      }
       renderBalanceSkeleton();
       return;
     }
 
     if (balances.error) {
+      const snapshot = readBalanceSnapshot(userAddress);
+      if (snapshot?.balances?.length) {
+        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, portfolioPricesRef.current, true);
+      }
       renderBalanceError();
       return;
     }
 
     if (!balances.data?.balances) return;
-    syncBalancesToPrototype(balances.data.balances, market.data, onchain.data, portfolioPricesRef.current);
+    writeBalanceSnapshot(userAddress, balances.data.balances);
+    syncBalancesToPrototype(
+      balances.data.balances,
+      market.data,
+      onchain.data,
+      portfolioPricesRef.current,
+      Boolean(balances.data.stale),
+    );
   }, [
     balances.data,
     balances.error,
     balances.isLoading,
     enabled,
+    userAddress,
     market.data,
     market.isLoading,
     onchain.data,
@@ -98,6 +117,7 @@ function syncBalancesToPrototype(
   marketData?: MarketPricesResponse,
   onchainData?: OnchainPricesResponse,
   portfolioPrices: Record<string, number> = {},
+  stale = false,
 ) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
@@ -179,6 +199,7 @@ function syncBalancesToPrototype(
     availMap = ${JSON.stringify(availableMap)};
     prices = ${JSON.stringify(priceMap)};
     marketPrices = ${JSON.stringify(marketPriceMap)};
+    window.__luminaBalancesStale = ${JSON.stringify(stale)};
     window.__luminaWalletBaseTotalUsd = ${JSON.stringify(totalUsd)};
     totalUsdNum = window.__luminaWalletBaseTotalUsd + (Number(window.__luminaEarnTotalUsd || 0) || 0);
     change24hUsdNum = ${JSON.stringify(changeUsd)};
@@ -282,6 +303,41 @@ function renderBalanceSkeleton() {
 function renderBalanceError() {
   // Keep the last rendered balances on transient RPC/API failures.
   // A global toast here appears on Home, Earn, and Swap every refresh cycle.
+}
+
+function snapshotKey(userAddress: string | null) {
+  return userAddress ? `lumina_balance_snapshot_v2:${userAddress.toLowerCase()}` : null;
+}
+
+function readBalanceSnapshot(userAddress: string | null): BalancesResponse | null {
+  const key = snapshotKey(userAddress);
+  if (!key) return null;
+  try {
+    const snapshot = JSON.parse(localStorage.getItem(key) || "null") as (BalancesResponse & { savedAt?: number }) | null;
+    if (!snapshot?.balances?.length || !snapshot.savedAt) return null;
+    if (Date.now() - snapshot.savedAt > 30 * 60_000) return null;
+    return snapshot;
+  } catch {
+    return null;
+  }
+}
+
+function writeBalanceSnapshot(userAddress: string | null, balances: BalanceApiItem[]) {
+  const key = snapshotKey(userAddress);
+  if (!key || !balances.length) return;
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify({
+        balances,
+        cached: true,
+        stale: true,
+        savedAt: Date.now(),
+      }),
+    );
+  } catch {
+    // localStorage can be unavailable in restricted WebViews.
+  }
 }
 
 function formatTokenAmount(value: string) {

@@ -2,12 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useWaitForUserOperationReceipt } from "@worldcoin/minikit-react";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, fallback, http } from "viem";
 import { worldchain } from "viem/chains";
+
+const PUBLIC_WORLD_CHAIN_RPC_URLS = [
+  "https://worldchain-mainnet.g.alchemy.com/public",
+  "https://worldchain.drpc.org",
+];
 
 const client = createPublicClient({
   chain: worldchain,
-  transport: http("https://worldchain-mainnet.g.alchemy.com/public"),
+  transport: fallback(PUBLIC_WORLD_CHAIN_RPC_URLS.map((url) => http(url, { timeout: 6_000 }))),
 });
 
 type EarnTransactionStatusProps = {

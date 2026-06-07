@@ -3,9 +3,11 @@ import { isAddress, type Address } from "viem";
 import { fetchBalances } from "@/lib/balances";
 
 const CACHE_TTL_MS = 5_000;
+const STALE_CACHE_TTL_MS = 10 * 60_000;
 
 type CachedBalances = {
   expiresAt: number;
+  staleUntil: number;
   data: Awaited<ReturnType<typeof serializeBalances>>;
 };
 
@@ -40,10 +42,19 @@ export async function GET(request: NextRequest) {
     balanceCache.set(cacheKey, {
       data,
       expiresAt: Date.now() + CACHE_TTL_MS,
+      staleUntil: Date.now() + STALE_CACHE_TTL_MS,
     });
     return NextResponse.json({ balances: data, cached: false });
   } catch (error) {
     console.error("Failed to fetch World Chain balances", error);
+    if (cached && cached.staleUntil > Date.now()) {
+      return NextResponse.json({
+        balances: cached.data,
+        cached: true,
+        stale: true,
+        warning: "Using the last successful on-chain balance snapshot.",
+      });
+    }
     return NextResponse.json(
       { error: "Unable to read on-chain balances. Please try again later." },
       { status: 502 },

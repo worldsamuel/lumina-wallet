@@ -1,4 +1,22 @@
-import { createPublicClient, defineChain, http } from "viem";
+import { createPublicClient, defineChain, fallback, http } from "viem";
+
+const DEFAULT_WORLD_CHAIN_RPC_URLS = [
+  "https://worldchain-mainnet.g.alchemy.com/public",
+  "https://worldchain.drpc.org",
+];
+
+export const WORLD_CHAIN_RPC_URLS = Array.from(
+  new Set(
+    [
+      process.env.TENDERLY_RPC_URL,
+      ...(process.env.WORLD_CHAIN_RPC_URLS ?? "")
+        .split(",")
+        .map((url) => url.trim())
+        .filter(Boolean),
+      ...DEFAULT_WORLD_CHAIN_RPC_URLS,
+    ].filter((url): url is string => Boolean(url)),
+  ),
+);
 
 /**
  * Read-only World Chain public client.
@@ -8,7 +26,7 @@ export const worldChain = defineChain({
   name: "World Chain",
   nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
   rpcUrls: {
-    default: { http: [process.env.TENDERLY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public"] },
+    default: { http: WORLD_CHAIN_RPC_URLS },
   },
   blockExplorers: {
     default: { name: "Worldscan", url: "https://worldscan.org" },
@@ -25,5 +43,28 @@ export const worldChain = defineChain({
  */
 export const publicClient = createPublicClient({
   chain: worldChain,
-  transport: http(process.env.TENDERLY_RPC_URL || undefined),
+  transport: fallback(WORLD_CHAIN_RPC_URLS.map((url) => http(url, { timeout: 6_000 })), {
+    retryCount: 1,
+  }),
 });
+
+export const worldChainReadClients = WORLD_CHAIN_RPC_URLS.map((url) =>
+  createPublicClient({
+    chain: worldChain,
+    transport: http(url, { timeout: 6_000 }),
+  }),
+);
+
+export async function readWorldChainWithFallback<T>(
+  read: (client: (typeof worldChainReadClients)[number]) => Promise<T>,
+) {
+  let lastError: unknown;
+  for (const client of worldChainReadClients) {
+    try {
+      return await read(client);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("All World Chain RPC reads failed.");
+}

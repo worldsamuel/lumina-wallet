@@ -1,5 +1,5 @@
 import { formatUnits, type Address } from "viem";
-import { publicClient } from "./chain";
+import { readWorldChainWithFallback } from "./chain";
 import { db } from "./db";
 import { ERC20_TOKENS, TOKENS } from "./tokens";
 import worldChainTokenCatalog from "./swap/worldchain-token-catalog.json";
@@ -54,7 +54,8 @@ type BalanceTokenConfig = {
   aliasOf?: string;
 };
 
-const WORLD_CHAIN_PUBLIC_RPC = "https://worldchain-mainnet.g.alchemy.com/public";
+const WORLD_CHAIN_ALCHEMY_RPC =
+  process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
 const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
   {
     symbol: "ORB",
@@ -107,7 +108,7 @@ function toDiscoveredBalance(token: CatalogToken, balance: bigint): ChainBalance
 }
 
 async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<CatalogToken | null> {
-  const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
+  const response = await fetch(WORLD_CHAIN_ALCHEMY_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -139,24 +140,13 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
 export async function fetchBalances(userAddress: Address) {
   const ethToken = TOKENS.find((token) => token.native);
   const balanceTokens = await getBalanceTokens();
-  const [nativeBalance, erc20Results, discoveredBalances] = await Promise.all([
-    publicClient.getBalance({ address: userAddress }),
-    publicClient.multicall({
-      allowFailure: true,
-      contracts: balanceTokens.map((token) => ({
-        address: token.contractAddress,
-        abi: erc20BalanceAbi,
-        functionName: "balanceOf",
-        args: [userAddress],
-      })),
-    }),
+  const [nativeBalance, configuredTokenBalances, discoveredBalances] = await Promise.all([
+    readWorldChainWithFallback((client) => client.getBalance({ address: userAddress })),
+    fetchConfiguredTokenBalances(userAddress, balanceTokens),
     fetchDiscoveredTokenBalances(userAddress).catch(() => [] as ChainBalance[]),
   ]);
 
-  const rawConfiguredBalances = balanceTokens.map((token, index) => {
-    const result = erc20Results[index];
-    return toBalance(token, result?.status === "success" ? result.result : 0n);
-  });
+  const rawConfiguredBalances = balanceTokens.map((token) => toBalance(token, configuredTokenBalances.get(token.contractAddress) ?? 0n));
   const erc20Balances = mergeAliasBalances(rawConfiguredBalances);
 
   const configured = [
@@ -174,6 +164,47 @@ export async function fetchBalances(userAddress: Address) {
       return address && !configuredAddresses.has(address) && item.balance > 0n;
     }),
   ];
+}
+
+async function fetchConfiguredTokenBalances(userAddress: Address, balanceTokens: BalanceTokenConfig[]) {
+  const erc20Results = await readWorldChainWithFallback((client) =>
+    client.multicall({
+      allowFailure: true,
+      contracts: balanceTokens.map((token) => ({
+        address: token.contractAddress,
+        abi: erc20BalanceAbi,
+        functionName: "balanceOf",
+        args: [userAddress],
+      })),
+    }),
+  );
+  const balances = new Map<Address, bigint>();
+  const retryTokens: BalanceTokenConfig[] = [];
+
+  balanceTokens.forEach((token, index) => {
+    const result = erc20Results[index];
+    if (result?.status === "success") {
+      balances.set(token.contractAddress, result.result);
+    } else {
+      retryTokens.push(token);
+    }
+  });
+
+  await Promise.all(
+    retryTokens.map(async (token) => {
+      const balance = await readWorldChainWithFallback((client) =>
+        client.readContract({
+          address: token.contractAddress,
+          abi: erc20BalanceAbi,
+          functionName: "balanceOf",
+          args: [userAddress],
+        }),
+      );
+      balances.set(token.contractAddress, balance);
+    }),
+  );
+
+  return balances;
 }
 
 async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
@@ -255,7 +286,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
   for (let page = 0; page < 8; page += 1) {
     const params = [...baseParams];
     if (pageKey) params.push({ pageKey });
-    const response = await fetch(WORLD_CHAIN_PUBLIC_RPC, {
+    const response = await fetch(WORLD_CHAIN_ALCHEMY_RPC, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
