@@ -2595,14 +2595,25 @@ function enhancePrototypeHome() {
           var nextText = formatHomeBalanceMoney(nextValue);
           var previousValue = Number(balEl.getAttribute("data-balance-value"));
           var previousText = balEl.getAttribute("data-balance-text") || balEl.textContent || "";
+          function escFlipText(text){
+            return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
+          }
+          function staticBalanceHtml(text){
+            return String(text || "").split("").map(function(ch){
+              var kind = /[0-9]/.test(ch) ? "num" : (ch === " " ? "spacer" : "mark");
+              var safe = ch === " " ? "&nbsp;" : escFlipText(ch);
+              return '<span class="balance-digit static ' + kind + '">' + safe + '</span>';
+            }).join("");
+          }
+          function renderStaticBalance(text){
+            balEl.classList.remove("digits-flipping");
+            balEl.innerHTML = '<span class="balance-flip-row">' + staticBalanceHtml(text) + '</span>';
+          }
           balEl.setAttribute("data-balance-value", String(Number.isFinite(nextValue) ? nextValue : 0));
           balEl.setAttribute("data-balance-text", nextText);
           if (immediate || !previousText || previousText === "—" || previousText === nextText || !Number.isFinite(previousValue)) {
-            balEl.textContent = nextText;
+            renderStaticBalance(nextText);
             return;
-          }
-          function escFlipText(text){
-            return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
           }
           var direction = nextValue >= previousValue ? "up" : "down";
           var previousChars = String(previousText).split("");
@@ -2619,11 +2630,11 @@ function enhancePrototypeHome() {
             if (!changed) return '<span class="balance-digit static ' + kind + '">' + safeNext + '</span>';
             return '<span class="balance-digit flip num ' + direction + '"><span class="balance-digit-track"><span class="old">' + safeOld + '</span><span class="new">' + safeNext + '</span></span></span>';
           }).join("");
+          balEl.classList.remove("digits-flipping");
           balEl.innerHTML = '<span class="balance-flip-row">' + html + '</span>';
           window.clearTimeout(window.__luminaBalanceRollTimer);
           window.__luminaBalanceRollTimer = window.setTimeout(function(){
-            balEl.classList.remove("digits-flipping");
-            balEl.textContent = nextText;
+            renderStaticBalance(nextText);
           }, 980);
           window.requestAnimationFrame(function(){
             balEl.classList.add("digits-flipping");
@@ -2679,7 +2690,19 @@ function enhancePrototypeHome() {
           window.__luminaHomeRenderMoneyFix = true;
           var rawRenderMoney = renderMoney;
           renderMoney = function(){
+            var balEl = document.getElementById("balAmt");
+            var previousHtml = balEl ? balEl.innerHTML : "";
+            var previousValue = balEl ? balEl.getAttribute("data-balance-value") : null;
+            var previousText = balEl ? balEl.getAttribute("data-balance-text") : null;
             rawRenderMoney();
+            if (balEl && typeof window.__luminaSetAnimatedHomeBalance === "function") {
+              balEl.innerHTML = previousHtml;
+              if (previousValue == null) balEl.removeAttribute("data-balance-value");
+              else balEl.setAttribute("data-balance-value", previousValue);
+              if (previousText == null) balEl.removeAttribute("data-balance-text");
+              else balEl.setAttribute("data-balance-text", previousText);
+              window.__luminaSetAnimatedHomeBalance(totalUsdNum);
+            }
             var subEl = document.getElementById("balSub");
             if (subEl && typeof change24hUsdNum !== "undefined") {
               var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
