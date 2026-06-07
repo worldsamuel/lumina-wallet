@@ -871,6 +871,11 @@ function updatePrototypeAddress(host: HTMLDivElement, address: string | null, us
   if (window.__luminaUserAddress && typeof window.__luminaMaybeOpenWelcomeBox === "function") {
     window.setTimeout(() => window.__luminaMaybeOpenWelcomeBox?.(), 250);
   }
+  if (window.__luminaUserAddress) {
+    [80, 700, 1800, 3600].forEach((delay) => {
+      window.setTimeout(() => void forceWelcomeBoxCheck(window.__luminaUserAddress), delay);
+    });
+  }
   window.__luminaUsername = username ?? "";
   const label = shortenAddress(address);
   const displayName = username || label;
