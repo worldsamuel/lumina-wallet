@@ -1334,12 +1334,53 @@ function enhancePrototypeEarn() {
       function nonZeroPosition(pos){
         return !!pos && String(pos.assets || pos.shares || "0") !== "0";
       }
+      function earnSnapshotKey(){
+        var address = String(window.__luminaUserAddress || "").toLowerCase();
+        return address ? "lumina_earn_positions_snapshot_v1:" + address : "";
+      }
+      function readEarnSnapshot(){
+        var key = earnSnapshotKey();
+        if (!key) return null;
+        try {
+          var snapshot = JSON.parse(localStorage.getItem(key) || "null");
+          if (!snapshot || !snapshot.savedAt || !Array.isArray(snapshot.positions)) return null;
+          if (Date.now() - Number(snapshot.savedAt) > 30 * 60 * 1000) return null;
+          if (!snapshot.positions.some(nonZeroPosition)) return null;
+          return snapshot;
+        } catch(e) {
+          return null;
+        }
+      }
+      function writeEarnSnapshot(positions){
+        var key = earnSnapshotKey();
+        if (!key) return;
+        try {
+          if (!Array.isArray(positions) || !positions.some(nonZeroPosition)) {
+            localStorage.removeItem(key);
+            return;
+          }
+          localStorage.setItem(key, JSON.stringify({ positions: positions, savedAt: Date.now() }));
+        } catch(e) {}
+      }
+      function hydrateEarnPositionsFromSnapshot(){
+        if ((morphoPositions || []).some(nonZeroPosition)) return true;
+        var snapshot = readEarnSnapshot();
+        if (!snapshot) return false;
+        morphoPositions = snapshot.positions;
+        updateHomeEarnTotal();
+        return true;
+      }
       function renderHomeEarningPositions(){
         var assetList = document.getElementById("assetList");
         if (!assetList) return;
         var existing = document.getElementById("homeEarningSection");
         var positions = morphoPositions.filter(nonZeroPosition);
         if (!positions.length) {
+          if (morphoLoading || morphoError) {
+            if (existing) return;
+            if (hydrateEarnPositionsFromSnapshot()) return renderHomeEarningPositions();
+            return;
+          }
           if (existing) existing.remove();
           return;
         }
@@ -1737,6 +1778,7 @@ function enhancePrototypeEarn() {
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
         morphoPositions = Array.isArray(data.positions) ? data.positions : [];
+        writeEarnSnapshot(morphoPositions);
         updateHomeEarnTotal();
         console.log("[EARN] Positions address:", address);
         console.log("[EARN] Positions response:", data);
@@ -1753,12 +1795,18 @@ function enhancePrototypeEarn() {
         morphoStarted = true;
         morphoLoading = true;
         morphoError = "";
+        hydrateEarnPositionsFromSnapshot();
         renderProducts();
         try {
           await loadMorphoVaults();
-          try { await loadMorphoPositions(); } catch(e) {}
+          try {
+            await loadMorphoPositions();
+          } catch(e) {
+            hydrateEarnPositionsFromSnapshot();
+          }
         } catch(e) {
           morphoError = "Unable to load live vault data";
+          hydrateEarnPositionsFromSnapshot();
         } finally {
           morphoLoading = false;
           renderProducts();

@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { publicClient } from "@/lib/chain";
+import { readWorldChainWithFallback } from "@/lib/chain";
 import { getEnabledEarnVaults } from "@/lib/admin/earn-products";
 import { ERC20_APPROVE_ABI, METAMORPHO_ABI } from "@/lib/morpho/abi";
 
@@ -48,9 +48,11 @@ export async function GET(
       },
     ]);
 
-    const baseResults = await publicClient.multicall({ allowFailure: true, contracts });
+    const baseResults = await readWorldChainWithFallback((client) =>
+      client.multicall({ allowFailure: true, contracts }),
+    );
     const assetContracts = vaults.map((vault, index) => {
-      const shares = resultBigInt(baseResults[index * 3]);
+      const shares = resultBigInt(baseResults[index * 3], "vault shares");
       return {
         address: vault.address as Address,
         abi: METAMORPHO_ABI,
@@ -58,13 +60,15 @@ export async function GET(
         args: [shares],
       };
     });
-    const assetResults = await publicClient.multicall({ allowFailure: true, contracts: assetContracts });
+    const assetResults = await readWorldChainWithFallback((client) =>
+      client.multicall({ allowFailure: true, contracts: assetContracts }),
+    );
 
     const positions = vaults.map((vault, index) => {
-      const shares = resultBigInt(baseResults[index * 3]);
-      const maxWithdraw = resultBigInt(baseResults[index * 3 + 1]);
-      const walletBalance = resultBigInt(baseResults[index * 3 + 2]);
-      const assets = resultBigInt(assetResults[index]);
+      const shares = resultBigInt(baseResults[index * 3], "vault shares");
+      const maxWithdraw = resultBigInt(baseResults[index * 3 + 1], "max withdraw");
+      const walletBalance = resultBigInt(baseResults[index * 3 + 2], "wallet balance");
+      const assets = resultBigInt(assetResults[index], "vault assets");
       return {
         vaultAddress: vault.address,
         displayName: vault.displayName,
@@ -87,6 +91,10 @@ export async function GET(
   }
 }
 
-function resultBigInt(result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined) {
-  return result?.status === "success" && typeof result.result === "bigint" ? result.result : 0n;
+function resultBigInt(
+  result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined,
+  label: string,
+) {
+  if (result?.status === "success" && typeof result.result === "bigint") return result.result;
+  throw new Error(`Unable to read Morpho ${label}.`);
 }
