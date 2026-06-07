@@ -4747,6 +4747,14 @@ function enhancePrototypeActivity() {
         if (!value || /completed/i.test(String(value))) return activityCopy("completed");
         return value;
       }
+      function activityTime(item){
+        var raw = item && (item.createdAt || item.time || item.timestamp);
+        if (!raw) return "";
+        var date = new Date(raw);
+        if (!Number.isFinite(date.getTime())) return "";
+        var pad = function(n){ return String(n).padStart(2, "0"); };
+        return pad(date.getMonth() + 1) + "/" + pad(date.getDate()) + " " + pad(date.getHours()) + ":" + pad(date.getMinutes());
+      }
       function readJson(key, fallback){
         try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch(e) { return fallback; }
       }
@@ -4768,6 +4776,7 @@ function enhancePrototypeActivity() {
           amount: item && item.amount || "—",
           status: item && item.status || "Completed",
           hash: item && item.hash || ("pending-" + Date.now()),
+          time: item && (item.time || item.createdAt || item.timestamp) || "",
           createdAt: item && item.createdAt || new Date().toISOString()
         };
       }
@@ -4860,9 +4869,11 @@ function enhancePrototypeActivity() {
       function itemHtml(a){
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
+        var when = activityTime(a);
+        var subtitle = activitySubtitle(a.subtitle);
         return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'' + activityCopy("pendingToast") + '\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
-          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s">' + activitySubtitle(a.subtitle) + '</div></div>' +
+          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s"><span>' + subtitle + '</span>' + (when ? '<span class="act-time">' + when + '</span>' : '') + '</div></div>' +
           '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + activityStatus(a.status) + '</div></div>' +
         '</div>';
       }

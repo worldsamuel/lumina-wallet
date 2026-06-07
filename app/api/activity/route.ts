@@ -9,6 +9,7 @@ import { ERC20_TOKENS } from "@/lib/tokens";
 const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
 const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
+const blockTimeCache = new Map<string, string>();
 
 export function OPTIONS() {
   return optionsResponse();
@@ -51,6 +52,23 @@ async function getTokenMeta(address: Address) {
   }
 }
 
+async function getBlockTime(blockNumber: bigint) {
+  const key = blockNumber.toString();
+  const cached = blockTimeCache.get(key);
+  if (cached) return cached;
+
+  try {
+    const block = await publicClient.getBlock({ blockNumber });
+    const iso = new Date(Number(block.timestamp) * 1000).toISOString();
+    blockTimeCache.set(key, iso);
+    return iso;
+  } catch {
+    const iso = new Date().toISOString();
+    blockTimeCache.set(key, iso);
+    return iso;
+  }
+}
+
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:activity", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
@@ -79,7 +97,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const latest = await publicClient.getBlockNumber();
-    const fromBlock = latest > 200_000n ? latest - 200_000n : 0n;
+    const fromBlock = latest > 1_000_000n ? latest - 1_000_000n : 0n;
     const lower = address.toLowerCase();
     const [incoming, outgoing] = await Promise.all([
       publicClient.getLogs({
@@ -112,7 +130,7 @@ export async function GET(req: NextRequest) {
           const incomingTx = to.toLowerCase() === lower;
           const direction: "in" | "out" = incomingTx ? "in" : "out";
           const value = log.args.value ?? 0n;
-          const meta = await getTokenMeta(log.address);
+          const [meta, createdAt] = await Promise.all([getTokenMeta(log.address), getBlockTime(log.blockNumber)]);
           return {
             hash: log.transactionHash,
             type: direction,
@@ -123,6 +141,7 @@ export async function GET(req: NextRequest) {
             tokenAmount: Number(formatUnits(value, meta.decimals)),
             direction,
             status: "Completed",
+            createdAt,
             blockNumber: Number(log.blockNumber),
             logIndex: log.logIndex,
           };
@@ -136,10 +155,10 @@ export async function GET(req: NextRequest) {
       const bt = "createdAt" in b ? new Date(String(b.createdAt)).getTime() : 0;
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
-    return jsonResponse(allRows.slice(0, 30));
+    return jsonResponse(allRows.slice(0, 80));
   } catch (error) {
     console.error("Failed to fetch real activity", error);
-    return jsonResponse(storedRows.slice(0, 30));
+    return jsonResponse(storedRows.slice(0, 80));
   }
 }
 
@@ -186,6 +205,7 @@ function mergeSwapActivity<
     tokenAmount: number;
     direction: "in" | "out";
     status: string;
+    createdAt: string;
     blockNumber: number;
     logIndex: number;
   },
@@ -220,6 +240,7 @@ function mergeSwapActivity<
         subtitle,
         amount: `+${incoming.tokenText}`,
         status: "Completed",
+        createdAt: newestCreatedAt(group),
         blockNumber: Math.max(...group.map((item) => item.blockNumber)),
         logIndex: Math.max(...group.map((item) => item.logIndex)),
       } as Omit<T, "direction" | "tokenText" | "tokenAmount">);
@@ -228,6 +249,13 @@ function mergeSwapActivity<
     }
   }
   return rows;
+}
+
+function newestCreatedAt<T extends { createdAt: string }>(items: T[]) {
+  return items
+    .map((item) => item.createdAt)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? new Date().toISOString();
 }
 
 function largestTransfer<

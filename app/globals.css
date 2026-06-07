@@ -490,7 +490,8 @@
   .act-item:active { background: var(--surface-2); }
   .act-ic { width: 42px; height: 42px; border-radius: 50%; background: var(--surface-2); display: grid; place-items: center; flex-shrink: 0; }
   .act-ic.in { color: var(--green); } .act-ic.out { color: var(--text); } .act-ic.swap { color: #8aa3d8; }
-  .act-mid { flex: 1; } .act-mid .t { font-weight: 600; font-size: 15px; } .act-mid .s { color: var(--text-mute); font-size: 12px; margin-top: 3px; }
+  .act-mid { flex: 1; min-width: 0; } .act-mid .t { font-weight: 600; font-size: 15px; } .act-mid .s { color: var(--text-mute); font-size: 12px; margin-top: 3px; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+  .act-mid .act-time { color: rgba(255,255,255,.42); }
   .act-amt { text-align: right; white-space: nowrap; } .act-amt .v { font-weight: 700; font-size: 15px; } .act-amt .v.plus { color: var(--green); } .act-amt .st { font-size: 11px; color: var(--text-mute); margin-top: 3px; }
   /* Detail */
   #view-detail { padding: 18px var(--pad-screen) 112px; }
