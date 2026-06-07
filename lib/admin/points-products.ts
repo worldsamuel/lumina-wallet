@@ -130,7 +130,7 @@ function parseProducts(value: unknown): PointsProductConfig[] {
     .filter((item): item is Partial<PointsProductConfig> => !!item && typeof item === "object")
     .map(normalizeProduct)
     .filter((item) => item.id);
-  return (rows.length ? rows : defaultProducts()).sort((a, b) => a.sortOrder - b.sortOrder);
+  return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 async function readStoredProducts() {

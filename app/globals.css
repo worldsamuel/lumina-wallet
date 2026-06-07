@@ -864,13 +864,25 @@
   .points-shop-head { min-height: 54px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
   .points-close { width: 40px; height: 40px; border: none; background: transparent; color: #fff; font-size: 34px; line-height: 1; display: grid; place-items: center; padding: 0; }
   .points-shop-brand { justify-self: center; display: inline-flex; align-items: center; gap: 8px; font-size: 23px; font-weight: 950; }
+  .lumina-mark { width: 24px; height: 24px; border-radius: 50%; display: inline-grid; place-items: center; position: relative; flex: 0 0 auto; background: radial-gradient(circle at 50% 50%, rgba(111,255,144,.18), rgba(74,222,128,.04) 58%, transparent 70%); box-shadow: 0 0 18px rgba(74,222,128,.26); }
+  .lumina-mark::before, .lumina-mark::after { content: ""; position: absolute; width: 10px; height: 16px; border: 2px solid #5ff083; border-radius: 999px 999px 2px 999px; transform-origin: 50% 100%; }
+  .lumina-mark::before { transform: translate(-4px, 1px) rotate(-28deg); }
+  .lumina-mark::after { transform: translate(4px, 1px) rotate(28deg) scaleX(-1); }
+  .lumina-mark i { position: absolute; width: 2px; height: 10px; bottom: 3px; border-radius: 999px; background: #5ff083; box-shadow: 0 0 10px rgba(95,240,131,.5); }
+  .lumina-mark.sm { width: 20px; height: 20px; }
+  .lumina-mark.sm::before, .lumina-mark.sm::after { width: 8px; height: 13px; border-width: 1.7px; }
+  .lumina-mark.sm i { height: 8px; bottom: 2px; }
+  .lumina-mark.lg { width: 46px; height: 46px; border: 1px solid rgba(255,255,255,.78); background: radial-gradient(circle, rgba(74,222,128,.18), rgba(0,0,0,.16)); }
+  .lumina-mark.lg::before, .lumina-mark.lg::after { width: 17px; height: 27px; border-width: 3px; }
+  .lumina-mark.lg i { width: 3px; height: 17px; bottom: 7px; }
   .lumina-dot { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--green); color: var(--green); display: inline-grid; place-items: center; font-size: 10px; font-weight: 950; line-height: 1; box-shadow: 0 0 16px rgba(74,222,128,.28); flex: 0 0 auto; }
   .points-balance-card { margin-top: 20px; min-height: 122px; padding: 28px 22px; border: 1px solid rgba(74,222,128,.22); border-radius: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; background: radial-gradient(78% 100% at 74% -12%, rgba(74,222,128,.18), transparent 56%), radial-gradient(80% 120% at 90% 102%, rgba(74,222,128,.28), transparent 58%), linear-gradient(135deg, #0b0f0b, #060706); overflow: hidden; }
   .points-card-title { display: flex; align-items: center; gap: 10px; color: #fff; font-size: 17px; font-weight: 900; }
   .points-big { margin-top: 20px; border: none; background: transparent; color: #fff; display: inline-flex; align-items: center; gap: 10px; padding: 0; font-size: 42px; line-height: 1; font-weight: 950; }
   .points-big i { font-style: normal; color: #fff; font-size: 32px; transform: translateY(-1px); }
-  .coupon-pill { min-width: 116px; height: 46px; border: 1px solid rgba(74,222,128,.28); border-radius: 999px; background: rgba(7,18,10,.72); color: var(--green); font-size: 14px; font-weight: 900; white-space: nowrap; }
-  .coupon-pill b { margin-left: 8px; }
+  .coupon-card { min-width: 118px; height: 54px; border: 1px solid rgba(74,222,128,.24); border-radius: 18px; background: linear-gradient(135deg, rgba(74,222,128,.16), rgba(5,16,8,.68)); color: var(--green); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 0 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+  .coupon-card span { color: #b7ffc8; font-size: 12px; font-weight: 850; text-align: left; }
+  .coupon-card b { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,.16); color: #fff; font-size: 14px; }
   .points-shop-panel { margin: 2px -16px 0; padding: 24px 16px 0; border-radius: 26px 26px 0 0; background: #020302; box-shadow: 0 -18px 50px rgba(0,0,0,.44); }
   .points-shop-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .points-shop-title h2 { margin: 0; font-size: 24px; line-height: 1.1; }
@@ -889,7 +901,6 @@
   .points-product-body { min-height: 104px; padding: 13px 12px 14px; display: flex; flex-direction: column; justify-content: space-between; gap: 14px; background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.01)); }
   .points-product-body strong { display: block; color: #d9ded9; font-size: 15px; line-height: 1.35; font-weight: 700; }
   .points-product-cost { display: flex; align-items: center; gap: 6px; min-width: 0; color: #fff; }
-  .points-product-cost .lumina-dot { width: 16px; height: 16px; font-size: 8px; }
   .points-product-cost b { font-size: 13px; font-weight: 950; white-space: nowrap; }
   .points-product-cost del { color: #777d77; font-size: 12px; white-space: nowrap; }
   .points-products .points-empty { grid-column: 1 / -1; }
@@ -900,8 +911,11 @@
   .points-detail-hero.blind::before { content: ""; position: absolute; inset: -35%; background: repeating-conic-gradient(from -18deg, rgba(203,255,31,.42) 0 14deg, rgba(74,222,128,.08) 14deg 30deg); animation: blindCardGlow 14s linear infinite; opacity: .9; }
   .points-detail-hero img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
   .points-detail-hero span { position: relative; z-index: 1; max-width: 86%; text-shadow: 0 0 30px rgba(174,255,31,.38); }
+  .mystery-art { position: relative; z-index: 1; width: min(170px, 70%); aspect-ratio: 1.12; border-radius: 14px 14px 20px 20px; display: grid; place-items: center; background: linear-gradient(155deg, #17341d, #050906); border: 1px solid rgba(201,255,34,.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 20px 50px rgba(0,0,0,.35); color: #c9ff22; }
+  .mystery-art::before { content: ""; position: absolute; left: -10px; right: -10px; top: -26px; height: 36px; border-radius: 12px; background: linear-gradient(155deg, #275f2e, #0a170d); border: 1px solid rgba(201,255,34,.28); }
+  .mystery-art span { font-size: 52px; line-height: 1; }
+  .mystery-art b { position: absolute; left: 12px; bottom: 12px; color: #eaffcf; font-size: 13px; line-height: 1.1; text-align: left; text-transform: uppercase; }
   .points-detail-title { margin-top: 26px; display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: center; }
-  .points-detail-title .lumina-dot { width: 46px; height: 46px; font-size: 22px; border-color: rgba(255,255,255,.84); color: #c9ff22; }
   .points-detail-title h2 { margin: 0; color: #fff; font-size: 22px; line-height: 1.18; font-weight: 950; }
   .points-detail-title p { margin: 8px 0 0; color: #b7bdb7; font-size: 16px; line-height: 1.35; }
   .points-policy { display: inline-flex; margin-top: 24px; padding: 8px 12px; border-radius: 8px; background: rgba(203,255,31,.14); color: #c9ff22; font-size: 15px; font-weight: 900; }
@@ -913,12 +927,23 @@
   .points-detail-section li b { color: #e7ffd1; font-weight: 900; }
   .points-detail-footer { position: sticky; left: 0; right: 0; bottom: calc(-28px - env(safe-area-inset-bottom)); margin: 30px -16px calc(-28px - env(safe-area-inset-bottom)); padding: 18px 22px calc(18px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr) 142px; gap: 14px; align-items: center; background: rgba(17,19,18,.92); border-top: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(16px); }
   .points-detail-price > div { display: flex; align-items: center; gap: 8px; min-width: 0; color: #fff; }
-  .points-detail-price .lumina-dot { width: 22px; height: 22px; font-size: 10px; color: #c9ff22; border-color: #c9ff22; }
   .points-detail-price strong { font-size: 28px; line-height: 1; font-weight: 950; }
   .points-detail-price del { color: #626762; font-size: 20px; white-space: nowrap; }
   .points-detail-price small { display: block; margin-top: 6px; color: #a9afa9; font-size: 13px; }
   .points-detail-price small b { color: #c9ff22; }
   .points-detail-footer button { height: 60px; border: none; border-radius: 999px; background: linear-gradient(135deg, #c9ff22, #9af10d); color: #071007; font-size: 15px; font-weight: 950; letter-spacing: 0; box-shadow: 0 14px 36px rgba(161,255,19,.2); }
+  .points-mini-sheet { position: fixed; inset: 0; z-index: 320; display: none; align-items: flex-end; justify-content: center; padding: 18px; background: rgba(0,0,0,.62); backdrop-filter: blur(12px); }
+  .points-mini-sheet.open { display: flex; }
+  .points-mini-sheet > div { position: relative; width: min(390px, 100%); max-height: 72vh; overflow: auto; padding: 22px; border: 1px solid rgba(255,255,255,.1); border-radius: 26px; background: linear-gradient(180deg, #151715, #070807); box-shadow: 0 -20px 60px rgba(0,0,0,.5); }
+  .points-mini-sheet h3 { margin: 2px 42px 16px 0; color: #fff; font-size: 24px; line-height: 1.1; }
+  .points-ledger-row, .coupon-row { min-height: 62px; display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
+  .points-ledger-row span { flex: 1; min-width: 0; }
+  .points-ledger-row b, .coupon-row b { display: block; color: #fff; font-size: 14px; line-height: 1.25; }
+  .points-ledger-row small, .coupon-row small { display: block; margin-top: 4px; color: #8e958e; font-size: 12px; line-height: 1.2; }
+  .points-ledger-row strong { color: #6cff91; font-size: 16px; }
+  .points-ledger-row.spend strong { color: #ff7f87; }
+  .coupon-row > div { flex: 1; min-width: 0; }
+  .coupon-row em { padding: 6px 9px; border-radius: 999px; background: rgba(74,222,128,.14); color: var(--green); font-size: 11px; font-style: normal; font-weight: 900; }
   .blind-box-modal { position: fixed; inset: 0; z-index: 300; display: none; place-items: center; padding: 24px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); }
   .blind-box-modal.open { display: grid; }
   .blind-box-stage { position: relative; width: min(340px, 100%); min-height: 430px; border: 1px solid rgba(74,222,128,.2); border-radius: 28px; background: radial-gradient(circle at 50% 42%, rgba(74,222,128,.22), transparent 46%), linear-gradient(180deg, #121512, #050605); overflow: hidden; display: grid; place-items: center; }
