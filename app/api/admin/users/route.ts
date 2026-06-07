@@ -7,11 +7,21 @@ export function OPTIONS() {
   return optionsResponse();
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  const url = new URL(req.url);
+  const q = String(url.searchParams.get("q") || "").trim().toLowerCase();
 
   const users = await db.user.findMany({
+    where: q
+      ? {
+          OR: [
+            { address: { contains: q, mode: "insensitive" } },
+            { worldId: { contains: q, mode: "insensitive" } },
+          ],
+        }
+      : undefined,
     orderBy: { createdAt: "desc" },
     take: 200,
   });

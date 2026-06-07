@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { calculateRulePoints, getSystemConfig, type PointsRuleKind } from "@/lib/admin/system-config";
 
 const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_ORDERS_KEY = "points_orders";
@@ -40,6 +41,8 @@ export type PointsOrderConfig = {
     name: string;
     value?: string | null;
   } | null;
+  note?: string | null;
+  createdBy?: string | null;
   createdAt: string;
   openedAt?: string | null;
 };
@@ -202,6 +205,8 @@ function parseOrders(value: unknown): PointsOrderConfig[] {
           name: String(item.reward.name || "Lumina reward"),
           value: typeof item.reward.value === "string" ? item.reward.value : null,
         } : null,
+        note: typeof item.note === "string" && item.note.trim() ? item.note.trim() : null,
+        createdBy: typeof item.createdBy === "string" && item.createdBy.trim() ? item.createdBy.trim() : null,
         createdAt: String(item.createdAt || new Date().toISOString()),
         openedAt: item.openedAt ? String(item.openedAt) : null,
       };
@@ -267,6 +272,10 @@ export async function getPointsOrders(address: string) {
   return (await readStoredOrders()).filter((order) => order.address === normalized);
 }
 
+export async function getAllPointsOrders() {
+  return readStoredOrders();
+}
+
 export async function getPointsAdjustments(address?: string) {
   const rows = await readStoredAdjustments();
   if (!address) return rows;
@@ -295,6 +304,26 @@ export async function addPointsAdjustment(input: { address: string; points: numb
   rows.unshift(row);
   await writeStoredAdjustments(rows);
   return row;
+}
+
+export async function awardRulePoints(input: { address: string; kind: PointsRuleKind; note?: string | null; createdBy?: string | null; uniqueKey?: string | null }) {
+  const address = String(input.address || "").toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
+  const existing = await getPointsAdjustments(address);
+  if (input.uniqueKey && existing.some((row) => row.createdBy === input.uniqueKey)) {
+    return { row: null, points: 0, skipped: true };
+  }
+  const config = await getSystemConfig();
+  const award = calculateRulePoints(input.kind, config);
+  if (award.points <= 0) return { row: null, points: 0, skipped: true };
+  const suffix = award.reasons.length ? ` (${award.reasons.join(", ")})` : "";
+  const row = await addPointsAdjustment({
+    address,
+    points: award.points,
+    note: `${input.note || `${input.kind} points`}${suffix}`,
+    createdBy: input.uniqueKey || input.createdBy || `points-rule:${input.kind}`,
+  });
+  return { row, points: award.points, skipped: false, multiplier: award.multiplier, reasons: award.reasons };
 }
 
 function pickBlindReward(product: PointsProductConfig) {
@@ -327,6 +356,32 @@ export async function purchasePointsProduct(input: { address: string; productId:
     type: product.type,
     status: "purchased",
     reward: product.type === "product" ? { name: product.title, value: product.imageText ?? null } : null,
+    createdAt: new Date().toISOString(),
+    openedAt: null,
+  };
+  const orders = await readStoredOrders();
+  orders.unshift(order);
+  await writeStoredOrders(orders);
+  return { order, product };
+}
+
+export async function airdropBlindBox(input: { address: string; productId: string; note?: string | null; createdBy?: string | null }) {
+  const address = String(input.address || "").toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
+  const product = (await readStoredProducts()).find((item) => item.id === input.productId && item.type === "blind_box" && item.enabled);
+  if (!product) throw new Error("Blind box unavailable.");
+  if (product.stock <= 0) throw new Error("Blind box sold out.");
+  const order: PointsOrderConfig = {
+    id: `airdrop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    address,
+    productId: product.id,
+    productTitle: product.title,
+    points: 0,
+    type: "blind_box",
+    status: "purchased",
+    reward: null,
+    note: input.note || "Airdropped mystery box",
+    createdBy: input.createdBy || "admin-airdrop",
     createdAt: new Date().toISOString(),
     openedAt: null,
   };
