@@ -2776,7 +2776,6 @@ function enhancePrototypeHome() {
         if (!window.__luminaUserAddress || document.getElementById("welcomeBoxModal")) return;
         var box = welcomeBoxConfig();
         if (!box.enabled || box.totalCount <= 0) return;
-        try { if (localStorage.getItem(welcomeBoxKey()) === "done") return; } catch(e) {}
         fetch("/api/welcome-box?address=" + encodeURIComponent(window.__luminaUserAddress), { cache:"no-store" })
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){
