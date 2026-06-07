@@ -243,6 +243,14 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   }, [address, status]);
 
   useEffect(() => {
+    if (status !== "authenticated" || !prototypeReady || !address) return;
+    const timers = [250, 1000, 2500, 5000, 9000].map((delay) =>
+      window.setTimeout(() => window.__luminaMaybeOpenWelcomeBox?.(), delay),
+    );
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [address, prototypeReady, status]);
+
+  useEffect(() => {
     const handleEarnUserOp = (event: Event) => {
       const detail = (event as CustomEvent<{ userOpHash?: string; action?: EarnPendingAction }>).detail;
       if (detail?.action) setEarnPendingAction(detail.action);

@@ -23,7 +23,7 @@ export async function GET(req: Request) {
         }
       : undefined,
     orderBy: { createdAt: "desc" },
-    take: 200,
+    take: 1000,
   });
   const enriched = await Promise.all(users.map(async (user) => {
     const [adjustments, adjustmentTotal] = await Promise.all([
