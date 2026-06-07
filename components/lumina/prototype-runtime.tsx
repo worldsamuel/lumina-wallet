@@ -5072,9 +5072,26 @@ function enhancePrototypeMe() {
             { id:"wine-discount", type:"product", title:"Vintage Fine Wines order discount", category:"dining", points:9, imageText:"Vintage Fine Wines", stock:120, enabled:true, sortOrder:4 }
           ];
         }
+        function purchaseKey(id){ return "lumina_points_purchase_" + String(id || ""); }
+        function purchasedCount(id){
+          try { return Math.max(0, Number(localStorage.getItem(purchaseKey(id)) || 0)); } catch(e) { return 0; }
+        }
+        function setPurchasedCount(id, count){
+          try { localStorage.setItem(purchaseKey(id), String(Math.max(0, Number(count || 0)))); } catch(e) {}
+        }
+        function updatePointsBalance(nextValue){
+          window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
+          var meBadge = document.getElementById("mePointsBadge");
+          var centerBadge = document.getElementById("pointsCenterValue");
+          var shopBadge = document.getElementById("pointsShopBalance");
+          [meBadge, centerBadge, shopBadge].forEach(function(el){ if (el) el.textContent = Number(window.__luminaPoints || 0).toLocaleString(); });
+        }
         window.__luminaOpenBlindBox = function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
+          var count = purchasedCount(product.id);
+          if (count <= 0) { toast("Please buy this mystery box first"); return; }
+          setPurchasedCount(product.id, count - 1);
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
           var total = rewards.reduce(function(sum, item){ return sum + Math.max(0, Number(item.odds || 0)); }, 0) || rewards.length;
           var pick = Math.random() * total;
@@ -5091,12 +5108,50 @@ function enhancePrototypeMe() {
           box.onclick = function(event){ if (event.target === box) box.remove(); };
           box.innerHTML = '<div class="blind-box-stage"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result"><small>You got</small><strong>' + escapeAttr(won.name || "Lumina reward") + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">Done</button></div></div>';
           document.body.appendChild(box);
+          renderProductDetail(product.id);
         };
         function productArt(product){
           if (product.imageUrl) return '<img src="' + escapeAttr(product.imageUrl) + '" alt="" />';
           var text = escapeAttr(product.imageText || product.title || "Lumina");
           return '<span>' + text + '</span>';
         }
+        function rewardDetails(product){
+          var rewards = Array.isArray(product.rewards) ? product.rewards.filter(function(item){ return item && item.name; }) : [];
+          if (!rewards.length) return '<li>Rewards are issued to your Lumina account after redemption.</li>';
+          return rewards.map(function(item){
+            return '<li>' + escapeAttr(item.name) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
+          }).join("");
+        }
+        function buyProduct(productId){
+          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          if (!product) return;
+          var cost = Math.max(0, Number(product.points || 0));
+          updatePointsBalance(Number(window.__luminaPoints || 0) - cost);
+          setPurchasedCount(product.id, purchasedCount(product.id) + 1);
+          toast(product.type === "blind_box" ? "Mystery box purchased" : "Redeemed");
+          renderProductDetail(product.id);
+        }
+        function renderProductDetail(productId){
+          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          if (!product || !modal) return;
+          var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
+          var isBlind = product.type === "blind_box";
+          var owned = purchasedCount(product.id);
+          var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
+          var actionText = isBlind && owned > 0 ? "OPEN NOW" : (isBlind ? "BUY BOX" : "REDEEM NOW");
+          var subtitle = isBlind ? "Buy first, then open the mystery box." : "Redeem this reward with Lumina Points.";
+          var description = product.description || (isBlind ? "Use Lumina Points to buy this mystery box. After purchase, open it for a chance to reveal one reward from the prize pool." : "Use Lumina Points to redeem this reward. Your coupon will be added after redemption.");
+          modal.innerHTML =
+            '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><div class="points-shop-brand"><span class="lumina-dot">L</span><b>LUMINA</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+            '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product) + '</div>' +
+            '<div class="points-detail-title"><span class="lumina-dot">L</span><div><h2>' + escapeAttr(product.title) + '</h2><p>' + subtitle + '</p></div></div>' +
+            '<span class="points-policy">Non-refundable</span>' +
+            '<section class="points-detail-section"><h3>Product Details</h3><p>' + escapeAttr(description) + '</p></section>' +
+            '<section class="points-detail-section"><h3>Rewards</h3><ul>' + rewardDetails(product) + '</ul></section>' +
+            '<div class="points-detail-footer"><div class="points-detail-price"><div><span class="lumina-dot">L</span><strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>Available: <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · Owned: ' + owned : '') + '</small></div><button type="button" onclick="' + action + '">' + actionText + '</button></div>';
+        }
+        window.__luminaBuyPointsProduct = buyProduct;
+        window.__luminaOpenPointsProduct = renderProductDetail;
         function renderProducts(products, active){
           var list = products.filter(function(item){ return active === "all" || String(item.category || "shop") === active; });
           var box = modal.querySelector("#pointsProductGrid");
@@ -5105,28 +5160,32 @@ function enhancePrototypeMe() {
             var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
             var badgeText = product.badge || (product.type === "blind_box" ? "Blind Box" : "");
             var badge = badgeText ? '<em>' + escapeAttr(badgeText) + '</em>' : "";
-            var action = product.type === "blind_box" ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "toast('Coming soon')";
+            var action = "window.__luminaOpenPointsProduct('" + escapeAttr(product.id) + "')";
             return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(product.title) + '</strong><div class="points-product-cost"><span class="lumina-dot">L</span><b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div></div></button>';
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
-        modal.innerHTML =
-          '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><div class="points-shop-brand"><span class="lumina-dot">L</span><b>Lumina</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
-          '<div class="points-balance-card"><div><div class="points-card-title"><span class="lumina-dot">L</span><b>Lumina Points</b></div><button type="button" class="points-big" onclick="toast(\\'' + c.pointsRule.replace(/'/g, "\\\\'") + '\\')">' + Number(window.__luminaPoints || 0).toLocaleString() + '<i>›</i></button></div><button type="button" class="coupon-pill">My coupons <b>0</b></button></div>' +
-          '<div class="points-shop-panel"><div class="points-shop-title"><h2>Rewards</h2><button type="button" class="points-region">◎ Global⌄</button></div><div class="points-tabs">' +
-          categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
-          '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
+        function renderShop(){
+          modal.innerHTML =
+            '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><div class="points-shop-brand"><span class="lumina-dot">L</span><b>Lumina</b></div><button type="button" data-points-close="1" class="points-close">×</button></div>' +
+            '<div class="points-balance-card"><div><div class="points-card-title"><span class="lumina-dot">L</span><b>Lumina Points</b></div><button type="button" class="points-big" onclick="toast(\\'' + c.pointsRule.replace(/'/g, "\\\\'") + '\\')"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button></div><button type="button" class="coupon-pill">My coupons <b>0</b></button></div>' +
+            '<div class="points-shop-panel"><div class="points-shop-title"><h2>Rewards</h2><button type="button" class="points-region">◎ Global⌄</button></div><div class="points-tabs">' +
+            categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
+            '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
+          renderProducts(products, "all");
+          modal.querySelectorAll("[data-points-cat]").forEach(function(btn){
+            btn.addEventListener("click", function(){
+              modal.querySelectorAll("[data-points-cat]").forEach(function(item){ item.classList.remove("sel"); });
+              btn.classList.add("sel");
+              renderProducts(products, btn.getAttribute("data-points-cat") || "all");
+            });
+          });
+        }
+        window.__luminaRenderPointsShop = renderShop;
         document.body.appendChild(modal);
         var products = fallbackProducts();
         window.__luminaPointsProducts = products;
-        renderProducts(products, "all");
-        modal.querySelectorAll("[data-points-cat]").forEach(function(btn){
-          btn.addEventListener("click", function(){
-            modal.querySelectorAll("[data-points-cat]").forEach(function(item){ item.classList.remove("sel"); });
-            btn.classList.add("sel");
-            renderProducts(products, btn.getAttribute("data-points-cat") || "all");
-          });
-        });
+        renderShop();
         try {
           var res = await fetch("/api/points-products", { cache: "no-store" });
           var data = await res.json().catch(function(){ return null; });

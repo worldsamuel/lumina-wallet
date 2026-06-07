@@ -895,6 +895,30 @@
   .points-products .points-empty { grid-column: 1 / -1; }
   .points-product.blind .points-product-art::before { content: ""; position: absolute; inset: -30%; background: conic-gradient(from 0deg, transparent, rgba(112,255,143,.3), transparent 35%); animation: blindCardGlow 4s linear infinite; }
   @keyframes blindCardGlow { to { transform: rotate(360deg); } }
+  .points-detail-head { min-height: 58px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
+  .points-detail-hero { position: relative; min-height: 238px; margin-top: 28px; border: 1px solid rgba(74,222,128,.28); border-radius: 20px; display: grid; place-items: center; overflow: hidden; background: radial-gradient(circle at 50% 50%, rgba(74,222,128,.42), rgba(74,222,128,.16) 42%, rgba(8,14,10,.7) 72%), linear-gradient(135deg, #0b160e, #111); color: #c8ff2f; font-size: 58px; line-height: 1; font-weight: 950; text-align: center; }
+  .points-detail-hero.blind::before { content: ""; position: absolute; inset: -35%; background: repeating-conic-gradient(from -18deg, rgba(203,255,31,.42) 0 14deg, rgba(74,222,128,.08) 14deg 30deg); animation: blindCardGlow 14s linear infinite; opacity: .9; }
+  .points-detail-hero img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .points-detail-hero span { position: relative; z-index: 1; max-width: 86%; text-shadow: 0 0 30px rgba(174,255,31,.38); }
+  .points-detail-title { margin-top: 26px; display: grid; grid-template-columns: 54px 1fr; gap: 14px; align-items: center; }
+  .points-detail-title .lumina-dot { width: 46px; height: 46px; font-size: 22px; border-color: rgba(255,255,255,.84); color: #c9ff22; }
+  .points-detail-title h2 { margin: 0; color: #fff; font-size: 22px; line-height: 1.18; font-weight: 950; }
+  .points-detail-title p { margin: 8px 0 0; color: #b7bdb7; font-size: 16px; line-height: 1.35; }
+  .points-policy { display: inline-flex; margin-top: 24px; padding: 8px 12px; border-radius: 8px; background: rgba(203,255,31,.14); color: #c9ff22; font-size: 15px; font-weight: 900; }
+  .points-detail-section { margin-top: 28px; color: #c5cac5; }
+  .points-detail-section h3 { margin: 0 0 16px; color: #fff; font-size: 18px; line-height: 1.1; font-weight: 950; }
+  .points-detail-section p { margin: 0; color: #b8beb8; font-size: 16px; line-height: 1.75; }
+  .points-detail-section ul { margin: 0; padding: 0 0 0 22px; display: grid; gap: 16px; color: #b8beb8; font-size: 16px; line-height: 1.55; }
+  .points-detail-section li::marker { color: #c9ff22; }
+  .points-detail-section li b { color: #e7ffd1; font-weight: 900; }
+  .points-detail-footer { position: sticky; left: 0; right: 0; bottom: calc(-28px - env(safe-area-inset-bottom)); margin: 30px -16px calc(-28px - env(safe-area-inset-bottom)); padding: 18px 22px calc(18px + env(safe-area-inset-bottom)); display: grid; grid-template-columns: minmax(0, 1fr) 142px; gap: 14px; align-items: center; background: rgba(17,19,18,.92); border-top: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(16px); }
+  .points-detail-price > div { display: flex; align-items: center; gap: 8px; min-width: 0; color: #fff; }
+  .points-detail-price .lumina-dot { width: 22px; height: 22px; font-size: 10px; color: #c9ff22; border-color: #c9ff22; }
+  .points-detail-price strong { font-size: 28px; line-height: 1; font-weight: 950; }
+  .points-detail-price del { color: #626762; font-size: 20px; white-space: nowrap; }
+  .points-detail-price small { display: block; margin-top: 6px; color: #a9afa9; font-size: 13px; }
+  .points-detail-price small b { color: #c9ff22; }
+  .points-detail-footer button { height: 60px; border: none; border-radius: 999px; background: linear-gradient(135deg, #c9ff22, #9af10d); color: #071007; font-size: 15px; font-weight: 950; letter-spacing: 0; box-shadow: 0 14px 36px rgba(161,255,19,.2); }
   .blind-box-modal { position: fixed; inset: 0; z-index: 300; display: none; place-items: center; padding: 24px; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); }
   .blind-box-modal.open { display: grid; }
   .blind-box-stage { position: relative; width: min(340px, 100%); min-height: 430px; border: 1px solid rgba(74,222,128,.2); border-radius: 28px; background: radial-gradient(circle at 50% 42%, rgba(74,222,128,.22), transparent 46%), linear-gradient(180deg, #121512, #050605); overflow: hidden; display: grid; place-items: center; }
