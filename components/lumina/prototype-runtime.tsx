@@ -5104,7 +5104,8 @@ function enhancePrototypeMe() {
         }
         function purchaseKey(id){ return "lumina_points_purchase_" + String(id || ""); }
         function purchasedCount(id){
-          try { return Math.max(0, Number(localStorage.getItem(purchaseKey(id)) || 0)); } catch(e) { return 0; }
+          var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
+          try { return serverCount + Math.max(0, Number(localStorage.getItem(purchaseKey(id)) || 0)); } catch(e) { return serverCount; }
         }
         function setPurchasedCount(id, count){
           try { localStorage.setItem(purchaseKey(id), String(Math.max(0, Number(count || 0)))); } catch(e) {}
@@ -5119,19 +5120,37 @@ function enhancePrototypeMe() {
         function luminaMark(extra){
           return '<span class="lumina-mark ' + (extra || "") + '" aria-hidden="true"><i></i></span>';
         }
-        window.__luminaOpenBlindBox = function(productId){
+        window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           var count = purchasedCount(product.id);
           if (count <= 0) { toast("Please buy this mystery box first"); return; }
-          setPurchasedCount(product.id, count - 1);
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
-          var total = rewards.reduce(function(sum, item){ return sum + Math.max(0, Number(item.odds || 0)); }, 0) || rewards.length;
-          var pick = Math.random() * total;
           var won = rewards[0];
-          for (var i = 0; i < rewards.length; i++) {
-            pick -= Math.max(0, Number(rewards[i].odds || 0)) || 1;
-            if (pick <= 0) { won = rewards[i]; break; }
+          try {
+            if (!window.__luminaUserAddress) throw new Error("Wallet address required");
+            var res = await fetch("/api/points-products/purchase", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id }),
+            });
+            var data = await res.json().catch(function(){ return null; });
+            if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+            if (data.reward) won = data.reward;
+            if (Array.isArray(window.__luminaPointsOrders)) {
+              var openedOne = false;
+              window.__luminaPointsOrders = window.__luminaPointsOrders.map(function(order){
+                if (!openedOne && order.productId === product.id && order.status === "purchased") {
+                  openedOne = true;
+                  return Object.assign({}, order, { status:"opened", reward:won });
+                }
+                return order;
+              });
+            }
+            setPurchasedCount(product.id, Math.max(0, Number(localStorage.getItem(purchaseKey(product.id)) || 0) - 1));
+          } catch(e) {
+            toast(e && e.message ? e.message : "Open failed");
+            return;
           }
           var old = document.getElementById("blindBoxModal");
           if (old) old.remove();
@@ -5157,15 +5176,30 @@ function enhancePrototypeMe() {
             return '<li>' + escapeAttr(item.name) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
           }).join("");
         }
-        function buyProduct(productId){
+        async function buyProduct(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           if (product.enabled === false) { toast("This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
           if (Number(window.__luminaPoints || 0) < cost) { toast("Not enough Lumina Points"); return; }
+          try {
+            if (!window.__luminaUserAddress) throw new Error("Wallet address required");
+            var res = await fetch("/api/points-products/purchase", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:Number(window.__luminaPoints || 0) }),
+            });
+            var data = await res.json().catch(function(){ return null; });
+            if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
+            if (data.order) {
+              window.__luminaPointsOrders = [data.order].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
+            }
+          } catch(e) {
+            toast(e && e.message ? e.message : "Purchase failed");
+            return;
+          }
           updatePointsBalance(Number(window.__luminaPoints || 0) - cost);
           addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
-          setPurchasedCount(product.id, purchasedCount(product.id) + 1);
           if (product.type !== "blind_box") addPointsCoupon({ title:product.title, value:product.imageText || "", source:"Product Center" });
           toast(product.type === "blind_box" ? "Mystery box purchased" : "Redeemed");
           renderProductDetail(product.id);
@@ -5245,6 +5279,7 @@ function enhancePrototypeMe() {
         document.body.appendChild(modal);
         var products = fallbackProducts();
         window.__luminaPointsProducts = products;
+        window.__luminaPointsOrders = [];
         renderShop();
         try {
           var res = await fetch("/api/points-products", { cache: "no-store" });
@@ -5254,6 +5289,13 @@ function enhancePrototypeMe() {
             window.__luminaPointsProducts = products;
             var active = (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") : "all";
             renderProducts(products, active || "all");
+          }
+        } catch(e) {}
+        try {
+          if (window.__luminaUserAddress) {
+            var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
+            var orderData = await orderRes.json().catch(function(){ return []; });
+            window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
           }
         } catch(e) {}
       };

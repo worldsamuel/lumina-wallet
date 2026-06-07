@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 const POINTS_PRODUCTS_KEY = "points_products";
+const POINTS_ORDERS_KEY = "points_orders";
 
 export type PointsProductConfig = {
   id: string;
@@ -23,6 +24,22 @@ export type PointsProductConfig = {
     odds: number;
     stock?: number | null;
   }>;
+};
+
+export type PointsOrderConfig = {
+  id: string;
+  address: string;
+  productId: string;
+  productTitle: string;
+  points: number;
+  type: "product" | "blind_box";
+  status: "purchased" | "opened";
+  reward?: {
+    name: string;
+    value?: string | null;
+  } | null;
+  createdAt: string;
+  openedAt?: string | null;
 };
 
 function defaultProducts(): PointsProductConfig[] {
@@ -148,12 +165,110 @@ async function writeStoredProducts(products: PointsProductConfig[]) {
   return sorted;
 }
 
+function parseOrders(value: unknown): PointsOrderConfig[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is Partial<PointsOrderConfig> => !!item && typeof item === "object")
+    .map((item): PointsOrderConfig => {
+      const type: PointsOrderConfig["type"] = item.type === "blind_box" ? "blind_box" : "product";
+      const status: PointsOrderConfig["status"] = item.status === "opened" ? "opened" : "purchased";
+      return {
+        id: String(item.id || `order-${Date.now()}`),
+        address: String(item.address || "").toLowerCase(),
+        productId: String(item.productId || ""),
+        productTitle: String(item.productTitle || "Lumina Reward"),
+        points: Math.max(0, Math.floor(Number(item.points || 0))),
+        type,
+        status,
+        reward: item.reward && typeof item.reward === "object" ? {
+          name: String(item.reward.name || "Lumina reward"),
+          value: typeof item.reward.value === "string" ? item.reward.value : null,
+        } : null,
+        createdAt: String(item.createdAt || new Date().toISOString()),
+        openedAt: item.openedAt ? String(item.openedAt) : null,
+      };
+    })
+    .filter((item) => item.address && item.productId);
+}
+
+async function readStoredOrders() {
+  const page = await db.contentPage.findUnique({ where: { key: POINTS_ORDERS_KEY } });
+  return parseOrders(page?.bodyI18n);
+}
+
+async function writeStoredOrders(orders: PointsOrderConfig[]) {
+  const trimmed = orders.slice(0, 500);
+  await db.contentPage.upsert({
+    where: { key: POINTS_ORDERS_KEY },
+    update: { bodyI18n: trimmed as unknown as Prisma.InputJsonValue },
+    create: { key: POINTS_ORDERS_KEY, bodyI18n: trimmed as unknown as Prisma.InputJsonValue },
+  });
+  return trimmed;
+}
+
 export async function getPointsProducts() {
   return readStoredProducts();
 }
 
 export async function getPublicPointsProducts() {
   return (await readStoredProducts()).filter((product) => product.enabled);
+}
+
+export async function getPointsOrders(address: string) {
+  const normalized = address.toLowerCase();
+  return (await readStoredOrders()).filter((order) => order.address === normalized);
+}
+
+function pickBlindReward(product: PointsProductConfig) {
+  const rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name: "Lumina reward", value: null, odds: 1 }];
+  const total = rewards.reduce((sum, item) => sum + Math.max(0, Number(item.odds || 0)), 0) || rewards.length;
+  let pick = Math.random() * total;
+  let won = rewards[0];
+  for (const reward of rewards) {
+    pick -= Math.max(0, Number(reward.odds || 0)) || 1;
+    if (pick <= 0) {
+      won = reward;
+      break;
+    }
+  }
+  return { name: won.name || "Lumina reward", value: won.value ?? null };
+}
+
+export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number }) {
+  const address = input.address.toLowerCase();
+  const product = (await getPublicPointsProducts()).find((item) => item.id === input.productId);
+  if (!product) throw new Error("Product unavailable.");
+  if (product.stock <= 0) throw new Error("Product sold out.");
+  if (Math.floor(Number(input.availablePoints || 0)) < product.points) throw new Error("Not enough Lumina Points.");
+  const order: PointsOrderConfig = {
+    id: `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    address,
+    productId: product.id,
+    productTitle: product.title,
+    points: product.points,
+    type: product.type,
+    status: "purchased",
+    reward: product.type === "product" ? { name: product.title, value: product.imageText ?? null } : null,
+    createdAt: new Date().toISOString(),
+    openedAt: null,
+  };
+  const orders = await readStoredOrders();
+  orders.unshift(order);
+  await writeStoredOrders(orders);
+  return { order, product };
+}
+
+export async function openBlindBoxOrder(input: { address: string; productId: string }) {
+  const address = input.address.toLowerCase();
+  const product = (await getPublicPointsProducts()).find((item) => item.id === input.productId);
+  if (!product || product.type !== "blind_box") throw new Error("Mystery box unavailable.");
+  const orders = await readStoredOrders();
+  const index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.type === "blind_box" && order.status === "purchased");
+  if (index < 0) throw new Error("Please buy this mystery box first.");
+  const reward = pickBlindReward(product);
+  orders[index] = { ...orders[index], status: "opened", reward, openedAt: new Date().toISOString() };
+  await writeStoredOrders(orders);
+  return { order: orders[index], reward, product };
 }
 
 export async function upsertPointsProduct(input: Partial<PointsProductConfig>) {
