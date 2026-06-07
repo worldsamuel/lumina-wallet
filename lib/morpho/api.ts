@@ -48,7 +48,6 @@ async function graphql<T>(query: string, variables: Record<string, unknown>): Pr
     headers: { "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({ query, variables }),
     cache: "no-store",
-    signal: AbortSignal.timeout(4_000),
   });
   if (!response.ok) throw new Error(`Morpho GraphQL responded ${response.status}`);
   const body = (await response.json()) as GraphqlResponse;
