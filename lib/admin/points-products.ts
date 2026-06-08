@@ -10,10 +10,13 @@ export type PointsProductConfig = {
   id: string;
   type: "product" | "blind_box";
   title: string;
+  titleI18n?: Record<string, string>;
   category: string;
   points: number;
   originalPoints?: number | null;
   imageUrl?: string | null;
+  detailImageUrl?: string | null;
+  iconUrl?: string | null;
   imageText?: string | null;
   badge?: string | null;
   countries?: string[];
@@ -21,8 +24,11 @@ export type PointsProductConfig = {
   enabled: boolean;
   sortOrder: number;
   description?: string | null;
+  descriptionI18n?: Record<string, string>;
   rewards?: Array<{
+    id?: string | null;
     name: string;
+    nameI18n?: Record<string, string>;
     value?: string | null;
     odds: number;
     stock?: number | null;
@@ -65,6 +71,7 @@ function defaultProducts(): PointsProductConfig[] {
       category: "cash",
       points: 500,
       originalPoints: 17500,
+      iconUrl: "/points/lumina-points-icon.png",
       imageText: "$50",
       badge: "Hot",
       countries: ["global"],
@@ -129,13 +136,28 @@ function slugify(value: string) {
     .slice(0, 48) || `reward-${Date.now()}`;
 }
 
+function cleanI18n(value: unknown, fallback: string) {
+  const source = typeof value === "object" && value !== null ? value as Record<string, unknown> : {};
+  const out: Record<string, string> = {};
+  Object.entries(source).forEach(([key, text]) => {
+    const lang = String(key || "").trim();
+    const cleaned = typeof text === "string" ? text.trim() : "";
+    if (lang && cleaned) out[lang] = cleaned.slice(0, 240);
+  });
+  if (!out.en) out.en = fallback;
+  return out;
+}
+
 function normalizeProduct(input: Partial<PointsProductConfig>, index: number): PointsProductConfig {
-  const title = String(input.title || "Lumina Reward").trim();
+  const title = String(input.title || input.titleI18n?.en || "Lumina Reward").trim();
+  const description = typeof input.description === "string" && input.description.trim() ? input.description.trim() : null;
   const rewards = Array.isArray(input.rewards)
     ? input.rewards
         .filter((reward) => reward && typeof reward === "object" && String(reward.name || "").trim())
         .map((reward) => ({
+          id: typeof reward.id === "string" && reward.id.trim() ? reward.id.trim().slice(0, 32) : null,
           name: String(reward.name || "").trim(),
+          nameI18n: cleanI18n(reward.nameI18n, String(reward.name || "Reward").trim()),
           value: typeof reward.value === "string" && reward.value.trim() ? reward.value.trim() : null,
           odds: Math.max(0, Number(reward.odds || 0)),
           stock: reward.stock == null ? null : Math.max(0, Math.floor(Number(reward.stock))),
@@ -145,10 +167,13 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
     id: String(input.id || slugify(title)).trim(),
     type: input.type === "blind_box" ? "blind_box" : "product",
     title,
+    titleI18n: cleanI18n(input.titleI18n, title),
     category: String(input.category || "shop").trim().toLowerCase(),
     points: Math.max(0, Math.floor(Number(input.points ?? 0))),
     originalPoints: input.originalPoints == null || input.originalPoints === 0 ? null : Math.max(0, Math.floor(Number(input.originalPoints))),
     imageUrl: typeof input.imageUrl === "string" && input.imageUrl.trim() ? input.imageUrl.trim() : null,
+    detailImageUrl: typeof input.detailImageUrl === "string" && input.detailImageUrl.trim() ? input.detailImageUrl.trim() : null,
+    iconUrl: typeof input.iconUrl === "string" && input.iconUrl.trim() ? input.iconUrl.trim() : null,
     imageText: typeof input.imageText === "string" && input.imageText.trim() ? input.imageText.trim() : null,
     badge: typeof input.badge === "string" && input.badge.trim() ? input.badge.trim() : null,
     countries: Array.isArray(input.countries) && input.countries.length
@@ -157,7 +182,8 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
     stock: Math.max(0, Math.floor(Number(input.stock ?? 0))),
     enabled: input.enabled !== false,
     sortOrder: Number(input.sortOrder ?? index + 1),
-    description: typeof input.description === "string" && input.description.trim() ? input.description.trim() : null,
+    description,
+    descriptionI18n: cleanI18n(input.descriptionI18n, description || ""),
     rewards,
   };
 }

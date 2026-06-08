@@ -5024,6 +5024,31 @@ function enhancePrototypeMe() {
           swapReward: { en:"Swap reward", fr:"Récompense Swap", de:"Swap-Belohnung", es:"Recompensa Swap", ja:"Swap リワード", "zh-CN":"Swap 积分", "zh-TW":"Swap 積分" },
           earnReward: { en:"Earn reward", fr:"Récompense Earn", de:"Earn-Belohnung", es:"Recompensa Earn", ja:"Earn リワード", "zh-CN":"Earn 积分", "zh-TW":"Earn 積分" },
           taskReward: { en:"Task reward", fr:"Récompense tâche", de:"Aufgaben-Belohnung", es:"Recompensa de tarea", ja:"タスクリワード", "zh-CN":"任务积分", "zh-TW":"任務積分" },
+          productCenter: { en:"Product Center", fr:"Centre produits", de:"Produktcenter", es:"Centro de productos", ja:"商品センター", "zh-CN":"商品中心", "zh-TW":"商品中心" },
+          priorityCard: { en:"Priority member card", fr:"Carte membre prioritaire", de:"Priority-Mitgliedskarte", es:"Tarjeta de miembro prioritario", ja:"優先メンバーカード", "zh-CN":"优先会员卡", "zh-TW":"優先會員卡" },
+          box: { en:"Box", fr:"Box", de:"Box", es:"Caja", ja:"Box", "zh-CN":"盲盒", "zh-TW":"盲盒" },
+          nonRefundable: { en:"Non-refundable", fr:"Non remboursable", de:"Nicht erstattungsfähig", es:"No reembolsable", ja:"返金不可", "zh-CN":"不可退款", "zh-TW":"不可退款" },
+          productDetails: { en:"Product Details", fr:"Détails du produit", de:"Produktdetails", es:"Detalles del producto", ja:"商品詳細", "zh-CN":"商品详情", "zh-TW":"商品詳情" },
+          rewards: { en:"Rewards", fr:"Récompenses", de:"Rewards", es:"Recompensas", ja:"リワード", "zh-CN":"奖励", "zh-TW":"獎勵" },
+          rewardFallback: { en:"Rewards are issued to your Lumina account after redemption.", fr:"Les récompenses sont versées après l'échange.", de:"Rewards werden nach Einlösung gutgeschrieben.", es:"Las recompensas se emiten tras el canje.", ja:"交換後にリワードが付与されます。", "zh-CN":"兑换后奖励会发放到你的 Lumina 账户。", "zh-TW":"兌換後獎勵會發放到你的 Lumina 帳戶。" },
+          chance: { en:"Chance", fr:"Chance", de:"Chance", es:"Probabilidad", ja:"確率", "zh-CN":"抽中概率", "zh-TW":"抽中機率" },
+          buyFirstOpen: { en:"Buy first, then open the mystery box.", fr:"Achetez d'abord, puis ouvrez la box.", de:"Erst kaufen, dann Mystery Box öffnen.", es:"Compra primero y luego abre la caja.", ja:"先に購入してからミステリーボックスを開けます。", "zh-CN":"先购买，然后打开盲盒。", "zh-TW":"先購買，然後打開盲盒。" },
+          redeemWithPoints: { en:"Redeem this reward with Lumina Points.", fr:"Échangez cette récompense avec des Lumina Points.", de:"Diese Reward mit Lumina Points einlösen.", es:"Canjea esta recompensa con Lumina Points.", ja:"Lumina Points でこのリワードを交換。", "zh-CN":"使用 Lumina Points 兑换该奖励。", "zh-TW":"使用 Lumina Points 兌換該獎勵。" },
+          blindBoxDescription: { en:"Use Lumina Points to buy this mystery box. After purchase, open it for a chance to reveal one reward from the prize pool.", fr:"Utilisez Lumina Points pour acheter cette box et révéler une récompense.", de:"Kaufe die Mystery Box mit Lumina Points und enthülle eine Reward.", es:"Usa Lumina Points para comprar esta caja y revelar una recompensa.", ja:"Lumina Points で購入し、賞品プールからリワードを開封します。", "zh-CN":"使用 Lumina Points 购买盲盒，购买后可从奖池中随机开出一个奖励。", "zh-TW":"使用 Lumina Points 購買盲盒，購買後可從獎池中隨機開出一個獎勵。" },
+          productDescription: { en:"Use Lumina Points to redeem this reward. Your coupon will be added after redemption.", fr:"Échangez avec Lumina Points. Le coupon sera ajouté après échange.", de:"Mit Lumina Points einlösen. Der Coupon wird danach hinzugefügt.", es:"Canjea con Lumina Points. Tu cupón se añadirá después.", ja:"Lumina Points で交換後、クーポンが追加されます。", "zh-CN":"使用 Lumina Points 兑换该奖励，兑换后会加入你的券包。", "zh-TW":"使用 Lumina Points 兌換該獎勵，兌換後會加入你的券包。" },
+          buyBox: { en:"BUY BOX", fr:"ACHETER", de:"BOX KAUFEN", es:"COMPRAR CAJA", ja:"BOX購入", "zh-CN":"购买盲盒", "zh-TW":"購買盲盒" },
+          openNow: { en:"OPEN NOW", fr:"OUVRIR", de:"JETZT ÖFFNEN", es:"ABRIR", ja:"今すぐ開封", "zh-CN":"立即开盒", "zh-TW":"立即開盒" },
+          redeemNow: { en:"REDEEM NOW", fr:"ÉCHANGER", de:"EINLÖSEN", es:"CANJEAR", ja:"交換する", "zh-CN":"立即兑换", "zh-TW":"立即兌換" },
+          available: { en:"Available", fr:"Disponible", de:"Verfügbar", es:"Disponible", ja:"利用可能", "zh-CN":"可用", "zh-TW":"可用" },
+          owned: { en:"Owned", fr:"Possédé", de:"Besitzt", es:"Tienes", ja:"保有", "zh-CN":"已拥有", "zh-TW":"已擁有" },
+          insufficientPoints: { en:"Not enough Lumina Points", fr:"Lumina Points insuffisants", de:"Nicht genug Lumina Points", es:"Lumina Points insuficientes", ja:"Lumina Points が不足しています", "zh-CN":"积分不足", "zh-TW":"積分不足" },
+          buyFirst: { en:"Please buy this mystery box first", fr:"Achetez d'abord cette box", de:"Bitte kaufe zuerst diese Mystery Box", es:"Compra primero esta caja", ja:"先にこのミステリーボックスを購入してください", "zh-CN":"请先购买这个盲盒", "zh-TW":"請先購買這個盲盒" },
+          unavailable: { en:"This product is unavailable", fr:"Ce produit est indisponible", de:"Dieses Produkt ist nicht verfügbar", es:"Este producto no está disponible", ja:"この商品は利用できません", "zh-CN":"该商品已下架", "zh-TW":"該商品已下架" },
+          mysteryPurchased: { en:"Mystery box purchased", fr:"Mystery box achetée", de:"Mystery Box gekauft", es:"Caja comprada", ja:"ミステリーボックスを購入しました", "zh-CN":"盲盒购买成功", "zh-TW":"盲盒購買成功" },
+          redeemed: { en:"Redeemed", fr:"Échangé", de:"Eingelöst", es:"Canjeado", ja:"交換済み", "zh-CN":"兑换成功", "zh-TW":"兌換成功" },
+          youGot: { en:"You got", fr:"Vous avez reçu", de:"Du hast erhalten", es:"Has obtenido", ja:"獲得", "zh-CN":"你获得了", "zh-TW":"你獲得了" },
+          done: { en:"Done", fr:"Terminé", de:"Fertig", es:"Listo", ja:"完了", "zh-CN":"完成", "zh-TW":"完成" },
+          noBoxRecords: { en:"No box records yet. Buy or open a mystery box to see it here.", fr:"Aucun historique de box pour le moment.", de:"Noch keine Box-Datensätze.", es:"Aún no hay registros de caja.", ja:"Box履歴はまだありません。", "zh-CN":"暂无盲盒记录，购买或开盒后会显示在这里。", "zh-TW":"暫無盲盒記錄，購買或開盒後會顯示在這裡。" },
           mediaCenter: { en:"Media Center", fr:"Centre média", de:"Medienzentrum", es:"Centro multimedia", ja:"メディアセンター", "zh-CN":"媒体中心", "zh-TW":"媒體中心" },
           mediaHint: { en:"Follow Lumina official channels.", fr:"Suivez les canaux officiels Lumina.", de:"Folgen Sie den offiziellen Lumina-Kanälen.", es:"Sigue los canales oficiales de Lumina.", ja:"Lumina 公式チャンネルをフォロー。", "zh-CN":"查看 Lumina 官方媒体链接。", "zh-TW":"查看 Lumina 官方媒體連結。" },
           noMedia: { en:"No media links configured yet.", fr:"Aucun lien média configuré.", de:"Noch keine Medienlinks konfiguriert.", es:"Aún no hay enlaces configurados.", ja:"メディアリンクは未設定です。", "zh-CN":"后台还没有配置媒体链接。", "zh-TW":"後台還沒有配置媒體連結。" },
@@ -5432,12 +5457,31 @@ function enhancePrototypeMe() {
         modal.onclick = function(event){ if(event.target && event.target.getAttribute && event.target.getAttribute("data-points-close") === "1") modal.remove(); };
         function escapeAttr(text){ return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; }); }
         function categoryLabel(key){
-          var map = { all:"All", shop:"Shop", travel:"Travel", fitness:"Fitness", dining:"Dining", cash:"Cash" };
-          return map[key] || key.charAt(0).toUpperCase() + key.slice(1);
+          var lang = window.currentLang || "en";
+          var map = {
+            all:{ en:"All", "zh-CN":"全部", "zh-TW":"全部" },
+            shop:{ en:"Shop", "zh-CN":"商城", "zh-TW":"商城" },
+            travel:{ en:"Travel", "zh-CN":"旅行", "zh-TW":"旅行" },
+            fitness:{ en:"Fitness", "zh-CN":"健身", "zh-TW":"健身" },
+            dining:{ en:"Dining", "zh-CN":"餐饮", "zh-TW":"餐飲" },
+            cash:{ en:"Cash", "zh-CN":"现金", "zh-TW":"現金" }
+          };
+          return (map[key] && (map[key][lang] || map[key].en)) || key.charAt(0).toUpperCase() + key.slice(1);
         }
         function countryLabel(key){
-          var map = { global:"Global", us:"United States", cn:"China", jp:"Japan", kr:"Korea", sg:"Singapore", hk:"Hong Kong", eu:"Europe", ae:"UAE" };
-          return map[key] || key.toUpperCase();
+          var lang = window.currentLang || "en";
+          var map = {
+            global:{ en:"Global", "zh-CN":"全球", "zh-TW":"全球" },
+            us:{ en:"United States", "zh-CN":"美国", "zh-TW":"美國" },
+            cn:{ en:"China", "zh-CN":"中国", "zh-TW":"中國" },
+            jp:{ en:"Japan", "zh-CN":"日本", "zh-TW":"日本" },
+            kr:{ en:"Korea", "zh-CN":"韩国", "zh-TW":"韓國" },
+            sg:{ en:"Singapore", "zh-CN":"新加坡", "zh-TW":"新加坡" },
+            hk:{ en:"Hong Kong", "zh-CN":"香港", "zh-TW":"香港" },
+            eu:{ en:"Europe", "zh-CN":"欧洲", "zh-TW":"歐洲" },
+            ae:{ en:"UAE", "zh-CN":"阿联酋", "zh-TW":"阿聯酋" }
+          };
+          return (map[key] && (map[key][lang] || map[key].en)) || key.toUpperCase();
         }
         function productCountries(product){
           return Array.isArray(product.countries) && product.countries.length ? product.countries.map(function(x){ return String(x || "").toLowerCase(); }) : ["global"];
@@ -5462,7 +5506,7 @@ function enhancePrototypeMe() {
           [meBadge, centerBadge, shopBadge].forEach(function(el){ if (el) el.textContent = Number(window.__luminaPoints || 0).toLocaleString(); });
         }
         function luminaMark(extra){
-          return '<span class="lumina-mark ' + (extra || "") + '" aria-hidden="true"><i></i></span>';
+          return '<span class="lumina-mark ' + (extra || "") + '" aria-hidden="true"><img src="/points/lumina-points-icon.png" alt="" /></span>';
         }
         function pointsSystemConfig(){
           try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
@@ -5472,6 +5516,8 @@ function enhancePrototypeMe() {
           map = map || {};
           return map[lang] || map.en || fallback || "";
         }
+        function productTitle(product){ return i18nText(product.titleI18n, product.title || "Lumina Reward"); }
+        function productDescription(product, fallback){ return i18nText(product.descriptionI18n, product.description || fallback || ""); }
         function userScopedKey(prefix, id){ return prefix + "_" + String(window.__luminaUserAddress || "guest").toLowerCase() + "_" + String(id || ""); }
         function todayKey(){ return new Date().toISOString().slice(0, 10); }
         var dailyTaskIds = ["open-world-app", "make-swap", "make-earn"];
@@ -5624,8 +5670,9 @@ function enhancePrototypeMe() {
         window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
+          var copy = meCopy();
           var count = purchasedCount(product.id);
-          if (count <= 0) { toast("Please buy this mystery box first"); return; }
+          if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); return; }
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
           var won = rewards[0];
           try {
@@ -5659,30 +5706,37 @@ function enhancePrototypeMe() {
           box.id = "blindBoxModal";
           box.className = "blind-box-modal open";
           box.onclick = function(event){ if (event.target === box) box.remove(); };
-          box.innerHTML = '<div class="blind-box-stage"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result"><small>You got</small><strong>' + escapeAttr(won.name || "Lumina reward") + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">Done</button></div></div>';
+          box.innerHTML = '<div class="blind-box-stage"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result"><small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(i18nText(won.nameI18n, won.name || "Lumina reward")) + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button></div></div>';
           document.body.appendChild(box);
-          addPointsCoupon({ title: won.name || "Lumina reward", value: won.value || "", source: product.title });
+          addPointsCoupon({ title: i18nText(won.nameI18n, won.name || "Lumina reward"), value: won.value || "", source: productTitle(product) });
           renderProductDetail(product.id);
         };
-        function productArt(product){
-          if (product.imageUrl) return '<img src="' + escapeAttr(product.imageUrl) + '" alt="" />';
+        function productArt(product, mode){
+          var image = mode === "detail" ? (product.detailImageUrl || product.imageUrl) : product.imageUrl;
+          if (image) return '<img src="' + escapeAttr(image) + '" alt="" />';
           if (product.type === "blind_box") return '<div class="mystery-art"><span>?</span><b>Lumina Mystery Box</b></div>';
           var text = escapeAttr(product.imageText || product.title || "Lumina");
           return '<span>' + text + '</span>';
         }
         function rewardDetails(product){
           var rewards = Array.isArray(product.rewards) ? product.rewards.filter(function(item){ return item && item.name; }) : [];
-          if (!rewards.length) return '<li>Rewards are issued to your Lumina account after redemption.</li>';
+          var copy = meCopy();
+          if (!rewards.length) return '<li>' + escapeAttr(copy.rewardFallback || "Rewards are issued to your Lumina account after redemption.") + '</li>';
+          var total = rewards.reduce(function(sum,item){ return sum + Math.max(0, Number(item.odds || 0)); }, 0) || 1;
           return rewards.map(function(item){
-            return '<li>' + escapeAttr(item.name) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
+            var pct = Math.max(0, Number(item.odds || 0)) / total * 100;
+            var pctText = pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct < 1 ? 2 : 1).replace(/\\.0$/, "") + "%";
+            var title = i18nText(item.nameI18n, item.name || "Reward");
+            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '<em>' + escapeAttr(copy.chance || "Chance") + ': ' + pctText + '</em></li>';
           }).join("");
         }
         async function buyProduct(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
-          if (product.enabled === false) { toast("This product is unavailable"); return; }
+          var copy = meCopy();
+          if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
-          if (Number(window.__luminaPoints || 0) < cost) { toast("Not enough Lumina Points"); return; }
+          if (Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             var res = await fetch("/api/points-products/purchase", {
@@ -5702,27 +5756,29 @@ function enhancePrototypeMe() {
           updatePointsBalance(Number(window.__luminaPoints || 0) - cost);
           addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
           if (product.type !== "blind_box") addPointsCoupon({ title:product.title, value:product.imageText || "", source:"Product Center" });
-          toast(product.type === "blind_box" ? "Mystery box purchased" : "Redeemed");
+          toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
           renderProductDetail(product.id);
         }
-        function renderProductDetail(productId){
+        function renderProductDetail(productId, errorText){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product || !modal) return;
+          var copy = meCopy();
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
           var isBlind = product.type === "blind_box";
           var owned = purchasedCount(product.id);
           var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
-          var actionText = isBlind && owned > 0 ? "OPEN NOW" : (isBlind ? "BUY BOX" : "REDEEM NOW");
-          var subtitle = isBlind ? "Buy first, then open the mystery box." : "Redeem this reward with Lumina Points.";
-          var description = product.description || (isBlind ? "Use Lumina Points to buy this mystery box. After purchase, open it for a chance to reveal one reward from the prize pool." : "Use Lumina Points to redeem this reward. Your coupon will be added after redemption.");
+          var actionText = isBlind && owned > 0 ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
+          var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
+          var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
+          var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
           modal.innerHTML =
             '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
-            '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product) + '</div>' +
-            '<div class="points-detail-title">' + luminaMark("lg") + '<div><h2>' + escapeAttr(product.title) + '</h2><p>' + subtitle + '</p></div></div>' +
-            '<span class="points-policy">Non-refundable</span>' +
-            '<section class="points-detail-section"><h3>Product Details</h3><p>' + escapeAttr(description) + '</p></section>' +
-            '<section class="points-detail-section"><h3>Rewards</h3><ul>' + rewardDetails(product) + '</ul></section>' +
-            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>Available: <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · Owned: ' + owned : '') + '</small></div><button type="button" onclick="' + action + '">' + actionText + '</button></div>';
+            '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product, "detail") + '</div>' +
+            '<div class="points-detail-title"><div><h2>' + escapeAttr(productTitle(product)) + '</h2><p>' + subtitle + '</p></div></div>' +
+            '<span class="points-policy">' + escapeAttr(copy.nonRefundable || "Non-refundable") + '</span>' +
+            '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
+            '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
+            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + error + '</div><button type="button" onclick="' + action + '">' + escapeAttr(actionText) + '</button></div>';
         }
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
@@ -5745,6 +5801,7 @@ function enhancePrototypeMe() {
           document.body.appendChild(sheet);
         };
         window.__luminaOpenCoupons = function(){
+          var copy = meCopy();
           var serverRows = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).map(function(order){
             var reward = order.reward || {};
             var title = order.status === "opened" ? (reward.name || "Opened mystery box") : "Unopened mystery box";
@@ -5758,7 +5815,7 @@ function enhancePrototypeMe() {
           sheet.id = "pointsCouponsSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsCouponsSheet\\').remove()">×</button><h3>Box</h3>' + (rows || '<p class="points-empty">No box records yet. Buy or open a mystery box to see it here.</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsCouponsSheet\\').remove()">×</button><h3>' + escapeAttr(copy.box || "Box") + '</h3>' + (rows || '<p class="points-empty">' + escapeAttr(copy.noBoxRecords || "No box records yet. Buy or open a mystery box to see it here.") + '</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         function renderProducts(products, active){
@@ -5771,7 +5828,7 @@ function enhancePrototypeMe() {
             var badgeText = product.badge || (product.type === "blind_box" ? "Blind Box" : "");
             var badge = badgeText ? '<em>' + escapeAttr(badgeText) + '</em>' : "";
             var action = "window.__luminaOpenPointsProduct('" + escapeAttr(product.id) + "')";
-            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(product.title) + '</strong><div class="points-product-cost">' + luminaMark("sm") + '<b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div></div></button>';
+            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div class="points-product-cost">' + luminaMark("sm") + '<b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div></div></button>';
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
@@ -5783,8 +5840,8 @@ function enhancePrototypeMe() {
           var selectedRegion = window.__luminaPointsRegion || "global";
           modal.innerHTML =
             '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><span></span></div>' +
-            '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>Priority member card</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>Box</span><b>' + ((window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).length + pointsCoupons().length) + '</b></button></div>' +
-            '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><label class="points-region"><span>◎</span><select id="pointsRegionSelect">' + countries.map(function(key){ return '<option value="' + key + '"' + (key === selectedRegion ? " selected" : "") + '>' + countryLabel(key) + '</option>'; }).join("") + '</select></label></div><div class="points-tabs">' +
+            '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>' + escapeAttr(c.priorityCard || "Priority member card") + '</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>' + escapeAttr(c.box || "Box") + '</span><b>' + ((window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).length + pointsCoupons().length) + '</b></button></div>' +
+            '<div class="points-shop-panel"><div class="points-shop-title"><h2>' + escapeAttr(c.productCenter || "Product Center") + '</h2><label class="points-region"><span>◎</span><select id="pointsRegionSelect">' + countries.map(function(key){ return '<option value="' + key + '"' + (key === selectedRegion ? " selected" : "") + '>' + countryLabel(key) + '</option>'; }).join("") + '</select></label></div><div class="points-tabs">' +
             categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
             '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
           renderProducts(products, "all");
