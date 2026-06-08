@@ -2739,9 +2739,25 @@ function enhancePrototypeHome() {
         function setAnimatedHomeBalance(value, immediate){
           var balEl = document.getElementById("balAmt");
           if (!balEl || typeof formatMoney !== "function") return;
+          function fitHomeBalance(){
+            var row = balEl.querySelector(".balance-flip-row");
+            if (!row) return;
+            row.style.transform = "";
+            if (!balEl.clientWidth) return;
+            window.requestAnimationFrame(function(){
+              var nextRow = balEl.querySelector(".balance-flip-row");
+              if (!nextRow || !balEl.clientWidth) return;
+              nextRow.style.transform = "";
+              var width = nextRow.scrollWidth || nextRow.getBoundingClientRect().width || 0;
+              if (!width) return;
+              var scale = Math.min(1, Math.max(0.68, (balEl.clientWidth - 2) / width));
+              nextRow.style.transform = scale < 1 ? "scale(" + scale.toFixed(3) + ")" : "";
+            });
+          }
           if (typeof hidden !== "undefined" && hidden) {
             balEl.textContent = "••••••";
             balEl.removeAttribute("data-balance-value");
+            balEl.style.removeProperty("--balance-scale");
             return;
           }
           var nextValue = Number(value);
@@ -2761,6 +2777,7 @@ function enhancePrototypeHome() {
           function renderStaticBalance(text){
             balEl.classList.remove("digits-flipping");
             balEl.innerHTML = '<span class="balance-flip-row">' + staticBalanceHtml(text) + '</span>';
+            fitHomeBalance();
           }
           balEl.setAttribute("data-balance-value", String(Number.isFinite(nextValue) ? nextValue : 0));
           balEl.setAttribute("data-balance-text", nextText);
@@ -2785,15 +2802,25 @@ function enhancePrototypeHome() {
           }).join("");
           balEl.classList.remove("digits-flipping");
           balEl.innerHTML = '<span class="balance-flip-row">' + html + '</span>';
+          fitHomeBalance();
           window.clearTimeout(window.__luminaBalanceRollTimer);
           window.__luminaBalanceRollTimer = window.setTimeout(function(){
             renderStaticBalance(nextText);
           }, 980);
           window.requestAnimationFrame(function(){
             balEl.classList.add("digits-flipping");
+            fitHomeBalance();
           });
         }
         window.__luminaSetAnimatedHomeBalance = setAnimatedHomeBalance;
+        if (!window.__luminaBalanceResizeFit) {
+          window.__luminaBalanceResizeFit = true;
+          window.addEventListener("resize", function(){
+            if (typeof window.__luminaSetAnimatedHomeBalance === "function" && typeof totalUsdNum !== "undefined") {
+              window.__luminaSetAnimatedHomeBalance(totalUsdNum, true);
+            }
+          });
+        }
         window.__luminaApplyBalancePrivacy = function(){
           var isHidden = typeof hidden !== "undefined" && !!hidden;
           var balEl = document.getElementById("balAmt");

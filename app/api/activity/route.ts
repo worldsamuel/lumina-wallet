@@ -13,6 +13,7 @@ const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
+const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
 const activityTokenAddresses = Array.from(
   new Set(
     [
@@ -21,6 +22,40 @@ const activityTokenAddresses = Array.from(
     ].map((address) => address.toLowerCase()),
   ),
 ) as Address[];
+
+type ActivityTransferRow = {
+  hash: `0x${string}`;
+  type: "in" | "out";
+  title: string;
+  subtitle: string;
+  amount: string;
+  tokenText: string;
+  tokenAmount: number;
+  direction: "in" | "out";
+  status: string;
+  createdAt: string;
+  blockNumber: number;
+  logIndex: number;
+};
+
+type AlchemyAssetTransfer = {
+  blockNum?: string;
+  uniqueId?: string;
+  hash?: string;
+  from?: string;
+  to?: string;
+  value?: number | string | null;
+  asset?: string | null;
+  category?: string;
+  rawContract?: {
+    value?: string | null;
+    address?: string | null;
+    decimal?: string | number | null;
+  };
+  metadata?: {
+    blockTimestamp?: string;
+  };
+};
 
 export function OPTIONS() {
   return optionsResponse();
@@ -35,6 +70,36 @@ function formatTokenAmount(value: bigint, decimals: number) {
   const [whole, fraction = ""] = raw.split(".");
   const trimmed = fraction.slice(0, 3).replace(/0+$/, "");
   return trimmed ? `${whole}.${trimmed}` : whole;
+}
+
+function formatTransferNumber(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return "0";
+  if (value > 0 && value < 0.001) return "<0.001";
+  const formatted = value.toLocaleString(undefined, { maximumFractionDigits: value >= 1000 ? 2 : 6 });
+  return formatted.includes(".") ? formatted.replace(/\.?0+$/, "") : formatted;
+}
+
+function parseHexNumber(value: string | undefined) {
+  if (!value) return 0;
+  try {
+    if (value.startsWith("0x")) return Number(BigInt(value));
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function parseAlchemyDecimals(value: string | number | null | undefined) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 18;
+  if (!value) return 18;
+  try {
+    if (value.startsWith("0x")) return Number(BigInt(value));
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 18;
+  } catch {
+    return 18;
+  }
 }
 
 function isValidActivityHash(value: string) {
@@ -126,6 +191,111 @@ async function getTransferLogsForAddress(address: Address, latest: bigint, direc
   return logs;
 }
 
+async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Promise<ActivityTransferRow[]> {
+  const minBlock = latest > activityLookbackBlocks ? latest - activityLookbackBlocks : 0n;
+  const lower = address.toLowerCase();
+  const rows: ActivityTransferRow[] = [];
+
+  async function fetchDirection(direction: "in" | "out") {
+    let pageKey: string | undefined;
+    let pages = 0;
+    do {
+      const params: Record<string, unknown> = {
+        fromBlock: `0x${minBlock.toString(16)}`,
+        toBlock: "latest",
+        category: ["external", "erc20"],
+        withMetadata: true,
+        excludeZeroValue: true,
+        maxCount: "0x64",
+        order: "desc",
+      };
+      if (direction === "in") params.toAddress = address;
+      else params.fromAddress = address;
+      if (pageKey) params.pageKey = pageKey;
+
+      const response = await fetch(worldChainAlchemyRpc, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: `activity-${direction}-${pages}`,
+          method: "alchemy_getAssetTransfers",
+          params: [params],
+        }),
+        next: { revalidate: 0 },
+      });
+      if (!response.ok) throw new Error(`Alchemy activity request failed: ${response.status}`);
+      const payload = (await response.json()) as {
+        result?: { transfers?: AlchemyAssetTransfer[]; pageKey?: string };
+        error?: { message?: string };
+      };
+      if (payload.error) throw new Error(payload.error.message || "Alchemy activity request failed");
+
+      for (const transfer of payload.result?.transfers ?? []) {
+        const hash = String(transfer.hash || "");
+        if (!/^0x[a-fA-F0-9]{16,}$/.test(hash)) continue;
+        const from = String(transfer.from || "");
+        const to = String(transfer.to || "");
+        const incomingTx = to.toLowerCase() === lower;
+        const outgoingTx = from.toLowerCase() === lower;
+        if (!incomingTx && !outgoingTx) continue;
+
+        const tokenAddress = transfer.rawContract?.address && isAddress(transfer.rawContract.address)
+          ? transfer.rawContract.address as Address
+          : null;
+        const configuredMeta = tokenAddress ? await getTokenMeta(tokenAddress) : null;
+        const symbol = String(configuredMeta?.symbol || transfer.asset || (transfer.category === "external" ? "ETH" : "TOKEN")).slice(0, 12);
+        const decimals = configuredMeta?.decimals ?? parseAlchemyDecimals(transfer.rawContract?.decimal);
+        let tokenText = "";
+        let tokenAmount = 0;
+        const rawValue = transfer.rawContract?.value;
+        if (rawValue && /^0x[0-9a-fA-F]+$/.test(rawValue)) {
+          const value = BigInt(rawValue);
+          tokenAmount = Number(formatUnits(value, decimals));
+          tokenText = `${formatTokenAmount(value, decimals)} ${symbol}`;
+        } else {
+          tokenAmount = Number(transfer.value || 0);
+          tokenText = `${formatTransferNumber(tokenAmount)} ${symbol}`;
+        }
+        if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) continue;
+
+        const rowDirection: "in" | "out" = incomingTx ? "in" : "out";
+        const blockNumber = parseHexNumber(transfer.blockNum);
+        rows.push({
+          hash: hash as `0x${string}`,
+          type: rowDirection,
+          title: incomingTx ? `Received ${symbol}` : `Sent ${symbol}`,
+          subtitle: incomingTx ? `From ${shortAddress(from)}` : `To ${shortAddress(to)}`,
+          amount: `${incomingTx ? "+" : "-"}${tokenText}`,
+          tokenText,
+          tokenAmount,
+          direction: rowDirection,
+          status: "Completed",
+          createdAt: transfer.metadata?.blockTimestamp || new Date().toISOString(),
+          blockNumber,
+          logIndex: parseHexNumber(transfer.uniqueId?.split(":").pop()),
+        });
+      }
+
+      pageKey = payload.result?.pageKey;
+      pages += 1;
+    } while (pageKey && pages < 3);
+  }
+
+  await Promise.all([fetchDirection("in"), fetchDirection("out")]);
+  return rows;
+}
+
+function dedupeTransferRows(rows: ActivityTransferRow[]) {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.hash}-${row.direction}-${row.tokenText}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:activity", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
@@ -155,12 +325,16 @@ export async function GET(req: NextRequest) {
   try {
     const latest = await publicClient.getBlockNumber();
     const lower = address.toLowerCase();
-    const [incoming, outgoing] = await Promise.all([
+    const [incoming, outgoing, indexedTransfers] = await Promise.all([
       getTransferLogsForAddress(address as Address, latest, "in"),
       getTransferLogsForAddress(address as Address, latest, "out"),
+      fetchAlchemyAssetTransfers(address as Address, latest).catch((error) => {
+        console.error("Failed to fetch indexed activity transfers", { address, error });
+        return [] as ActivityTransferRow[];
+      }),
     ]);
     const seen = new Set<string>();
-    const logs = await Promise.all(
+    const logs: ActivityTransferRow[] = await Promise.all(
       [...incoming, ...outgoing]
         .filter((log) => {
           const value = log.args.value ?? 0n;
@@ -189,12 +363,12 @@ export async function GET(req: NextRequest) {
             status: "Completed",
             createdAt,
             blockNumber: Number(log.blockNumber),
-            logIndex: log.logIndex,
+            logIndex: Number(log.logIndex),
           };
         }),
     );
 
-    const merged = mergeSwapActivity(logs);
+    const merged = mergeSwapActivity(dedupeTransferRows([...logs, ...indexedTransfers]));
     const allRows = [...storedRows, ...merged];
     allRows.sort((a, b) => {
       const at = "createdAt" in a ? new Date(String(a.createdAt)).getTime() : 0;
