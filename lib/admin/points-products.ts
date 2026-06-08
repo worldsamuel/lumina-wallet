@@ -326,6 +326,24 @@ export async function awardRulePoints(input: { address: string; kind: PointsRule
   return { row, points: award.points, skipped: false, multiplier: award.multiplier, reasons: award.reasons };
 }
 
+export async function awardFixedPoints(input: { address: string; points: number; note: string; uniqueKey: string; createdBy?: string | null }) {
+  const address = String(input.address || "").toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
+  const points = Math.max(0, Math.floor(Number(input.points || 0)));
+  if (points <= 0) return { row: null, points: 0, skipped: true };
+  const existing = await getPointsAdjustments(address);
+  if (existing.some((row) => row.createdBy === input.uniqueKey)) {
+    return { row: null, points: 0, skipped: true };
+  }
+  const row = await addPointsAdjustment({
+    address,
+    points,
+    note: input.note,
+    createdBy: input.uniqueKey || input.createdBy || "points-task",
+  });
+  return { row, points, skipped: false };
+}
+
 function pickBlindReward(product: PointsProductConfig) {
   const rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name: "Lumina reward", value: null, odds: 1 }];
   const total = rewards.reduce((sum, item) => sum + Math.max(0, Number(item.odds || 0)), 0) || rewards.length;
