@@ -5481,13 +5481,11 @@ function enhancePrototypeMe() {
         function profileAdjustments(){ return ((window.__luminaPointsProfile || {}).adjustments || []); }
         function adjustmentDone(key){ return profileAdjustments().some(function(row){ return row && row.createdBy === key; }); }
         function taskDone(id){
-          if (adjustmentDone("points-task:" + id)) return true;
-          try { return localStorage.getItem(completedTaskKey(id)) === "1"; } catch(e) { return false; }
+          return adjustmentDone("points-task:" + id);
         }
         function taskVisited(id){ try { return localStorage.getItem(visitedTaskKey(id)) === "1"; } catch(e) { return false; } }
         function checkinDone(){
-          if (adjustmentDone("points-task:daily-checkin:" + todayKey())) return true;
-          try { return localStorage.getItem(checkinKey()) === "1"; } catch(e) { return false; }
+          return adjustmentDone("points-task:daily-checkin:" + todayKey());
         }
         function readCheckinStreak(){
           var days = profileAdjustments().map(function(row){
