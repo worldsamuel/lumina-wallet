@@ -2,12 +2,11 @@ import { NextRequest } from "next/server";
 import { isAddress } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getSystemConfig } from "@/lib/admin/system-config";
+import { checkinRewardForDay, getSystemConfig } from "@/lib/admin/system-config";
 import { awardFixedPoints, getPointsAdjustments, getPointsOrders } from "@/lib/admin/points-products";
 import { getStoredActivities } from "@/lib/admin/activity-store";
 import { db } from "@/lib/db";
 
-const checkinRewards = [10, 15, 20, 25, 30, 40, 100];
 const dailyTaskIds = new Set(["open-world-app", "make-swap", "make-earn"]);
 
 export function OPTIONS() {
@@ -119,7 +118,7 @@ export async function POST(req: NextRequest) {
     if (!validation.ok) return jsonResponse({ error: validation.reason || "Task is not complete yet." }, { status: 400 });
 
     const checkinDay = isCheckin ? nextCheckinDay(adjustments, today) : null;
-    const points = isCheckin ? checkinRewards[(checkinDay || 1) - 1] : task.points;
+    const points = isCheckin ? checkinRewardForDay(config, checkinDay || 1) : task.points;
     const note = isCheckin ? "Daily check-in" : i18nText(task.titleI18n, "Task reward");
     const result = await awardFixedPoints({
       address,

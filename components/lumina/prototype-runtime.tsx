@@ -5464,7 +5464,7 @@ function enhancePrototypeMe() {
             travel:{ en:"Travel", "zh-CN":"旅行", "zh-TW":"旅行" },
             fitness:{ en:"Fitness", "zh-CN":"健身", "zh-TW":"健身" },
             dining:{ en:"Dining", "zh-CN":"餐饮", "zh-TW":"餐飲" },
-            cash:{ en:"Cash", "zh-CN":"现金", "zh-TW":"現金" }
+            cash:{ en:"Coin", "zh-CN":"Coin", "zh-TW":"Coin" }
           };
           return (map[key] && (map[key][lang] || map[key].en)) || key.charAt(0).toUpperCase() + key.slice(1);
         }
@@ -5518,6 +5518,14 @@ function enhancePrototypeMe() {
         }
         function productTitle(product){ return i18nText(product.titleI18n, product.title || "Lumina Reward"); }
         function productDescription(product, fallback){ return i18nText(product.descriptionI18n, product.description || fallback || ""); }
+        function checkinRewards(){
+          var cfg = pointsSystemConfig();
+          var rewards = cfg && cfg.pointsRules && Array.isArray(cfg.pointsRules.checkinRewards) ? cfg.pointsRules.checkinRewards : [];
+          rewards = rewards.map(function(item){ return Math.max(0, Math.floor(Number(item || 0))); }).slice(0, 7);
+          var fallback = [10, 15, 20, 25, 30, 40, 100];
+          while (rewards.length < 7) rewards.push(fallback[rewards.length]);
+          return rewards;
+        }
         function userScopedKey(prefix, id){ return prefix + "_" + String(window.__luminaUserAddress || "guest").toLowerCase() + "_" + String(id || ""); }
         function todayKey(){ return new Date().toISOString().slice(0, 10); }
         var dailyTaskIds = ["open-world-app", "make-swap", "make-earn"];
@@ -5637,7 +5645,7 @@ function enhancePrototypeMe() {
           var copy = meCopy();
           var streak = readCheckinStreak();
           var doneToday = checkinDone();
-          var rewards = [10, 15, 20, 25, 30, 40, 100];
+          var rewards = checkinRewards();
           var dayCards = rewards.map(function(points, index){
             var day = index + 1;
             var active = doneToday ? day === streak : day === ((streak % 7) + 1);

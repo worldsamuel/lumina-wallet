@@ -35,6 +35,7 @@ export type CustomPointsRule = {
 export type PointsRulesConfig = {
   enabled: boolean;
   checkinPoints: number;
+  checkinRewards: number[];
   swapPoints: number;
   swapPointsPerUsd: number;
   swapDailyUsdCap: number;
@@ -80,6 +81,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   pointsRules: {
     enabled: true,
     checkinPoints: 5,
+    checkinRewards: [10, 15, 20, 25, 30, 40, 100],
     swapPoints: 10,
     swapPointsPerUsd: 1,
     swapDailyUsdCap: 1000,
@@ -242,9 +244,15 @@ function normalizeWelcomeBox(value: unknown): SystemConfig["welcomeBox"] {
 
 function normalizePointsRules(value: unknown): PointsRulesConfig {
   const source = typeof value === "object" && value !== null ? value as Partial<PointsRulesConfig> : {};
+  const fallbackCheckinRewards = DEFAULT_SYSTEM_CONFIG.pointsRules.checkinRewards;
+  const checkinRewards = Array.isArray(source.checkinRewards)
+    ? source.checkinRewards.map((item) => Math.max(0, Math.floor(Number(item || 0)))).slice(0, 7)
+    : [];
+  while (checkinRewards.length < 7) checkinRewards.push(fallbackCheckinRewards[checkinRewards.length] ?? 0);
   return {
     enabled: typeof source.enabled === "boolean" ? source.enabled : DEFAULT_SYSTEM_CONFIG.pointsRules.enabled,
     checkinPoints: Math.max(0, Math.floor(Number(source.checkinPoints ?? DEFAULT_SYSTEM_CONFIG.pointsRules.checkinPoints))),
+    checkinRewards,
     swapPoints: Math.max(0, Math.floor(Number(source.swapPoints ?? DEFAULT_SYSTEM_CONFIG.pointsRules.swapPoints))),
     swapPointsPerUsd: Math.max(0, Number(source.swapPointsPerUsd ?? DEFAULT_SYSTEM_CONFIG.pointsRules.swapPointsPerUsd)),
     swapDailyUsdCap: Math.max(0, Number(source.swapDailyUsdCap ?? DEFAULT_SYSTEM_CONFIG.pointsRules.swapDailyUsdCap)),
@@ -324,6 +332,14 @@ export function pointsRuleBase(kind: PointsRuleKind, config: SystemConfig) {
   const custom = config.pointsRules.customRules.find((rule) => rule.id === kind && rule.enabled);
   if (custom) return custom.points;
   return 0;
+}
+
+export function checkinRewardForDay(config: SystemConfig, day: number) {
+  const rewards = Array.isArray(config.pointsRules.checkinRewards) && config.pointsRules.checkinRewards.length
+    ? config.pointsRules.checkinRewards
+    : DEFAULT_SYSTEM_CONFIG.pointsRules.checkinRewards;
+  const index = Math.max(0, Math.min(6, Math.floor(Number(day || 1)) - 1));
+  return Math.max(0, Math.floor(Number(rewards[index] ?? rewards[0] ?? config.pointsRules.checkinPoints ?? 0)));
 }
 
 export function calculateUsdRulePoints(kind: "swap" | "earn", usdValue: number, config: SystemConfig, date = new Date()) {
