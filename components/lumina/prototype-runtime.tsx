@@ -1899,6 +1899,15 @@ function enhancePrototypeSystemConfig() {
         document.body.appendChild(overlay);
       };
       window.__luminaApplySystemConfig();
+      fetch("/api/system-config", { cache:"no-store" })
+        .then(function(res){ return res.ok ? res.json() : null; })
+        .then(function(cfg){
+          if (!cfg) return;
+          try { localStorage.setItem("ww_system_config", JSON.stringify(cfg)); } catch(e) {}
+          window.__luminaApplySystemConfig();
+          if (typeof window.__luminaApplySwapSystemConfig === "function") window.__luminaApplySwapSystemConfig();
+        })
+        .catch(function(){});
     })();
   `;
   runInPrototypeScope(source, "Failed to apply system config");
@@ -4999,6 +5008,22 @@ function enhancePrototypeMe() {
           pointsHistory: { en:"Points history", fr:"Historique des points", de:"Punkteverlauf", es:"Historial de puntos", ja:"ポイント履歴", "zh-CN":"积分记录", "zh-TW":"積分記錄" },
           tradeLabel: { en:"Trade", fr:"Transaction", de:"Transaktion", es:"Operación", ja:"取引", "zh-CN":"交易", "zh-TW":"交易" },
           noPoints: { en:"Rewards are loading.", fr:"Chargement des récompenses.", de:"Rewards werden geladen.", es:"Cargando recompensas.", ja:"リワードを読み込み中。", "zh-CN":"Rewards are loading.", "zh-TW":"Rewards are loading." },
+          taskCenter: { en:"Task Center", fr:"Centre des tâches", de:"Aufgabencenter", es:"Centro de tareas", ja:"タスクセンター", "zh-CN":"任务中心", "zh-TW":"任務中心" },
+          dailyCheckin: { en:"Daily Check-in", fr:"Check-in quotidien", de:"Täglicher Check-in", es:"Registro diario", ja:"デイリーチェックイン", "zh-CN":"每日签到", "zh-TW":"每日簽到" },
+          checkinHint: { en:"Check in daily to earn more points", fr:"Connectez-vous chaque jour pour gagner plus de points", de:"Täglich einchecken und mehr Punkte sammeln", es:"Regístrate a diario para ganar más puntos", ja:"毎日チェックインしてポイントを獲得", "zh-CN":"每日签到获得更多积分", "zh-TW":"每日簽到獲得更多積分" },
+          checkinCalendar: { en:"Check-in Calendar", fr:"Calendrier", de:"Check-in Kalender", es:"Calendario", ja:"チェックインカレンダー", "zh-CN":"签到日历", "zh-TW":"簽到日曆" },
+          checkIn: { en:"Check In", fr:"Check-in", de:"Einchecken", es:"Check-in", ja:"チェックイン", "zh-CN":"签到", "zh-TW":"簽到" },
+          today: { en:"Today", fr:"Aujourd'hui", de:"Heute", es:"Hoy", ja:"今日", "zh-CN":"今天", "zh-TW":"今天" },
+          dailyTasks: { en:"Daily Tasks", fr:"Tâches quotidiennes", de:"Tägliche Aufgaben", es:"Tareas diarias", ja:"デイリータスク", "zh-CN":"每日任务", "zh-TW":"每日任務" },
+          moreTasks: { en:"More Tasks", fr:"Plus de tâches", de:"Weitere Aufgaben", es:"Más tareas", ja:"その他のタスク", "zh-CN":"更多任务", "zh-TW":"更多任務" },
+          refreshDaily: { en:"Refreshes daily at 00:00 (UTC+8)", fr:"Actualisé chaque jour à 00:00 (UTC+8)", de:"Aktualisiert täglich um 00:00 (UTC+8)", es:"Se actualiza a diario a las 00:00 (UTC+8)", ja:"毎日 00:00 (UTC+8) に更新", "zh-CN":"每日 00:00（UTC+8）刷新", "zh-TW":"每日 00:00（UTC+8）刷新" },
+          comingSoon: { en:"More tasks coming soon. Stay tuned!", fr:"D'autres tâches arrivent bientôt.", de:"Weitere Aufgaben folgen bald.", es:"Más tareas próximamente.", ja:"新しいタスクを準備中です。", "zh-CN":"更多任务即将上线，敬请期待！", "zh-TW":"更多任務即將上線，敬請期待！" },
+          go: { en:"Go", fr:"Go", de:"Los", es:"Ir", ja:"Go", "zh-CN":"去完成", "zh-TW":"去完成" },
+          completed: { en:"Completed", fr:"Terminé", de:"Erledigt", es:"Completado", ja:"完了", "zh-CN":"已完成", "zh-TW":"已完成" },
+          claim: { en:"Claim", fr:"Réclamer", de:"Abholen", es:"Reclamar", ja:"受け取る", "zh-CN":"领取", "zh-TW":"領取" },
+          swapReward: { en:"Swap reward", fr:"Récompense Swap", de:"Swap-Belohnung", es:"Recompensa Swap", ja:"Swap リワード", "zh-CN":"Swap 积分", "zh-TW":"Swap 積分" },
+          earnReward: { en:"Earn reward", fr:"Récompense Earn", de:"Earn-Belohnung", es:"Recompensa Earn", ja:"Earn リワード", "zh-CN":"Earn 积分", "zh-TW":"Earn 積分" },
+          taskReward: { en:"Task reward", fr:"Récompense tâche", de:"Aufgaben-Belohnung", es:"Recompensa de tarea", ja:"タスクリワード", "zh-CN":"任务积分", "zh-TW":"任務積分" },
           mediaCenter: { en:"Media Center", fr:"Centre média", de:"Medienzentrum", es:"Centro multimedia", ja:"メディアセンター", "zh-CN":"媒体中心", "zh-TW":"媒體中心" },
           mediaHint: { en:"Follow Lumina official channels.", fr:"Suivez les canaux officiels Lumina.", de:"Folgen Sie den offiziellen Lumina-Kanälen.", es:"Sigue los canales oficiales de Lumina.", ja:"Lumina 公式チャンネルをフォロー。", "zh-CN":"查看 Lumina 官方媒体链接。", "zh-TW":"查看 Lumina 官方媒體連結。" },
           noMedia: { en:"No media links configured yet.", fr:"Aucun lien média configuré.", de:"Noch keine Medienlinks konfiguriert.", es:"Aún no hay enlaces configurados.", ja:"メディアリンクは未設定です。", "zh-CN":"后台还没有配置媒体链接。", "zh-TW":"後台還沒有配置媒體連結。" },
@@ -5163,6 +5188,16 @@ function enhancePrototypeMe() {
       function pointsFromActivity(rows){
         var total = 0;
         var records = [];
+        var cfg = {};
+        try { cfg = JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { cfg = {}; }
+        var rules = cfg.pointsRules || {};
+        function ruleValue(name, fallback){ var n = Number(rules[name]); return Number.isFinite(n) ? n : fallback; }
+        function typedTitle(type){
+          var copy = meCopy();
+          if (type === "swap") return copy.swapReward || "Swap reward";
+          if (type === "earn") return copy.earnReward || "Earn reward";
+          return copy.taskReward || "Task reward";
+        }
         (rows || []).forEach(function(item){
           var text = String(item.amount || "").replace(/[+,]/g, "").trim();
           var match = text.match(/(-?\\d+(?:\\.\\d+)?)\\s+([A-Za-z0-9$]+)/);
@@ -5172,9 +5207,14 @@ function enhancePrototypeMe() {
           var price = priceForSymbol(symbol);
           if (Number.isFinite(amount) && Number.isFinite(price) && price > 0) {
             var usd = amount * price;
-            var points = Math.floor(usd);
+            var type = item.type === "swap" || /\\bswap\\b/i.test(String(item.title || "")) ? "swap" : (/\\bearn|vault|deposit|withdraw\\b/i.test(String(item.title + " " + item.subtitle)) ? "earn" : "");
+            if (!type) return;
+            var cap = type === "swap" ? ruleValue("swapDailyUsdCap", 1000) : ruleValue("earnDailyUsdCap", 1000);
+            var perUsd = type === "swap" ? ruleValue("swapPointsPerUsd", 1) : ruleValue("earnPointsPerUsd", 2);
+            var fixed = type === "swap" ? ruleValue("swapPoints", 0) : ruleValue("earnPoints", 0);
+            var points = Math.floor(Math.min(usd, cap) * perUsd + fixed);
             if (points > 0) {
-              records.push({ date: item.time || item.day || item.createdAt || "", usd: usd, points: points, symbol: symbol });
+              records.push({ date: item.time || item.day || item.createdAt || "", usd: usd, points: points, symbol: symbol, type:type, title:typedTitle(type) });
               total += points;
             }
           }
@@ -5361,6 +5401,7 @@ function enhancePrototypeMe() {
           '</div>' +
           '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
             row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
+            row("points", c.taskCenter, "", "openPointsCenter(\\'tasks\\')") +
           '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
             row("media", c.mediaCenter, "", "openMediaCenter()") +
@@ -5378,7 +5419,7 @@ function enhancePrototypeMe() {
         refreshPoints();
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
-      window.openPointsCenter = async function(){
+      window.openPointsCenter = async function(initialView){
         if (typeof window.__luminaForceWelcomeBoxCheck === "function") {
           window.setTimeout(function(){ window.__luminaForceWelcomeBoxCheck(window.__luminaUserAddress); }, 120);
         }
@@ -5423,6 +5464,109 @@ function enhancePrototypeMe() {
         function luminaMark(extra){
           return '<span class="lumina-mark ' + (extra || "") + '" aria-hidden="true"><i></i></span>';
         }
+        function pointsSystemConfig(){
+          try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
+        }
+        function i18nText(map, fallback){
+          var lang = window.currentLang || "en";
+          map = map || {};
+          return map[lang] || map.en || fallback || "";
+        }
+        function userScopedKey(prefix, id){ return prefix + "_" + String(window.__luminaUserAddress || "guest").toLowerCase() + "_" + String(id || ""); }
+        function todayKey(){ return new Date().toISOString().slice(0, 10); }
+        function completedTaskKey(id){ return userScopedKey("lumina_points_task_done", id); }
+        function checkinKey(){ return userScopedKey("lumina_points_checkin", todayKey()); }
+        function streakKey(){ return userScopedKey("lumina_points_checkin_streak", "v1"); }
+        function taskDone(id){ try { return localStorage.getItem(completedTaskKey(id)) === "1"; } catch(e) { return false; } }
+        function checkinDone(){ try { return localStorage.getItem(checkinKey()) === "1"; } catch(e) { return false; } }
+        function readCheckinStreak(){ try { return Math.max(0, Number(localStorage.getItem(streakKey()) || 0)); } catch(e) { return 0; } }
+        function writeCheckinStreak(value){ try { localStorage.setItem(streakKey(), String(Math.max(0, Number(value || 0)))); } catch(e) {} }
+        function completeTask(id, silent){
+          var task = (pointsSystemConfig().pointsTasks || []).find(function(item){ return item && item.id === id; });
+          if (!task || taskDone(id)) return;
+          try { localStorage.setItem(completedTaskKey(id), "1"); } catch(e) {}
+          updatePointsBalance(Number(window.__luminaPoints || 0) + Number(task.points || 0));
+          addPointsLedger({ type:"task", points:Number(task.points || 0), title:i18nText(task.titleI18n, "Task reward"), source:"Task Center" });
+          if (!silent) toast("+" + Number(task.points || 0).toLocaleString() + " Lumina Points");
+          if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
+        }
+        function completeCheckin(){
+          if (checkinDone()) return;
+          var rewards = [10, 15, 20, 25, 30, 40, 100];
+          var next = (readCheckinStreak() % 7) + 1;
+          var points = rewards[next - 1] || 10;
+          try { localStorage.setItem(checkinKey(), "1"); } catch(e) {}
+          writeCheckinStreak(next);
+          updatePointsBalance(Number(window.__luminaPoints || 0) + points);
+          addPointsLedger({ type:"task", points:points, title:i18nText({ en:"Daily check-in", "zh-CN":"每日签到", "zh-TW":"每日簽到" }, "Daily check-in"), source:"Task Center" });
+          toast("+" + points + " Lumina Points");
+          renderTaskPage();
+        }
+        function goTask(id){
+          var task = (pointsSystemConfig().pointsTasks || []).find(function(item){ return item && item.id === id; });
+          if (!task) return;
+          completeTask(id, true);
+          var url = String(task.actionUrl || "");
+          if (url === "/swap") { modal.remove(); go("swap"); setTabByName("Swap"); return; }
+          if (url === "/earn") { modal.remove(); go("earn"); setTabByName("Earn"); return; }
+          if (/^https?:\\/\\//i.test(url)) window.open(url, "_blank");
+        }
+        window.__luminaCompleteTask = function(id){ completeTask(id, false); };
+        window.__luminaCompleteCheckin = completeCheckin;
+        window.__luminaGoTask = goTask;
+        function taskIcon(type){
+          if (type === "swap") return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M16 3h5v5"/><path d="M4 11a7 7 0 0 1 11.7-5.2L21 11"/><path d="M8 21H3v-5"/><path d="M20 13A7 7 0 0 1 8.3 18.2L3 13"/></svg>';
+          if (type === "earn") return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 3c4 3 6 6 6 10a6 6 0 0 1-12 0c0-4 2-7 6-10z"/><path d="M9 14c1.3 1 2.4 1.4 3.5 1.1 1-.2 1.9-1 2.5-2.1"/></svg>';
+          if (type === "social") return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/></svg>';
+          return '<svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg>';
+        }
+        function configuredTasks(){
+          var cfg = pointsSystemConfig();
+          return (Array.isArray(cfg.pointsTasks) ? cfg.pointsTasks : []).filter(function(item){ return item && item.enabled !== false; }).sort(function(a,b){ return Number(a.sortOrder || 0) - Number(b.sortOrder || 0); });
+        }
+        function taskRow(task){
+          var copy = meCopy();
+          var done = taskDone(task.id);
+          var title = i18nText(task.titleI18n, "Task");
+          var desc = i18nText(task.descriptionI18n, "");
+          var action = done ? (copy.completed || "Completed") : i18nText(task.actionLabelI18n, copy.go || "Go");
+          return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" ' + (done ? "disabled" : "") + ' onclick="event.stopPropagation();window.__luminaGoTask(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
+        }
+        function renderTaskPage(){
+          window.__luminaPointsCurrentView = "tasks";
+          var copy = meCopy();
+          var streak = readCheckinStreak();
+          var doneToday = checkinDone();
+          var rewards = [10, 15, 20, 25, 30, 40, 100];
+          var dayCards = rewards.map(function(points, index){
+            var day = index + 1;
+            var active = doneToday ? day === streak : day === ((streak % 7) + 1);
+            var label = active && !doneToday ? copy.today : ("Day " + day);
+            return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><span>' + (day === 7 ? "▰" : "☆") + '</span><strong>+' + points + '</strong></div>';
+          }).join("");
+          var allTasks = configuredTasks().filter(function(task){ return task.type !== "checkin"; });
+          var daily = allTasks.filter(function(task){ return ["swap", "earn", "custom"].indexOf(task.type) >= 0; }).slice(0, 4);
+          var more = allTasks.filter(function(task){ return daily.indexOf(task) < 0; });
+          modal.innerHTML =
+            '<div class="task-page-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><h1>' + escapeAttr(copy.taskCenter || "Task Center") + '</h1><span></span></div>' +
+            '<section class="task-card checkin-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyCheckin) + '</h2><p>' + escapeAttr(copy.checkinHint) + '</p></div><button type="button">' + escapeAttr(copy.checkinCalendar) + ' ◴</button></div><div class="checkin-grid">' + dayCards + '</div><button class="checkin-main" type="button" ' + (doneToday ? "disabled" : "") + ' onclick="window.__luminaCompleteCheckin()">' + escapeAttr(doneToday ? copy.completed : copy.checkIn) + '</button></section>' +
+            '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyTasks) + '</h2><p>' + escapeAttr(copy.refreshDaily) + '</p></div></div><div class="task-list-card">' + (daily.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.noPoints) + '</div>') + '</div></section>' +
+            '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.moreTasks) + '</h2></div></div><div class="task-list-card">' + (more.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.comingSoon) + '</div>') + '</div><p class="task-coming">✦ ' + escapeAttr(copy.comingSoon) + ' ✦</p></section>';
+        }
+        function renderTaskCenter(){
+          var tasks = configuredTasks();
+          if (!tasks.length) return "";
+          var copy = meCopy();
+          var preview = tasks.filter(function(task){ return task.type !== "checkin"; }).slice(0, 2).map(function(task){
+            var done = taskDone(task.id);
+            var title = i18nText(task.titleI18n, "Task");
+            var desc = i18nText(task.descriptionI18n, "");
+            var action = done ? (copy.completed || "Completed") : i18nText(task.actionLabelI18n, copy.claim || "Claim");
+            return '<div class="points-task-row"><span class="points-task-icon">' + luminaMark("sm") + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + '</strong><button type="button" ' + (done ? "disabled" : "") + ' onclick="event.stopPropagation();window.__luminaCompleteTask(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
+          }).join("");
+          return '<section class="points-task-panel"><div class="points-shop-title"><h2>' + escapeAttr(copy.taskCenter || "Task Center") + '</h2><button type="button" class="points-task-view" onclick="window.__luminaRenderTaskCenter()">View</button></div><div class="points-task-list">' + preview + '</div></section>';
+        }
+        window.__luminaRenderTaskCenter = renderTaskPage;
         window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
@@ -5530,7 +5674,7 @@ function enhancePrototypeMe() {
         window.__luminaOpenPointsProduct = renderProductDetail;
         window.__luminaOpenPointsLedger = function(){
           var ledgerRows = [];
-          (window.__luminaPointRecords || []).forEach(function(row){ ledgerRows.push({ title:"Earned from " + (row.symbol || "activity"), date:row.date || "", points:Number(row.points || 0) }); });
+          (window.__luminaPointRecords || []).forEach(function(row){ ledgerRows.push({ title:row.title || (row.type === "swap" ? "Swap reward" : row.type === "earn" ? "Earn reward" : "Task reward"), date:row.date || "", points:Number(row.points || 0) }); });
           (((window.__luminaPointsProfile || {}).adjustments) || []).forEach(function(row){ ledgerRows.push({ title:row.note || "Admin points adjustment", date:row.createdAt || "", points:Number(row.points || 0) }); });
           pointsLocalRows("lumina_points_ledger_v1").forEach(function(row){ ledgerRows.push({ title:row.title || "Redeemed", date:row.date || "", points:-Math.abs(Number(row.points || 0)) }); });
           ledgerRows.sort(function(a,b){ return (Date.parse(b.date) || 0) - (Date.parse(a.date) || 0); });
@@ -5576,6 +5720,7 @@ function enhancePrototypeMe() {
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
         var countries = ["global", "us", "cn", "jp", "kr", "sg", "hk", "eu", "ae"];
         function renderShop(){
+          window.__luminaPointsCurrentView = "shop";
           var profile = window.__luminaPointsProfile || {};
           var vipNo = profile.luminaNo ? ("Lumina No." + profile.luminaNo) : "Lumina VIP";
           var selectedRegion = window.__luminaPointsRegion || "global";
@@ -5605,7 +5750,7 @@ function enhancePrototypeMe() {
         var products = [];
         window.__luminaPointsProducts = products;
         window.__luminaPointsOrders = [];
-        renderShop();
+        if (initialView === "tasks") renderTaskPage(); else renderShop();
         try {
           if (window.__luminaUserAddress) {
             var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
@@ -5613,7 +5758,7 @@ function enhancePrototypeMe() {
             if (profileRes.ok && profileData) {
               window.__luminaPointsProfile = profileData;
               refreshPoints();
-              renderShop();
+              if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
           var res = await fetch("/api/points-products", { cache: "no-store" });
@@ -5630,7 +5775,7 @@ function enhancePrototypeMe() {
             var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
             var orderData = await orderRes.json().catch(function(){ return []; });
             window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
-            renderShop();
+            if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
           }
         } catch(e) {}
       };
