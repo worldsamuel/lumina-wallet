@@ -4,6 +4,8 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { DEFAULT_FEE_CONFIGS, ensureDefaultFees } from "@/lib/admin/ensure-fee-schema";
 import { db } from "@/lib/db";
 
+const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -16,9 +18,9 @@ export async function GET(req: NextRequest) {
   try {
     await ensureDefaultFees();
     const fees = await db.feeConfig.findMany({ orderBy: { businessType: "asc" } });
-    return jsonResponse(fees);
+    return jsonResponse(fees, CONFIG_CACHE);
   } catch (error) {
     console.error("Failed to load fee configs, using defaults", error);
-    return jsonResponse(DEFAULT_FEE_CONFIGS);
+    return jsonResponse(DEFAULT_FEE_CONFIGS, CONFIG_CACHE);
   }
 }

@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { db } from "@/lib/db";
 
 const allowedKeys = new Set(["help", "about"]);
+const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
 
 export function OPTIONS() {
   return optionsResponse();
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { key: string 
 
   try {
     const page = await db.contentPage.findUnique({ where: { key: params.key } });
-    return jsonResponse(page ?? { key: params.key, bodyI18n: {} });
+    return jsonResponse(page ?? { key: params.key, bodyI18n: {} }, CONFIG_CACHE);
   } catch (error) {
     console.error("Failed to load content page, using fallback", error);
     return jsonResponse({
@@ -29,6 +30,6 @@ export async function GET(req: NextRequest, { params }: { params: { key: string 
         params.key === "help"
           ? { en: "Lumina Help Center", "zh-CN": "Lumina 帮助中心" }
           : { en: "About Lumina", "zh-CN": "关于 Lumina" },
-    });
+    }, CONFIG_CACHE);
   }
 }

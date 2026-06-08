@@ -5,6 +5,8 @@ import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { getWorldChainMarketForToken, getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
+const MARKET_CACHE = { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } };
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -88,5 +90,5 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return jsonResponse(merged);
+  return jsonResponse(merged, MARKET_CACHE);
 }

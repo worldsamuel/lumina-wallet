@@ -1899,15 +1899,6 @@ function enhancePrototypeSystemConfig() {
         document.body.appendChild(overlay);
       };
       window.__luminaApplySystemConfig();
-      fetch("/api/system-config", { cache:"no-store" })
-        .then(function(res){ return res.ok ? res.json() : null; })
-        .then(function(cfg){
-          if (!cfg) return;
-          try { localStorage.setItem("ww_system_config", JSON.stringify(cfg)); } catch(e) {}
-          window.__luminaApplySystemConfig();
-          if (typeof window.__luminaApplySwapSystemConfig === "function") window.__luminaApplySwapSystemConfig();
-        })
-        .catch(function(){});
     })();
   `;
   runInPrototypeScope(source, "Failed to apply system config");
@@ -1920,6 +1911,7 @@ function enhancePrototypeAnalytics() {
       window.__luminaAnalyticsStarted = true;
       function send(event){
         try {
+          if (event !== "open") return;
           fetch("/api/analytics", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -1929,13 +1921,6 @@ function enhancePrototypeAnalytics() {
         } catch(e) {}
       }
       send("open");
-      var originalGo = typeof go === "function" ? go : null;
-      if (originalGo) {
-        go = function(name){
-          originalGo(name);
-          send("visit");
-        };
-      }
     })();
   `;
   runInPrototypeScope(source, "Failed to install analytics");
@@ -2540,8 +2525,12 @@ function enhancePrototypeTokens() {
       syncAssetTokenStatuses();
       refreshImportedBalances();
       if (!window.__luminaImportedRefreshTimer) {
-        window.__luminaImportedRefreshTimer = setInterval(refreshImportedBalances, 10000);
-        document.addEventListener("visibilitychange", refreshImportedBalances);
+        window.__luminaImportedRefreshTimer = setInterval(function(){
+          if (!document.hidden) refreshImportedBalances();
+        }, 60000);
+        document.addEventListener("visibilitychange", function(){
+          if (!document.hidden) refreshImportedBalances();
+        });
         window.addEventListener("focus", refreshImportedBalances);
       }
       ensureAllAssetsView();
@@ -5019,11 +5008,10 @@ function enhancePrototypeActivity() {
           if (name === "activity") setTimeout(window.__luminaRefreshActivity, 80);
         };
       }
-      window.__luminaRefreshActivity();
       setInterval(function(){
         var view = document.getElementById("view-activity");
         if (view && view.classList.contains("active")) window.__luminaRefreshActivity();
-      }, 60000);
+      }, 120000);
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance real activity");

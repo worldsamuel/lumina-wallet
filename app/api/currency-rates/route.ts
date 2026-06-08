@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { db } from "@/lib/db";
 import { defaultCurrencies } from "@/lib/money-data";
 
-const NO_STORE = { headers: { "Cache-Control": "no-store, max-age=0" } };
+const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
 
 export function OPTIONS() {
   return optionsResponse();
@@ -12,14 +12,14 @@ export function OPTIONS() {
 
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:currency-rates", 60).ok) {
-    return jsonResponse({ error: "Too many requests." }, { status: 429, ...NO_STORE });
+    return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
 
   try {
     const rates = await db.currencyRate.findMany({ orderBy: { code: "asc" } });
-    return jsonResponse(rates.length ? rates : defaultCurrencies, NO_STORE);
+    return jsonResponse(rates.length ? rates : defaultCurrencies, CONFIG_CACHE);
   } catch (error) {
     console.error("Failed to load currency rates, using fallback", error);
-    return jsonResponse(defaultCurrencies, NO_STORE);
+    return jsonResponse(defaultCurrencies, CONFIG_CACHE);
   }
 }

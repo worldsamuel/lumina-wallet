@@ -4,6 +4,8 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { ensureAnnouncementSchema } from "@/lib/admin/ensure-announcement-schema";
 import { db } from "@/lib/db";
 
+const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
       FROM "Announcement"
       ORDER BY "pinned" DESC, "publishedAt" DESC
     `;
-    return jsonResponse(announcements);
+    return jsonResponse(announcements, CONFIG_CACHE);
   } catch (error) {
     console.error("Failed to load announcements, using fallback", error);
     return jsonResponse([
@@ -43,6 +45,6 @@ export async function GET(req: NextRequest) {
         imageUrl: null,
         pinned: false,
       },
-    ]);
+    ], CONFIG_CACHE);
   }
 }

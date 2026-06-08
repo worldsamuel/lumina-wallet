@@ -25,7 +25,7 @@ declare global {
 }
 
 const fetcher = async <T,>(url: string): Promise<T> => {
-  const res = await fetch(url, { cache: "no-store" });
+  const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch ${url}`);
   return (await res.json()) as T;
 };
@@ -113,9 +113,11 @@ function uniqueTokens(rows: BackendToken[] | undefined, swapOnly = false) {
  */
 export function useBackendConfigSync(enabled: boolean) {
   const swrOptions = {
-    dedupingInterval: 2_000,
-    refreshInterval: 5_000,
-    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+    refreshInterval: 300_000,
+    revalidateOnFocus: true,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
   };
   const announcements = useSWR<BackendAnnouncement[]>(
     enabled ? "/api/announcements" : null,

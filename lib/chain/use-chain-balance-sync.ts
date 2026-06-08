@@ -41,16 +41,16 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
-    { dedupingInterval: 5_000, refreshInterval: 10_000, revalidateOnFocus: true },
+    { dedupingInterval: 15_000, refreshInterval: 60_000, revalidateOnFocus: true, refreshWhenHidden: false },
   );
   const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
-    dedupingInterval: 15_000,
-    refreshInterval: 30_000,
+    dedupingInterval: 60_000,
+    refreshInterval: 120_000,
     revalidateOnFocus: false,
   });
   const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
-    dedupingInterval: 15_000,
-    refreshInterval: 30_000,
+    dedupingInterval: 60_000,
+    refreshInterval: 120_000,
     revalidateOnFocus: false,
   });
 
