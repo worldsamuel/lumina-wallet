@@ -14,6 +14,8 @@ const blockTimeCache = new Map<string, string>();
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
+const universalActivityLookbackBlocks = 80_000n;
+const universalActivityLogChunkBlocks = 10_000n;
 const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
 const activityTokenAddresses = Array.from(
   new Set(
@@ -246,6 +248,39 @@ async function getRecentPriorityTransferLogs(address: Address, latest: bigint, d
   return logs;
 }
 
+async function getRecentUniversalTransferLogs(address: Address, latest: bigint, direction: "in" | "out") {
+  const minBlock = latest > universalActivityLookbackBlocks ? latest - universalActivityLookbackBlocks : 0n;
+  const logs = [];
+
+  for (let toBlock = latest; toBlock >= minBlock; ) {
+    let fromBlock = toBlock > universalActivityLogChunkBlocks ? toBlock - universalActivityLogChunkBlocks + 1n : 0n;
+    if (fromBlock < minBlock) fromBlock = minBlock;
+
+    try {
+      const chunkLogs = await publicClient.getLogs({
+        event: transferEvent,
+        args: direction === "in" ? { to: address } : { from: address },
+        fromBlock,
+        toBlock,
+      });
+      logs.push(...chunkLogs);
+    } catch (error) {
+      console.error("Failed to fetch universal activity logs", {
+        address,
+        direction,
+        fromBlock: fromBlock.toString(),
+        toBlock: toBlock.toString(),
+        error,
+      });
+    }
+
+    if (fromBlock === 0n || fromBlock === minBlock) break;
+    toBlock = fromBlock - 1n;
+  }
+
+  return logs;
+}
+
 async function withActivityTimeout<T>(promise: Promise<T>, fallbackValue: T, label: string, timeoutMs = 4_500) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -397,7 +432,9 @@ export async function GET(req: NextRequest) {
   try {
     const latest = await publicClient.getBlockNumber();
     const lower = address.toLowerCase();
-    const [priorityIncoming, priorityOutgoing, incoming, outgoing, indexedTransfers] = await Promise.all([
+    const [universalIncoming, universalOutgoing, priorityIncoming, priorityOutgoing, incoming, outgoing, indexedTransfers] = await Promise.all([
+      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "in"), [], "incoming-universal-logs", 7_000),
+      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "out"), [], "outgoing-universal-logs", 7_000),
       getRecentPriorityTransferLogs(address as Address, latest, "in"),
       getRecentPriorityTransferLogs(address as Address, latest, "out"),
       withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "in"), [], "incoming-token-logs"),
@@ -409,7 +446,7 @@ export async function GET(req: NextRequest) {
     ]);
     const seen = new Set<string>();
     const logs: ActivityTransferRow[] = await Promise.all(
-      [...priorityIncoming, ...priorityOutgoing, ...incoming, ...outgoing]
+      [...universalIncoming, ...universalOutgoing, ...priorityIncoming, ...priorityOutgoing, ...incoming, ...outgoing]
         .filter((log) => {
           const value = log.args.value ?? 0n;
           if (value <= 0n) return false;
