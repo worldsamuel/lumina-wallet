@@ -5689,7 +5689,7 @@ function enhancePrototypeMe() {
             var day = index + 1;
             var active = doneToday ? day === streak : day === ((streak % 7) + 1);
             var label = active && !doneToday ? copy.today : ("Day " + day);
-            return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><span></span><strong>+' + points + '</strong></div>';
+            return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><strong>+' + points + '</strong></div>';
           }).join("");
           var allTasks = configuredTasks().filter(function(task){ return task.type !== "checkin"; });
           var daily = dailyTaskIds.map(function(id){ return allTasks.find(function(task){ return task.id === id; }); }).filter(Boolean);
