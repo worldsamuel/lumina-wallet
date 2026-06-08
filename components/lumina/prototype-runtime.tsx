@@ -5474,6 +5474,7 @@ function enhancePrototypeMe() {
         }
         function userScopedKey(prefix, id){ return prefix + "_" + String(window.__luminaUserAddress || "guest").toLowerCase() + "_" + String(id || ""); }
         function todayKey(){ return new Date().toISOString().slice(0, 10); }
+        var dailyTaskIds = ["open-world-app", "make-swap", "make-earn"];
         function completedTaskKey(id){ return userScopedKey("lumina_points_task_done", id); }
         function visitedTaskKey(id){ return userScopedKey("lumina_points_task_visited", id); }
         function checkinKey(){ return userScopedKey("lumina_points_checkin", todayKey()); }
@@ -5481,6 +5482,7 @@ function enhancePrototypeMe() {
         function profileAdjustments(){ return ((window.__luminaPointsProfile || {}).adjustments || []); }
         function adjustmentDone(key){ return profileAdjustments().some(function(row){ return row && row.createdBy === key; }); }
         function taskDone(id){
+          if (dailyTaskIds.indexOf(id) >= 0) return adjustmentDone("points-task:" + id + ":" + todayKey());
           return adjustmentDone("points-task:" + id);
         }
         function taskVisited(id){ try { return localStorage.getItem(visitedTaskKey(id)) === "1"; } catch(e) { return false; } }
@@ -5579,7 +5581,7 @@ function enhancePrototypeMe() {
           var visited = taskVisited(task.id);
           var title = i18nText(task.titleI18n, "Task");
           var desc = i18nText(task.descriptionI18n, "");
-          var needsGo = !done && !visited && (task.actionUrl || task.type === "swap" || task.type === "earn" || task.type === "social" || task.id === "open-mystery-box");
+          var needsGo = !done && !visited && task.id !== "open-world-app" && (task.actionUrl || task.type === "swap" || task.type === "earn" || task.type === "social" || task.id === "open-mystery-box");
           var action = done ? (copy.completed || "Completed") : (needsGo ? i18nText(task.actionLabelI18n, copy.go || "Go") : (copy.claim || "Claim"));
           var handler = needsGo ? "window.__luminaGoTask" : "window.__luminaCompleteTask";
           return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" ' + (done ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
@@ -5597,7 +5599,7 @@ function enhancePrototypeMe() {
             return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><span>' + (day === 7 ? "▰" : "☆") + '</span><strong>+' + points + '</strong></div>';
           }).join("");
           var allTasks = configuredTasks().filter(function(task){ return task.type !== "checkin"; });
-          var daily = allTasks.filter(function(task){ return ["swap", "earn", "custom"].indexOf(task.type) >= 0; }).slice(0, 4);
+          var daily = dailyTaskIds.map(function(id){ return allTasks.find(function(task){ return task.id === id; }); }).filter(Boolean);
           var more = allTasks.filter(function(task){ return daily.indexOf(task) < 0; });
           modal.innerHTML =
             '<div class="task-page-head"><button type="button" class="points-close" onclick="document.getElementById(\\'pointsModal\\')&&document.getElementById(\\'pointsModal\\').remove()">‹</button><h1>' + escapeAttr(copy.taskCenter || "Task Center") + '</h1><span></span></div>' +

@@ -96,13 +96,24 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     {
       id: "daily-checkin",
       type: "checkin",
-      titleI18n: { en: "Open Lumina App", "zh-CN": "打开 Lumina App" },
-      descriptionI18n: { en: "Open the app everyday", "zh-CN": "每天打开应用" },
+      titleI18n: { en: "Daily Check-in", "zh-CN": "每日签到" },
+      descriptionI18n: { en: "Check in daily to earn more points", "zh-CN": "每日签到获得更多积分" },
       points: 10,
       actionLabelI18n: { en: "Check in" },
       actionUrl: null,
       enabled: true,
       sortOrder: 1,
+    },
+    {
+      id: "open-world-app",
+      type: "custom",
+      titleI18n: { en: "Open Lumina App", "zh-CN": "打开 Lumina App" },
+      descriptionI18n: { en: "Open the app everyday", "zh-CN": "每天打开应用" },
+      points: 10,
+      actionLabelI18n: { en: "Claim", "zh-CN": "领取" },
+      actionUrl: null,
+      enabled: true,
+      sortOrder: 2,
     },
     {
       id: "make-swap",
@@ -113,7 +124,18 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: "/swap",
       enabled: true,
-      sortOrder: 2,
+      sortOrder: 3,
+    },
+    {
+      id: "make-earn",
+      type: "earn",
+      titleI18n: { en: "Make an Earn", "zh-CN": "完成一次 Earn" },
+      descriptionI18n: { en: "Complete any Earn transaction", "zh-CN": "完成任意 Earn 操作" },
+      points: 20,
+      actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
+      actionUrl: "/earn",
+      enabled: true,
+      sortOrder: 4,
     },
     {
       id: "bind-world-app",
@@ -124,7 +146,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: null,
       enabled: true,
-      sortOrder: 3,
+      sortOrder: 5,
     },
     {
       id: "share-friends",
@@ -135,7 +157,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: null,
       enabled: true,
-      sortOrder: 4,
+      sortOrder: 6,
     },
     {
       id: "open-mystery-box",
@@ -146,7 +168,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: null,
       enabled: true,
-      sortOrder: 5,
+      sortOrder: 7,
     },
     {
       id: "invite-friend",
@@ -157,7 +179,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: null,
       enabled: true,
-      sortOrder: 6,
+      sortOrder: 8,
     },
     {
       id: "follow-twitter",
@@ -168,7 +190,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       actionLabelI18n: { en: "Go", "zh-CN": "去完成" },
       actionUrl: "https://x.com/luminafi_xyz",
       enabled: true,
-      sortOrder: 7,
+      sortOrder: 9,
     },
   ],
   socialLinks: {
@@ -266,7 +288,15 @@ function cleanI18n(value: unknown, fallback: string) {
 
 function normalizePointsTasks(value: unknown): PointsTaskConfig[] {
   const source = Array.isArray(value) ? value : DEFAULT_SYSTEM_CONFIG.pointsTasks;
-  return source
+  const mergedSource = Array.isArray(value)
+    ? [
+        ...source,
+        ...DEFAULT_SYSTEM_CONFIG.pointsTasks.filter(
+          (defaultTask) => !source.some((task) => !!task && typeof task === "object" && String((task as Partial<PointsTaskConfig>).id || "") === defaultTask.id),
+        ),
+      ]
+    : source;
+  return mergedSource
     .filter((item) => !!item && typeof item === "object")
     .map((item, index) => {
       const task = item as Partial<PointsTaskConfig>;

@@ -8,6 +8,7 @@ import { getStoredActivities } from "@/lib/admin/activity-store";
 import { db } from "@/lib/db";
 
 const checkinRewards = [10, 15, 20, 25, 30, 40, 100];
+const dailyTaskIds = new Set(["open-world-app", "make-swap", "make-earn"]);
 
 export function OPTIONS() {
   return optionsResponse();
@@ -68,6 +69,10 @@ async function hasRecentActivity(address: string, type: "swap" | "earn") {
 
 async function validateTask(address: string, taskId: string, type: string, proof: string | null) {
   if (taskId === "daily-checkin" || type === "checkin") return { ok: true };
+  if (taskId === "open-world-app") {
+    const user = await db.user.findUnique({ where: { address } });
+    return { ok: !!user, reason: "Open Lumina in World App first." };
+  }
   if (type === "swap") return { ok: await hasRecentActivity(address, "swap"), reason: "Complete a swap first." };
   if (type === "earn") return { ok: await hasRecentActivity(address, "earn"), reason: "Complete an Earn transaction first." };
   if (taskId === "bind-world-app") {
@@ -104,7 +109,8 @@ export async function POST(req: NextRequest) {
     const today = dayKey();
     const adjustments = await getPointsAdjustments(address);
     const isCheckin = task.id === "daily-checkin" || task.type === "checkin";
-    const uniqueKey = isCheckin ? `points-task:daily-checkin:${today}` : `points-task:${task.id}`;
+    const isDailyTask = dailyTaskIds.has(task.id);
+    const uniqueKey = isCheckin ? `points-task:daily-checkin:${today}` : isDailyTask ? `points-task:${task.id}:${today}` : `points-task:${task.id}`;
     if (adjustments.some((row) => row.createdBy === uniqueKey)) {
       return jsonResponse({ ok: true, skipped: true, completed: true, points: 0 });
     }
