@@ -18,8 +18,8 @@ export async function POST(req: NextRequest) {
   if (!file.type.startsWith("image/")) {
     return jsonResponse({ error: "Only images are supported." }, { status: 400 });
   }
-  if (file.size > 256 * 1024) {
-    return jsonResponse({ error: "Image must be smaller than 256KB. Use an external CDN URL for larger files." }, { status: 400 });
+  if (file.size > 2 * 1024 * 1024) {
+    return jsonResponse({ error: "Image must be smaller than 2MB. Use an external CDN URL for larger files." }, { status: 400 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

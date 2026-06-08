@@ -5689,7 +5689,7 @@ function enhancePrototypeMe() {
             var day = index + 1;
             var active = doneToday ? day === streak : day === ((streak % 7) + 1);
             var label = active && !doneToday ? copy.today : ("Day " + day);
-            return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><span>' + (day === 7 ? "▰" : "☆") + '</span><strong>+' + points + '</strong></div>';
+            return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><span></span><strong>+' + points + '</strong></div>';
           }).join("");
           var allTasks = configuredTasks().filter(function(task){ return task.type !== "checkin"; });
           var daily = dailyTaskIds.map(function(id){ return allTasks.find(function(task){ return task.id === id; }); }).filter(Boolean);
@@ -5722,6 +5722,14 @@ function enhancePrototypeMe() {
           if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); return; }
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
           var won = rewards[0];
+          var old = document.getElementById("blindBoxModal");
+          if (old) old.remove();
+          var box = document.createElement("div");
+          box.id = "blindBoxModal";
+          box.className = "blind-box-modal open";
+          box.onclick = function(event){ if (event.target === box) box.remove(); };
+          box.innerHTML = '<div class="blind-box-stage opening"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result pending"><small>' + escapeAttr(copy.openNow || "Opening") + '</small><strong>...</strong></div></div>';
+          document.body.appendChild(box);
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             var res = await fetch("/api/points-products/purchase", {
@@ -5744,17 +5752,15 @@ function enhancePrototypeMe() {
             }
             setPurchasedCount(product.id, Math.max(0, Number(localStorage.getItem(purchaseKey(product.id)) || 0) - 1));
           } catch(e) {
+            box.remove();
             toast(e && e.message ? e.message : "Open failed");
             return;
           }
-          var old = document.getElementById("blindBoxModal");
-          if (old) old.remove();
-          var box = document.createElement("div");
-          box.id = "blindBoxModal";
-          box.className = "blind-box-modal open";
-          box.onclick = function(event){ if (event.target === box) box.remove(); };
-          box.innerHTML = '<div class="blind-box-stage"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result"><small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(i18nText(won.nameI18n, won.name || "Lumina reward")) + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button></div></div>';
-          document.body.appendChild(box);
+          var result = box.querySelector(".blind-result");
+          if (result) {
+            result.classList.remove("pending");
+            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(i18nText(won.nameI18n, won.name || "Lumina reward")) + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
+          }
           addPointsCoupon({ title: i18nText(won.nameI18n, won.name || "Lumina reward"), value: won.value || "", source: productTitle(product) });
           renderProductDetail(product.id);
         };
