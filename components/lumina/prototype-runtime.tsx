@@ -5775,12 +5775,9 @@ function enhancePrototypeMe() {
           var rewards = Array.isArray(product.rewards) ? product.rewards.filter(function(item){ return item && item.name; }) : [];
           var copy = meCopy();
           if (!rewards.length) return '<li>' + escapeAttr(copy.rewardFallback || "Rewards are issued to your Lumina account after redemption.") + '</li>';
-          var total = rewards.reduce(function(sum,item){ return sum + Math.max(0, Number(item.odds || 0)); }, 0) || 1;
           return rewards.map(function(item){
-            var pct = Math.max(0, Number(item.odds || 0)) / total * 100;
-            var pctText = pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct < 1 ? 2 : 1).replace(/\\.0$/, "") + "%";
             var title = i18nText(item.nameI18n, item.name || "Reward");
-            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '<em>' + escapeAttr(copy.chance || "Chance") + ': ' + pctText + '</em></li>';
+            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
           }).join("");
         }
         async function buyProduct(productId){
