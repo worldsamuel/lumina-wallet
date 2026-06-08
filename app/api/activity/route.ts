@@ -13,6 +13,7 @@ const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
+const priorityActivityLookbackBlocks = 150_000n;
 const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
 const activityTokenAddresses = Array.from(
   new Set(
@@ -22,6 +23,12 @@ const activityTokenAddresses = Array.from(
     ].map((address) => address.toLowerCase()),
   ),
 ) as Address[];
+const priorityActivityTokenAddresses = activityTokenAddresses.filter((address) =>
+  [
+    "0x2cfc85d8e48f8eab294be644d9e25c3030863003",
+    "0x79a02482a880bce3f13e09da970dc34db4cd24d1",
+  ].includes(address.toLowerCase()),
+);
 
 type ActivityTransferRow = {
   hash: `0x${string}`;
@@ -59,6 +66,18 @@ type AlchemyAssetTransfer = {
 
 export function OPTIONS() {
   return optionsResponse();
+}
+
+function activityResponse(data: unknown, init?: ResponseInit) {
+  return jsonResponse(data, {
+    ...init,
+    headers: {
+      ...(init?.headers ?? {}),
+      "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
+      Pragma: "no-cache",
+      Expires: "0",
+    },
+  });
 }
 
 function shortAddress(address: string) {
@@ -191,6 +210,59 @@ async function getTransferLogsForAddress(address: Address, latest: bigint, direc
   return logs;
 }
 
+async function getRecentPriorityTransferLogs(address: Address, latest: bigint, direction: "in" | "out") {
+  const minBlock = latest > priorityActivityLookbackBlocks ? latest - priorityActivityLookbackBlocks : 0n;
+  const logs = [];
+
+  try {
+    const chunks = await Promise.all(
+      priorityActivityTokenAddresses.map((tokenAddress) =>
+        publicClient
+          .getLogs({
+            address: tokenAddress,
+            event: transferEvent,
+            args: direction === "in" ? { to: address } : { from: address },
+            fromBlock: minBlock,
+            toBlock: latest,
+          })
+          .catch((error) => {
+            console.error("Failed to fetch priority activity logs", {
+              tokenAddress,
+              address,
+              direction,
+              fromBlock: minBlock.toString(),
+              toBlock: latest.toString(),
+              error,
+            });
+            return [];
+          }),
+      ),
+    );
+    logs.push(...chunks.flat());
+  } catch (error) {
+    console.error("Failed to fetch priority activity log chunk", { address, direction, error });
+  }
+
+  return logs;
+}
+
+async function withActivityTimeout<T>(promise: Promise<T>, fallbackValue: T, label: string, timeoutMs = 4_500) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => {
+          console.error("Activity source timed out", { label, timeoutMs });
+          resolve(fallbackValue);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Promise<ActivityTransferRow[]> {
   const minBlock = latest > activityLookbackBlocks ? latest - activityLookbackBlocks : 0n;
   const lower = address.toLowerCase();
@@ -298,12 +370,12 @@ function dedupeTransferRows(rows: ActivityTransferRow[]) {
 
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:activity", 120).ok) {
-    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+    return activityResponse({ error: "Too many requests." }, { status: 429 });
   }
 
   const url = new URL(req.url);
   const address = url.searchParams.get("address") ?? "";
-  if (!isAddress(address)) return jsonResponse([]);
+  if (!isAddress(address)) return activityResponse([]);
   const storedRows = await getStoredActivities(80)
     .then((rows) =>
       rows
@@ -325,9 +397,11 @@ export async function GET(req: NextRequest) {
   try {
     const latest = await publicClient.getBlockNumber();
     const lower = address.toLowerCase();
-    const [incoming, outgoing, indexedTransfers] = await Promise.all([
-      getTransferLogsForAddress(address as Address, latest, "in"),
-      getTransferLogsForAddress(address as Address, latest, "out"),
+    const [priorityIncoming, priorityOutgoing, incoming, outgoing, indexedTransfers] = await Promise.all([
+      getRecentPriorityTransferLogs(address as Address, latest, "in"),
+      getRecentPriorityTransferLogs(address as Address, latest, "out"),
+      withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "in"), [], "incoming-token-logs"),
+      withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "out"), [], "outgoing-token-logs"),
       fetchAlchemyAssetTransfers(address as Address, latest).catch((error) => {
         console.error("Failed to fetch indexed activity transfers", { address, error });
         return [] as ActivityTransferRow[];
@@ -335,7 +409,7 @@ export async function GET(req: NextRequest) {
     ]);
     const seen = new Set<string>();
     const logs: ActivityTransferRow[] = await Promise.all(
-      [...incoming, ...outgoing]
+      [...priorityIncoming, ...priorityOutgoing, ...incoming, ...outgoing]
         .filter((log) => {
           const value = log.args.value ?? 0n;
           if (value <= 0n) return false;
@@ -375,10 +449,10 @@ export async function GET(req: NextRequest) {
       const bt = "createdAt" in b ? new Date(String(b.createdAt)).getTime() : 0;
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
-    return jsonResponse(allRows.slice(0, 80));
+    return activityResponse(allRows.slice(0, 80));
   } catch (error) {
     console.error("Failed to fetch real activity", error);
-    return jsonResponse(storedRows.slice(0, 80));
+    return activityResponse(storedRows.slice(0, 80));
   }
 }
 
