@@ -906,7 +906,7 @@
   .task-section-title button { min-width: max-content; border: 0; background: transparent; color: var(--green); font-size: 13px; font-weight: 850; }
   .checkin-grid { margin-top: 22px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; padding-bottom: 4px; scrollbar-width: none; }
   .checkin-grid::-webkit-scrollbar { display: none; }
-  .checkin-day { min-width: 0; min-height: 74px; padding: 13px 5px 12px; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; display: grid; justify-items: center; align-content: space-between; background: rgba(255,255,255,.025); color: #fff; }
+  .checkin-day { min-width: 0; min-height: 64px; padding: 12px 5px 10px; border: 1px solid rgba(255,255,255,.1); border-radius: 14px; display: grid; justify-items: center; align-content: center; gap: 8px; background: rgba(255,255,255,.025); color: #fff; }
   .checkin-day.active { border-color: var(--green); background: rgba(74,222,128,.08); box-shadow: 0 0 24px rgba(74,222,128,.16); }
   .checkin-day b { max-width: 100%; font-size: clamp(9px, 2.3vw, 13px); font-weight: 850; color: #d4d9d4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .checkin-day.active b { color: var(--green); }
