@@ -3653,6 +3653,7 @@ function enhancePrototypeSwapQuote() {
           ,reduceAmount: { en:"Please reduce the amount.", "zh-CN":"请降低金额。", "zh-TW":"請降低金額。", fr:"Veuillez réduire le montant.", de:"Bitte Betrag reduzieren.", es:"Reduce el importe.", ja:"金額を下げてください。" }
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
           ,slippageTooLow: { en:"Slippage cannot be 0. Please select at least 0.1%.", "zh-CN":"滑点不能设为 0,请至少选择 0.1%。", "zh-TW":"滑點不能設為 0,請至少選擇 0.1%。", fr:"Le slippage ne peut pas être 0. Sélectionnez au moins 0,1%.", de:"Slippage darf nicht 0 sein. Bitte mindestens 0,1% wählen.", es:"El slippage no puede ser 0. Selecciona al menos 0.1%.", ja:"スリッページは 0 にできません。0.1%以上を選択してください。" }
+          ,safeMaxAdjusted: { en:"MAX was adjusted slightly to avoid World App signing failure. Quote refreshed.", "zh-CN":"已为 MAX 预留少量余额，避免 World App 签名失败。报价已刷新。", "zh-TW":"已為 MAX 預留少量餘額，避免 World App 簽名失敗。報價已刷新。", fr:"MAX a été légèrement ajusté pour éviter l'échec de signature World App. Devis actualisé.", de:"MAX wurde leicht angepasst, um World App-Signaturfehler zu vermeiden. Angebot aktualisiert.", es:"MAX se ajustó ligeramente para evitar fallos de firma en World App. Cotización actualizada.", ja:"World App の署名失敗を避けるため MAX を少し調整しました。見積もりを更新しました。" }
           ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
           ,unsupportedToken: { en:"Token not supported", "zh-CN":"暂不支持此代币", "zh-TW":"暫不支援此代幣", fr:"Jeton non pris en charge", de:"Token nicht unterstützt", es:"Token no compatible", ja:"未対応のトークン" }
           ,worldAppBlocked: { en:"Blocked by World App", "zh-CN":"World App 已拦截", "zh-TW":"World App 已攔截", fr:"Bloqué par World App", de:"Von World App blockiert", es:"Bloqueado por World App", ja:"World App がブロック" }
@@ -3810,12 +3811,37 @@ function enhancePrototypeSwapQuote() {
         if (!Number.isFinite(n) || n <= 0) return "0";
         return shortAmount(n);
       }
+      function maxInputDecimals(symbol){
+        var meta = {};
+        try { meta = tokenMeta(symbol) || {}; } catch(e) {}
+        var decimals = Number(meta.decimals || meta.decimal || 18);
+        if (!Number.isFinite(decimals) || decimals < 0) decimals = 18;
+        return Math.max(0, Math.min(8, decimals));
+      }
+      function formatSwapInputAmount(value, symbol){
+        var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
+        if (!Number.isFinite(n) || n <= 0) return "0";
+        var decimals = maxInputDecimals(symbol);
+        var text = n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: decimals });
+        return text.replace(/(\\.\\d*?[1-9])0+$/, "$1").replace(/\\.0+$/, "");
+      }
+      function safeMaxSwapAmount(symbol){
+        var balance = balanceNumber(symbol);
+        if (!Number.isFinite(balance) || balance <= 0) return "0";
+        var decimals = maxInputDecimals(symbol);
+        var precisionDust = Math.pow(10, -Math.min(6, Math.max(0, decimals)));
+        var percentDust = balance * 0.0001;
+        var dust = Math.min(0.01, Math.max(precisionDust, percentDust));
+        if (balance <= dust) dust = Math.max(precisionDust, balance * 0.001);
+        var safe = Math.max(0, balance - dust);
+        return formatSwapInputAmount(safe || balance, symbol);
+      }
       function fillSwapMax(){
         var sell = document.getElementById("sellAmt");
         if (!sell) return;
-        sell.value = formatMaxAmount(balanceNumber(swapState.sell));
+        sell.value = safeMaxSwapAmount(swapState.sell);
         sell.dispatchEvent(new Event("input", { bubbles: true }));
-        setSwapDebug("input:max", { amount: sell.value, token: swapState.sell });
+        setSwapDebug("input:max", { amount: sell.value, token: swapState.sell, rawBalance: balanceNumber(swapState.sell) });
         scheduleQuote();
       }
       function ensureSwapMaxButton(){
@@ -4244,7 +4270,20 @@ function enhancePrototypeSwapQuote() {
 	        if (!swapExecutionEnabled) return { ok:false, error:"Swap mainnet execution is disabled until Tenderly verification is approved." };
 	        if (!window.__luminaUserAddress) return { ok:false, error:"Connect wallet before swapping." };
 	        if (!amount || !Number.isFinite(amount) || amount <= 0) return { ok:false, error:"Enter an amount greater than 0." };
-	        if (amount > balanceNumber(swapState.sell)) return { ok:false, error:swapCopy("insufficientBalance") };
+	        var balance = balanceNumber(swapState.sell);
+	        if (amount > balance) return { ok:false, error:swapCopy("insufficientBalance") };
+	        var safeMaxText = safeMaxSwapAmount(swapState.sell);
+	        var safeMax = Number(safeMaxText);
+	        if (safeMax > 0 && amount > safeMax && amount <= balance) {
+	          if (sell) {
+	            sell.value = safeMaxText;
+	            sell.dispatchEvent(new Event("input", { bubbles: true }));
+	          }
+	          latestSwapQuote = null;
+	          latestQuoteAt = 0;
+	          scheduleQuote();
+	          return { ok:false, error:swapCopy("safeMaxAdjusted") };
+	        }
 	        if (slip <= 0) return { ok:false, error:swapCopy("slippageTooLow") };
 	        if (!latestSwapQuote) return { ok:false, error:swapCopy("quoteFirst") };
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
