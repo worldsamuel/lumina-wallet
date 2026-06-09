@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
 import { type MarketPrice, type MarketPricesResponse, PRICE_SYMBOLS } from "@/lib/prices";
 
-export const runtime = "edge";
-
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 300_000;
 const COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
 const VS_CURRENCIES = ["usd", "eur", "jpy", "cny", "hkd", "gbp"] as const;
 
@@ -51,7 +49,7 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
 
   const response = await fetch(`${COINGECKO_SIMPLE_PRICE_URL}?${params}`, {
     headers,
-    next: { revalidate: 30 },
+      next: { revalidate: 300 },
   });
   if (!response.ok) throw new Error(`CoinGecko simple/price responded ${response.status}`);
 
@@ -82,7 +80,7 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
 function marketResponse(data: MarketPricesResponse) {
   return new Response(JSON.stringify(data), {
     headers: {
-      "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+      "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
       "Content-Type": "application/json",
     },
   });
@@ -98,8 +96,8 @@ export async function GET() {
     cachedMarket = { data, expiresAt: Date.now() + CACHE_TTL_MS };
     lastGoodMarket = data;
     return marketResponse(data);
-  } catch (error) {
-    console.error("Failed to fetch CoinGecko market prices", error);
+  } catch {
+    console.warn("[prices/market] upstream unavailable");
     if (lastGoodMarket) {
       const staleData = { ...lastGoodMarket, stale: true, updated_at: new Date().toISOString() };
       cachedMarket = { data: staleData, expiresAt: Date.now() + CACHE_TTL_MS };

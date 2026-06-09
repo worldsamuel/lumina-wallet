@@ -18,8 +18,8 @@ export async function GET(req: NextRequest) {
   try {
     const rates = await db.currencyRate.findMany({ orderBy: { code: "asc" } });
     return jsonResponse(rates.length ? rates : defaultCurrencies, CONFIG_CACHE);
-  } catch (error) {
-    console.error("Failed to load currency rates, using fallback", error);
+  } catch {
+    console.warn("[currency-rates] fallback used");
     return jsonResponse(defaultCurrencies, CONFIG_CACHE);
   }
 }

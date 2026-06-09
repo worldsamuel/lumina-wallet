@@ -2487,7 +2487,7 @@ function enhancePrototypeTokens() {
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
       function syncBackendSwapTokens(){
-        fetch("/api/tokens?ts=" + Date.now(), { cache: "no-store" })
+        fetch("/api/tokens")
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(list){
             if (!Array.isArray(list)) return;
@@ -2527,7 +2527,7 @@ function enhancePrototypeTokens() {
       if (!window.__luminaImportedRefreshTimer) {
         window.__luminaImportedRefreshTimer = setInterval(function(){
           if (!document.hidden) refreshImportedBalances();
-        }, 60000);
+        }, 120000);
         document.addEventListener("visibilitychange", function(){
           if (!document.hidden) refreshImportedBalances();
         });
@@ -3550,7 +3550,7 @@ function enhancePrototypeMarket() {
           var box = document.getElementById("gainersList");
           if (box) box.innerHTML = '<div class="import-load">' + marketCopy("loading") + '</div>';
           var pricesPayload = pricePayload || window.__luminaMarketPrices || null;
-          fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab), { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
+          fetch("/api/tokens/top?mode=" + encodeURIComponent(marketTab)).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
             .then(function(result){
               registerMarketsFromPriceMeta(pricesPayload);
               var cg = marketsFromCoinGecko(pricesPayload);
@@ -4995,7 +4995,7 @@ function enhancePrototypeActivity() {
           renderActivity();
           return;
         }
-        fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
+        fetch("/api/activity?address=" + encodeURIComponent(address))
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });
@@ -5008,10 +5008,10 @@ function enhancePrototypeActivity() {
           if (name === "activity") setTimeout(window.__luminaRefreshActivity, 80);
         };
       }
-      setInterval(function(){
+      document.addEventListener("visibilitychange", function(){
         var view = document.getElementById("view-activity");
-        if (view && view.classList.contains("active")) window.__luminaRefreshActivity();
-      }, 120000);
+        if (!document.hidden && view && view.classList.contains("active")) window.__luminaRefreshActivity();
+      });
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance real activity");
@@ -5302,7 +5302,7 @@ function enhancePrototypeMe() {
         setValue();
         var address = window.__luminaUserAddress || "";
         if (!address) return;
-        fetch("/api/points-profile?address=" + encodeURIComponent(address), { cache: "no-store" })
+        fetch("/api/points-profile?address=" + encodeURIComponent(address))
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){
             if (!data) return;
@@ -5310,7 +5310,7 @@ function enhancePrototypeMe() {
             setValue();
           })
           .catch(function(){});
-        fetch("/api/activity?address=" + encodeURIComponent(address), { cache: "no-store" })
+        fetch("/api/activity?address=" + encodeURIComponent(address))
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ setValue(pointsFromActivity(Array.isArray(rows) ? rows : [])); })
           .catch(function(){});
@@ -5582,7 +5582,7 @@ function enhancePrototypeMe() {
         async function reloadPointsProfile(){
           var address = window.__luminaUserAddress || "";
           if (!address) return null;
-          var res = await fetch("/api/points-profile?address=" + encodeURIComponent(address), { cache: "no-store" });
+          var res = await fetch("/api/points-profile?address=" + encodeURIComponent(address));
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && data) {
             window.__luminaPointsProfile = data;
@@ -5905,7 +5905,7 @@ function enhancePrototypeMe() {
         if (initialView === "tasks") renderTaskPage(); else renderShop();
         try {
           if (window.__luminaUserAddress) {
-            var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
+            var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress));
             var profileData = await profileRes.json().catch(function(){ return null; });
             if (profileRes.ok && profileData) {
               window.__luminaPointsProfile = profileData;
@@ -6187,7 +6187,7 @@ function enhancePrototypeDetail() {
             var lookupUrl = /^0x[a-fA-F0-9]{40}$/.test(address)
               ? "/api/market/token?address=" + encodeURIComponent(address) + "&symbol=" + encodeURIComponent(asset.sym || "")
               : "/api/tokens/top?mode=all";
-            fetch(lookupUrl, { cache: "no-store" })
+            fetch(lookupUrl)
               .then(function(res){ return res.ok ? res.json() : []; })
               .then(function(payload){
                 var markets = Array.isArray(payload) ? payload : (payload && payload.market ? [payload.market] : []);
@@ -6218,7 +6218,7 @@ function enhancePrototypeDetail() {
         var address = assetMarketAddress(asset);
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
-          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"), { cache: "no-store" })
+          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"))
             .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];
@@ -6240,7 +6240,7 @@ function enhancePrototypeDetail() {
           return;
         }
         chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
-        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || ""), { cache: "no-store" })
+        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || ""))
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
@@ -6392,7 +6392,7 @@ function enhancePrototypeDetail() {
           return;
         }
         tradesBox.innerHTML = '<div class="detail-empty-row">' + detailCopy("loadingTrades") + '</div>';
-        fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address), { cache: "no-store" })
+        fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address))
           .then(function(res){ return res.ok ? res.json() : { trades: [], holders: [] }; })
           .then(function(data){
             tradesBox.innerHTML = tradeRows(Array.isArray(data.trades) ? data.trades : [], asset);

@@ -21,8 +21,8 @@ export async function GET(req: NextRequest) {
       where: { status: { not: "disabled" } },
       orderBy: { createdAt: "asc" },
     });
-  } catch (error) {
-    console.error("Failed to load public tokens, using core fallback", error);
+  } catch {
+    console.warn("[tokens] fallback used");
   }
   const allConfigured = await db.token.findMany().catch(() => tokens);
   const configuredBySymbol = new Map(allConfigured.map((token) => [token.symbol.toUpperCase(), token]));
@@ -51,14 +51,14 @@ export async function GET(req: NextRequest) {
     createdAt: new Date(0).toISOString(),
   }));
   return jsonResponse([...coreFallback, ...tokens], {
-    headers: { "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0" },
+    headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
   });
 }
 
 async function ensurePublicCoreTokens() {
   try {
     await ensureCoreTokens();
-  } catch (error) {
-    console.error("Failed to ensure public core tokens", error);
+  } catch {
+    console.warn("[tokens] core ensure failed");
   }
 }

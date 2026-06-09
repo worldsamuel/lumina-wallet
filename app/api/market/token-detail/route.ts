@@ -3,8 +3,6 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolTrades } from "@/lib/market-data";
 
-export const runtime = "edge";
-
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -21,9 +19,7 @@ export async function GET(req: NextRequest) {
     (reason) => ({ status: "rejected" as const, reason }),
   );
 
-  if (tradesResult.status === "rejected") {
-    console.error("Failed to fetch pool trades", tradesResult.reason);
-  }
+  if (tradesResult.status === "rejected") console.warn("[market/token-detail] trades unavailable");
 
   return jsonResponse({
     pool,

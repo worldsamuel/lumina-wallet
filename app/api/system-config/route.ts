@@ -16,8 +16,8 @@ export async function GET(req: NextRequest) {
 
   try {
     return jsonResponse(await getSystemConfig(), CONFIG_CACHE);
-  } catch (error) {
-    console.error("Failed to load system config, using fallback", error);
+  } catch {
+    console.warn("[system-config] fallback used");
     return jsonResponse(DEFAULT_SYSTEM_CONFIG, CONFIG_CACHE);
   }
 }

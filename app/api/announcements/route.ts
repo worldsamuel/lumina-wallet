@@ -33,8 +33,8 @@ export async function GET(req: NextRequest) {
       ORDER BY "pinned" DESC, "publishedAt" DESC
     `;
     return jsonResponse(announcements, CONFIG_CACHE);
-  } catch (error) {
-    console.error("Failed to load announcements, using fallback", error);
+  } catch {
+    console.warn("[announcements] fallback used");
     return jsonResponse([
       {
         id: 1,

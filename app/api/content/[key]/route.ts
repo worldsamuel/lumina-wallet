@@ -22,8 +22,8 @@ export async function GET(req: NextRequest, { params }: { params: { key: string 
   try {
     const page = await db.contentPage.findUnique({ where: { key: params.key } });
     return jsonResponse(page ?? { key: params.key, bodyI18n: {} }, CONFIG_CACHE);
-  } catch (error) {
-    console.error("Failed to load content page, using fallback", error);
+  } catch {
+    console.warn("[content] fallback used");
     return jsonResponse({
       key: params.key,
       bodyI18n:

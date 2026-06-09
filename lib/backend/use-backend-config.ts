@@ -113,8 +113,8 @@ function uniqueTokens(rows: BackendToken[] | undefined, swapOnly = false) {
  */
 export function useBackendConfigSync(enabled: boolean) {
   const swrOptions = {
-    dedupingInterval: 60_000,
-    refreshInterval: 300_000,
+    dedupingInterval: 300_000,
+    refreshInterval: 900_000,
     revalidateOnFocus: true,
     refreshWhenHidden: false,
     refreshWhenOffline: false,

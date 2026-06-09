@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
     where: { key: ANALYTICS_KEY },
     update: { bodyI18n: next },
     create: { key: ANALYTICS_KEY, bodyI18n: next },
-  }).catch((error: unknown) => {
-    console.error("Failed to record analytics event", error);
+  }).catch(() => {
+    console.warn("[analytics] record failed");
   });
 
   return jsonResponse({ ok: true });

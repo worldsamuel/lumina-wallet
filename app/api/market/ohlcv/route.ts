@@ -3,8 +3,6 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolOhlcv } from "@/lib/market-data";
 
-export const runtime = "edge";
-
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -46,8 +44,8 @@ export async function GET(req: NextRequest) {
       if (candles.length) return jsonResponse({ pool, range, candles });
     }
     return jsonResponse({ pool, range, candles: [] });
-  } catch (error) {
-    console.error("Failed to fetch GeckoTerminal OHLCV", error);
+  } catch {
+    console.warn("[market/ohlcv] unavailable");
     return jsonResponse({ pool, range, candles: [] });
   }
 }

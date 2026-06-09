@@ -6,7 +6,9 @@ import { db } from "@/lib/db";
 export async function GET(req: NextRequest) {
   const address = String(req.nextUrl.searchParams.get("address") || "").toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) {
-    return jsonResponse({ luminaNo: null, adjustmentTotal: 0, adjustments: [] });
+    return jsonResponse({ luminaNo: null, adjustmentTotal: 0, adjustments: [] }, {
+      headers: { "Cache-Control": "private, max-age=60" },
+    });
   }
 
   const user = await db.user.findUnique({ where: { address } });
@@ -16,10 +18,13 @@ export async function GET(req: NextRequest) {
   ]);
   const luminaNo = user ? await db.user.count({ where: { createdAt: { lte: user.createdAt } } }) : null;
 
-  return jsonResponse({
-    address,
-    luminaNo,
-    adjustmentTotal,
-    adjustments: adjustments.slice(0, 30),
-  });
+  return jsonResponse(
+    {
+      address,
+      luminaNo,
+      adjustmentTotal,
+      adjustments: adjustments.slice(0, 30),
+    },
+    { headers: { "Cache-Control": "private, max-age=60" } },
+  );
 }

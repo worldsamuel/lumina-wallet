@@ -5,8 +5,6 @@ import { getPoolOhlcv, getWorldChainMarketForToken } from "@/lib/market-data";
 import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
 import { TOKENS } from "@/lib/tokens";
 
-export const runtime = "edge";
-
 const COINGECKO_MARKET_CHART_URL = "https://api.coingecko.com/api/v3/coins";
 
 type CoinGeckoMarketChart = {
@@ -78,8 +76,8 @@ export async function GET(req: NextRequest) {
     const outputCandles = candles.length ? candles : stablecoinCandles(symbol, range);
     cache.set(key, { candles: outputCandles, expiresAt: Date.now() + 180_000 });
     return jsonResponse({ symbol, range, source: "coingecko", candles: outputCandles });
-  } catch (error) {
-    console.error("Failed to fetch CoinGecko market history", error);
+  } catch {
+    console.warn("[market/history] coingecko unavailable");
     return jsonResponse({ symbol, range, candles: stablecoinCandles(symbol, range) });
   }
 }
@@ -87,18 +85,18 @@ export async function GET(req: NextRequest) {
 async function candlesForContract(address: string, symbol: string, range: string) {
   const cfg = ohlcvConfig(range);
   if (address.toLowerCase() === ORB_ADDRESS && symbol === "ORB") {
-    return getPoolOhlcv(ORB_POOL_ID, cfg.timeframe, cfg.aggregate, cfg.limit).catch((error) => {
-      console.error("Failed to fetch ORB override OHLCV", error);
+    return getPoolOhlcv(ORB_POOL_ID, cfg.timeframe, cfg.aggregate, cfg.limit).catch(() => {
+      console.warn("[market/history] orb ohlcv unavailable");
       return [];
     });
   }
-  const market = await getWorldChainMarketForToken(address, symbol).catch((error) => {
-    console.error("Failed to resolve market history contract", error);
+  const market = await getWorldChainMarketForToken(address, symbol).catch(() => {
+    console.warn("[market/history] contract resolve failed");
     return null;
   });
   if (!market?.poolAddress) return [];
-  return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit, address).catch((error) => {
-    console.error("Failed to fetch contract OHLCV", error);
+  return getPoolOhlcv(market.poolAddress, cfg.timeframe, cfg.aggregate, cfg.limit, address).catch(() => {
+    console.warn("[market/history] contract ohlcv unavailable");
     return [];
   });
 }

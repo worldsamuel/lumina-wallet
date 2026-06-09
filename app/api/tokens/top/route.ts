@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
   const requestedMode = req.nextUrl.searchParams.get("mode");
   const mode: WorldChainMarketMode =
     requestedMode === "losers" || requestedMode === "new" || requestedMode === "all" ? requestedMode : "gainers";
-  await ensureTokenControlColumns().catch((error) => console.error("Failed to ensure token control columns", error));
+  await ensureTokenControlColumns().catch(() => console.warn("[tokens/top] control column ensure failed"));
   const [tokens, configured] = await Promise.all([
     getWorldChainMarkets(mode),
     db.token.findMany().catch(() => []),

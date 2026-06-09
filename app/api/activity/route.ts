@@ -11,6 +11,7 @@ const transferEvent = parseAbiItem("event Transfer(address indexed from, address
 const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
+const activityCache = new Map<string, { expiresAt: number; data: unknown }>();
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
@@ -75,9 +76,7 @@ function activityResponse(data: unknown, init?: ResponseInit) {
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
-      Pragma: "no-cache",
-      Expires: "0",
+      "Cache-Control": "private, max-age=30",
     },
   });
 }
@@ -187,22 +186,15 @@ async function getTransferLogsForAddress(address: Address, latest: bigint, direc
               fromBlock,
               toBlock,
             })
-            .catch((error) => {
-              console.error("Failed to fetch token activity logs", {
-                tokenAddress,
-                address,
-                direction,
-                fromBlock: fromBlock.toString(),
-                toBlock: toBlock.toString(),
-                error,
-              });
+            .catch(() => {
+              console.warn("[activity] token logs unavailable");
               return [];
             }),
         ),
       );
       logs.push(...chunks.flat());
-    } catch (error) {
-      console.error("Failed to fetch activity log chunk", { address, direction, fromBlock: fromBlock.toString(), toBlock: toBlock.toString(), error });
+    } catch {
+      console.warn("[activity] log chunk unavailable");
     }
 
     if (fromBlock === 0n || fromBlock === minBlock) break;
@@ -227,22 +219,15 @@ async function getRecentPriorityTransferLogs(address: Address, latest: bigint, d
             fromBlock: minBlock,
             toBlock: latest,
           })
-          .catch((error) => {
-            console.error("Failed to fetch priority activity logs", {
-              tokenAddress,
-              address,
-              direction,
-              fromBlock: minBlock.toString(),
-              toBlock: latest.toString(),
-              error,
-            });
+          .catch(() => {
+            console.warn("[activity] priority logs unavailable");
             return [];
           }),
       ),
     );
     logs.push(...chunks.flat());
-  } catch (error) {
-    console.error("Failed to fetch priority activity log chunk", { address, direction, error });
+  } catch {
+    console.warn("[activity] priority log chunk unavailable");
   }
 
   return logs;
@@ -264,14 +249,8 @@ async function getRecentUniversalTransferLogs(address: Address, latest: bigint, 
         toBlock,
       });
       logs.push(...chunkLogs);
-    } catch (error) {
-      console.error("Failed to fetch universal activity logs", {
-        address,
-        direction,
-        fromBlock: fromBlock.toString(),
-        toBlock: toBlock.toString(),
-        error,
-      });
+    } catch {
+      console.warn("[activity] universal logs unavailable");
     }
 
     if (fromBlock === 0n || fromBlock === minBlock) break;
@@ -288,7 +267,7 @@ async function withActivityTimeout<T>(promise: Promise<T>, fallbackValue: T, lab
       promise,
       new Promise<T>((resolve) => {
         timer = setTimeout(() => {
-          console.error("Activity source timed out", { label, timeoutMs });
+          console.warn("[activity] source timed out", label, timeoutMs);
           resolve(fallbackValue);
         }, timeoutMs);
       }),
@@ -411,6 +390,9 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const address = url.searchParams.get("address") ?? "";
   if (!isAddress(address)) return activityResponse([]);
+  const cacheKey = address.toLowerCase();
+  const cached = activityCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return activityResponse(cached.data);
   const storedRows = await getStoredActivities(80)
     .then((rows) =>
       rows
@@ -439,8 +421,8 @@ export async function GET(req: NextRequest) {
       getRecentPriorityTransferLogs(address as Address, latest, "out"),
       withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "in"), [], "incoming-token-logs"),
       withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "out"), [], "outgoing-token-logs"),
-      fetchAlchemyAssetTransfers(address as Address, latest).catch((error) => {
-        console.error("Failed to fetch indexed activity transfers", { address, error });
+      fetchAlchemyAssetTransfers(address as Address, latest).catch(() => {
+        console.warn("[activity] indexed transfers unavailable");
         return [] as ActivityTransferRow[];
       }),
     ]);
@@ -486,9 +468,11 @@ export async function GET(req: NextRequest) {
       const bt = "createdAt" in b ? new Date(String(b.createdAt)).getTime() : 0;
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
-    return activityResponse(allRows.slice(0, 80));
-  } catch (error) {
-    console.error("Failed to fetch real activity", error);
+    const output = allRows.slice(0, 80);
+    activityCache.set(cacheKey, { data: output, expiresAt: Date.now() + 30_000 });
+    return activityResponse(output);
+  } catch {
+    console.warn("[activity] real activity unavailable");
     return activityResponse(storedRows.slice(0, 80));
   }
 }
@@ -518,9 +502,10 @@ export async function POST(req: NextRequest) {
 
   try {
     await recordActivity({ type, address, amount, hash, status, metadata: body?.metadata ?? {} });
+    if (address) activityCache.delete(address.toLowerCase());
     return jsonResponse({ ok: true });
-  } catch (error) {
-    console.error("Failed to record activity", error);
+  } catch {
+    console.warn("[activity] record failed");
     return jsonResponse({ error: "Failed to record activity." }, { status: 500 });
   }
 }

@@ -3,8 +3,6 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getWorldChainMarketForToken } from "@/lib/market-data";
 
-export const runtime = "edge";
-
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -20,8 +18,8 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ market: null });
   }
 
-  const market = await getWorldChainMarketForToken(address, symbol).catch((error) => {
-    console.error("Failed to fetch token market", error);
+  const market = await getWorldChainMarketForToken(address, symbol).catch(() => {
+    console.warn("[market/token] unavailable");
     return null;
   });
 

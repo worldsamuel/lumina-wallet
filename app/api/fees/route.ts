@@ -19,8 +19,8 @@ export async function GET(req: NextRequest) {
     await ensureDefaultFees();
     const fees = await db.feeConfig.findMany({ orderBy: { businessType: "asc" } });
     return jsonResponse(fees, CONFIG_CACHE);
-  } catch (error) {
-    console.error("Failed to load fee configs, using defaults", error);
+  } catch {
+    console.warn("[fees] defaults used");
     return jsonResponse(DEFAULT_FEE_CONFIGS, CONFIG_CACHE);
   }
 }

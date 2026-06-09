@@ -9,7 +9,7 @@ const GECKO_TOKENS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_
 const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 const DEXSCREENER_CHAIN_IDS = ["worldchain", "world-chain"] as const;
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 300_000;
 const MIN_LIQUIDITY_USD = 10;
 const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
@@ -356,7 +356,7 @@ export async function getWorldChainMarketCatalog() {
       .map((result) => result.value);
     if (!pages.length) {
       settledPages.forEach((result) => {
-        if (result.status === "rejected") console.error(result.reason);
+        if (result.status === "rejected") console.warn("[market-data] page unavailable");
       });
       throw new Error("No GeckoTerminal World Chain pages returned");
     }
@@ -391,8 +391,8 @@ export async function getWorldChainMarketCatalog() {
     cached = { data, expiresAt: Date.now() + CACHE_TTL_MS };
     lastGood = data;
     return data;
-  } catch (error) {
-    console.error("Failed to fetch World Chain market data", error);
+  } catch {
+    console.warn("[market-data] catalog unavailable");
     return lastGood;
   }
 }
@@ -411,7 +411,7 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
       .filter((market): market is MarketToken => Boolean(market))
       .sort((a, b) => (b.liquidityUsd || b.volume24hUsd || 0) - (a.liquidityUsd || a.volume24hUsd || 0))[0];
     if (dexMarket) {
-      tokenMarketCache.set(cacheKey, { data: dexMarket, expiresAt: Date.now() + 60_000 });
+      tokenMarketCache.set(cacheKey, { data: dexMarket, expiresAt: Date.now() + 300_000 });
       return dexMarket;
     }
 
@@ -436,11 +436,11 @@ export async function getWorldChainMarketForToken(tokenAddress: string, symbolHi
       }
     }
     const resolved = best ?? overrideMarket;
-    tokenMarketCache.set(cacheKey, { data: resolved, expiresAt: Date.now() + 60_000 });
+    tokenMarketCache.set(cacheKey, { data: resolved, expiresAt: Date.now() + 300_000 });
     return resolved;
-  } catch (error) {
-    console.error("Failed to fetch GeckoTerminal token pools", error);
-    tokenMarketCache.set(cacheKey, { data: overrideMarket, expiresAt: Date.now() + 20_000 });
+  } catch {
+    console.warn("[market-data] token pools unavailable");
+    tokenMarketCache.set(cacheKey, { data: overrideMarket, expiresAt: Date.now() + 120_000 });
     return overrideMarket;
   }
 }
