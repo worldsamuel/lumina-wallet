@@ -66,6 +66,13 @@ export type SocialLinkConfig = {
   logoUrl: string | null;
 };
 
+type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsRules" | "pointsTasks">> & {
+  socialLinks?: unknown;
+  welcomeBox?: unknown;
+  pointsRules?: unknown;
+  pointsTasks?: unknown;
+};
+
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   maintenance: false,
   morphoDepositEnabled: true,
@@ -408,7 +415,12 @@ function cleanSocialLink(value: unknown): SocialLinkConfig {
 function cleanUrl(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  return /^https?:\/\//i.test(trimmed) ? trimmed : null;
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (/^(?:www\.|[a-z0-9-]+(?:\.[a-z0-9-]+)+)(?:[/:?#]|$)/i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return null;
 }
 
 function cleanTaskUrl(value: unknown) {
@@ -418,21 +430,67 @@ function cleanTaskUrl(value: unknown) {
   return cleanUrl(trimmed);
 }
 
+function cleanUndefinedFields<T extends Record<string, unknown>>(value: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item !== undefined),
+  ) as Partial<T>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function mergeSystemConfigPatch(
+  current: SystemConfig,
+  patch: SystemConfigPatch,
+): Partial<SystemConfig> {
+  const cleaned = cleanUndefinedFields(patch as Record<string, unknown>) as Partial<SystemConfig> & {
+    socialLinks?: unknown;
+    welcomeBox?: unknown;
+    pointsRules?: unknown;
+    pointsTasks?: unknown;
+  };
+  const next: Partial<SystemConfig> = { ...cleaned };
+
+  if (isRecord(cleaned.welcomeBox)) {
+    next.welcomeBox = { ...current.welcomeBox, ...cleanUndefinedFields(cleaned.welcomeBox) };
+  }
+
+  if (isRecord(cleaned.pointsRules)) {
+    next.pointsRules = { ...current.pointsRules, ...cleanUndefinedFields(cleaned.pointsRules) };
+  }
+
+  if (Array.isArray(cleaned.pointsTasks)) {
+    next.pointsTasks = cleaned.pointsTasks as PointsTaskConfig[];
+  }
+
+  if (isRecord(cleaned.socialLinks)) {
+    const links: SystemConfig["socialLinks"] = { ...current.socialLinks };
+    (["x", "telegram", "website", "discord", "youtube"] as const).forEach((key) => {
+      const incoming = cleaned.socialLinks?.[key];
+      if (incoming === undefined) return;
+      const mergedLink = isRecord(incoming)
+        ? { ...current.socialLinks[key], ...cleanUndefinedFields(incoming) }
+        : incoming;
+      links[key] = cleanSocialLink(mergedLink);
+    });
+    next.socialLinks = links;
+  }
+
+  return next;
+}
+
 export async function getSystemConfig() {
   const page = await db.contentPage.findUnique({ where: { key: SYSTEM_CONFIG_KEY } });
   return normalizeSystemConfig(page?.bodyI18n);
 }
 
 export async function updateSystemConfig(
-  patch: Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsRules" | "pointsTasks">> & {
-    socialLinks?: unknown;
-    welcomeBox?: unknown;
-    pointsRules?: unknown;
-    pointsTasks?: unknown;
-  },
+  patch: SystemConfigPatch,
 ) {
   const current = await getSystemConfig();
-  const next = normalizeSystemConfig({ ...current, ...patch });
+  const mergedPatch = mergeSystemConfigPatch(current, patch);
+  const next = normalizeSystemConfig({ ...current, ...mergedPatch });
   await db.contentPage.upsert({
     where: { key: SYSTEM_CONFIG_KEY },
     update: { bodyI18n: next },
