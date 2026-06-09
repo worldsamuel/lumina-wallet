@@ -2946,8 +2946,11 @@ function enhancePrototypeHome() {
         map = map || {};
         return map[lang] || map.en || map["zh-CN"] || fallback || "";
       }
+      function homeSystemConfig(){
+        try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
+      }
       function homePointsBannerConfig(){
-        var cfg = systemConfig();
+        var cfg = homeSystemConfig();
         var banner = cfg && cfg.pointsHomeBanner ? cfg.pointsHomeBanner : {};
         return {
           enabled: banner.enabled !== false,
@@ -2982,7 +2985,7 @@ function enhancePrototypeHome() {
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
       }
       function welcomeBoxConfig(){
-        var cfg = systemConfig();
+        var cfg = homeSystemConfig();
         var box = cfg && cfg.welcomeBox ? cfg.welcomeBox : {};
         return {
           enabled: box.enabled !== false,
