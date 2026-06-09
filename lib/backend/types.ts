@@ -48,6 +48,13 @@ export type BackendSystemConfig = {
   adminLogoUrl: string | null;
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
+  pointsHomeBanner?: {
+    enabled?: boolean;
+    titleI18n?: Record<string, string>;
+    subtitleI18n?: Record<string, string>;
+    tasksLabelI18n?: Record<string, string>;
+    boxLabelI18n?: Record<string, string>;
+  };
   socialLinks?: {
     x?: BackendSocialLink | string | null;
     telegram?: BackendSocialLink | string | null;

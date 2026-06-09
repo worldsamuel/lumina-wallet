@@ -6,6 +6,13 @@ export type SystemConfig = {
   adminLogoUrl: string | null;
   faviconUrl: string | null;
   swapNetworkFeeLabel: string | null;
+  pointsHomeBanner: {
+    enabled: boolean;
+    titleI18n: Record<string, string>;
+    subtitleI18n: Record<string, string>;
+    tasksLabelI18n: Record<string, string>;
+    boxLabelI18n: Record<string, string>;
+  };
   welcomeBox: {
     enabled: boolean;
     totalCount: number;
@@ -66,9 +73,10 @@ export type SocialLinkConfig = {
   logoUrl: string | null;
 };
 
-type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsRules" | "pointsTasks">> & {
+type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsHomeBanner" | "pointsRules" | "pointsTasks">> & {
   socialLinks?: unknown;
   welcomeBox?: unknown;
+  pointsHomeBanner?: unknown;
   pointsRules?: unknown;
   pointsTasks?: unknown;
 };
@@ -79,6 +87,16 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
   adminLogoUrl: null,
   faviconUrl: null,
   swapNetworkFeeLabel: "~$0.00",
+  pointsHomeBanner: {
+    enabled: true,
+    titleI18n: { en: "Lumina Points", "zh-CN": "Lumina Points" },
+    subtitleI18n: {
+      en: "Complete tasks, earn points, and unlock amazing rewards.",
+      "zh-CN": "完成任务，赚取积分，解锁更多奖励。",
+    },
+    tasksLabelI18n: { en: "Tasks", "zh-CN": "任务" },
+    boxLabelI18n: { en: "Mystery Box", "zh-CN": "盲盒" },
+  },
   welcomeBox: {
     enabled: true,
     totalCount: 1000,
@@ -230,10 +248,23 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
       typeof source.swapNetworkFeeLabel === "string" && source.swapNetworkFeeLabel.trim()
         ? source.swapNetworkFeeLabel.trim()
         : DEFAULT_SYSTEM_CONFIG.swapNetworkFeeLabel,
+    pointsHomeBanner: normalizePointsHomeBanner(source.pointsHomeBanner),
     welcomeBox: normalizeWelcomeBox(source.welcomeBox),
     pointsRules: normalizePointsRules(source.pointsRules),
     pointsTasks: normalizePointsTasks(source.pointsTasks),
     socialLinks: normalizeSocialLinks(source.socialLinks),
+  };
+}
+
+function normalizePointsHomeBanner(value: unknown): SystemConfig["pointsHomeBanner"] {
+  const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["pointsHomeBanner"]> : {};
+  const fallback = DEFAULT_SYSTEM_CONFIG.pointsHomeBanner;
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
+    titleI18n: cleanI18n(source.titleI18n, fallback.titleI18n.en),
+    subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),
+    tasksLabelI18n: cleanI18n(source.tasksLabelI18n, fallback.tasksLabelI18n.en),
+    boxLabelI18n: cleanI18n(source.boxLabelI18n, fallback.boxLabelI18n.en),
   };
 }
 
@@ -447,6 +478,7 @@ function mergeSystemConfigPatch(
   const cleaned = cleanUndefinedFields(patch as Record<string, unknown>) as Partial<SystemConfig> & {
     socialLinks?: unknown;
     welcomeBox?: unknown;
+    pointsHomeBanner?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
   };
@@ -454,6 +486,10 @@ function mergeSystemConfigPatch(
 
   if (isRecord(cleaned.welcomeBox)) {
     next.welcomeBox = { ...current.welcomeBox, ...cleanUndefinedFields(cleaned.welcomeBox) };
+  }
+
+  if (isRecord(cleaned.pointsHomeBanner)) {
+    next.pointsHomeBanner = { ...current.pointsHomeBanner, ...cleanUndefinedFields(cleaned.pointsHomeBanner) };
   }
 
   if (isRecord(cleaned.pointsRules)) {

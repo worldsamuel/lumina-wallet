@@ -2935,7 +2935,48 @@ function enhancePrototypeHome() {
           search.innerHTML = '<span>' + homeIcon("search") + '</span><input id="homeTokenSearch" placeholder="Search token" oninput="renderAssets()" />';
           section.insertAdjacentElement("afterend", search);
         }
+        ensureHomePointsBanner();
         window.setTimeout(function(){ maybeOpenWelcomeBox(); }, 650);
+      }
+      function homeBannerEscape(text){
+        return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
+      }
+      function homeBannerText(map, fallback){
+        var lang = window.currentLang || "en";
+        map = map || {};
+        return map[lang] || map.en || map["zh-CN"] || fallback || "";
+      }
+      function homePointsBannerConfig(){
+        var cfg = systemConfig();
+        var banner = cfg && cfg.pointsHomeBanner ? cfg.pointsHomeBanner : {};
+        return {
+          enabled: banner.enabled !== false,
+          title: homeBannerText(banner.titleI18n, "Lumina Points"),
+          subtitle: homeBannerText(banner.subtitleI18n, "Complete tasks, earn points, and unlock amazing rewards."),
+          tasks: homeBannerText(banner.tasksLabelI18n, "Tasks"),
+          box: homeBannerText(banner.boxLabelI18n, "Mystery Box")
+        };
+      }
+      function ensureHomePointsBanner(){
+        var home = document.getElementById("view-home");
+        if (!home) return;
+        var cfg = homePointsBannerConfig();
+        var existing = document.getElementById("homePointsBanner");
+        if (!cfg.enabled) { if (existing) existing.remove(); return; }
+        if (!existing) {
+          var section = home.querySelector(".section-head");
+          if (!section) return;
+          existing = document.createElement("button");
+          existing.type = "button";
+          existing.id = "homePointsBanner";
+          existing.className = "home-points-banner";
+          existing.onclick = function(){ if (typeof window.openPointsCenter === "function") window.openPointsCenter(); };
+          section.insertAdjacentElement("beforebegin", existing);
+        }
+        existing.innerHTML =
+          '<span class="home-points-orbit"><img src="/points/lumina-points-icon.png" alt="" /></span>' +
+          '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
+          '<span class="home-points-gift" aria-hidden="true"></span><span class="home-points-chev">›</span>';
       }
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
@@ -3234,6 +3275,7 @@ function enhancePrototypeHome() {
           subEl.textContent = sign + formatMoney(change24hUsdNum) + " (24h)";
         }
         if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
+        ensureHomePointsBanner();
       }
       window.__luminaRefreshHomeTotalFromAssets = refreshHomeTotalFromAssets;
       function rowHtml(asset, index, imported){
@@ -5523,10 +5565,11 @@ function enhancePrototypeMe() {
         }
         function updatePointsBalance(nextValue){
           window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
-          var meBadge = document.getElementById("mePointsBadge");
-          var centerBadge = document.getElementById("pointsCenterValue");
-          var shopBadge = document.getElementById("pointsShopBalance");
-          [meBadge, centerBadge, shopBadge].forEach(function(el){ if (el) el.textContent = Number(window.__luminaPoints || 0).toLocaleString(); });
+        var meBadge = document.getElementById("mePointsBadge");
+        var centerBadge = document.getElementById("pointsCenterValue");
+        var shopBadge = document.getElementById("pointsShopBalance");
+        var homeBanner = document.getElementById("homePointsBannerValue");
+        [meBadge, centerBadge, shopBadge, homeBanner].forEach(function(el){ if (el) el.textContent = Number(window.__luminaPoints || 0).toLocaleString(); });
         }
         function luminaMark(extra){
           return '<span class="lumina-mark ' + (extra || "") + '" aria-hidden="true"><img src="/points/lumina-points-icon.png" alt="" /></span>';
@@ -5967,7 +6010,8 @@ function enhancePrototypeMe() {
               localStorage.setItem("ww_lang", code);
             } catch(e) {}
           }
-          if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
+        if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
+        if (typeof window.renderAssets === "function") window.renderAssets();
           updateFeedbackCopy();
         };
       }

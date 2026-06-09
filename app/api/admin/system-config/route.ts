@@ -24,6 +24,7 @@ export async function PATCH(req: NextRequest) {
     adminLogoUrl?: string | null;
     faviconUrl?: string | null;
     swapNetworkFeeLabel?: string | null;
+    pointsHomeBanner?: unknown;
     welcomeBox?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
@@ -47,6 +48,7 @@ export async function PATCH(req: NextRequest) {
         ? body.swapNetworkFeeLabel
         : undefined,
     welcomeBox: typeof body.welcomeBox === "object" && body.welcomeBox !== null ? body.welcomeBox : undefined,
+    pointsHomeBanner: typeof body.pointsHomeBanner === "object" && body.pointsHomeBanner !== null ? body.pointsHomeBanner : undefined,
     pointsRules: typeof body.pointsRules === "object" && body.pointsRules !== null ? body.pointsRules : undefined,
     pointsTasks: Array.isArray(body.pointsTasks) ? body.pointsTasks : undefined,
     socialLinks: typeof body.socialLinks === "object" && body.socialLinks !== null ? body.socialLinks : undefined,
