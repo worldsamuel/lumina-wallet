@@ -5517,13 +5517,9 @@ function enhancePrototypeMe() {
           var countries = productCountries(product);
           return region === "global" || countries.indexOf("global") >= 0 || countries.indexOf(region) >= 0;
         }
-        function purchaseKey(id){ return "lumina_points_purchase_" + String(id || ""); }
         function purchasedCount(id){
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
-          try { return serverCount + Math.max(0, Number(localStorage.getItem(purchaseKey(id)) || 0)); } catch(e) { return serverCount; }
-        }
-        function setPurchasedCount(id, count){
-          try { localStorage.setItem(purchaseKey(id), String(Math.max(0, Number(count || 0)))); } catch(e) {}
+          return Math.max(0, serverCount);
         }
         function updatePointsBalance(nextValue){
           window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
@@ -5590,6 +5586,19 @@ function enhancePrototypeMe() {
             return data;
           }
           return null;
+        }
+        async function reloadPointsOrders(){
+          var address = window.__luminaUserAddress || "";
+          if (!address) return [];
+          var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(address), { cache: "no-store" });
+          var orderData = await orderRes.json().catch(function(){ return []; });
+          window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
+          return window.__luminaPointsOrders;
+        }
+        function pointsActionBusy(key, value){
+          window.__luminaPointsActionBusy = window.__luminaPointsActionBusy || {};
+          if (arguments.length > 1) window.__luminaPointsActionBusy[key] = !!value;
+          return window.__luminaPointsActionBusy[key] === true;
         }
         async function completeTask(id, silent){
           var task = (pointsSystemConfig().pointsTasks || []).find(function(item){ return item && item.id === id; });
@@ -5706,8 +5715,12 @@ function enhancePrototypeMe() {
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           var copy = meCopy();
+          var busyKey = "open:" + product.id;
+          if (pointsActionBusy(busyKey)) return;
           var count = purchasedCount(product.id);
           if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); return; }
+          pointsActionBusy(busyKey, true);
+          renderProductDetail(product.id, null, "opening");
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
           var won = rewards[0];
           var old = document.getElementById("blindBoxModal");
@@ -5728,20 +5741,20 @@ function enhancePrototypeMe() {
             var data = await res.json().catch(function(){ return null; });
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
             if (data.reward) won = data.reward;
-            if (Array.isArray(window.__luminaPointsOrders)) {
-              var openedOne = false;
-              window.__luminaPointsOrders = window.__luminaPointsOrders.map(function(order){
-                if (!openedOne && order.productId === product.id && order.status === "purchased") {
-                  openedOne = true;
-                  return Object.assign({}, order, { status:"opened", reward:won });
-                }
+            if (data.order) {
+              var replaced = false;
+              window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
+                if (order && order.id === data.order.id) { replaced = true; return data.order; }
                 return order;
               });
+              if (!replaced) window.__luminaPointsOrders.unshift(data.order);
             }
-            setPurchasedCount(product.id, Math.max(0, Number(localStorage.getItem(purchaseKey(product.id)) || 0) - 1));
+            reloadPointsOrders().catch(function(){});
           } catch(e) {
             box.remove();
             toast(e && e.message ? e.message : "Open failed");
+            pointsActionBusy(busyKey, false);
+            renderProductDetail(product.id);
             return;
           }
           var result = box.querySelector(".blind-result");
@@ -5750,6 +5763,7 @@ function enhancePrototypeMe() {
             result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(i18nText(won.nameI18n, won.name || "Lumina reward")) + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
           }
           addPointsCoupon({ title: i18nText(won.nameI18n, won.name || "Lumina reward"), value: won.value || "", source: productTitle(product) });
+          pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
         };
         function productArt(product, mode){
@@ -5772,9 +5786,13 @@ function enhancePrototypeMe() {
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           var copy = meCopy();
+          var busyKey = "buy:" + product.id;
+          if (pointsActionBusy(busyKey)) return;
           if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
           if (Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
+          pointsActionBusy(busyKey, true);
+          renderProductDetail(product.id, null, "buying");
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             var res = await fetch("/api/points-products/purchase", {
@@ -5789,23 +5807,31 @@ function enhancePrototypeMe() {
             }
           } catch(e) {
             toast(e && e.message ? e.message : "Purchase failed");
+            pointsActionBusy(busyKey, false);
+            renderProductDetail(product.id);
             return;
           }
           updatePointsBalance(Number(window.__luminaPoints || 0) - cost);
           addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
           if (product.type !== "blind_box") addPointsCoupon({ title:product.title, value:product.imageText || "", source:"Product Center" });
           toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
+          pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
         }
-        function renderProductDetail(productId, errorText){
+        function renderProductDetail(productId, errorText, pendingAction){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product || !modal) return;
           var copy = meCopy();
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
           var isBlind = product.type === "blind_box";
           var owned = purchasedCount(product.id);
+          var isBuying = pendingAction === "buying" || pointsActionBusy("buy:" + product.id);
+          var isOpening = pendingAction === "opening" || pointsActionBusy("open:" + product.id);
           var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
           var actionText = isBlind && owned > 0 ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
+          if (isBuying) actionText = copy.processing || "Processing...";
+          if (isOpening) actionText = copy.opening || "Opening...";
+          var disabled = isBuying || isOpening;
           var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
           var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
@@ -5816,7 +5842,7 @@ function enhancePrototypeMe() {
             '<span class="points-policy">' + escapeAttr(copy.nonRefundable || "Non-refundable") + '</span>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
-            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + error + '</div><button type="button" onclick="' + action + '">' + escapeAttr(actionText) + '</button></div>';
+            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
         }
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
@@ -5924,9 +5950,7 @@ function enhancePrototypeMe() {
         } catch(e) {}
         try {
           if (window.__luminaUserAddress) {
-            var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
-            var orderData = await orderRes.json().catch(function(){ return []; });
-            window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
+            await reloadPointsOrders();
             if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
           }
         } catch(e) {}

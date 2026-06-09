@@ -972,6 +972,7 @@
   .points-detail-price small { display: block; margin-top: 6px; color: #a9afa9; font-size: 13px; }
   .points-detail-price small b { color: #c9ff22; }
   .points-detail-footer button { height: 60px; border: none; border-radius: 999px; background: linear-gradient(135deg, #c9ff22, #9af10d); color: #071007; font-size: 15px; font-weight: 950; letter-spacing: 0; box-shadow: 0 14px 36px rgba(161,255,19,.2); }
+  .points-detail-footer button:disabled { opacity: .62; filter: grayscale(.25); box-shadow: none; cursor: wait; }
   .points-mini-sheet { position: fixed; inset: 0; z-index: 320; display: none; align-items: flex-end; justify-content: center; padding: 18px; background: rgba(0,0,0,.62); backdrop-filter: blur(12px); }
   .points-mini-sheet.open { display: flex; }
   .points-mini-sheet > div { position: relative; width: min(390px, 100%); max-height: 72vh; overflow: auto; padding: 22px; border: 1px solid rgba(255,255,255,.1); border-radius: 26px; background: linear-gradient(180deg, #151715, #070807); box-shadow: 0 -20px 60px rgba(0,0,0,.5); }
