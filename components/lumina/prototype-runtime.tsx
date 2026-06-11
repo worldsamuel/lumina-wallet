@@ -4055,7 +4055,7 @@ function enhancePrototypeSwapQuote() {
       }
 	      function scheduleQuote(){
 	        clearTimeout(quoteTimer);
-	        quoteTimer = setTimeout(requestQuote, 300);
+	        quoteTimer = setTimeout(requestQuote, 80);
 	      }
 	      function tokenMeta(symbol, quoted){
 	        var meta = quoted || (customTokens && customTokens[symbol] ? customTokens[symbol] : null);
@@ -5865,9 +5865,9 @@ function enhancePrototypeMe() {
           renderProductDetail(product.id);
         };
         function productArt(product, mode){
-          var image = mode === "detail" ? (product.detailImageUrl || product.imageUrl) : product.imageUrl;
+          var image = mode === "detail" || product.type === "blind_box" ? (product.detailImageUrl || product.imageUrl) : product.imageUrl;
           if (image) return '<img src="' + escapeAttr(image) + '" alt="" />';
-          if (product.type === "blind_box") return '<div class="mystery-art"><span>?</span><b>Lumina Mystery Box</b></div>';
+          if (product.type === "blind_box") return '<div class="points-product-placeholder blind">' + luminaMark("sm") + '</div>';
           var text = escapeAttr(product.imageText || product.title || "Lumina");
           return '<span>' + text + '</span>';
         }
@@ -5894,6 +5894,25 @@ function enhancePrototypeMe() {
           if (Math.floor(Number(product.stock || 0)) <= 0) { toast(copy.soldOut || "Sold out"); renderProductDetail(productId, "soldout"); return; }
           pointsActionBusy(busyKey, true);
           renderProductDetail(product.id, null, "buying");
+          var previousPoints = Number(window.__luminaPoints || 0);
+          var previousStock = Math.max(0, Math.floor(Number(product.stock || 0)));
+          var tempOrderId = "local-buy-" + product.id + "-" + Date.now();
+          var tempOrder = {
+            id: tempOrderId,
+            productId: product.id,
+            productTitle: productTitle(product),
+            type: product.type,
+            status: product.type === "blind_box" ? "purchased" : "redeemed",
+            createdAt: new Date().toISOString(),
+            localPending: true
+          };
+          updatePointsBalance(previousPoints - cost);
+          if (previousStock > 0) product.stock = previousStock - 1;
+          window.__luminaPointsOrders = [tempOrder].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
+          pointsActionBusy(busyKey, false);
+          renderProductDetail(product.id);
+          renderProducts(window.__luminaPointsProducts || products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
+          renderHomePointsBanner();
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             var res = await fetch("/api/points-products/purchase", {
@@ -5904,22 +5923,24 @@ function enhancePrototypeMe() {
             var data = await res.json().catch(function(){ return null; });
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
             if (data.order) {
-              window.__luminaPointsOrders = [data.order].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
+              window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
+                return order && order.id === tempOrderId ? data.order : order;
+              });
             }
             if (data.product) {
               window.__luminaPointsProducts = (Array.isArray(window.__luminaPointsProducts) ? window.__luminaPointsProducts : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
               products = window.__luminaPointsProducts;
               product = data.product;
-            } else {
-              product.stock = Math.max(0, Math.floor(Number(product.stock || 0)) - 1);
             }
           } catch(e) {
+            updatePointsBalance(previousPoints);
+            product.stock = previousStock;
+            window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return !order || order.id !== tempOrderId; });
             toast(e && e.message ? e.message : "Purchase failed");
             pointsActionBusy(busyKey, false);
             renderProductDetail(product.id);
             return;
           }
-          updatePointsBalance(Number(window.__luminaPoints || 0) - cost);
           addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
           if (product.type !== "blind_box") addPointsCoupon({ title:product.title, value:product.imageText || "", source:"Product Center" });
           toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));

@@ -53,17 +53,23 @@ export async function POST(req: NextRequest) {
   const platformFeeConfig = getSwapPlatformFeeConfig();
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
+  const enableHoldstationReference =
+    process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ||
+    process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true";
+  const enableV4Reference = process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE === "true";
   const [holdstation, v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
-    withTimeout(buildHoldstationQuote(parsed.from, parsed.to, parsed.amountText, parsed.slippageBps), 13_000).catch((error) => {
-      console.warn("[SWAP] Holdstation quote failed", error);
-      return null;
-    }),
-    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
+    enableHoldstationReference
+      ? withTimeout(buildHoldstationQuote(parsed.from, parsed.to, parsed.amountText, parsed.slippageBps), 3_500).catch((error) => {
+          console.warn("[SWAP] Holdstation quote failed", error);
+          return null;
+        })
+      : Promise.resolve(null),
+    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 3_500)
       .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
       .catch(() => null),
-    hasCommunityToken
+    hasCommunityToken || !enableV4Reference
       ? Promise.resolve(null)
-      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 6_000)
+      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 3_500)
           .then((quote) => ({ source: "uniswap-v4" as const, ...quote }))
           .catch(() => null),
     reliableImpactReference ? fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null) : Promise.resolve(null),

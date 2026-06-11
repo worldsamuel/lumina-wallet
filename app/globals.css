@@ -328,16 +328,16 @@
   #view-home .home-points-actions { margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
   #view-home .home-points-actions i { min-height: 31px; padding: 0 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; display: inline-flex; align-items: center; background: rgba(6,8,7,.42); color: #fff; font-style: normal; font-size: 13px; font-weight: 900; }
   #view-home .home-points-actions i.gift { border-color: rgba(74,222,128,.14); background: rgba(74,222,128,.18); color: #9cf5aa; }
-  #view-home .home-points-gift { position: absolute; z-index: 0; right: 54px; top: 22px; width: 46px; height: 36px; border-radius: 8px 8px 10px 10px; background: linear-gradient(90deg, #313631 0 42%, #7ef090 42% 58%, #202520 58% 100%); opacity: .7; pointer-events: none; transform: rotate(-8deg); box-shadow: 0 16px 32px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.08); }
+  #view-home .home-points-gift { position: absolute; z-index: 0; right: 44px; top: 12px; width: 36px; height: 29px; border-radius: 7px 7px 9px 9px; background: linear-gradient(90deg, #313631 0 42%, #7ef090 42% 58%, #202520 58% 100%); opacity: .52; pointer-events: none; transform: rotate(-8deg); box-shadow: 0 16px 32px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.08); }
   #view-home .home-points-gift::before { content: ""; position: absolute; left: -4px; right: -4px; top: -9px; height: 12px; border-radius: 8px; background: linear-gradient(90deg, #3b413b 0 42%, #86f497 42% 58%, #272c27 58% 100%); }
-  #view-home .home-points-gift::after { content: ""; position: absolute; left: 14px; top: -22px; width: 30px; height: 20px; border: 5px solid #86f497; border-bottom: 0; border-radius: 18px 18px 0 0; transform: rotate(-12deg); }
+  #view-home .home-points-gift::after { content: ""; position: absolute; left: 11px; top: -18px; width: 24px; height: 16px; border: 4px solid #86f497; border-bottom: 0; border-radius: 16px 16px 0 0; transform: rotate(-12deg); }
   #view-home .home-points-chev { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-size: 34px; line-height: 1; z-index: 1; }
   @media (max-width: 390px) {
     #view-home .home-points-banner { min-height: 148px; padding-left: 96px; padding-right: 32px; }
     #view-home .home-points-orbit { left: 14px; width: 66px; height: 66px; }
     #view-home .home-points-orbit img { width: 48px; height: 48px; }
     #view-home .home-points-copy small { max-width: 190px; }
-    #view-home .home-points-gift { right: 40px; top: 18px; width: 40px; height: 31px; opacity: .58; }
+    #view-home .home-points-gift { right: 36px; top: 10px; width: 32px; height: 25px; opacity: .45; }
   }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }
@@ -975,10 +975,8 @@
   .points-detail-hero.blind::before { content: none; }
   .points-detail-hero img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: cover; display: block; }
   .points-detail-hero span { position: relative; z-index: 1; max-width: 86%; text-shadow: 0 0 30px rgba(174,255,31,.38); }
-  .mystery-art { position: relative; z-index: 1; width: min(170px, 70%); aspect-ratio: 1.12; border-radius: 14px 14px 20px 20px; display: grid; place-items: center; background: linear-gradient(155deg, #17341d, #050906); border: 1px solid rgba(201,255,34,.35); box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 20px 50px rgba(0,0,0,.35); color: #c9ff22; }
-  .mystery-art::before { content: ""; position: absolute; left: -10px; right: -10px; top: -26px; height: 36px; border-radius: 12px; background: linear-gradient(155deg, #275f2e, #0a170d); border: 1px solid rgba(201,255,34,.28); }
-  .mystery-art span { font-size: 52px; line-height: 1; }
-  .mystery-art b { position: absolute; left: 12px; bottom: 12px; color: #eaffcf; font-size: 13px; line-height: 1.1; text-align: left; text-transform: uppercase; }
+  .points-product-placeholder { width: 100%; height: 100%; display: grid; place-items: center; background: radial-gradient(circle at 50% 42%, rgba(152,255,59,.26), transparent 34%), linear-gradient(145deg, #061009, #111a12); }
+  .points-product-placeholder .lumina-mark { width: 54px; height: 54px; }
   .points-detail-title { margin-top: 24px; display: block; min-width: 0; }
   .points-detail-title > div { min-width: 0; }
   .points-detail-title h2 { margin: 0; max-width: 100%; color: #fff; font-size: clamp(24px, 7vw, 34px); line-height: 1.08; font-weight: 950; overflow-wrap: anywhere; word-break: normal; }
