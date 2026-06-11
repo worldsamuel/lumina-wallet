@@ -2977,9 +2977,9 @@ function enhancePrototypeHome() {
           section.insertAdjacentElement("beforebegin", existing);
         }
         existing.innerHTML =
-          '<span class="home-points-orbit"><img src="/points/lumina-points-icon.png" alt="" /></span>' +
+          '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
           '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
-          '<span class="home-points-gift" aria-hidden="true"></span><span class="home-points-chev">›</span>';
+          '<span class="home-points-gifts" aria-hidden="true"><span></span><span></span><span></span></span><span class="home-points-chev">›</span>';
       }
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
@@ -5816,7 +5816,7 @@ function enhancePrototypeMe() {
           var busyKey = "open:" + product.id;
           if (pointsActionBusy(busyKey)) return;
           var count = purchasedCount(product.id);
-          if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); return; }
+          if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); renderProductDetail(product.id, "buyfirst"); return; }
           pointsActionBusy(busyKey, true);
           renderProductDetail(product.id, null, "opening");
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
@@ -5986,6 +5986,7 @@ function enhancePrototypeMe() {
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
           if (errorText === "limit") error = '<div class="points-detail-error">' + escapeAttr(copy.limitReached || "Purchase limit reached") + '</div>';
           if (errorText === "soldout") error = '<div class="points-detail-error">' + escapeAttr(copy.soldOut || "Sold out") + '</div>';
+          if (errorText === "buyfirst") error = '<div class="points-detail-error">' + escapeAttr(copy.buyFirst || "Please buy this mystery box first") + '</div>';
           var boxInfo = isBlind ? '<small class="points-stock-line">' + escapeAttr(copy.boxQuantity || "Boxes") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(copy.limit || "Limit") + ': ' + totalOwned + '/' + limit : '') + '</small>' : "";
           modal.innerHTML =
             '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
