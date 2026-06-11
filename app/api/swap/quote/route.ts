@@ -197,7 +197,8 @@ async function buildHoldstationQuote(from: SwapToken, to: SwapToken, amountText:
 }
 
 function pickMainQuote(holdstation: HoldstationQuote | null, v3: SourceQuote | null, v4: SourceQuote | null) {
-  if (holdstation?.quote && holdstation.amountOutRaw > 0n) {
+  if (v3?.bestQuote) return { source: "uniswap-v3" as const, quote: v3.bestQuote };
+  if (process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" && holdstation?.quote && holdstation.amountOutRaw > 0n) {
     const netRaw = holdstation.amountOutRaw > holdstation.feeAmountOutRaw ? holdstation.amountOutRaw - holdstation.feeAmountOutRaw : holdstation.amountOutRaw;
     return {
       source: "holdstation" as const,
@@ -217,7 +218,8 @@ function pickMainQuote(holdstation: HoldstationQuote | null, v3: SourceQuote | n
       feeAmountOutRaw: holdstation.feeAmountOutRaw,
     };
   }
-  if (v3?.bestQuote) return { source: "uniswap-v3" as const, quote: v3.bestQuote };
+  // Holdstation is currently kept as a reference quote unless explicitly enabled.
+  // Its SDK execution can fail inside World App even when quote calldata exists.
   // Keep V4 as a reference quote only until the execution path supports V4 calldata.
   // Returning it as the main quote makes the UI look executable, then build-tx fails.
   return null;

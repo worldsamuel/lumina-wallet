@@ -4320,7 +4320,7 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        if (slip <= 0) return { ok:false, error:swapCopy("slippageTooLow") };
 	        if (!latestSwapQuote) return { ok:false, error:swapCopy("quoteFirst") };
-	        if (latestSwapQuote.source !== "uniswap-v3" && latestSwapQuote.source !== "holdstation") return { ok:false, error:"当前交易对暂无可执行路由。" };
+	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:swapCopy("limit") + " $" + swapMaxUsd + ". " + swapCopy("reduceAmount") };
 	        var riskText = swapRiskText();
 	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
