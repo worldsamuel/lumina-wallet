@@ -208,6 +208,21 @@ async function readStoredProducts() {
   return parseProducts(page?.bodyI18n);
 }
 
+function publicAssetUrl(productId: string, field: "imageUrl" | "detailImageUrl" | "iconUrl", value?: string | null) {
+  const text = String(value || "");
+  if (!text.startsWith("data:image/") || text.length < 2048) return value || null;
+  return `/api/points-products/image/${encodeURIComponent(productId)}?field=${field}`;
+}
+
+function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
+  return {
+    ...product,
+    imageUrl: publicAssetUrl(product.id, "imageUrl", product.imageUrl),
+    detailImageUrl: publicAssetUrl(product.id, "detailImageUrl", product.detailImageUrl),
+    iconUrl: publicAssetUrl(product.id, "iconUrl", product.iconUrl),
+  };
+}
+
 async function writeStoredProducts(products: PointsProductConfig[]) {
   const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder);
   await db.contentPage.upsert({
@@ -296,7 +311,7 @@ export async function getPointsProducts() {
 }
 
 export async function getPublicPointsProducts() {
-  return (await readStoredProducts()).filter((product) => product.enabled);
+  return (await readStoredProducts()).filter((product) => product.enabled).map(toPublicProduct);
 }
 
 export async function getPointsOrders(address: string) {
@@ -422,7 +437,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
   await writeStoredProducts(products);
   await writeStoredOrders(orders);
-  return { order, product: products[productIndex] };
+  return { order, product: toPublicProduct(products[productIndex]) };
 }
 
 export async function airdropBlindBox(input: { address: string; productId: string; note?: string | null; createdBy?: string | null }) {
@@ -454,7 +469,7 @@ export async function airdropBlindBox(input: { address: string; productId: strin
     await writeStoredProducts(products);
   }
   await writeStoredOrders(orders);
-  return { order, product };
+  return { order, product: toPublicProduct(product) };
 }
 
 export async function openBlindBoxOrder(input: { address: string; productId: string }) {
@@ -467,7 +482,7 @@ export async function openBlindBoxOrder(input: { address: string; productId: str
   const reward = pickBlindReward(product);
   orders[index] = { ...orders[index], status: "opened", reward, openedAt: new Date().toISOString() };
   await writeStoredOrders(orders);
-  return { order: orders[index], reward, product };
+  return { order: orders[index], reward, product: toPublicProduct(product) };
 }
 
 export async function upsertPointsProduct(input: Partial<PointsProductConfig>) {
