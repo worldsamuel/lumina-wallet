@@ -3,12 +3,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { consumeNonce, isNonceFormatValid, WALLET_AUTH_NONCE_COOKIE } from "@/lib/auth/nonce-store";
 import { getSessionMaxAgeSeconds, signSession } from "@/lib/auth/session";
 import type { WalletAuthPayload } from "@/lib/auth/wallet-auth-types";
+import { publicClient } from "@/lib/chain";
 import { db } from "@/lib/db";
 
 type VerifyRequestBody = {
   nonce: string;
   payload: WalletAuthPayload;
 };
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function verifyWalletAuthPayload(payload: WalletAuthPayload, nonce: string) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await verifySiweMessage(payload, nonce, "Sign in to Lumina", undefined, publicClient);
+    } catch (error) {
+      lastError = error;
+      if (attempt < 2) await sleep(250 * (attempt + 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("Signature verification failed.");
+}
 
 export async function POST(req: NextRequest) {
   const { nonce, payload } = (await req.json()) as VerifyRequestBody;
@@ -31,9 +49,10 @@ export async function POST(req: NextRequest) {
 
   let verification: Awaited<ReturnType<typeof verifySiweMessage>>;
   try {
-    verification = await verifySiweMessage(payload, nonce, "Sign in to Lumina");
+    verification = await verifyWalletAuthPayload(payload, nonce);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Signature verification failed.";
+    console.error("walletAuth signature verification failed", error);
+    const message = "Signature verification failed. Please try again.";
     return NextResponse.json({ error: message }, { status: 401 });
   }
 

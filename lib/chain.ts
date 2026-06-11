@@ -1,14 +1,16 @@
 import { createPublicClient, defineChain, fallback, http } from "viem";
 
 const DEFAULT_WORLD_CHAIN_RPC_URLS = [
-  "https://worldchain-mainnet.g.alchemy.com/public",
   "https://worldchain.drpc.org",
+  "https://worldchain-mainnet.g.alchemy.com/public",
 ];
 
 export const WORLD_CHAIN_RPC_URLS = Array.from(
   new Set(
     [
       process.env.TENDERLY_RPC_URL,
+      process.env.WORLD_CHAIN_RPC_URL,
+      process.env.WORLD_CHAIN_ALCHEMY_RPC_URL,
       ...(process.env.WORLD_CHAIN_RPC_URLS ?? "")
         .split(",")
         .map((url) => url.trim())
@@ -44,7 +46,7 @@ export const worldChain = defineChain({
 export const publicClient = createPublicClient({
   chain: worldChain,
   transport: fallback(WORLD_CHAIN_RPC_URLS.map((url) => http(url, { timeout: 6_000 })), {
-    retryCount: 1,
+    retryCount: 2,
   }),
 });
 

@@ -11,11 +11,12 @@ import {
   type SwapParams,
 } from "@holdstation/worldchain-sdk";
 import { getSwapPlatformFeeConfig } from "./platform-fee";
+import { WORLD_CHAIN_RPC_URLS } from "../chain";
 
 export const HOLDSTATION_TARGET_ADDRESS = "0x43222f934ea5c593a060a6d46772fdbdc2e2cff0";
 export const HOLDSTATION_ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
-const RPC_URL = "https://worldchain-mainnet.g.alchemy.com/public";
+const RPC_URL = WORLD_CHAIN_RPC_URLS[0] || "https://worldchain.drpc.org";
 
 const provider = new ethers.providers.StaticJsonRpcProvider(RPC_URL, {
   chainId: 480,

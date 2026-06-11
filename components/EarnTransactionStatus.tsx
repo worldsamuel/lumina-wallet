@@ -6,8 +6,12 @@ import { createPublicClient, fallback, http } from "viem";
 import { worldchain } from "viem/chains";
 
 const PUBLIC_WORLD_CHAIN_RPC_URLS = [
-  "https://worldchain-mainnet.g.alchemy.com/public",
+  ...(process.env.NEXT_PUBLIC_WORLD_CHAIN_RPC_URLS ?? "")
+    .split(",")
+    .map((url) => url.trim())
+    .filter(Boolean),
   "https://worldchain.drpc.org",
+  "https://worldchain-mainnet.g.alchemy.com/public",
 ];
 
 const client = createPublicClient({
