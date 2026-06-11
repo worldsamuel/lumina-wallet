@@ -5831,6 +5831,8 @@ function enhancePrototypeMe() {
           document.body.appendChild(box);
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
+            var pendingBuy = window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id];
+            if (pendingBuy) await pendingBuy;
             var res = await fetch("/api/points-products/purchase", {
               method: "POST",
               headers: { "content-type": "application/json" },
@@ -5849,8 +5851,13 @@ function enhancePrototypeMe() {
             }
             reloadPointsOrders().catch(function(){});
           } catch(e) {
-            box.remove();
-            toast(e && e.message ? e.message : "Open failed");
+            var openError = e && e.message ? e.message : "Open failed";
+            var failed = box.querySelector(".blind-result");
+            if (failed) {
+              failed.classList.remove("pending");
+              failed.innerHTML = '<small>' + escapeAttr(copy.openFailed || "Open failed") + '</small><strong>' + escapeAttr(openError) + '</strong><button type="button" onclick="window.__luminaOpenBlindBox(\\'' + escapeAttr(product.id) + '\\')">' + escapeAttr(copy.retry || "Retry") + '</button>';
+            }
+            toast(openError);
             pointsActionBusy(busyKey, false);
             renderProductDetail(product.id);
             return;
@@ -5915,13 +5922,18 @@ function enhancePrototypeMe() {
           renderHomePointsBanner();
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
-            var res = await fetch("/api/points-products/purchase", {
+            window.__luminaPendingProductBuys = window.__luminaPendingProductBuys || {};
+            var requestPromise = fetch("/api/points-products/purchase", {
               method: "POST",
               headers: { "content-type": "application/json" },
               body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:Number(window.__luminaPoints || 0) }),
+            }).then(async function(res){
+              var data = await res.json().catch(function(){ return null; });
+              if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
+              return data;
             });
-            var data = await res.json().catch(function(){ return null; });
-            if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
+            window.__luminaPendingProductBuys[product.id] = requestPromise;
+            var data = await requestPromise;
             if (data.order) {
               window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
                 return order && order.id === tempOrderId ? data.order : order;
@@ -5932,7 +5944,9 @@ function enhancePrototypeMe() {
               products = window.__luminaPointsProducts;
               product = data.product;
             }
+            if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] === requestPromise) delete window.__luminaPendingProductBuys[product.id];
           } catch(e) {
+            if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
             updatePointsBalance(previousPoints);
             product.stock = previousStock;
             window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return !order || order.id !== tempOrderId; });
