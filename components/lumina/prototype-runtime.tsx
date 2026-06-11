@@ -5604,16 +5604,19 @@ function enhancePrototypeMe() {
             ]
           }];
         }
+        function committedOrder(order){
+          return !!(order && order.localPending !== true && String(order.id || "").indexOf("local-buy-") !== 0);
+        }
         function purchasedCount(id){
           var productId = String(id || "");
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){
-            return order && String(order.productId || "") === productId && String(order.type || "") === "blind_box" && String(order.status || "").toLowerCase() === "purchased";
+            return committedOrder(order) && String(order.productId || "") === productId && String(order.type || "") === "blind_box" && String(order.status || "").toLowerCase() === "purchased";
           }).length;
           return Math.max(0, serverCount);
         }
         function totalPurchasedCount(id){
           var productId = String(id || "");
-          return (window.__luminaPointsOrders || []).filter(function(order){ return order && String(order.productId || "") === productId; }).length;
+          return (window.__luminaPointsOrders || []).filter(function(order){ return committedOrder(order) && String(order.productId || "") === productId; }).length;
         }
         function updatePointsBalance(nextValue){
           window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
@@ -5836,8 +5839,16 @@ function enhancePrototypeMe() {
           var pendingBuy = window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id];
           if (pendingBuy) {
             pointsActionBusy(busyKey, true);
-            renderProductDetail(product.id, null, "opening");
-            try { await pendingBuy; } catch(e) {}
+            renderProductDetail(product.id, null, "buying");
+            try {
+              await pendingBuy;
+              await reloadPointsOrders().catch(function(){ return []; });
+            } catch(e) {
+              pointsActionBusy(busyKey, false);
+              toast(e && e.message ? e.message : "Purchase failed");
+              renderProductDetail(product.id);
+              return;
+            }
             pointsActionBusy(busyKey, false);
           }
           var count = purchasedCount(product.id);
@@ -5863,7 +5874,8 @@ function enhancePrototypeMe() {
             var openOnce = async function(){
               var res = await fetch("/api/points-products/purchase", {
                 method: "POST",
-                headers: { "content-type": "application/json" },
+                cache: "no-store",
+                headers: { "content-type": "application/json", "cache-control": "no-store" },
                 body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id }),
               });
               var data = await res.json().catch(function(){ return null; });
@@ -5956,8 +5968,7 @@ function enhancePrototypeMe() {
           updatePointsBalance(previousPoints - cost);
           if (previousStock > 0) product.stock = previousStock - 1;
           window.__luminaPointsOrders = [tempOrder].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
-          pointsActionBusy(busyKey, false);
-          renderProductDetail(product.id);
+          renderProductDetail(product.id, null, "buying");
           renderProducts(window.__luminaPointsProducts || products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
           renderHomePointsBanner();
           try {
@@ -5965,7 +5976,8 @@ function enhancePrototypeMe() {
             window.__luminaPendingProductBuys = window.__luminaPendingProductBuys || {};
             var requestPromise = fetch("/api/points-products/purchase", {
               method: "POST",
-              headers: { "content-type": "application/json" },
+              cache: "no-store",
+              headers: { "content-type": "application/json", "cache-control": "no-store" },
               body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:previousPoints }),
             }).then(async function(res){
               var data = await res.json().catch(function(){ return null; });
