@@ -12,6 +12,6 @@ export async function GET(req: NextRequest) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
   return jsonResponse(await getPublicPointsProducts(), {
-    headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
   });
 }
