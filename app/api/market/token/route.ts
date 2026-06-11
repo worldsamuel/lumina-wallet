@@ -3,6 +3,10 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getWorldChainMarketForToken } from "@/lib/market-data";
 
+const MARKET_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+};
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -15,7 +19,7 @@ export async function GET(req: NextRequest) {
   const address = req.nextUrl.searchParams.get("address") ?? "";
   const symbol = req.nextUrl.searchParams.get("symbol") ?? "";
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    return jsonResponse({ market: null });
+    return marketJson({ market: null });
   }
 
   const market = await getWorldChainMarketForToken(address, symbol).catch(() => {
@@ -23,5 +27,11 @@ export async function GET(req: NextRequest) {
     return null;
   });
 
-  return jsonResponse({ market });
+  return marketJson({ market });
+}
+
+function marketJson(data: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  Object.entries(MARKET_CACHE_HEADERS).forEach(([name, value]) => headers.set(name, value));
+  return jsonResponse(data, { ...init, headers });
 }

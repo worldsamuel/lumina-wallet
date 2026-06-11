@@ -10,6 +10,7 @@ const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 const DEXSCREENER_CHAIN_IDS = ["worldchain", "world-chain"] as const;
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
 const CACHE_TTL_MS = 300_000;
+const OHLCV_CACHE_TTL_MS = 300_000;
 const MIN_LIQUIDITY_USD = 10;
 const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
@@ -599,7 +600,7 @@ export async function getPoolOhlcv(
     close,
     volume,
   }));
-  ohlcvCache.set(cacheKey, { data, expiresAt: Date.now() + 180_000 });
+  ohlcvCache.set(cacheKey, { data, expiresAt: Date.now() + OHLCV_CACHE_TTL_MS });
   return data;
 }
 

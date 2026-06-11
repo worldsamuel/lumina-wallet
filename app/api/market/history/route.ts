@@ -22,6 +22,9 @@ type HistoryCandle = {
 };
 
 const cache = new Map<string, { expiresAt: number; candles: HistoryCandle[] }>();
+const MARKET_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+};
 const SYMBOL_ALIASES: Record<string, string> = {
   WETH: "ETH",
   WBTC: "BTC",
@@ -42,17 +45,30 @@ export async function GET(req: NextRequest) {
   const symbol = (req.nextUrl.searchParams.get("symbol") ?? "").toUpperCase();
   const address = req.nextUrl.searchParams.get("address") ?? "";
   const range = (req.nextUrl.searchParams.get("range") ?? "1D").toUpperCase();
-  if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    const candles = await candlesForContract(address, symbol, range);
-    if (candles.length) return jsonResponse({ symbol, range, source: "geckoterminal", candles });
+  const normalizedAddress = /^0x[a-fA-F0-9]{40}$/.test(address) ? address.toLowerCase() : "";
+  const id = coingeckoIdForSymbol(symbol);
+  const key = normalizedAddress ? `contract:${normalizedAddress}:${symbol}:${range}` : `coingecko:${id ?? symbol}:${range}`;
+  const cached = cache.get(key);
+  if (cached && cached.expiresAt > Date.now()) {
+    return marketJson({ symbol, range, source: normalizedAddress ? "geckoterminal-cache" : "coingecko-cache", candles: cached.candles });
   }
 
-  const id = coingeckoIdForSymbol(symbol);
-  if (!id) return jsonResponse({ symbol, range, candles: stablecoinCandles(symbol, range) });
+  if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    const candles = await candlesForContract(address, symbol, range);
+    if (candles.length) {
+      cache.set(key, { candles, expiresAt: Date.now() + 300_000 });
+      return marketJson({ symbol, range, source: "geckoterminal", candles });
+    }
+    if (cached?.candles.length) {
+      return marketJson({ symbol, range, source: "geckoterminal-stale", candles: cached.candles });
+    }
+  }
 
-  const key = `${id}:${range}`;
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return jsonResponse({ symbol, range, source: "coingecko", candles: cached.candles });
+  if (!id) {
+    const candles = stablecoinCandles(symbol, range);
+    if (candles.length) cache.set(key, { candles, expiresAt: Date.now() + 300_000 });
+    return marketJson({ symbol, range, candles });
+  }
 
   try {
     const { days, interval } = chartConfig(range);
@@ -74,12 +90,21 @@ export async function GET(req: NextRequest) {
     const body = (await response.json()) as CoinGeckoMarketChart;
     const candles = pricePointsToCandles(body.prices ?? [], body.total_volumes ?? []);
     const outputCandles = candles.length ? candles : stablecoinCandles(symbol, range);
-    cache.set(key, { candles: outputCandles, expiresAt: Date.now() + 180_000 });
-    return jsonResponse({ symbol, range, source: "coingecko", candles: outputCandles });
+    cache.set(key, { candles: outputCandles, expiresAt: Date.now() + 300_000 });
+    return marketJson({ symbol, range, source: "coingecko", candles: outputCandles });
   } catch {
     console.warn("[market/history] coingecko unavailable");
-    return jsonResponse({ symbol, range, candles: stablecoinCandles(symbol, range) });
+    if (cached?.candles.length) {
+      return marketJson({ symbol, range, source: "coingecko-stale", candles: cached.candles });
+    }
+    return marketJson({ symbol, range, candles: stablecoinCandles(symbol, range) });
   }
+}
+
+function marketJson(data: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  Object.entries(MARKET_CACHE_HEADERS).forEach(([name, value]) => headers.set(name, value));
+  return jsonResponse(data, { ...init, headers });
 }
 
 async function candlesForContract(address: string, symbol: string, range: string) {

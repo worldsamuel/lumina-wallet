@@ -3,6 +3,10 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolOhlcv } from "@/lib/market-data";
 
+const MARKET_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+};
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -41,11 +45,17 @@ export async function GET(req: NextRequest) {
   try {
     for (const config of configs) {
       const candles = await getPoolOhlcv(pool, config.timeframe, config.aggregate, config.limit, token);
-      if (candles.length) return jsonResponse({ pool, range, candles });
+      if (candles.length) return marketJson({ pool, range, candles });
     }
-    return jsonResponse({ pool, range, candles: [] });
+    return marketJson({ pool, range, candles: [] });
   } catch {
     console.warn("[market/ohlcv] unavailable");
-    return jsonResponse({ pool, range, candles: [] });
+    return marketJson({ pool, range, candles: [] });
   }
+}
+
+function marketJson(data: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  Object.entries(MARKET_CACHE_HEADERS).forEach(([name, value]) => headers.set(name, value));
+  return jsonResponse(data, { ...init, headers });
 }
