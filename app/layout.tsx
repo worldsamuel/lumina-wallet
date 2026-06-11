@@ -22,23 +22,32 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const ErudaProvider = dynamic(
-    () => import("../components/Eruda").then((c) => c.ErudaProvider),
-    {
-      ssr: false,
-    }
+  const content = (
+    <MiniKitProvider>
+      <LanguageProvider>
+        <CurrencyProvider>{children}</CurrencyProvider>
+      </LanguageProvider>
+    </MiniKitProvider>
   );
+  const debugEnabled = process.env.NEXT_PUBLIC_ENABLE_ERUDA === "true";
+  const body = debugEnabled ? (
+    <ErudaProvider>{content}</ErudaProvider>
+  ) : (
+    content
+  );
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="bg-black text-white">
-        <ErudaProvider>
-          <MiniKitProvider>
-            <LanguageProvider>
-              <CurrencyProvider>{children}</CurrencyProvider>
-            </LanguageProvider>
-          </MiniKitProvider>
-        </ErudaProvider>
+        {body}
       </body>
     </html>
   );
 }
+
+const ErudaProvider = dynamic(
+  () => import("../components/Eruda").then((c) => c.ErudaProvider),
+  {
+    ssr: false,
+  },
+);

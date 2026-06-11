@@ -56,6 +56,8 @@ type BalanceTokenConfig = {
 
 const WORLD_CHAIN_ALCHEMY_RPC =
   process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
+const BALANCE_TOKEN_CONFIG_TTL_MS = 300_000;
+let cachedBalanceTokens: { expiresAt: number; data: BalanceTokenConfig[] } | null = null;
 const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
   {
     symbol: "ORB",
@@ -140,12 +142,15 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
 export async function fetchBalances(userAddress: Address) {
   const ethToken = TOKENS.find((token) => token.native);
   const balanceTokens = await getBalanceTokens();
-  const [nativeBalance, configuredTokenBalances, discoveredBalances] = await Promise.all([
+  const [nativeBalance, alchemyBalances] = await Promise.all([
     readWorldChainWithFallback((client) => client.getBalance({ address: userAddress })),
-    fetchConfiguredTokenBalances(userAddress, balanceTokens),
-    fetchDiscoveredTokenBalances(userAddress).catch(() => [] as ChainBalance[]),
+    fetchAllAlchemyTokenBalances(userAddress).catch(() => [] as AlchemyTokenBalance[]),
   ]);
 
+  const configuredTokenBalances = alchemyBalances.length
+    ? configuredTokenBalancesFromAlchemy(balanceTokens, alchemyBalances)
+    : await fetchConfiguredTokenBalances(userAddress, balanceTokens);
+  const discoveredBalances = await fetchDiscoveredTokenBalances(alchemyBalances).catch(() => [] as ChainBalance[]);
   const rawConfiguredBalances = balanceTokens.map((token) => toBalance(token, configuredTokenBalances.get(token.contractAddress) ?? 0n));
   const erc20Balances = mergeAliasBalances(rawConfiguredBalances);
 
@@ -208,6 +213,7 @@ async function fetchConfiguredTokenBalances(userAddress: Address, balanceTokens:
 }
 
 async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
+  if (cachedBalanceTokens && cachedBalanceTokens.expiresAt > Date.now()) return cachedBalanceTokens.data;
   const core = ERC20_TOKENS.map((token) => ({ ...token }));
   let configured: BalanceTokenConfig[] = [];
   try {
@@ -234,16 +240,32 @@ async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
   }
 
   const seen = new Set<string>();
-  return [...core, ...configured, ...LEGACY_BALANCE_TOKENS].filter((token): token is BalanceTokenConfig => {
+  const data = [...core, ...configured, ...LEGACY_BALANCE_TOKENS].filter((token): token is BalanceTokenConfig => {
     const address = token.contractAddress?.toLowerCase();
     if (!address || seen.has(address)) return false;
     seen.add(address);
     return true;
   });
+  cachedBalanceTokens = { data, expiresAt: Date.now() + BALANCE_TOKEN_CONFIG_TTL_MS };
+  return data;
 }
 
-async function fetchDiscoveredTokenBalances(userAddress: Address) {
-  const balances = await fetchAllAlchemyTokenBalances(userAddress);
+function configuredTokenBalancesFromAlchemy(balanceTokens: BalanceTokenConfig[], balances: AlchemyTokenBalance[]) {
+  const byAddress = new Map(
+    balances
+      .filter((item) => item.contractAddress && item.tokenBalance && !item.error)
+      .map((item) => [item.contractAddress!.toLowerCase(), parseAlchemyBalance(item.tokenBalance!)]),
+  );
+  return new Map(
+    balanceTokens.map((token) => [
+      token.contractAddress,
+      byAddress.get(token.contractAddress.toLowerCase()) ?? 0n,
+    ]),
+  );
+}
+
+async function fetchDiscoveredTokenBalances(knownBalances: AlchemyTokenBalance[]) {
+  const balances = knownBalances;
   const catalog = worldChainTokenCatalog as CatalogToken[];
   const catalogByAddress = new Map(
     catalog
@@ -295,7 +317,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
         method: "alchemy_getTokenBalances",
         params,
       }),
-      signal: AbortSignal.timeout(6_000),
+      signal: AbortSignal.timeout(4_500),
     });
     if (!response.ok) break;
 

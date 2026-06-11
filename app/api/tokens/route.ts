@@ -5,6 +5,10 @@ import { ensureCoreTokens } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { TOKENS } from "@/lib/tokens";
 
+const TOKEN_CACHE_TTL_MS = 180_000;
+const TOKEN_CACHE_HEADERS = { headers: { "Cache-Control": "public, s-maxage=180, stale-while-revalidate=300" } };
+let cachedTokens: { expiresAt: number; data: unknown[] } | null = null;
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -12,6 +16,10 @@ export function OPTIONS() {
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:tokens", 60).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
+  }
+
+  if (cachedTokens && cachedTokens.expiresAt > Date.now()) {
+    return jsonResponse(cachedTokens.data, TOKEN_CACHE_HEADERS);
   }
 
   await ensurePublicCoreTokens();
@@ -50,9 +58,9 @@ export async function GET(req: NextRequest) {
     onTopRanking: token.symbol === "WLD",
     createdAt: new Date(0).toISOString(),
   }));
-  return jsonResponse([...coreFallback, ...tokens], {
-    headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" },
-  });
+  const data = [...coreFallback, ...tokens];
+  cachedTokens = { data, expiresAt: Date.now() + TOKEN_CACHE_TTL_MS };
+  return jsonResponse(data, TOKEN_CACHE_HEADERS);
 }
 
 async function ensurePublicCoreTokens() {

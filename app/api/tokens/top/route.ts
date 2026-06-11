@@ -3,9 +3,11 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
-import { getWorldChainMarketForToken, getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
+import { getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
-const MARKET_CACHE = { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } };
+const MARKET_CACHE = { headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=300" } };
+const TOKEN_TOP_CACHE_TTL_MS = 120_000;
+const tokenTopCache = new Map<string, { expiresAt: number; data: unknown[] }>();
 
 export function OPTIONS() {
   return optionsResponse();
@@ -19,6 +21,9 @@ export async function GET(req: NextRequest) {
   const requestedMode = req.nextUrl.searchParams.get("mode");
   const mode: WorldChainMarketMode =
     requestedMode === "losers" || requestedMode === "new" || requestedMode === "all" ? requestedMode : "gainers";
+  const cached = tokenTopCache.get(mode);
+  if (cached && cached.expiresAt > Date.now()) return jsonResponse(cached.data, MARKET_CACHE);
+
   await ensureTokenControlColumns().catch(() => console.warn("[tokens/top] control column ensure failed"));
   const [tokens, configured] = await Promise.all([
     getWorldChainMarkets(mode),
@@ -66,20 +71,20 @@ export async function GET(req: NextRequest) {
         (!seenSymbols.has(token.symbol.toUpperCase()) || (address && !seenAddresses.has(address)))
       );
     });
-    const recovered = await Promise.all(
-      missingConfigured.map(async (token) => {
-        const market = await getWorldChainMarketForToken(token.contractAddr!, token.symbol);
-        return market
-          ? {
-              ...market,
-              logoUrl: token.logoUrl ?? market.logoUrl,
-              poolAddress: token.poolAddress || market.poolAddress,
-              status: token.status,
-              verified: token.status === "verified",
-            }
-          : null;
-      }),
-    );
+    const recovered = missingConfigured.map((token) => ({
+      symbol: token.symbol,
+      name: token.name,
+      address: token.contractAddr as `0x${string}`,
+      priceUsd: null,
+      change24h: null,
+      volume24hUsd: 0,
+      liquidityUsd: 0,
+      logoUrl: token.logoUrl ?? null,
+      poolAddress: token.poolAddress || "",
+      status: token.status,
+      verified: token.status === "verified",
+      decimals: token.decimals,
+    }));
     for (const market of recovered) {
       if (!market) continue;
       const address = market.address?.toLowerCase();
@@ -90,5 +95,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  tokenTopCache.set(mode, { data: merged, expiresAt: Date.now() + TOKEN_TOP_CACHE_TTL_MS });
   return jsonResponse(merged, MARKET_CACHE);
 }
