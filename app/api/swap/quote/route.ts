@@ -217,17 +217,10 @@ function pickMainQuote(holdstation: HoldstationQuote | null, v3: SourceQuote | n
       feeAmountOutRaw: holdstation.feeAmountOutRaw,
     };
   }
-  const candidates = [
-    v3?.bestQuote ? { source: "uniswap-v3" as const, quote: v3.bestQuote } : null,
-    v4?.bestQuote ? { source: "uniswap-v4" as const, quote: v4.bestQuote } : null,
-  ].filter((item): item is { source: "uniswap-v3" | "uniswap-v4"; quote: SwapQuoteResult } => Boolean(item));
-  const executable = candidates.find((item) => item.source === "uniswap-v3");
-  if (executable) return executable;
-  return candidates.sort((a, b) => {
-    const left = BigInt(a.quote.amountOutRaw);
-    const right = BigInt(b.quote.amountOutRaw);
-    return left > right ? -1 : left < right ? 1 : 0;
-  })[0] ?? null;
+  if (v3?.bestQuote) return { source: "uniswap-v3" as const, quote: v3.bestQuote };
+  // Keep V4 as a reference quote only until the execution path supports V4 calldata.
+  // Returning it as the main quote makes the UI look executable, then build-tx fails.
+  return null;
 }
 
 function buildReferences(

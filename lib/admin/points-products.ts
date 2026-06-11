@@ -52,6 +52,9 @@ export type PointsOrderConfig = {
   createdBy?: string | null;
   createdAt: string;
   openedAt?: string | null;
+  redeemed?: boolean;
+  redeemedAt?: string | null;
+  redeemedBy?: string | null;
 };
 
 export type PointsAdjustmentConfig = {
@@ -66,25 +69,27 @@ export type PointsAdjustmentConfig = {
 function defaultProducts(): PointsProductConfig[] {
   return [
     {
-      id: "cash-surprise-50",
+      id: "open-your-new-user-mystery-box",
       type: "blind_box",
-      title: "Win up to US$50 cash back",
-      category: "cash",
-      points: 500,
-      originalPoints: 17500,
+      title: "WLD Mystery Box",
+      titleI18n: { en: "WLD Mystery Box", "zh-CN": "WLD 盲盒", "zh-TW": "WLD 盲盒" },
+      category: "shop",
+      points: 150,
+      originalPoints: 1000,
       iconUrl: "/points/lumina-points-icon.png",
-      imageText: "$50",
+      imageText: null,
       badge: "Hot",
       countries: ["global"],
-      stock: 99,
+      stock: 0,
       purchaseLimit: null,
       enabled: true,
-      sortOrder: 1,
-      description: "Surprise cash-back reward.",
+      sortOrder: 5,
+      description: "Open your Lumina mystery box to reveal a WLD reward.",
+      descriptionI18n: { en: "Open your Lumina mystery box to reveal a WLD reward.", "zh-CN": "打开 Lumina 盲盒，领取随机 WLD 奖励。", "zh-TW": "打開 Lumina 盲盒，領取隨機 WLD 獎勵。" },
       rewards: [
-        { name: "US$50 cash back", value: "$50", odds: 1, stock: 10 },
-        { name: "US$10 cash back", value: "$10", odds: 9, stock: 40 },
-        { name: "US$1 cash back", value: "$1", odds: 90, stock: 999 },
+        { id: "1", name: "0.01 WLD", value: "0.01 WLD", odds: 9000, stock: null },
+        { id: "2", name: "0.1 WLD", value: "0.1 WLD", odds: 900, stock: null },
+        { id: "3", name: "1 WLD", value: "1 WLD", odds: 100, stock: null },
       ],
     },
     {
@@ -256,6 +261,9 @@ function parseOrders(value: unknown): PointsOrderConfig[] {
         createdBy: typeof item.createdBy === "string" && item.createdBy.trim() ? item.createdBy.trim() : null,
         createdAt: String(item.createdAt || new Date().toISOString()),
         openedAt: item.openedAt ? String(item.openedAt) : null,
+        redeemed: item.redeemed === true,
+        redeemedAt: item.redeemedAt ? String(item.redeemedAt) : null,
+        redeemedBy: typeof item.redeemedBy === "string" && item.redeemedBy.trim() ? item.redeemedBy.trim() : null,
       };
     })
     .filter((item) => item.address && item.productId);
@@ -321,6 +329,23 @@ export async function getPointsOrders(address: string) {
 
 export async function getAllPointsOrders() {
   return readStoredOrders();
+}
+
+export async function updatePointsOrderRedemption(input: { id: string; redeemed: boolean; redeemedBy?: string | null }) {
+  const id = String(input.id || "").trim();
+  if (!id) throw new Error("Invalid order id.");
+  const orders = await readStoredOrders();
+  const index = orders.findIndex((order) => order.id === id);
+  if (index < 0) throw new Error("Order not found.");
+  const now = new Date().toISOString();
+  orders[index] = {
+    ...orders[index],
+    redeemed: input.redeemed,
+    redeemedAt: input.redeemed ? (orders[index].redeemedAt || now) : null,
+    redeemedBy: input.redeemed ? (input.redeemedBy || "admin") : null,
+  };
+  await writeStoredOrders(orders);
+  return orders[index];
 }
 
 export async function getPointsAdjustments(address?: string) {

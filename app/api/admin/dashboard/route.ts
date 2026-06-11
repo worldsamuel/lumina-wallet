@@ -51,6 +51,20 @@ export async function GET() {
       .slice(0, 2)
       .map(([symbol, value]) => `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${symbol}`)
       .join(" / ") || "0";
+  const transferVolumes = [...volumeBySymbol.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([symbol, value], index) => ({
+      rank: index + 1,
+      symbol,
+      amount: value,
+      label: `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${symbol}`,
+    }));
+  const platformRevenue = [
+    { symbol: "WLD", amount: 0, label: "0 WLD" },
+    { symbol: "USDC", amount: 0, label: "0 USDC" },
+    { symbol: "ETH", amount: feeNative, label: `${feeNative.toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH` },
+  ];
   const feeSeries = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() - (6 - index));
@@ -84,6 +98,8 @@ export async function GET() {
     transactions,
     todayTransactions: todayActivity.length,
     transferVolumeLabel,
+    transferVolumes,
+    platformRevenue,
     feeNative,
     todayFeeNative,
     feeSeries,

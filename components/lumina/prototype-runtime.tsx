@@ -4320,7 +4320,7 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        if (slip <= 0) return { ok:false, error:swapCopy("slippageTooLow") };
 	        if (!latestSwapQuote) return { ok:false, error:swapCopy("quoteFirst") };
-	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
+	        if (latestSwapQuote.source !== "uniswap-v3" && latestSwapQuote.source !== "holdstation") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:swapCopy("limit") + " $" + swapMaxUsd + ". " + swapCopy("reduceAmount") };
 	        var riskText = swapRiskText();
 	        return { ok:true, amountText:amountText, impact:impact, riskText:riskText };
@@ -5564,29 +5564,29 @@ function enhancePrototypeMe() {
         }
         function fallbackPointsProducts(){
           return [{
-            id:"cash-surprise-50",
+            id:"open-your-new-user-mystery-box",
             type:"blind_box",
-            title:"Win up to US$50 Coin",
-            titleI18n:{ en:"Win up to US$50 Coin", "zh-CN":"赢取最高 US$50 Coin", "zh-TW":"贏取最高 US$50 Coin", ja:"最高 US$50 Coin を獲得" },
-            category:"cash",
-            points:500,
-            originalPoints:17500,
+            title:"WLD Mystery Box",
+            titleI18n:{ en:"WLD Mystery Box", "zh-CN":"WLD 盲盒", "zh-TW":"WLD 盲盒", ja:"WLD Mystery Box" },
+            category:"shop",
+            points:150,
+            originalPoints:1000,
             imageUrl:null,
             detailImageUrl:null,
             iconUrl:"/points/lumina-points-icon.png",
-            imageText:"$50",
+            imageText:null,
             badge:"Hot",
             countries:["global"],
-            stock:99,
+            stock:0,
             purchaseLimit:null,
             enabled:true,
-            sortOrder:1,
-            description:"Surprise Coin reward.",
-            descriptionI18n:{ en:"Surprise Coin reward.", "zh-CN":"惊喜 Coin 奖励。", "zh-TW":"驚喜 Coin 獎勵。", ja:"サプライズ Coin リワード。" },
+            sortOrder:5,
+            description:"Open your Lumina mystery box to reveal a WLD reward.",
+            descriptionI18n:{ en:"Open your Lumina mystery box to reveal a WLD reward.", "zh-CN":"打开 Lumina 盲盒，领取随机 WLD 奖励。", "zh-TW":"打開 Lumina 盲盒，領取隨機 WLD 獎勵。", ja:"Lumina Mystery Box を開いて WLD リワードを獲得しましょう。" },
             rewards:[
-              { id:"1", name:"US$50 Coin", nameI18n:{ en:"US$50 Coin", "zh-CN":"US$50 Coin", "zh-TW":"US$50 Coin", ja:"US$50 Coin" }, value:"$50", odds:1, stock:10 },
-              { id:"2", name:"US$10 Coin", nameI18n:{ en:"US$10 Coin", "zh-CN":"US$10 Coin", "zh-TW":"US$10 Coin", ja:"US$10 Coin" }, value:"$10", odds:9, stock:40 },
-              { id:"3", name:"US$1 Coin", nameI18n:{ en:"US$1 Coin", "zh-CN":"US$1 Coin", "zh-TW":"US$1 Coin", ja:"US$1 Coin" }, value:"$1", odds:90, stock:999 }
+              { id:"1", name:"0.01 WLD", nameI18n:{ en:"0.01 WLD", "zh-CN":"0.01 WLD", "zh-TW":"0.01 WLD", ja:"0.01 WLD" }, value:"0.01 WLD", odds:9000, stock:null },
+              { id:"2", name:"0.1 WLD", nameI18n:{ en:"0.1 WLD", "zh-CN":"0.1 WLD", "zh-TW":"0.1 WLD", ja:"0.1 WLD" }, value:"0.1 WLD", odds:900, stock:null },
+              { id:"3", name:"1 WLD", nameI18n:{ en:"1 WLD", "zh-CN":"1 WLD", "zh-TW":"1 WLD", ja:"1 WLD" }, value:"1 WLD", odds:100, stock:null }
             ]
           }];
         }
@@ -6046,6 +6046,9 @@ function enhancePrototypeMe() {
         }
         window.__luminaRenderPointsShop = renderShop;
         document.body.appendChild(modal);
+        if (Array.isArray(window.__luminaPointsProducts) && window.__luminaPointsProducts.some(function(item){ return item && item.id === "cash-surprise-50"; })) {
+          window.__luminaPointsProducts = fallbackPointsProducts();
+        }
         var products = Array.isArray(window.__luminaPointsProducts) && window.__luminaPointsProducts.length ? window.__luminaPointsProducts : fallbackPointsProducts();
         window.__luminaPointsProducts = products;
         if (!Array.isArray(window.__luminaPointsOrders)) window.__luminaPointsOrders = [];
