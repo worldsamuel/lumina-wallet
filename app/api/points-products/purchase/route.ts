@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!rateLimit(req, "public:points-purchase", 60).ok) {
-    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+    return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
   }
   const body = await req.json().catch(() => ({}));
   const address = String(body.address || "");

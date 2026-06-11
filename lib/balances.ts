@@ -56,6 +56,8 @@ type BalanceTokenConfig = {
 
 const WORLD_CHAIN_ALCHEMY_RPC =
   process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
+const ALCHEMY_BALANCE_TIMEOUT_MS = 1_200;
+const ALCHEMY_METADATA_TIMEOUT_MS = 900;
 const BALANCE_TOKEN_CONFIG_TTL_MS = 300_000;
 let cachedBalanceTokens: { expiresAt: number; data: BalanceTokenConfig[] } | null = null;
 const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
@@ -119,7 +121,7 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
       method: "alchemy_getTokenMetadata",
       params: [contractAddress],
     }),
-    signal: AbortSignal.timeout(2_500),
+    signal: AbortSignal.timeout(ALCHEMY_METADATA_TIMEOUT_MS),
   }).catch(() => null);
   if (!response?.ok) return null;
 
@@ -317,7 +319,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
         method: "alchemy_getTokenBalances",
         params,
       }),
-      signal: AbortSignal.timeout(4_500),
+      signal: AbortSignal.timeout(ALCHEMY_BALANCE_TIMEOUT_MS),
     });
     if (!response.ok) break;
 

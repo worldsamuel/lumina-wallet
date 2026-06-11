@@ -12,13 +12,15 @@ const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "funct
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
 const activityCache = new Map<string, { expiresAt: number; data: unknown }>();
-const ACTIVITY_CACHE_TTL_MS = 8_000;
+const ACTIVITY_CACHE_TTL_MS = 5_000;
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
 const universalActivityLookbackBlocks = 80_000n;
 const universalActivityLogChunkBlocks = 10_000n;
 const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
+const ACTIVITY_CHAIN_TIMEOUT_MS = 2_200;
+const ACTIVITY_INDEXER_TIMEOUT_MS = 1_800;
 const activityTokenAddresses = Array.from(
   new Set(
     [
@@ -261,7 +263,7 @@ async function getRecentUniversalTransferLogs(address: Address, latest: bigint, 
   return logs;
 }
 
-async function withActivityTimeout<T>(promise: Promise<T>, fallbackValue: T, label: string, timeoutMs = 4_500) {
+async function withActivityTimeout<T>(promise: Promise<T>, fallbackValue: T, label: string, timeoutMs = ACTIVITY_CHAIN_TIMEOUT_MS) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
@@ -309,6 +311,7 @@ async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Pro
           method: "alchemy_getAssetTransfers",
           params: [params],
         }),
+        signal: AbortSignal.timeout(ACTIVITY_INDEXER_TIMEOUT_MS),
         next: { revalidate: 0 },
       });
       if (!response.ok) throw new Error(`Alchemy activity request failed: ${response.status}`);
@@ -423,10 +426,10 @@ export async function GET(req: NextRequest) {
     const latest = await publicClient.getBlockNumber();
     const lower = address.toLowerCase();
     const [universalIncoming, universalOutgoing, priorityIncoming, priorityOutgoing, incoming, outgoing, indexedTransfers] = await Promise.all([
-      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "in"), [], "incoming-universal-logs", 7_000),
-      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "out"), [], "outgoing-universal-logs", 7_000),
-      getRecentPriorityTransferLogs(address as Address, latest, "in"),
-      getRecentPriorityTransferLogs(address as Address, latest, "out"),
+      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "in"), [], "incoming-universal-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
+      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "out"), [], "outgoing-universal-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
+      withActivityTimeout(getRecentPriorityTransferLogs(address as Address, latest, "in"), [], "incoming-priority-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
+      withActivityTimeout(getRecentPriorityTransferLogs(address as Address, latest, "out"), [], "outgoing-priority-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
       withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "in"), [], "incoming-token-logs"),
       withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "out"), [], "outgoing-token-logs"),
       fetchAlchemyAssetTransfers(address as Address, latest).catch(() => {

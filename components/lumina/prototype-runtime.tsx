@@ -5361,7 +5361,7 @@ function enhancePrototypeMe() {
         setValue();
         var address = window.__luminaUserAddress || "";
         if (!address) return;
-        fetch("/api/points-profile?address=" + encodeURIComponent(address))
+        fetch("/api/points-profile?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){
             if (!data) return;
@@ -5369,7 +5369,7 @@ function enhancePrototypeMe() {
             setValue();
           })
           .catch(function(){});
-        fetch("/api/activity?address=" + encodeURIComponent(address))
+        fetch("/api/activity?address=" + encodeURIComponent(address) + "&fast=1&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ setValue(pointsFromActivity(Array.isArray(rows) ? rows : [])); })
           .catch(function(){});
@@ -5678,7 +5678,7 @@ function enhancePrototypeMe() {
         async function reloadPointsProfile(){
           var address = window.__luminaUserAddress || "";
           if (!address) return null;
-          var res = await fetch("/api/points-profile?address=" + encodeURIComponent(address));
+          var res = await fetch("/api/points-profile?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" });
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && data) {
             window.__luminaPointsProfile = data;
@@ -5690,7 +5690,7 @@ function enhancePrototypeMe() {
         async function reloadPointsOrders(){
           var address = window.__luminaUserAddress || "";
           if (!address) return [];
-          var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(address), { cache: "no-store" });
+          var orderRes = await fetch("/api/points-products/purchase?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" });
           var orderData = await orderRes.json().catch(function(){ return []; });
           window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
           return window.__luminaPointsOrders;
@@ -5887,7 +5887,9 @@ function enhancePrototypeMe() {
               });
               if (!replaced) window.__luminaPointsOrders.unshift(data.order);
             }
-            reloadPointsOrders().catch(function(){});
+            reloadPointsOrders().then(function(){
+              renderProductDetail(product.id);
+            }).catch(function(){});
           } catch(e) {
             var openError = e && e.message ? e.message : "Open failed";
             var failed = box.querySelector(".blind-result");
@@ -5982,6 +5984,7 @@ function enhancePrototypeMe() {
               products = window.__luminaPointsProducts;
               product = data.product;
             }
+            await reloadPointsOrders().catch(function(){ return []; });
             if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] === requestPromise) delete window.__luminaPendingProductBuys[product.id];
           } catch(e) {
             if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
@@ -6129,7 +6132,7 @@ function enhancePrototypeMe() {
         if (initialView === "tasks") renderTaskPage(); else renderShop();
         try {
           if (window.__luminaUserAddress) {
-            var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress));
+            var profileRes = await fetch("/api/points-profile?address=" + encodeURIComponent(window.__luminaUserAddress) + "&t=" + Date.now(), { cache: "no-store" });
             var profileData = await profileRes.json().catch(function(){ return null; });
             if (profileRes.ok && profileData) {
               window.__luminaPointsProfile = profileData;
@@ -6137,7 +6140,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products?v=20260611", { cache: "no-store" });
+          var res = await fetch("/api/points-products?v=20260612&t=" + Date.now(), { cache: "no-store" });
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {
             products = data;
