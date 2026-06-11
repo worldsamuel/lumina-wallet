@@ -6060,7 +6060,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products", { cache: "no-store" });
+          var res = await fetch("/api/points-products?v=20260611", { cache: "no-store" });
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {
             products = data;
