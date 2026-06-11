@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import type { ConnectionInfo } from "@ethersproject/web";
 import { Client, Multicall3 } from "@holdstation/worldchain-ethers-v5";
 import {
   config,
@@ -18,7 +19,13 @@ export const HOLDSTATION_ZERO_ADDRESS = "0x0000000000000000000000000000000000000
 
 const RPC_URL = WORLD_CHAIN_RPC_URLS[0] || "https://worldchain.drpc.org";
 
-const provider = new ethers.providers.StaticJsonRpcProvider(RPC_URL, {
+const RPC_CONNECTION: ConnectionInfo = {
+  url: RPC_URL,
+  timeout: 8_000,
+  skipFetchSetup: true,
+};
+
+const provider = new ethers.providers.StaticJsonRpcProvider(RPC_CONNECTION, {
   chainId: 480,
   name: "worldchain",
 });
