@@ -5562,9 +5562,40 @@ function enhancePrototypeMe() {
           var countries = productCountries(product);
           return region === "global" || countries.indexOf("global") >= 0 || countries.indexOf(region) >= 0;
         }
+        function fallbackPointsProducts(){
+          return [{
+            id:"cash-surprise-50",
+            type:"blind_box",
+            title:"Win up to US$50 Coin",
+            titleI18n:{ en:"Win up to US$50 Coin", "zh-CN":"赢取最高 US$50 Coin", "zh-TW":"贏取最高 US$50 Coin", ja:"最高 US$50 Coin を獲得" },
+            category:"cash",
+            points:500,
+            originalPoints:17500,
+            imageUrl:null,
+            detailImageUrl:null,
+            iconUrl:"/points/lumina-points-icon.png",
+            imageText:"$50",
+            badge:"Hot",
+            countries:["global"],
+            stock:99,
+            purchaseLimit:null,
+            enabled:true,
+            sortOrder:1,
+            description:"Surprise Coin reward.",
+            descriptionI18n:{ en:"Surprise Coin reward.", "zh-CN":"惊喜 Coin 奖励。", "zh-TW":"驚喜 Coin 獎勵。", ja:"サプライズ Coin リワード。" },
+            rewards:[
+              { id:"1", name:"US$50 Coin", nameI18n:{ en:"US$50 Coin", "zh-CN":"US$50 Coin", "zh-TW":"US$50 Coin", ja:"US$50 Coin" }, value:"$50", odds:1, stock:10 },
+              { id:"2", name:"US$10 Coin", nameI18n:{ en:"US$10 Coin", "zh-CN":"US$10 Coin", "zh-TW":"US$10 Coin", ja:"US$10 Coin" }, value:"$10", odds:9, stock:40 },
+              { id:"3", name:"US$1 Coin", nameI18n:{ en:"US$1 Coin", "zh-CN":"US$1 Coin", "zh-TW":"US$1 Coin", ja:"US$1 Coin" }, value:"$1", odds:90, stock:999 }
+            ]
+          }];
+        }
         function purchasedCount(id){
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
           return Math.max(0, serverCount);
+        }
+        function totalPurchasedCount(id){
+          return (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id; }).length;
         }
         function updatePointsBalance(nextValue){
           window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
@@ -5605,12 +5636,17 @@ function enhancePrototypeMe() {
         function profileAdjustments(){ return ((window.__luminaPointsProfile || {}).adjustments || []); }
         function adjustmentDone(key){ return profileAdjustments().some(function(row){ return row && row.createdBy === key; }); }
         function taskDone(id){
-          if (dailyTaskIds.indexOf(id) >= 0) return adjustmentDone("points-task:" + id + ":" + todayKey());
-          return adjustmentDone("points-task:" + id);
+          if (dailyTaskIds.indexOf(id) >= 0) {
+            if (adjustmentDone("points-task:" + id + ":" + todayKey())) return true;
+          } else if (adjustmentDone("points-task:" + id)) {
+            return true;
+          }
+          try { return localStorage.getItem(completedTaskKey(id)) === "1"; } catch(e) { return false; }
         }
         function taskVisited(id){ try { return localStorage.getItem(visitedTaskKey(id)) === "1"; } catch(e) { return false; } }
         function checkinDone(){
-          return adjustmentDone("points-task:daily-checkin:" + todayKey());
+          if (adjustmentDone("points-task:daily-checkin:" + todayKey())) return true;
+          try { return localStorage.getItem(checkinKey()) === "1"; } catch(e) { return false; }
         }
         function readCheckinStreak(){
           var days = profileAdjustments().map(function(row){
@@ -5649,6 +5685,10 @@ function enhancePrototypeMe() {
         async function completeTask(id, silent){
           var task = (pointsSystemConfig().pointsTasks || []).find(function(item){ return item && item.id === id; });
           if (!task || taskDone(id)) return;
+          var busyKey = "task:" + id;
+          if (pointsActionBusy(busyKey)) return;
+          pointsActionBusy(busyKey, true);
+          if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
           try {
             var res = await fetch("/api/points-task/complete", {
               method: "POST",
@@ -5658,15 +5698,22 @@ function enhancePrototypeMe() {
             var data = await res.json().catch(function(){ return null; });
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Task is not complete yet.");
             try { localStorage.setItem(completedTaskKey(id), "1"); } catch(e) {}
-            await reloadPointsProfile();
+            if (Number(data.points || 0) > 0) updatePointsBalance(Number(window.__luminaPoints || 0) + Number(data.points || 0));
             if (!silent && Number(data.points || 0) > 0) toast("+" + Number(data.points || 0).toLocaleString() + " Lumina Points");
+            reloadPointsProfile().catch(function(){});
           } catch(e) {
+            try { localStorage.removeItem(completedTaskKey(id)); } catch(err) {}
             if (!silent) toast(e && e.message ? e.message : "Task is not complete yet.");
           }
+          pointsActionBusy(busyKey, false);
           if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
         }
         async function completeCheckin(){
           if (checkinDone()) return;
+          var busyKey = "checkin:" + todayKey();
+          if (pointsActionBusy(busyKey)) return;
+          pointsActionBusy(busyKey, true);
+          renderTaskPage();
           try {
             var res = await fetch("/api/points-task/complete", {
               method: "POST",
@@ -5677,11 +5724,14 @@ function enhancePrototypeMe() {
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Check-in failed.");
             try { localStorage.setItem(checkinKey(), "1"); } catch(e) {}
             writeCheckinStreak(data.checkinDay || ((readCheckinStreak() % 7) + 1));
-            await reloadPointsProfile();
+            if (Number(data.points || 0) > 0) updatePointsBalance(Number(window.__luminaPoints || 0) + Number(data.points || 0));
             if (Number(data.points || 0) > 0) toast("+" + Number(data.points || 0).toLocaleString() + " Lumina Points");
+            reloadPointsProfile().catch(function(){});
           } catch(e) {
+            try { localStorage.removeItem(checkinKey()); } catch(err) {}
             toast(e && e.message ? e.message : "Check-in failed.");
           }
+          pointsActionBusy(busyKey, false);
           renderTaskPage();
         }
         function goTask(id){
@@ -5714,19 +5764,21 @@ function enhancePrototypeMe() {
         function taskRow(task){
           var copy = meCopy();
           var done = taskDone(task.id);
+          var busy = pointsActionBusy("task:" + task.id);
           var visited = taskVisited(task.id);
           var title = i18nText(task.titleI18n, "Task");
           var desc = i18nText(task.descriptionI18n, "");
           var needsGo = !done && !visited && task.id !== "open-world-app" && (task.actionUrl || task.type === "swap" || task.type === "earn" || task.type === "social" || task.id === "open-mystery-box");
-          var action = done ? (copy.completed || "Completed") : (needsGo ? i18nText(task.actionLabelI18n, copy.go || "Go") : (copy.claim || "Claim"));
+          var action = busy ? (copy.processing || "Processing...") : (done ? (copy.completed || "Completed") : (needsGo ? i18nText(task.actionLabelI18n, copy.go || "Go") : (copy.claim || "Claim")));
           var handler = needsGo ? "window.__luminaGoTask" : "window.__luminaCompleteTask";
-          return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" ' + (done ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
+          return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" class="' + (busy ? "is-loading" : "") + '" ' + ((done || busy) ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
         }
         function renderTaskPage(){
           window.__luminaPointsCurrentView = "tasks";
           var copy = meCopy();
           var streak = readCheckinStreak();
           var doneToday = checkinDone();
+          var checkinBusy = pointsActionBusy("checkin:" + todayKey());
           var rewards = checkinRewards();
           var dayCards = rewards.map(function(points, index){
             var day = index + 1;
@@ -5739,7 +5791,7 @@ function enhancePrototypeMe() {
           var more = allTasks.filter(function(task){ return daily.indexOf(task) < 0; });
           modal.innerHTML =
             '<div class="task-page-head"><button type="button" class="points-close" onclick="document.getElementById(\\'pointsModal\\')&&document.getElementById(\\'pointsModal\\').remove()">‹</button><h1>' + escapeAttr(copy.taskCenter || "Task Center") + '</h1><span></span></div>' +
-            '<section class="task-card checkin-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyCheckin) + '</h2><p>' + escapeAttr(copy.checkinHint) + '</p></div><button type="button">' + escapeAttr(copy.checkinCalendar) + ' ◴</button></div><div class="checkin-grid">' + dayCards + '</div><button class="checkin-main" type="button" ' + (doneToday ? "disabled" : "") + ' onclick="window.__luminaCompleteCheckin()">' + escapeAttr(doneToday ? copy.completed : copy.checkIn) + '</button></section>' +
+            '<section class="task-card checkin-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyCheckin) + '</h2><p>' + escapeAttr(copy.checkinHint) + '</p></div><button type="button">' + escapeAttr(copy.checkinCalendar) + ' ◴</button></div><div class="checkin-grid">' + dayCards + '</div><button class="checkin-main ' + (checkinBusy ? "is-loading" : "") + '" type="button" ' + ((doneToday || checkinBusy) ? "disabled" : "") + ' onclick="window.__luminaCompleteCheckin()">' + escapeAttr(checkinBusy ? (copy.processing || "Processing...") : (doneToday ? copy.completed : copy.checkIn)) + '</button></section>' +
             '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyTasks) + '</h2><p>' + escapeAttr(copy.refreshDaily) + '</p></div></div><div class="task-list-card">' + (daily.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.noPoints) + '</div>') + '</div></section>' +
             '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.moreTasks) + '</h2></div></div><div class="task-list-card">' + (more.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.comingSoon) + '</div>') + '</div><p class="task-coming">✦ ' + escapeAttr(copy.comingSoon) + ' ✦</p></section>';
         }
@@ -5837,6 +5889,9 @@ function enhancePrototypeMe() {
           if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
           if (Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
+          var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
+          if (limit > 0 && totalPurchasedCount(product.id) >= limit) { toast(copy.limitReached || "Purchase limit reached"); renderProductDetail(productId, "limit"); return; }
+          if (Math.floor(Number(product.stock || 0)) <= 0) { toast(copy.soldOut || "Sold out"); renderProductDetail(productId, "soldout"); return; }
           pointsActionBusy(busyKey, true);
           renderProductDetail(product.id, null, "buying");
           try {
@@ -5850,6 +5905,13 @@ function enhancePrototypeMe() {
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
             if (data.order) {
               window.__luminaPointsOrders = [data.order].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
+            }
+            if (data.product) {
+              window.__luminaPointsProducts = (Array.isArray(window.__luminaPointsProducts) ? window.__luminaPointsProducts : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
+              products = window.__luminaPointsProducts;
+              product = data.product;
+            } else {
+              product.stock = Math.max(0, Math.floor(Number(product.stock || 0)) - 1);
             }
           } catch(e) {
             toast(e && e.message ? e.message : "Purchase failed");
@@ -5871,16 +5933,25 @@ function enhancePrototypeMe() {
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
           var isBlind = product.type === "blind_box";
           var owned = purchasedCount(product.id);
+          var totalOwned = totalPurchasedCount(product.id);
+          var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
+          var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
           var isBuying = pendingAction === "buying" || pointsActionBusy("buy:" + product.id);
           var isOpening = pendingAction === "opening" || pointsActionBusy("open:" + product.id);
           var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
           var actionText = isBlind && owned > 0 ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
           if (isBuying) actionText = copy.processing || "Processing...";
           if (isOpening) actionText = copy.opening || "Opening...";
-          var disabled = isBuying || isOpening;
+          var limitReached = isBlind && limit > 0 && totalOwned >= limit && owned <= 0;
+          var disabled = isBuying || isOpening || limitReached || stock <= 0;
+          if (limitReached) actionText = copy.limitReached || "LIMIT REACHED";
+          if (stock <= 0 && owned <= 0) actionText = copy.soldOut || "SOLD OUT";
           var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
           var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
+          if (errorText === "limit") error = '<div class="points-detail-error">' + escapeAttr(copy.limitReached || "Purchase limit reached") + '</div>';
+          if (errorText === "soldout") error = '<div class="points-detail-error">' + escapeAttr(copy.soldOut || "Sold out") + '</div>';
+          var boxInfo = isBlind ? '<small class="points-stock-line">' + escapeAttr(copy.boxQuantity || "Boxes") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(copy.limit || "Limit") + ': ' + totalOwned + '/' + limit : '') + '</small>' : "";
           modal.innerHTML =
             '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
             '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product, "detail") + '</div>' +
@@ -5888,7 +5959,7 @@ function enhancePrototypeMe() {
             '<span class="points-policy">' + escapeAttr(copy.nonRefundable || "Non-refundable") + '</span>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
-            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
+            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
         }
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
@@ -5938,7 +6009,11 @@ function enhancePrototypeMe() {
             var badgeText = product.badge || (product.type === "blind_box" ? "Blind Box" : "");
             var badge = badgeText ? '<em>' + escapeAttr(badgeText) + '</em>' : "";
             var action = "window.__luminaOpenPointsProduct('" + escapeAttr(product.id) + "')";
-            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div class="points-product-cost">' + luminaMark("sm") + '<b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div></div></button>';
+            var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
+            var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
+            var owned = totalPurchasedCount(product.id);
+            var meta = product.type === "blind_box" ? '<small class="points-product-meta">' + escapeAttr(c.box || "Box") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(c.limit || "Limit") + ': ' + owned + '/' + limit : '') + '</small>' : "";
+            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div><div class="points-product-cost">' + luminaMark("sm") + '<b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div>' + meta + '</div></div></button>';
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
@@ -5971,9 +6046,9 @@ function enhancePrototypeMe() {
         }
         window.__luminaRenderPointsShop = renderShop;
         document.body.appendChild(modal);
-        var products = [];
+        var products = Array.isArray(window.__luminaPointsProducts) && window.__luminaPointsProducts.length ? window.__luminaPointsProducts : fallbackPointsProducts();
         window.__luminaPointsProducts = products;
-        window.__luminaPointsOrders = [];
+        if (!Array.isArray(window.__luminaPointsOrders)) window.__luminaPointsOrders = [];
         if (initialView === "tasks") renderTaskPage(); else renderShop();
         try {
           if (window.__luminaUserAddress) {

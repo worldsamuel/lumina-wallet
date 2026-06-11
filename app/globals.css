@@ -328,7 +328,7 @@
   #view-home .home-points-actions { margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
   #view-home .home-points-actions i { min-height: 31px; padding: 0 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; display: inline-flex; align-items: center; background: rgba(6,8,7,.42); color: #fff; font-style: normal; font-size: 13px; font-weight: 900; }
   #view-home .home-points-actions i.gift { border-color: rgba(74,222,128,.14); background: rgba(74,222,128,.18); color: #9cf5aa; }
-  #view-home .home-points-gift { position: absolute; right: 54px; bottom: 24px; width: 56px; height: 44px; border-radius: 8px 8px 10px 10px; background: linear-gradient(90deg, #313631 0 42%, #7ef090 42% 58%, #202520 58% 100%); box-shadow: 0 16px 32px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.08); }
+  #view-home .home-points-gift { position: absolute; z-index: 0; right: 54px; top: 22px; width: 46px; height: 36px; border-radius: 8px 8px 10px 10px; background: linear-gradient(90deg, #313631 0 42%, #7ef090 42% 58%, #202520 58% 100%); opacity: .7; pointer-events: none; transform: rotate(-8deg); box-shadow: 0 16px 32px rgba(0,0,0,.28), inset 0 0 0 1px rgba(255,255,255,.08); }
   #view-home .home-points-gift::before { content: ""; position: absolute; left: -4px; right: -4px; top: -9px; height: 12px; border-radius: 8px; background: linear-gradient(90deg, #3b413b 0 42%, #86f497 42% 58%, #272c27 58% 100%); }
   #view-home .home-points-gift::after { content: ""; position: absolute; left: 14px; top: -22px; width: 30px; height: 20px; border: 5px solid #86f497; border-bottom: 0; border-radius: 18px 18px 0 0; transform: rotate(-12deg); }
   #view-home .home-points-chev { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-size: 34px; line-height: 1; z-index: 1; }
@@ -337,7 +337,7 @@
     #view-home .home-points-orbit { left: 14px; width: 66px; height: 66px; }
     #view-home .home-points-orbit img { width: 48px; height: 48px; }
     #view-home .home-points-copy small { max-width: 190px; }
-    #view-home .home-points-gift { right: 42px; width: 46px; height: 36px; opacity: .72; }
+    #view-home .home-points-gift { right: 40px; top: 18px; width: 40px; height: 31px; opacity: .58; }
   }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }
@@ -919,6 +919,7 @@
   .points-task-side strong { color: var(--green); font-size: 14px; font-weight: 950; }
   .points-task-side button { min-width: 74px; height: 32px; border: 0; border-radius: 999px; background: var(--green); color: #041007; font-size: 12px; font-weight: 900; }
   .points-task-side button:disabled { background: rgba(255,255,255,.1); color: #7d847d; }
+  .points-task-side button.is-loading { background: rgba(74,222,128,.28); color: rgba(255,255,255,.78); cursor: wait; }
   .points-task-view { border: 0; background: transparent; color: var(--green); font-size: 14px; font-weight: 850; }
   .task-page-head { min-height: 58px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
   .task-page-head h1 { margin: 0; text-align: center; color: #fff; font-size: 21px; line-height: 1.1; font-weight: 850; }
@@ -937,6 +938,7 @@
   .checkin-day.active strong { color: #fff; }
   .checkin-main { width: 100%; height: 56px; margin-top: 24px; border: 0; border-radius: 999px; background: var(--green); color: #031006; font-size: 19px; font-weight: 950; }
   .checkin-main:disabled { background: rgba(74,222,128,.22); color: rgba(255,255,255,.62); }
+  .checkin-main.is-loading { color: rgba(255,255,255,.82); cursor: wait; }
   .task-list-card { margin-top: 16px; overflow: hidden; border-radius: 16px; background: rgba(255,255,255,.025); }
   .task-list-card .points-task-row { border-width: 0 0 1px; border-radius: 0; background: transparent; min-height: 82px; }
   .task-list-card .points-task-row:last-child { border-bottom: 0; }
@@ -963,6 +965,8 @@
   .points-product-cost { display: flex; align-items: center; gap: 6px; min-width: 0; color: #fff; }
   .points-product-cost b { font-size: 13px; font-weight: 950; white-space: nowrap; }
   .points-product-cost del { color: #777d77; font-size: 12px; white-space: nowrap; }
+  .points-product-meta { display: block; margin-top: 6px; color: #8f968f; font-size: 11px; line-height: 1.25; font-weight: 850; }
+  .points-product-meta b { color: var(--green); }
   .points-products .points-empty { grid-column: 1 / -1; }
   .points-product.blind .points-product-art::before { content: none; }
   @keyframes blindCardGlow { to { transform: rotate(360deg); } }
@@ -994,6 +998,7 @@
   .points-detail-price del { color: #626762; font-size: 20px; white-space: nowrap; }
   .points-detail-price small { display: block; margin-top: 6px; color: #a9afa9; font-size: 13px; }
   .points-detail-price small b { color: #c9ff22; }
+  .points-detail-price .points-stock-line { margin-top: 4px; font-size: 12px; }
   .points-detail-footer button { height: 60px; border: none; border-radius: 999px; background: linear-gradient(135deg, #c9ff22, #9af10d); color: #071007; font-size: 15px; font-weight: 950; letter-spacing: 0; box-shadow: 0 14px 36px rgba(161,255,19,.2); }
   .points-detail-footer button:disabled { opacity: .62; filter: grayscale(.25); box-shadow: none; cursor: wait; }
   .points-mini-sheet { position: fixed; inset: 0; z-index: 320; display: none; align-items: flex-end; justify-content: center; padding: 18px; background: rgba(0,0,0,.62); backdrop-filter: blur(12px); }

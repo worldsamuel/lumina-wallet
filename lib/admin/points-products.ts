@@ -21,6 +21,7 @@ export type PointsProductConfig = {
   badge?: string | null;
   countries?: string[];
   stock: number;
+  purchaseLimit?: number | null;
   enabled: boolean;
   sortOrder: number;
   description?: string | null;
@@ -76,6 +77,7 @@ function defaultProducts(): PointsProductConfig[] {
       badge: "Hot",
       countries: ["global"],
       stock: 99,
+      purchaseLimit: null,
       enabled: true,
       sortOrder: 1,
       description: "Surprise cash-back reward.",
@@ -95,6 +97,7 @@ function defaultProducts(): PointsProductConfig[] {
       badge: null,
       countries: ["global"],
       stock: 200,
+      purchaseLimit: null,
       enabled: true,
       sortOrder: 2,
       description: "Membership coupon.",
@@ -108,6 +111,7 @@ function defaultProducts(): PointsProductConfig[] {
       imageText: "$50",
       countries: ["global"],
       stock: 50,
+      purchaseLimit: null,
       enabled: true,
       sortOrder: 3,
       description: "Redeem points for cash back.",
@@ -121,6 +125,7 @@ function defaultProducts(): PointsProductConfig[] {
       imageText: "Vintage Fine Wines",
       countries: ["global"],
       stock: 120,
+      purchaseLimit: null,
       enabled: true,
       sortOrder: 4,
       description: "Single-order discount coupon.",
@@ -180,6 +185,7 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
       ? Array.from(new Set(input.countries.map((country) => String(country || "").trim().toLowerCase()).filter(Boolean)))
       : ["global"],
     stock: Math.max(0, Math.floor(Number(input.stock ?? 0))),
+    purchaseLimit: input.purchaseLimit == null || Number(input.purchaseLimit) <= 0 ? null : Math.max(1, Math.floor(Number(input.purchaseLimit))),
     enabled: input.enabled !== false,
     sortOrder: Number(input.sortOrder ?? index + 1),
     description,
@@ -387,10 +393,19 @@ function pickBlindReward(product: PointsProductConfig) {
 
 export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number }) {
   const address = input.address.toLowerCase();
-  const product = (await getPublicPointsProducts()).find((item) => item.id === input.productId);
+  if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
+  const products = await readStoredProducts();
+  const productIndex = products.findIndex((item) => item.id === input.productId && item.enabled);
+  const product = productIndex >= 0 ? products[productIndex] : null;
   if (!product) throw new Error("Product unavailable.");
   if (product.stock <= 0) throw new Error("Product sold out.");
   if (Math.floor(Number(input.availablePoints || 0)) < product.points) throw new Error("Not enough Lumina Points.");
+  const orders = await readStoredOrders();
+  const limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
+  if (limit > 0) {
+    const purchased = orders.filter((order) => order.address === address && order.productId === product.id).length;
+    if (purchased >= limit) throw new Error("Purchase limit reached.");
+  }
   const order: PointsOrderConfig = {
     id: `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     address,
@@ -403,10 +418,11 @@ export async function purchasePointsProduct(input: { address: string; productId:
     createdAt: new Date().toISOString(),
     openedAt: null,
   };
-  const orders = await readStoredOrders();
   orders.unshift(order);
+  products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
+  await writeStoredProducts(products);
   await writeStoredOrders(orders);
-  return { order, product };
+  return { order, product: products[productIndex] };
 }
 
 export async function airdropBlindBox(input: { address: string; productId: string; note?: string | null; createdBy?: string | null }) {
@@ -431,6 +447,12 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   };
   const orders = await readStoredOrders();
   orders.unshift(order);
+  const products = await readStoredProducts();
+  const index = products.findIndex((item) => item.id === product.id);
+  if (index >= 0) {
+    products[index] = { ...products[index], stock: Math.max(0, products[index].stock - 1) };
+    await writeStoredProducts(products);
+  }
   await writeStoredOrders(orders);
   return { order, product };
 }
