@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress, type Address } from "viem";
 import { fetchBalances } from "@/lib/balances";
 
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 5_000;
 const STALE_CACHE_TTL_MS = 10 * 60_000;
 
 type CachedBalances = {
@@ -13,7 +13,8 @@ type CachedBalances = {
 
 const balanceCache = new Map<string, CachedBalances>();
 
-const BALANCE_CACHE_HEADERS = { "Cache-Control": "private, max-age=30" };
+const BALANCE_CACHE_HEADERS = { "Cache-Control": "private, max-age=5, stale-while-revalidate=10" };
+const FRESH_BALANCE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 
 function serializeBalances(balances: Awaited<ReturnType<typeof fetchBalances>>) {
   return balances.map((item) => ({
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
       expiresAt: Date.now() + CACHE_TTL_MS,
       staleUntil: Date.now() + STALE_CACHE_TTL_MS,
     });
-    return NextResponse.json({ balances: data, cached: false }, { headers: BALANCE_CACHE_HEADERS });
+    return NextResponse.json({ balances: data, cached: false }, { headers: refresh ? FRESH_BALANCE_HEADERS : BALANCE_CACHE_HEADERS });
   } catch {
     console.warn("[balances] upstream unavailable");
     if (cached && cached.staleUntil > Date.now()) {
@@ -57,7 +58,7 @@ export async function GET(request: NextRequest) {
           stale: true,
           warning: "Using the last successful on-chain balance snapshot.",
         },
-        { headers: BALANCE_CACHE_HEADERS },
+        { headers: refresh ? FRESH_BALANCE_HEADERS : BALANCE_CACHE_HEADERS },
       );
     }
     return NextResponse.json(

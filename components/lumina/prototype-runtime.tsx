@@ -763,7 +763,13 @@ function exposeTokenTransfer(
   window.__luminaFriendlySwapError = friendlySwapError;
   window.__luminaExecuteSwap = async (params) => executeSwap(params);
   window.__luminaRefreshWalletData = () => {
-    if (address) void mutate(`/api/balances?address=${address}`);
+    if (address) {
+      var balanceKey = `/api/balances?address=${address}`;
+      void fetch(balanceKey + `&refresh=1&t=${Date.now()}`, { cache: "no-store" })
+        .then(function(res){ return res.ok ? res.json() : null; })
+        .then(function(data){ if (data) void mutate(balanceKey, data, false); })
+        .catch(function(){ void mutate(balanceKey); });
+    }
     void mutate("/api/prices/market");
     void mutate("/api/prices/onchain");
     window.__luminaRefreshImportedTokens?.();
@@ -4053,10 +4059,10 @@ function enhancePrototypeSwapQuote() {
           if (activeQuotePromise === promise) activeQuotePromise = null;
         }
       }
-	      function scheduleQuote(){
-	        clearTimeout(quoteTimer);
-	        quoteTimer = setTimeout(requestQuote, 80);
-	      }
+      function scheduleQuote(){
+        clearTimeout(quoteTimer);
+        quoteTimer = setTimeout(requestQuote, 220);
+      }
 	      function tokenMeta(symbol, quoted){
 	        var meta = quoted || (customTokens && customTokens[symbol] ? customTokens[symbol] : null);
 	        var known = (typeof tokens !== "undefined" && tokens.find) ? tokens.find(function(t){ return t.sym === symbol || t.symbol === symbol; }) : null;
@@ -4443,7 +4449,9 @@ function enhancePrototypeSwapQuote() {
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) {
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 6500);
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 1000);
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 4000);
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 10000);
 	          }
 	        } catch(e) {
 	          setSwapDebug("execute:error", readableSwapError(e));
@@ -5040,10 +5048,16 @@ function enhancePrototypeActivity() {
           renderActivity();
           return;
         }
-        fetch("/api/activity?address=" + encodeURIComponent(address))
+        fetch("/api/activity?address=" + encodeURIComponent(address) + "&fast=1&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });
+        setTimeout(function(){
+          fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
+            .then(function(res){ return res.ok ? res.json() : []; })
+            .then(function(rows){ activityItems = mergeActivityRows(localActivity(), Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
+            .catch(function(){});
+        }, 250);
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
         window.__luminaActivityGoWrapped = true;
@@ -5591,11 +5605,15 @@ function enhancePrototypeMe() {
           }];
         }
         function purchasedCount(id){
-          var serverCount = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id && order.type === "blind_box" && order.status === "purchased"; }).length;
+          var productId = String(id || "");
+          var serverCount = (window.__luminaPointsOrders || []).filter(function(order){
+            return order && String(order.productId || "") === productId && String(order.type || "") === "blind_box" && String(order.status || "").toLowerCase() === "purchased";
+          }).length;
           return Math.max(0, serverCount);
         }
         function totalPurchasedCount(id){
-          return (window.__luminaPointsOrders || []).filter(function(order){ return order && order.productId === id; }).length;
+          var productId = String(id || "");
+          return (window.__luminaPointsOrders || []).filter(function(order){ return order && String(order.productId || "") === productId; }).length;
         }
         function updatePointsBalance(nextValue){
           window.__luminaPoints = Math.max(0, Math.floor(Number(nextValue || 0)));
@@ -5815,7 +5833,18 @@ function enhancePrototypeMe() {
           var copy = meCopy();
           var busyKey = "open:" + product.id;
           if (pointsActionBusy(busyKey)) return;
+          var pendingBuy = window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id];
+          if (pendingBuy) {
+            pointsActionBusy(busyKey, true);
+            renderProductDetail(product.id, null, "opening");
+            try { await pendingBuy; } catch(e) {}
+            pointsActionBusy(busyKey, false);
+          }
           var count = purchasedCount(product.id);
+          if (count <= 0) {
+            await reloadPointsOrders().catch(function(){ return []; });
+            count = purchasedCount(product.id);
+          }
           if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); renderProductDetail(product.id, "buyfirst"); return; }
           pointsActionBusy(busyKey, true);
           renderProductDetail(product.id, null, "opening");
@@ -5831,15 +5860,24 @@ function enhancePrototypeMe() {
           document.body.appendChild(box);
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
-            var pendingBuy = window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id];
-            if (pendingBuy) await pendingBuy;
-            var res = await fetch("/api/points-products/purchase", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id }),
-            });
-            var data = await res.json().catch(function(){ return null; });
-            if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+            var openOnce = async function(){
+              var res = await fetch("/api/points-products/purchase", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id }),
+              });
+              var data = await res.json().catch(function(){ return null; });
+              if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+              return data;
+            };
+            var data;
+            try {
+              data = await openOnce();
+            } catch(firstError) {
+              await reloadPointsOrders().catch(function(){ return []; });
+              if (purchasedCount(product.id) <= 0) throw firstError;
+              data = await openOnce();
+            }
             if (data.reward) won = data.reward;
             if (data.order) {
               var replaced = false;
@@ -5926,7 +5964,7 @@ function enhancePrototypeMe() {
             var requestPromise = fetch("/api/points-products/purchase", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:Number(window.__luminaPoints || 0) }),
+              body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:previousPoints }),
             }).then(async function(res){
               var data = await res.json().catch(function(){ return null; });
               if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");

@@ -9,13 +9,17 @@ export function OPTIONS() {
   return optionsResponse();
 }
 
+const NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+};
+
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:points-orders", 120).ok) {
-    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+    return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
   }
   const address = req.nextUrl.searchParams.get("address") || "";
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return jsonResponse([]);
-  return jsonResponse(await getPointsOrders(address));
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) return jsonResponse([], { headers: NO_STORE_HEADERS });
+  return jsonResponse(await getPointsOrders(address), { headers: NO_STORE_HEADERS });
 }
 
 export async function POST(req: NextRequest) {
@@ -30,10 +34,13 @@ export async function POST(req: NextRequest) {
 
   try {
     if (body.action === "open") {
-      return jsonResponse({ ok: true, ...(await openBlindBoxOrder({ address, productId })) });
+      return jsonResponse({ ok: true, ...(await openBlindBoxOrder({ address, productId })) }, { headers: NO_STORE_HEADERS });
     }
-    return jsonResponse({ ok: true, ...(await purchasePointsProduct({ address, productId, availablePoints: Number(body.availablePoints || 0) })) });
+    return jsonResponse(
+      { ok: true, ...(await purchasePointsProduct({ address, productId, availablePoints: Number(body.availablePoints || 0) })) },
+      { headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
-    return jsonResponse({ error: error instanceof Error ? error.message : "Purchase failed." }, { status: 400 });
+    return jsonResponse({ error: error instanceof Error ? error.message : "Purchase failed." }, { status: 400, headers: NO_STORE_HEADERS });
   }
 }

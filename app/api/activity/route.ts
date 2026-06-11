@@ -12,6 +12,7 @@ const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "funct
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
 const activityCache = new Map<string, { expiresAt: number; data: unknown }>();
+const ACTIVITY_CACHE_TTL_MS = 8_000;
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
@@ -76,7 +77,7 @@ function activityResponse(data: unknown, init?: ResponseInit) {
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      "Cache-Control": "private, max-age=30",
+      "Cache-Control": "private, max-age=8, stale-while-revalidate=12",
     },
   });
 }
@@ -389,6 +390,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const address = url.searchParams.get("address") ?? "";
+  const fast = url.searchParams.get("fast") === "1";
   if (!isAddress(address)) return activityResponse([]);
   const cacheKey = address.toLowerCase();
   const cached = activityCache.get(cacheKey);
@@ -410,6 +412,12 @@ export async function GET(req: NextRequest) {
         })),
     )
     .catch(() => []);
+
+  if (fast) {
+    return activityResponse(storedRows.slice(0, 80), {
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
+  }
 
   try {
     const latest = await publicClient.getBlockNumber();
@@ -469,7 +477,7 @@ export async function GET(req: NextRequest) {
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
     const output = allRows.slice(0, 80);
-    activityCache.set(cacheKey, { data: output, expiresAt: Date.now() + 30_000 });
+    activityCache.set(cacheKey, { data: output, expiresAt: Date.now() + ACTIVITY_CACHE_TTL_MS });
     return activityResponse(output);
   } catch {
     console.warn("[activity] real activity unavailable");

@@ -37,6 +37,12 @@ async function verifyWalletAuth(nonce: string, payload: WalletAuthPayload) {
   return (await response.json()) as { address: string };
 }
 
+async function readSession() {
+  const response = await fetch("/api/auth/session", { cache: "no-store" });
+  if (!response.ok) return null;
+  return (await response.json().catch(() => null)) as { authenticated?: boolean; address?: string } | null;
+}
+
 /**
  * Runs the World MiniKit walletAuth login flow and stores the authenticated wallet address.
  */
@@ -91,12 +97,30 @@ export function useWalletAuth() {
   }, [clear, mockMode]);
 
   useEffect(() => {
+    let cancelled = false;
     if (address) {
       setStatus("authenticated");
-      return;
+      return () => {
+        cancelled = true;
+      };
     }
-    void login();
-  }, [address, login]);
+    async function hydrateThenLogin() {
+      setStatus("checking");
+      const session = await readSession().catch(() => null);
+      if (cancelled) return;
+      if (session?.authenticated && session.address) {
+        setUser({ address: session.address, username: null });
+        setStatus("authenticated");
+        setError(null);
+        return;
+      }
+      await login();
+    }
+    void hydrateThenLogin();
+    return () => {
+      cancelled = true;
+    };
+  }, [address, login, setUser]);
 
   return {
     address,

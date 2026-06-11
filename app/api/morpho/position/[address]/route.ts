@@ -96,5 +96,6 @@ function resultBigInt(
   label: string,
 ) {
   if (result?.status === "success" && typeof result.result === "bigint") return result.result;
-  throw new Error(`Unable to read Morpho ${label}.`);
+  console.warn(`[morpho] Unable to read ${label}; using 0`);
+  return 0n;
 }

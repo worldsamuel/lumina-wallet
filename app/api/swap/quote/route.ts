@@ -33,6 +33,14 @@ type SourceQuote = {
 };
 
 type HoldstationQuote = NonNullable<Awaited<ReturnType<typeof buildHoldstationQuote>>>;
+type QuoteCacheEntry = { expiresAt: number; data: unknown };
+
+const QUOTE_CACHE_TTL_MS = 5_000;
+const quoteCacheStore = globalThis as typeof globalThis & {
+  __luminaSwapQuoteCache?: Map<string, QuoteCacheEntry>;
+};
+const quoteCache = quoteCacheStore.__luminaSwapQuoteCache ?? new Map<string, QuoteCacheEntry>();
+quoteCacheStore.__luminaSwapQuoteCache = quoteCache;
 
 export function OPTIONS() {
   return optionsResponse();
@@ -51,6 +59,25 @@ export async function POST(req: NextRequest) {
   const amountIn = grossAmountIn;
   const amountText = formatUnits(amountIn, parsed.from.decimals);
   const platformFeeConfig = getSwapPlatformFeeConfig();
+  const cacheKey = [
+    parsed.from.address.toLowerCase(),
+    parsed.to.address.toLowerCase(),
+    amountIn.toString(),
+    parsed.slippageBps,
+    platformFeeConfig?.bps ?? 0,
+    process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ? "hs-exec" : "no-hs-exec",
+    process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true" ? "hs-ref" : "no-hs-ref",
+    process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE === "true" ? "v4-ref" : "no-v4-ref",
+  ].join(":");
+  const cached = quoteCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return jsonResponse(cached.data, {
+      headers: {
+        "Cache-Control": "private, max-age=3, stale-while-revalidate=5",
+      },
+    });
+  }
+
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
   const enableHoldstationReference =
@@ -112,38 +139,47 @@ export async function POST(req: NextRequest) {
   if (priceImpactPercent !== null && closestDeviation > 0.05) warnings.push("price_anomaly");
   if (priceImpactPercent !== null && priceImpactPercent > 0.1) warnings.push("low_liquidity");
 
-  return jsonResponse(
-    {
-      source: main.source,
-      amountIn: amountText,
-      amountInRaw: amountIn.toString(),
-      grossAmountIn: parsed.amountText,
-      amountOut,
-      amountOutRaw: netAmountOut.toString(),
-      grossAmountOut: main.quote.amountOut,
-      grossAmountOutRaw: grossAmountOutRaw.toString(),
-      rate: quoteRate,
-      priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
-      priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
-      priceImpactAvailable: priceImpactPercent !== null,
-      gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
-      feeTier: main.quote.fee,
-      route: main.quote.route,
-      tx: main.source === "holdstation" ? main.tx : undefined,
-      addons: main.source === "holdstation" ? main.addons : undefined,
-      platformFee,
-      tokens: {
-        from: tokenPayload(parsed.from),
-        to: tokenPayload(parsed.to),
-      },
-      references: buildReferences(parsed.from, parsed.to, amountInNumber, holdstation, v3, v4, chainlink, coingecko, main.source),
-      warnings,
-      blocked: false,
-      blockReason: undefined,
+  const payload = {
+    source: main.source,
+    amountIn: amountText,
+    amountInRaw: amountIn.toString(),
+    grossAmountIn: parsed.amountText,
+    amountOut,
+    amountOutRaw: netAmountOut.toString(),
+    grossAmountOut: main.quote.amountOut,
+    grossAmountOutRaw: grossAmountOutRaw.toString(),
+    rate: quoteRate,
+    priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
+    priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
+    priceImpactAvailable: priceImpactPercent !== null,
+    gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
+    feeTier: main.quote.fee,
+    route: main.quote.route,
+    tx: main.source === "holdstation" ? main.tx : undefined,
+    addons: main.source === "holdstation" ? main.addons : undefined,
+    platformFee,
+    tokens: {
+      from: tokenPayload(parsed.from),
+      to: tokenPayload(parsed.to),
     },
+    references: buildReferences(parsed.from, parsed.to, amountInNumber, holdstation, v3, v4, chainlink, coingecko, main.source),
+    warnings,
+    blocked: false,
+    blockReason: undefined,
+  };
+  quoteCache.set(cacheKey, { data: payload, expiresAt: Date.now() + QUOTE_CACHE_TTL_MS });
+  if (quoteCache.size > 400) {
+    const now = Date.now();
+    for (const [key, value] of quoteCache) {
+      if (value.expiresAt <= now || quoteCache.size > 300) quoteCache.delete(key);
+    }
+  }
+
+  return jsonResponse(
+    payload,
     {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "private, max-age=3, stale-while-revalidate=5",
       },
     },
   );
