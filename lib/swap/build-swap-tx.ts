@@ -95,8 +95,14 @@ export async function buildSwapTransaction({
   return {
     to: UNIVERSAL_ROUTER_ADDRESS,
     data: calldata as `0x${string}`,
-    value: (value && value !== "0" ? value : "0x0") as `0x${string}`,
+    value: normalizeTxValue(value),
   };
+}
+
+function normalizeTxValue(value: string | undefined): `0x${string}` {
+  if (!value || value === "0") return "0x0";
+  const parsed = BigInt(value);
+  return parsed === 0n ? "0x0" : (`0x${parsed.toString(16)}` as `0x${string}`);
 }
 
 function toSdkToken(token: SwapTokenLike) {

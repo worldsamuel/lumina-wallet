@@ -217,7 +217,7 @@ async function submitBuiltSwap(
   fromAmount: bigint,
   attempt: "primary",
 ) {
-  const tx = built.tx;
+  const tx = { ...built.tx, value: normalizeTxValue(built.tx.value) };
   const executableQuote = built.quote;
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
@@ -416,6 +416,12 @@ function assertUint160(amount: bigint) {
   const maxUint160 = (1n << 160n) - 1n;
   if (amount > maxUint160) throw new Error("Swap amount exceeds Permit2 allowance limit.");
   return amount;
+}
+
+function normalizeTxValue(value?: string): `0x${string}` {
+  if (!value || value === "0") return "0x0";
+  const parsed = BigInt(value);
+  return parsed === 0n ? "0x0" : (`0x${parsed.toString(16)}` as `0x${string}`);
 }
 
 function attachSwapDebug(error: unknown, debug: unknown) {
