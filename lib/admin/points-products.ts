@@ -460,8 +460,10 @@ export async function purchasePointsProduct(input: { address: string; productId:
   };
   orders.unshift(order);
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
-  await writeStoredProducts(products);
-  await writeStoredOrders(orders);
+  await Promise.all([
+    writeStoredProducts(products),
+    writeStoredOrders(orders),
+  ]);
   return { order, product: toPublicProduct(products[productIndex]) };
 }
 
@@ -491,21 +493,23 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   const index = products.findIndex((item) => item.id === product.id);
   if (index >= 0) {
     products[index] = { ...products[index], stock: Math.max(0, products[index].stock - 1) };
-    await writeStoredProducts(products);
   }
-  await writeStoredOrders(orders);
+  await Promise.all([
+    index >= 0 ? writeStoredProducts(products) : Promise.resolve(products),
+    writeStoredOrders(orders),
+  ]);
   return { order, product: toPublicProduct(product) };
 }
 
 export async function openBlindBoxOrder(input: { address: string; productId: string }) {
   const address = input.address.toLowerCase();
-  const product = (await getPublicPointsProducts()).find((item) => item.id === input.productId);
+  const product = (await readStoredProducts()).find((item) => item.id === input.productId && item.enabled);
   if (!product || product.type !== "blind_box") throw new Error("Mystery box unavailable.");
   const orders = await readStoredOrders();
-  const index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.type === "blind_box" && order.status === "purchased");
+  const index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.status === "purchased");
   if (index < 0) throw new Error("Please buy this mystery box first.");
   const reward = pickBlindReward(product);
-  orders[index] = { ...orders[index], status: "opened", reward, openedAt: new Date().toISOString() };
+  orders[index] = { ...orders[index], type: "blind_box", status: "opened", reward, openedAt: new Date().toISOString() };
   await writeStoredOrders(orders);
   return { order: orders[index], reward, product: toPublicProduct(product) };
 }

@@ -5610,7 +5610,7 @@ function enhancePrototypeMe() {
         function purchasedCount(id){
           var productId = String(id || "");
           var serverCount = (window.__luminaPointsOrders || []).filter(function(order){
-            return committedOrder(order) && String(order.productId || "") === productId && String(order.type || "") === "blind_box" && String(order.status || "").toLowerCase() === "purchased";
+            return committedOrder(order) && String(order.productId || "") === productId && String(order.status || "").toLowerCase() === "purchased";
           }).length;
           return Math.max(0, serverCount);
         }
@@ -5697,6 +5697,11 @@ function enhancePrototypeMe() {
           var orderData = await orderRes.json().catch(function(){ return []; });
           window.__luminaPointsOrders = Array.isArray(orderData) ? orderData : [];
           return window.__luminaPointsOrders;
+        }
+        function fetchWithTimeout(url, options, timeoutMs){
+          var controller = new AbortController();
+          var timer = setTimeout(function(){ try { controller.abort(); } catch(e) {} }, Math.max(1000, Number(timeoutMs || 10000)));
+          return fetch(url, Object.assign({}, options || {}, { signal: controller.signal })).finally(function(){ clearTimeout(timer); });
         }
         function pointsActionBusy(key, value){
           window.__luminaPointsActionBusy = window.__luminaPointsActionBusy || {};
@@ -5974,12 +5979,12 @@ function enhancePrototypeMe() {
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             window.__luminaPendingProductBuys = window.__luminaPendingProductBuys || {};
-            var requestPromise = fetch("/api/points-products/purchase", {
+            var requestPromise = fetchWithTimeout("/api/points-products/purchase", {
               method: "POST",
               cache: "no-store",
               headers: { "content-type": "application/json", "cache-control": "no-store" },
               body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:previousPoints }),
-            }).then(async function(res){
+            }, 12000).then(async function(res){
               var data = await res.json().catch(function(){ return null; });
               if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
               return data;
@@ -6003,7 +6008,7 @@ function enhancePrototypeMe() {
             updatePointsBalance(previousPoints);
             product.stock = previousStock;
             window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return !order || order.id !== tempOrderId; });
-            toast(e && e.message ? e.message : "Purchase failed");
+            toast(e && e.name === "AbortError" ? (copy.requestTimeout || "Request timed out. Please try again.") : (e && e.message ? e.message : "Purchase failed"));
             pointsActionBusy(busyKey, false);
             renderProductDetail(product.id);
             return;
