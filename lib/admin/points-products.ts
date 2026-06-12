@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { calculateRulePoints, getSystemConfig, type PointsRuleKind } from "@/lib/admin/system-config";
 
 const POINTS_PRODUCTS_KEY = "points_products";
+const POINTS_PRODUCTS_PUBLIC_KEY = "points_products_public";
 const POINTS_ORDERS_KEY = "points_orders";
 const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
 const PUBLIC_PRODUCTS_CACHE_MS = 30_000;
@@ -211,9 +212,40 @@ function parseProducts(value: unknown): PointsProductConfig[] {
   return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+function stripProductForPublicStore(product: PointsProductConfig): PointsProductConfig {
+  const imageUrl = publicAssetUrl(product.id, "imageUrl", product.imageUrl);
+  const detailImageUrl = publicAssetUrl(product.id, "detailImageUrl", product.detailImageUrl);
+  const iconUrl = publicAssetUrl(product.id, "iconUrl", product.iconUrl);
+  return {
+    ...product,
+    imageUrl,
+    detailImageUrl,
+    iconUrl,
+  };
+}
+
 async function readStoredProducts() {
   const page = await db.contentPage.findUnique({ where: { key: POINTS_PRODUCTS_KEY } });
   return parseProducts(page?.bodyI18n);
+}
+
+async function readStoredPublicProducts() {
+  const page = await db.contentPage.findUnique({ where: { key: POINTS_PRODUCTS_PUBLIC_KEY } });
+  if (Array.isArray(page?.bodyI18n)) return parseProducts(page.bodyI18n);
+  const products = await readStoredProducts();
+  await writeStoredPublicProducts(products);
+  return products.map(stripProductForPublicStore);
+}
+
+async function writeStoredPublicProducts(products: PointsProductConfig[]) {
+  const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder).map(stripProductForPublicStore);
+  publicProductsCache = null;
+  await db.contentPage.upsert({
+    where: { key: POINTS_PRODUCTS_PUBLIC_KEY },
+    update: { bodyI18n: sorted as unknown as Prisma.InputJsonValue },
+    create: { key: POINTS_PRODUCTS_PUBLIC_KEY, bodyI18n: sorted as unknown as Prisma.InputJsonValue },
+  });
+  return sorted;
 }
 
 function publicAssetUrl(productId: string, field: "imageUrl" | "detailImageUrl" | "iconUrl", value?: string | null) {
@@ -234,11 +266,14 @@ function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
 async function writeStoredProducts(products: PointsProductConfig[]) {
   const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder);
   publicProductsCache = null;
-  await db.contentPage.upsert({
-    where: { key: POINTS_PRODUCTS_KEY },
-    update: { bodyI18n: sorted as unknown as Prisma.InputJsonValue },
-    create: { key: POINTS_PRODUCTS_KEY, bodyI18n: sorted as unknown as Prisma.InputJsonValue },
-  });
+  await Promise.all([
+    db.contentPage.upsert({
+      where: { key: POINTS_PRODUCTS_KEY },
+      update: { bodyI18n: sorted as unknown as Prisma.InputJsonValue },
+      create: { key: POINTS_PRODUCTS_KEY, bodyI18n: sorted as unknown as Prisma.InputJsonValue },
+    }),
+    writeStoredPublicProducts(sorted),
+  ]);
   return sorted;
 }
 
@@ -327,7 +362,7 @@ export async function getPublicPointsProducts() {
   if (publicProductsCache && publicProductsCache.expiresAt > now) {
     return publicProductsCache.rows;
   }
-  const rows = (await readStoredProducts()).filter((product) => product.enabled).map(toPublicProduct);
+  const rows = (await readStoredPublicProducts()).filter((product) => product.enabled).map(toPublicProduct);
   publicProductsCache = { expiresAt: now + PUBLIC_PRODUCTS_CACHE_MS, rows };
   return rows;
 }
@@ -444,7 +479,7 @@ function pickBlindReward(product: PointsProductConfig) {
 export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number }) {
   const address = input.address.toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
-  const products = await readStoredProducts();
+  const products = await readStoredPublicProducts();
   const productIndex = products.findIndex((item) => item.id === input.productId && item.enabled);
   const product = productIndex >= 0 ? products[productIndex] : null;
   if (!product) throw new Error("Product unavailable.");
@@ -471,7 +506,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
   orders.unshift(order);
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
   await Promise.all([
-    writeStoredProducts(products),
+    writeStoredPublicProducts(products),
     writeStoredOrders(orders),
   ]);
   return { order, product: toPublicProduct(products[productIndex]) };
@@ -480,7 +515,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
 export async function airdropBlindBox(input: { address: string; productId: string; note?: string | null; createdBy?: string | null }) {
   const address = String(input.address || "").toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
-  const product = (await readStoredProducts()).find((item) => item.id === input.productId && item.type === "blind_box" && item.enabled);
+  const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.type === "blind_box" && item.enabled);
   if (!product) throw new Error("Blind box unavailable.");
   if (product.stock <= 0) throw new Error("Blind box sold out.");
   const order: PointsOrderConfig = {
@@ -499,13 +534,13 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   };
   const orders = await readStoredOrders();
   orders.unshift(order);
-  const products = await readStoredProducts();
+  const products = await readStoredPublicProducts();
   const index = products.findIndex((item) => item.id === product.id);
   if (index >= 0) {
     products[index] = { ...products[index], stock: Math.max(0, products[index].stock - 1) };
   }
   await Promise.all([
-    index >= 0 ? writeStoredProducts(products) : Promise.resolve(products),
+    index >= 0 ? writeStoredPublicProducts(products) : Promise.resolve(products),
     writeStoredOrders(orders),
   ]);
   return { order, product: toPublicProduct(product) };
@@ -513,7 +548,7 @@ export async function airdropBlindBox(input: { address: string; productId: strin
 
 export async function openBlindBoxOrder(input: { address: string; productId: string }) {
   const address = input.address.toLowerCase();
-  const product = (await readStoredProducts()).find((item) => item.id === input.productId && item.enabled);
+  const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.enabled);
   if (!product || product.type !== "blind_box") throw new Error("Mystery box unavailable.");
   const orders = await readStoredOrders();
   const index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.status === "purchased");
