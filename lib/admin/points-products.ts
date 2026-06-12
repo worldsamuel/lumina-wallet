@@ -505,10 +505,11 @@ export async function purchasePointsProduct(input: { address: string; productId:
   };
   orders.unshift(order);
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
-  await Promise.all([
-    writeStoredPublicProducts(products),
-    writeStoredOrders(orders),
-  ]);
+  await writeStoredOrders(orders);
+  publicProductsCache = null;
+  writeStoredPublicProducts(products).catch((error) => {
+    console.error("[points-products] failed to update product stock after purchase", error);
+  });
   return { order, product: toPublicProduct(products[productIndex]) };
 }
 
