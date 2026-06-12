@@ -5990,7 +5990,8 @@ function enhancePrototypeMe() {
           updatePointsBalance(previousPoints - cost);
           if (previousStock > 0) product.stock = previousStock - 1;
           window.__luminaPointsOrders = [tempOrder].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
-          renderProductDetail(product.id, null, "buying");
+          pointsActionBusy(busyKey, false);
+          renderProductDetail(product.id);
           renderProducts(window.__luminaPointsProducts || products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
           renderHomePointsBanner();
           try {
@@ -6076,16 +6077,17 @@ function enhancePrototypeMe() {
           var totalOwned = totalPurchasedCount(product.id);
           var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
           var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
-          var isBuying = pendingAction === "buying" || pointsActionBusy("buy:" + product.id);
+          var isBuying = owned <= 0 && (pendingAction === "buying" || pointsActionBusy("buy:" + product.id));
           var isOpening = pendingAction === "opening" || pointsActionBusy("open:" + product.id);
           var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
           var actionText = isBlind && owned > 0 ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
           if (isBuying) actionText = copy.processing || "Processing...";
           if (isOpening) actionText = copy.opening || "Opening...";
           var limitReached = isBlind && limit > 0 && totalOwned >= limit && owned <= 0;
-          var disabled = isBuying || isOpening || limitReached || stock <= 0;
+          var soldOutForAction = stock <= 0 && !(isBlind && owned > 0);
+          var disabled = isBuying || isOpening || limitReached || soldOutForAction;
           if (limitReached) actionText = copy.limitReached || "LIMIT REACHED";
-          if (stock <= 0 && owned <= 0) actionText = copy.soldOut || "SOLD OUT";
+          if (soldOutForAction) actionText = copy.soldOut || "SOLD OUT";
           var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
           var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
@@ -6204,7 +6206,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products?v=20260612&t=" + Date.now(), { cache: "no-store" });
+          var res = await fetch("/api/points-products?v=20260612");
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {
             products = data;

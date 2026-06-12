@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
     });
   }
   return jsonResponse(await getPublicPointsProducts(), {
-    headers: { "Cache-Control": "private, no-store, max-age=0" },
+    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
   });
 }
