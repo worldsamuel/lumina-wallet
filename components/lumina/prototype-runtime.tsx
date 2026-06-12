@@ -5995,7 +5995,7 @@ function enhancePrototypeMe() {
               cache: "no-store",
               headers: { "content-type": "application/json", "cache-control": "no-store" },
               body: JSON.stringify({ action:"buy", address:window.__luminaUserAddress, productId:product.id, availablePoints:previousPoints }),
-            }, 12000).then(async function(res){
+            }, 6500).then(async function(res){
               var data = await res.json().catch(function(){ return null; });
               if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Purchase failed");
               return data;
@@ -6021,6 +6021,23 @@ function enhancePrototypeMe() {
             reloadPointsOrders().catch(function(){ return []; });
             if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] === requestPromise) delete window.__luminaPendingProductBuys[product.id];
           } catch(e) {
+            var confirmedOrder = null;
+            try {
+              var freshOrders = await reloadPointsOrders();
+              confirmedOrder = (Array.isArray(freshOrders) ? freshOrders : []).find(function(order){
+                return order && order.productId === product.id && order.type === product.type && (order.status === "purchased" || order.status === "redeemed");
+              }) || null;
+            } catch(confirmError) {}
+            if (confirmedOrder) {
+              window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return order && order.id !== tempOrderId; });
+              if (!window.__luminaPointsOrders.some(function(order){ return order && order.id === confirmedOrder.id; })) window.__luminaPointsOrders.unshift(confirmedOrder);
+              if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
+              addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
+              toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
+              pointsActionBusy(busyKey, false);
+              renderProductDetail(product.id);
+              return;
+            }
             if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
             updatePointsBalance(previousPoints);
             product.stock = previousStock;
