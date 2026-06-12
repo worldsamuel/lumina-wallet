@@ -5846,8 +5846,19 @@ function enhancePrototypeMe() {
             pointsActionBusy(busyKey, true);
             renderProductDetail(product.id, null, "buying");
             try {
-              await pendingBuy;
-              await reloadPointsOrders().catch(function(){ return []; });
+              var buyData = await pendingBuy;
+              if (buyData && buyData.order) {
+                var inserted = false;
+                window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
+                  if (order && order.productId === product.id && (order.localPending === true || String(order.id || "").indexOf("local-buy-") === 0)) {
+                    inserted = true;
+                    return buyData.order;
+                  }
+                  return order;
+                });
+                if (!inserted && !window.__luminaPointsOrders.some(function(order){ return order && order.id === buyData.order.id; })) window.__luminaPointsOrders.unshift(buyData.order);
+              }
+              reloadPointsOrders().catch(function(){ return []; });
             } catch(e) {
               pointsActionBusy(busyKey, false);
               toast(e && e.message ? e.message : "Purchase failed");
@@ -5992,16 +6003,22 @@ function enhancePrototypeMe() {
             window.__luminaPendingProductBuys[product.id] = requestPromise;
             var data = await requestPromise;
             if (data.order) {
+              var replacedOrder = false;
               window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
-                return order && order.id === tempOrderId ? data.order : order;
+                if (order && order.id === tempOrderId) {
+                  replacedOrder = true;
+                  return data.order;
+                }
+                return order;
               });
+              if (!replacedOrder && !window.__luminaPointsOrders.some(function(order){ return order && order.id === data.order.id; })) window.__luminaPointsOrders.unshift(data.order);
             }
             if (data.product) {
               window.__luminaPointsProducts = (Array.isArray(window.__luminaPointsProducts) ? window.__luminaPointsProducts : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
               products = window.__luminaPointsProducts;
               product = data.product;
             }
-            await reloadPointsOrders().catch(function(){ return []; });
+            reloadPointsOrders().catch(function(){ return []; });
             if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] === requestPromise) delete window.__luminaPendingProductBuys[product.id];
           } catch(e) {
             if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
