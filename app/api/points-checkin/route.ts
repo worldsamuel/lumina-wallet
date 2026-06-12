@@ -4,6 +4,10 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { checkinRewardForDay, getSystemConfig } from "@/lib/admin/system-config";
 import { awardFixedPoints, getPointsAdjustments } from "@/lib/admin/points-products";
 
+function dayKey(date = new Date()) {
+  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
 function previousDay(day: string) {
   const date = new Date(`${day}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() - 1);
@@ -35,7 +39,7 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json().catch(() => ({}));
   const address = String(body.address || "").toLowerCase();
-  const day = new Date().toISOString().slice(0, 10);
+  const day = dayKey();
   try {
     const config = await getSystemConfig();
     const adjustments = await getPointsAdjustments(address);

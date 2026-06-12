@@ -14,18 +14,18 @@ export function OPTIONS() {
 }
 
 function dayKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
+  return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function todayStart() {
   const day = dayKey();
-  return new Date(`${day}T00:00:00.000Z`);
+  return new Date(`${day}T00:00:00.000+08:00`);
 }
 
 function previousDay(day: string) {
   const date = new Date(`${day}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() - 1);
-  return dayKey(date);
+  return date.toISOString().slice(0, 10);
 }
 
 function i18nText(map: Record<string, string> | undefined, fallback: string) {

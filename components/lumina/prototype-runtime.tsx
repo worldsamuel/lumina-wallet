@@ -5648,12 +5648,22 @@ function enhancePrototypeMe() {
           return rewards;
         }
         function userScopedKey(prefix, id){ return prefix + "_" + String(window.__luminaUserAddress || "guest").toLowerCase() + "_" + String(id || ""); }
-        function todayKey(){ return new Date().toISOString().slice(0, 10); }
+        function dateKeyUTC8(date){
+          var d = date instanceof Date ? date : new Date(date || Date.now());
+          return new Date(d.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+        }
+        function todayKey(){ return dateKeyUTC8(new Date()); }
+        function previousDateKeyUTC8(day){
+          var d = new Date(String(day) + "T00:00:00.000Z");
+          d.setUTCDate(d.getUTCDate() - 1);
+          return d.toISOString().slice(0, 10);
+        }
         var dailyTaskIds = ["open-world-app", "make-swap", "make-earn"];
         function completedTaskKey(id){ return userScopedKey("lumina_points_task_done", id); }
         function visitedTaskKey(id){ return userScopedKey("lumina_points_task_visited", id); }
         function checkinKey(){ return userScopedKey("lumina_points_checkin", todayKey()); }
         function streakKey(){ return userScopedKey("lumina_points_checkin_streak", "v1"); }
+        function streakDateKey(){ return userScopedKey("lumina_points_checkin_streak_date", "v1"); }
         function profileAdjustments(){ return ((window.__luminaPointsProfile || {}).adjustments || []); }
         function adjustmentDone(key){ return profileAdjustments().some(function(row){ return row && row.createdBy === key; }); }
         function taskDone(id){
@@ -5669,15 +5679,50 @@ function enhancePrototypeMe() {
           if (adjustmentDone("points-task:daily-checkin:" + todayKey())) return true;
           try { return localStorage.getItem(checkinKey()) === "1"; } catch(e) { return false; }
         }
-        function readCheckinStreak(){
-          var days = profileAdjustments().map(function(row){
+        function checkinDaysSet(){
+          var days = {};
+          profileAdjustments().forEach(function(row){
             var m = String(row && row.createdBy || "").match(/^points-task:daily-checkin:(\\d{4}-\\d{2}-\\d{2})$/);
-            return m ? m[1] : "";
-          }).filter(Boolean).sort();
-          if (days.length) return ((days.length - 1) % 7) + 1;
-          try { return Math.max(0, Number(localStorage.getItem(streakKey()) || 0)); } catch(e) { return 0; }
+            if (m) days[m[1]] = true;
+          });
+          return days;
         }
-        function writeCheckinStreak(value){ try { localStorage.setItem(streakKey(), String(Math.max(0, Number(value || 0)))); } catch(e) {} }
+        function consecutiveCheckinStreak(doneToday){
+          var days = checkinDaysSet();
+          var cursor = doneToday ? todayKey() : previousDateKeyUTC8(todayKey());
+          var streak = 0;
+          while (days[cursor]) {
+            streak += 1;
+            cursor = previousDateKeyUTC8(cursor);
+          }
+          return streak > 0 ? ((streak - 1) % 7) + 1 : 0;
+        }
+        function storedCheckinStreak(){
+          try {
+            var storedDay = localStorage.getItem(streakDateKey()) || "";
+            var value = Math.max(0, Number(localStorage.getItem(streakKey()) || 0));
+            var today = todayKey();
+            if (storedDay === today || storedDay === previousDateKeyUTC8(today)) return value;
+          } catch(e) {}
+          return 0;
+        }
+        function readCheckinStreak(){
+          var fromProfile = consecutiveCheckinStreak(checkinDone());
+          if (fromProfile > 0) return fromProfile;
+          return storedCheckinStreak();
+        }
+        function nextCheckinDayFromProfile(){
+          var previous = consecutiveCheckinStreak(false);
+          if (previous > 0) return (previous % 7) + 1;
+          var stored = storedCheckinStreak();
+          return stored > 0 ? ((stored % 7) + 1) : 1;
+        }
+        function writeCheckinStreak(value){
+          try {
+            localStorage.setItem(streakKey(), String(Math.max(0, Number(value || 0))));
+            localStorage.setItem(streakDateKey(), todayKey());
+          } catch(e) {}
+        }
         async function reloadPointsProfile(){
           var address = window.__luminaUserAddress || "";
           if (!address) return null;
@@ -5749,7 +5794,7 @@ function enhancePrototypeMe() {
             var data = await res.json().catch(function(){ return null; });
             if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Check-in failed.");
             try { localStorage.setItem(checkinKey(), "1"); } catch(e) {}
-            writeCheckinStreak(data.checkinDay || ((readCheckinStreak() % 7) + 1));
+            writeCheckinStreak(data.checkinDay || nextCheckinDayFromProfile());
             if (Number(data.points || 0) > 0) updatePointsBalance(Number(window.__luminaPoints || 0) + Number(data.points || 0));
             if (Number(data.points || 0) > 0) toast("+" + Number(data.points || 0).toLocaleString() + " Lumina Points");
             reloadPointsProfile().catch(function(){});
@@ -5808,7 +5853,7 @@ function enhancePrototypeMe() {
           var rewards = checkinRewards();
           var dayCards = rewards.map(function(points, index){
             var day = index + 1;
-            var active = doneToday ? day === streak : day === ((streak % 7) + 1);
+            var active = doneToday ? day === streak : day === nextCheckinDayFromProfile();
             var label = active && !doneToday ? copy.today : ("Day " + day);
             return '<div class="checkin-day ' + (active ? "active" : "") + '"><b>' + escapeAttr(label) + '</b><strong>+' + points + '</strong></div>';
           }).join("");
@@ -5835,6 +5880,14 @@ function enhancePrototypeMe() {
           return '<section class="points-task-panel"><div class="points-shop-title"><h2>' + escapeAttr(copy.taskCenter || "Task Center") + '</h2><button type="button" class="points-task-view" onclick="window.__luminaRenderTaskCenter()">View</button></div><div class="points-task-list">' + preview + '</div></section>';
         }
         window.__luminaRenderTaskCenter = renderTaskPage;
+        function cleanRewardText(text){
+          return String(text || "").replace(/^\\s*\\d+\\s+(?=(\\d|US|WLD|ETH|USDC|ORB|SUSHI|Point|\\$))/i, "").trim();
+        }
+        function blindRewardLabel(reward){
+          var value = cleanRewardText(reward && reward.value);
+          var name = cleanRewardText(i18nText(reward && reward.nameI18n, reward && reward.name || ""));
+          return value || name || "Lumina reward";
+        }
         window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
@@ -5938,10 +5991,11 @@ function enhancePrototypeMe() {
           }
           var result = box.querySelector(".blind-result");
           if (result) {
+            var rewardLabel = blindRewardLabel(won);
             result.classList.remove("pending");
-            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(i18nText(won.nameI18n, won.name || "Lumina reward")) + '</strong>' + (won.value ? '<b>' + escapeAttr(won.value) + '</b>' : '') + '<button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
+            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(rewardLabel) + '</strong><button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
           }
-          addPointsCoupon({ title: i18nText(won.nameI18n, won.name || "Lumina reward"), value: won.value || "", source: productTitle(product) });
+          addPointsCoupon({ title: blindRewardLabel(won), value: "", source: productTitle(product) });
           pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
         };
