@@ -5,6 +5,9 @@ import { calculateRulePoints, getSystemConfig, type PointsRuleKind } from "@/lib
 const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_ORDERS_KEY = "points_orders";
 const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
+const PUBLIC_PRODUCTS_CACHE_MS = 30_000;
+
+let publicProductsCache: { expiresAt: number; rows: PointsProductConfig[] } | null = null;
 
 export type PointsProductConfig = {
   id: string;
@@ -230,6 +233,7 @@ function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
 
 async function writeStoredProducts(products: PointsProductConfig[]) {
   const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder);
+  publicProductsCache = null;
   await db.contentPage.upsert({
     where: { key: POINTS_PRODUCTS_KEY },
     update: { bodyI18n: sorted as unknown as Prisma.InputJsonValue },
@@ -319,7 +323,13 @@ export async function getPointsProducts() {
 }
 
 export async function getPublicPointsProducts() {
-  return (await readStoredProducts()).filter((product) => product.enabled).map(toPublicProduct);
+  const now = Date.now();
+  if (publicProductsCache && publicProductsCache.expiresAt > now) {
+    return publicProductsCache.rows;
+  }
+  const rows = (await readStoredProducts()).filter((product) => product.enabled).map(toPublicProduct);
+  publicProductsCache = { expiresAt: now + PUBLIC_PRODUCTS_CACHE_MS, rows };
+  return rows;
 }
 
 export async function getPointsOrders(address: string) {
