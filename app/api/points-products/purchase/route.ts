@@ -34,10 +34,30 @@ export async function POST(req: NextRequest) {
 
   try {
     if (body.action === "open") {
-      return jsonResponse({ ok: true, ...(await openBlindBoxOrder({ address, productId })) }, { headers: NO_STORE_HEADERS });
+      return jsonResponse(
+        {
+          ok: true,
+          ...(await openBlindBoxOrder({
+            address,
+            productId,
+            availablePoints: Number(body.availablePoints || 0),
+            clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
+            allowPurchase: body.allowPurchase === true,
+          })),
+        },
+        { headers: NO_STORE_HEADERS },
+      );
     }
     return jsonResponse(
-      { ok: true, ...(await purchasePointsProduct({ address, productId, availablePoints: Number(body.availablePoints || 0) })) },
+      {
+        ok: true,
+        ...(await purchasePointsProduct({
+          address,
+          productId,
+          availablePoints: Number(body.availablePoints || 0),
+          clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
+        })),
+      },
       { headers: NO_STORE_HEADERS },
     );
   } catch (error) {

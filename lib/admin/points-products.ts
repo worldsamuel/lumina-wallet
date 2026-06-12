@@ -476,23 +476,33 @@ function pickBlindReward(product: PointsProductConfig) {
   return { name: won.name || "Lumina reward", value: won.value ?? null };
 }
 
-export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number }) {
+function normalizeClientOrderId(value?: string | null) {
+  const id = String(value || "").trim();
+  return /^[a-zA-Z0-9:_-]{8,96}$/.test(id) ? id : null;
+}
+
+export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number; clientOrderId?: string | null }) {
   const address = input.address.toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
   const products = await readStoredPublicProducts();
   const productIndex = products.findIndex((item) => item.id === input.productId && item.enabled);
   const product = productIndex >= 0 ? products[productIndex] : null;
   if (!product) throw new Error("Product unavailable.");
+  const orders = await readStoredOrders();
+  const clientOrderId = normalizeClientOrderId(input.clientOrderId);
+  if (clientOrderId) {
+    const existing = orders.find((order) => order.id === clientOrderId && order.address === address && order.productId === product.id);
+    if (existing) return { order: existing, product: toPublicProduct(product) };
+  }
   if (product.stock <= 0) throw new Error("Product sold out.");
   if (Math.floor(Number(input.availablePoints || 0)) < product.points) throw new Error("Not enough Lumina Points.");
-  const orders = await readStoredOrders();
   const limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
   if (limit > 0) {
     const purchased = orders.filter((order) => order.address === address && order.productId === product.id).length;
     if (purchased >= limit) throw new Error("Purchase limit reached.");
   }
   const order: PointsOrderConfig = {
-    id: `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: clientOrderId || `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     address,
     productId: product.id,
     productTitle: product.title,
@@ -503,9 +513,15 @@ export async function purchasePointsProduct(input: { address: string; productId:
     createdAt: new Date().toISOString(),
     openedAt: null,
   };
-  orders.unshift(order);
+  let latestOrders = orders;
+  if (clientOrderId) {
+    latestOrders = await readStoredOrders();
+    const latestExisting = latestOrders.find((item) => item.id === clientOrderId && item.address === address && item.productId === product.id);
+    if (latestExisting) return { order: latestExisting, product: toPublicProduct(product) };
+  }
+  latestOrders = [order, ...latestOrders.filter((item) => item.id !== order.id)];
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
-  await writeStoredOrders(orders);
+  await writeStoredOrders(latestOrders);
   publicProductsCache = null;
   writeStoredPublicProducts(products).catch((error) => {
     console.error("[points-products] failed to update product stock after purchase", error);
@@ -547,12 +563,23 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   return { order, product: toPublicProduct(product) };
 }
 
-export async function openBlindBoxOrder(input: { address: string; productId: string }) {
+export async function openBlindBoxOrder(input: { address: string; productId: string; availablePoints?: number; clientOrderId?: string | null; allowPurchase?: boolean }) {
   const address = input.address.toLowerCase();
   const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.enabled);
   if (!product || product.type !== "blind_box") throw new Error("Mystery box unavailable.");
-  const orders = await readStoredOrders();
-  const index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.status === "purchased");
+  let orders = await readStoredOrders();
+  let index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.status === "purchased");
+  if (index < 0 && input.allowPurchase) {
+    const purchased = await purchasePointsProduct({
+      address,
+      productId: product.id,
+      availablePoints: Number(input.availablePoints || 0),
+      clientOrderId: input.clientOrderId,
+    });
+    orders = await readStoredOrders();
+    index = orders.findIndex((order) => order.id === purchased.order.id && order.address === address && order.productId === product.id && order.status === "purchased");
+    if (index < 0) index = orders.findIndex((order) => order.address === address && order.productId === product.id && order.status === "purchased");
+  }
   if (index < 0) throw new Error("Please buy this mystery box first.");
   const reward = pickBlindReward(product);
   orders[index] = { ...orders[index], type: "blind_box", status: "opened", reward, openedAt: new Date().toISOString() };
