@@ -295,10 +295,13 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeMe();
       enhancePrototypeSystemConfig();
       enhancePrototypeAnalytics();
+      ensureMePointsUpgrade(host, address);
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
       setPrototypeReady(true);
+      window.setTimeout(() => ensureMePointsUpgrade(host, address), 900);
+      window.setTimeout(() => ensureMePointsUpgrade(host, address), 2500);
     });
 
     window.loginBack = () => {
@@ -938,6 +941,192 @@ function exposeMiniAppNotifications() {
       return notificationPermissionStatus(error);
     }
   };
+}
+
+function ensureMePointsUpgrade(host: HTMLDivElement, address: string | null) {
+  const view = host.querySelector<HTMLElement>("#view-me");
+  if (!view || view.querySelector("#pointsCenterValue")) return;
+
+  ensurePrototypeCoreFallbacks();
+  ensureFallbackPointsCenter(address);
+
+  const pointsText = Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString();
+  const card = view.querySelector<HTMLElement>(".me-card");
+  if (card && !card.querySelector(".me-points-chip")) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "me-points-chip";
+    chip.innerHTML = `<b id="mePointsBadge">${pointsText}</b><span>Points</span>`;
+    chip.addEventListener("click", () => {
+      (window as unknown as { openPointsCenter?: () => void }).openPointsCenter?.();
+    });
+    card.appendChild(chip);
+  }
+
+  const groupLabel = document.createElement("div");
+  groupLabel.className = "me-group-label lumina-points-fallback-label";
+  groupLabel.textContent = "Lumina Points";
+
+  const group = document.createElement("div");
+  group.className = "me-group lumina-points-fallback-group";
+  group.innerHTML = [
+    '<div class="me-row" data-lumina-points-open="shop"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Lumina Points</span><span class="val" id="pointsCenterValue">' +
+      pointsText +
+      '</span><span class="chev">›</span></div>',
+    '<div class="me-row" data-lumina-points-open="tasks"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Task Center</span><span class="chev">›</span></div>',
+  ].join("");
+  group.querySelectorAll<HTMLElement>("[data-lumina-points-open]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const mode = row.dataset.luminaPointsOpen === "tasks" ? "tasks" : undefined;
+      (window as unknown as { openPointsCenter?: (mode?: string) => void }).openPointsCenter?.(mode);
+    });
+  });
+
+  const preferenceLabel = Array.from(view.querySelectorAll<HTMLElement>(".me-group-label")).find((node) =>
+    /preferences|偏好|設定|设置/i.test(node.textContent || ""),
+  );
+  if (preferenceLabel?.parentNode) {
+    preferenceLabel.parentNode.insertBefore(groupLabel, preferenceLabel);
+    preferenceLabel.parentNode.insertBefore(group, preferenceLabel);
+  } else {
+    view.appendChild(groupLabel);
+    view.appendChild(group);
+  }
+
+  void refreshFallbackPoints(address);
+}
+
+function ensurePrototypeCoreFallbacks() {
+  const win = window as unknown as {
+    go?: (name: string) => void;
+    setTabByName?: (name: string) => void;
+    toast?: (message: string, tone?: string) => void;
+  };
+  if (typeof win.go !== "function") {
+    win.go = (name: string) => {
+      document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
+      document.getElementById(`view-${name}`)?.classList.add("active");
+      window.scrollTo(0, 0);
+    };
+  }
+  if (typeof win.setTabByName !== "function") {
+    win.setTabByName = (name: string) => {
+      document.querySelectorAll<HTMLElement>(".tab").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.n === name);
+      });
+    };
+  }
+  if (typeof win.toast !== "function") {
+    win.toast = (message: string) => toastFromPrototype(message);
+  }
+}
+
+function ensureFallbackPointsCenter(address: string | null) {
+  const win = window as unknown as { openPointsCenter?: (initialView?: string) => void };
+  if (typeof win.openPointsCenter === "function") return;
+
+  win.openPointsCenter = (initialView?: string) => {
+    document.getElementById("pointsModal")?.remove();
+    const modal = document.createElement("div");
+    modal.className = "points-shop-screen open";
+    modal.id = "pointsModal";
+    modal.innerHTML = [
+      '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><span></span></div>',
+      '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">Lumina VIP</em></div><button type="button" class="points-big"><span id="pointsShopBalance">',
+      Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString(),
+      "</span><i>›</i></button><small>Priority member card</small></div></div>",
+      initialView === "tasks"
+        ? '<section class="points-task-panel"><div class="points-shop-title"><h2>Task Center</h2></div><div class="points-task-list"><div class="points-task-row"><div><b>Daily Check-in</b><small>Check in daily to earn more points</small></div><button type="button" data-fallback-task="checkin">Check In</button></div><div class="points-task-row"><div><b>Daily Tasks</b><small>More tasks coming soon. Stay tuned.</small></div><button type="button" disabled>Go</button></div></div></section>'
+        : '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><button type="button" data-fallback-task-center="1" class="points-task-view">Task Center</button></div><div class="points-products" id="fallbackPointsProducts"><div class="points-empty">Rewards are loading.</div></div></div>',
+    ].join("");
+    modal.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest("[data-points-close]")) modal.remove();
+      if (target.closest("[data-fallback-task-center]")) win.openPointsCenter?.("tasks");
+      if (target.closest("[data-fallback-task]")) void fallbackCheckin(address);
+    });
+    document.body.appendChild(modal);
+    if (initialView !== "tasks") void renderFallbackProducts();
+  };
+}
+
+async function refreshFallbackPoints(address: string | null) {
+  const wallet = address || window.__luminaUserAddress || "";
+  if (!wallet) return;
+  try {
+    const res = await fetch(`/api/points-profile?address=${encodeURIComponent(wallet)}&t=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "cache-control": "no-store" },
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) return;
+    const total = Math.max(0, Math.floor(Number(data.points ?? data.totalPoints ?? data.adjustmentTotal ?? 0)));
+    (window as unknown as { __luminaPoints?: number }).__luminaPoints = total;
+    updateFallbackPointBadges(total);
+  } catch {
+    // Keep the last rendered points if the API is temporarily unavailable.
+  }
+}
+
+function updateFallbackPointBadges(points: number) {
+  ["mePointsBadge", "pointsCenterValue", "homePointsBannerValue", "pointsShopBalance"].forEach((id) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = Number(points || 0).toLocaleString();
+  });
+}
+
+async function fallbackCheckin(address: string | null) {
+  const wallet = address || window.__luminaUserAddress || "";
+  if (!wallet) return;
+  try {
+    const res = await fetch("/api/points-checkin", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: wallet }),
+    });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
+      const points = Math.max(0, Math.floor(Number(data.totalPoints ?? data.points ?? 0)));
+      if (points) updateFallbackPointBadges(points);
+      toastFromPrototype("Checked in");
+    }
+  } catch {
+    toastFromPrototype("Check-in failed");
+  }
+}
+
+async function renderFallbackProducts() {
+  const box = document.getElementById("fallbackPointsProducts");
+  if (!box) return;
+  try {
+    const res = await fetch(`/api/points-products?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: { "cache-control": "no-store" },
+    });
+    const data = await res.json().catch(() => null);
+    const products = Array.isArray(data) ? data : [];
+    box.innerHTML = products.length
+      ? products
+          .filter((item) => item && item.enabled !== false)
+          .slice(0, 20)
+          .map(
+            (item) =>
+              `<button type="button" class="points-product"><div class="points-product-art"><span>${escapeFallbackHtml(
+                String(item.tokenSymbol || item.category || "L").slice(0, 3),
+              )}</span></div><div class="points-product-body"><strong>${escapeFallbackHtml(
+                item.title || item.name || "Lumina reward",
+              )}</strong><div><div class="points-product-cost"><b>Lumina ${Number(item.points || 0).toLocaleString()}</b></div></div></div></button>`,
+          )
+          .join("")
+      : '<div class="points-empty">No rewards configured yet.</div>';
+  } catch {
+    box.innerHTML = '<div class="points-empty">Rewards are loading.</div>';
+  }
+}
+
+function escapeFallbackHtml(value: string) {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
 
 /**
