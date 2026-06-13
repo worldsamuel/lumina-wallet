@@ -295,13 +295,13 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeMe();
       enhancePrototypeSystemConfig();
       enhancePrototypeAnalytics();
-      ensureMePointsUpgrade(host, address);
+      ensureFullMePage(host, address, username);
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
       setPrototypeReady(true);
-      window.setTimeout(() => ensureMePointsUpgrade(host, address), 900);
-      window.setTimeout(() => ensureMePointsUpgrade(host, address), 2500);
+      window.setTimeout(() => ensureFullMePage(host, address, username), 900);
+      window.setTimeout(() => ensureFullMePage(host, address, username), 2500);
     });
 
     window.loginBack = () => {
@@ -943,7 +943,7 @@ function exposeMiniAppNotifications() {
   };
 }
 
-function ensureMePointsUpgrade(host: HTMLDivElement, address: string | null) {
+function ensureFullMePage(host: HTMLDivElement, address: string | null, username?: string | null) {
   const view = host.querySelector<HTMLElement>("#view-me");
   if (!view || view.querySelector("#pointsCenterValue")) return;
 
@@ -951,49 +951,57 @@ function ensureMePointsUpgrade(host: HTMLDivElement, address: string | null) {
   ensureFallbackPointsCenter(address);
 
   const pointsText = Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString();
-  const card = view.querySelector<HTMLElement>(".me-card");
-  if (card && !card.querySelector(".me-points-chip")) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "me-points-chip";
-    chip.innerHTML = `<b id="mePointsBadge">${pointsText}</b><span>Points</span>`;
-    chip.addEventListener("click", () => {
-      (window as unknown as { openPointsCenter?: () => void }).openPointsCenter?.();
-    });
-    card.appendChild(chip);
-  }
-
-  const groupLabel = document.createElement("div");
-  groupLabel.className = "me-group-label lumina-points-fallback-label";
-  groupLabel.textContent = "Lumina Points";
-
-  const group = document.createElement("div");
-  group.className = "me-group lumina-points-fallback-group";
-  group.innerHTML = [
-    '<div class="me-row" data-lumina-points-open="shop"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Lumina Points</span><span class="val" id="pointsCenterValue">' +
-      pointsText +
-      '</span><span class="chev">›</span></div>',
-    '<div class="me-row" data-lumina-points-open="tasks"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Task Center</span><span class="chev">›</span></div>',
+  const short = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected";
+  const name = username || short;
+  view.innerHTML = [
+    '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>',
+    '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">',
+    escapeFallbackHtml(name),
+    ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>',
+    escapeFallbackHtml(short),
+    '</span><button type="button" class="me-copy-btn" data-me-copy-address="1" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="me-orb">World App connected</span></div><button type="button" class="me-points-chip" data-lumina-points-open="shop"><b id="mePointsBadge">',
+    pointsText,
+    "</b><span>Points</span></button></div>",
+    '<div class="me-group-label">Support</div><div class="me-group"><div class="me-row" data-me-action="feedback"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="lbl">Feedback</span><span class="chev">›</span></div></div>',
+    '<div class="me-group-label">Lumina Points</div><div class="me-group"><div class="me-row" data-lumina-points-open="shop"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Lumina Points</span><span class="val" id="pointsCenterValue">',
+    pointsText,
+    '</span><span class="chev">›</span></div><div class="me-row" data-lumina-points-open="tasks"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Task Center</span><span class="chev">›</span></div></div>',
+    '<div class="me-group-label">Preferences</div><div class="me-group"><div class="me-row" data-me-action="media"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/></svg></span><span class="lbl">Media Center</span><span class="chev">›</span></div><div class="me-row" data-me-action="language"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg></span><span class="lbl">Language</span><span class="val" id="langVal">English</span><span class="chev">›</span></div><div class="me-row" data-me-action="currency"><span class="ic">$</span><span class="lbl">Display currency</span><span class="val" id="currencyVal">USD</span><span class="chev">›</span></div><div class="me-row"><span class="ic">◌</span><span class="lbl">Notifications</span><span id="meNotificationToggle" class="toggle" role="switch" aria-checked="false" data-me-action="notifications"></span></div></div>',
+    '<div class="me-group-label">Legal</div><div class="me-group"><div class="me-row" data-me-action="privacy"><span class="ic">◇</span><span class="lbl">Privacy Policy</span><span class="chev">›</span></div><div class="me-row" data-me-action="terms"><span class="ic">◇</span><span class="lbl">Terms of Service</span><span class="chev">›</span></div><div class="me-row"><span class="ic">i</span><span class="lbl">Version</span><span class="val">Lumina v1.0.0</span></div></div>',
   ].join("");
-  group.querySelectorAll<HTMLElement>("[data-lumina-points-open]").forEach((row) => {
+  bindFullMeActions(view, address);
+  void refreshFallbackPoints(address);
+}
+
+function bindFullMeActions(view: HTMLElement, address: string | null) {
+  view.querySelectorAll<HTMLElement>("[data-lumina-points-open]").forEach((row) => {
     row.addEventListener("click", () => {
       const mode = row.dataset.luminaPointsOpen === "tasks" ? "tasks" : undefined;
       (window as unknown as { openPointsCenter?: (mode?: string) => void }).openPointsCenter?.(mode);
     });
   });
-
-  const preferenceLabel = Array.from(view.querySelectorAll<HTMLElement>(".me-group-label")).find((node) =>
-    /preferences|偏好|設定|设置/i.test(node.textContent || ""),
-  );
-  if (preferenceLabel?.parentNode) {
-    preferenceLabel.parentNode.insertBefore(groupLabel, preferenceLabel);
-    preferenceLabel.parentNode.insertBefore(group, preferenceLabel);
-  } else {
-    view.appendChild(groupLabel);
-    view.appendChild(group);
-  }
-
-  void refreshFallbackPoints(address);
+  view.querySelector<HTMLElement>("[data-me-copy-address]")?.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const value = address || window.__luminaUserAddress || "";
+    void navigator.clipboard?.writeText(value).catch(() => undefined);
+    toastFromPrototype("Address copied");
+  });
+  view.querySelectorAll<HTMLElement>("[data-me-action]").forEach((node) => {
+    node.addEventListener("click", (event) => {
+      const action = node.dataset.meAction;
+      if (action === "feedback") return (window as unknown as { openFeedback?: () => void }).openFeedback?.();
+      if (action === "media") return (window as unknown as { openMediaCenter?: () => void }).openMediaCenter?.();
+      if (action === "language") return window.openLangModal?.();
+      if (action === "privacy") return window.__luminaOpenLegal?.("privacy");
+      if (action === "terms") return window.__luminaOpenLegal?.("terms");
+      if (action === "notifications") {
+        event.stopPropagation();
+        void window.__luminaRequestNotificationPermission?.().then((status) => {
+          node.classList.toggle("on", status === "granted");
+        });
+      }
+    });
+  });
 }
 
 function ensurePrototypeCoreFallbacks() {
