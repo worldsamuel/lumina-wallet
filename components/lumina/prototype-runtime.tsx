@@ -2986,6 +2986,13 @@ function enhancePrototypeHome() {
           '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
           '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
           '<span class="home-points-gifts" aria-hidden="true"><span></span><span></span><span></span></span><span class="home-points-chev">›</span>';
+        if (window.__luminaUserAddress && (!window.__luminaHomePointsRefreshedAt || Date.now() - window.__luminaHomePointsRefreshedAt > 10000)) {
+          window.__luminaHomePointsRefreshedAt = Date.now();
+          window.setTimeout(function(){ if (typeof refreshPoints === "function") refreshPoints(); }, 0);
+        }
+      }
+      function renderHomePointsBanner(){
+        ensureHomePointsBanner();
       }
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
@@ -5203,7 +5210,7 @@ function enhancePrototypeMe() {
       }
       function linkIcon(label, logoUrl){
         if (/^https?:\\/\\//i.test(String(logoUrl || ""))) {
-          return '<span class="media-icon has-img"><img src="' + safeAttr(logoUrl) + '" alt="' + safeAttr(label) + ' logo" onerror="this.parentNode.textContent=\\'' + String(label || "?").slice(0, 1).toUpperCase() + '\\'"></span>';
+          return '<span class="media-icon has-img"><img src="' + safeAttr(logoUrl) + '" alt="' + safeAttr(label) + ' logo" /></span>';
         }
         return '<span class="media-icon">' + String(label || "?").slice(0, 1).toUpperCase() + '</span>';
       }
@@ -5888,6 +5895,14 @@ function enhancePrototypeMe() {
           var name = cleanRewardText(i18nText(reward && reward.nameI18n, reward && reward.name || ""));
           return value || name || "Lumina reward";
         }
+        function blindRewardLogo(reward){
+          var logo = reward && reward.tokenLogoUrl ? String(reward.tokenLogoUrl) : "";
+          var symbol = reward && reward.tokenSymbol ? String(reward.tokenSymbol).toUpperCase() : "";
+          if (logo && (/^https?:\/\//i.test(logo) || logo.charAt(0) === "/")) {
+            return '<span class="blind-reward-logo"><img src="' + escapeAttr(logo) + '" alt="' + escapeAttr(symbol || "token") + '" /></span>';
+          }
+          return symbol ? '<span class="blind-reward-logo">' + escapeAttr(symbol.slice(0, 1)) + '</span>' : "";
+        }
         window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
           if (!product) return;
@@ -5993,7 +6008,7 @@ function enhancePrototypeMe() {
           if (result) {
             var rewardLabel = blindRewardLabel(won);
             result.classList.remove("pending");
-            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(rewardLabel) + '</strong><button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
+            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong class="blind-reward-line">' + blindRewardLogo(won) + '<span>' + escapeAttr(rewardLabel) + '</span></strong><button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
           }
           addPointsCoupon({ title: blindRewardLabel(won), value: "", source: productTitle(product) });
           pointsActionBusy(busyKey, false);
@@ -6012,7 +6027,8 @@ function enhancePrototypeMe() {
           if (!rewards.length) return '<li>' + escapeAttr(copy.rewardFallback || "Rewards are issued to your Lumina account after redemption.") + '</li>';
           return rewards.map(function(item){
             var title = i18nText(item.nameI18n, item.name || "Reward");
-            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
+            var range = item.minAmount != null && item.maxAmount != null ? (String(item.minAmount) + "-" + String(item.maxAmount) + (item.tokenSymbol ? " " + item.tokenSymbol : "")) : "";
+            return '<li>' + escapeAttr(title) + (range || item.value ? ' <b>' + escapeAttr(range || item.value) + '</b>' : '') + '</li>';
           }).join("");
         }
         async function buyProduct(productId){
@@ -6260,7 +6276,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products?v=20260612");
+          var res = await fetch("/api/points-products?t=" + Date.now(), { cache: "no-store", headers: { "cache-control": "no-store" } });
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {
             products = data;

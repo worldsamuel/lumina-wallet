@@ -6,7 +6,7 @@ const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_PRODUCTS_PUBLIC_KEY = "points_products_public";
 const POINTS_ORDERS_KEY = "points_orders";
 const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
-const PUBLIC_PRODUCTS_CACHE_MS = 30_000;
+const PUBLIC_PRODUCTS_CACHE_MS = 0;
 
 let publicProductsCache: { expiresAt: number; rows: PointsProductConfig[] } | null = null;
 
@@ -35,6 +35,10 @@ export type PointsProductConfig = {
     name: string;
     nameI18n?: Record<string, string>;
     value?: string | null;
+    tokenSymbol?: string | null;
+    tokenLogoUrl?: string | null;
+    minAmount?: number | null;
+    maxAmount?: number | null;
     odds: number;
     stock?: number | null;
   }>;
@@ -51,6 +55,9 @@ export type PointsOrderConfig = {
   reward?: {
     name: string;
     value?: string | null;
+    tokenSymbol?: string | null;
+    tokenLogoUrl?: string | null;
+    amount?: number | null;
   } | null;
   note?: string | null;
   createdBy?: string | null;
@@ -162,6 +169,46 @@ function cleanI18n(value: unknown, fallback: string) {
   return out;
 }
 
+function cleanTokenSymbol(value: unknown) {
+  const symbol = String(value || "").trim().toUpperCase();
+  return /^[A-Z0-9]{2,12}$/.test(symbol) ? symbol : null;
+}
+
+function cleanTokenLogoUrl(value: unknown) {
+  const url = String(value || "").trim();
+  if (!url) return null;
+  if (url.startsWith("/") || /^https?:\/\//i.test(url)) return url.slice(0, 500);
+  return null;
+}
+
+function amountOrNull(value: unknown) {
+  if (value == null || value === "") return null;
+  const amount = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
+function inferRewardToken(reward: Partial<NonNullable<PointsProductConfig["rewards"]>[number]>) {
+  const text = `${reward.name || ""} ${reward.value || ""}`;
+  const match = text.match(/\b(WLD|USDC|ETH|WETH|USDT|EURC|WBTC)\b/i);
+  return cleanTokenSymbol(reward.tokenSymbol) || (match ? match[1].toUpperCase() : null);
+}
+
+function inferRewardRange(reward: Partial<NonNullable<PointsProductConfig["rewards"]>[number]>) {
+  const directMin = amountOrNull(reward.minAmount);
+  const directMax = amountOrNull(reward.maxAmount);
+  if (directMin != null || directMax != null) {
+    const min = directMin ?? directMax ?? null;
+    const max = directMax ?? directMin ?? min;
+    return { minAmount: min, maxAmount: max != null && min != null ? Math.max(min, max) : max };
+  }
+  const text = `${reward.name || ""} ${reward.value || ""}`;
+  const match = text.match(/(?:区间|range)?\s*(\d+(?:\.\d+)?)\s*[-~至到]\s*(\d+(?:\.\d+)?)/i);
+  if (!match) return { minAmount: null, maxAmount: null };
+  const min = amountOrNull(match[1]);
+  const max = amountOrNull(match[2]);
+  return { minAmount: min, maxAmount: max != null && min != null ? Math.max(min, max) : max };
+}
+
 function normalizeProduct(input: Partial<PointsProductConfig>, index: number): PointsProductConfig {
   const title = String(input.title || input.titleI18n?.en || "Lumina Reward").trim();
   const description = typeof input.description === "string" && input.description.trim() ? input.description.trim() : null;
@@ -173,6 +220,9 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
           name: String(reward.name || "").trim(),
           nameI18n: cleanI18n(reward.nameI18n, String(reward.name || "Reward").trim()),
           value: typeof reward.value === "string" && reward.value.trim() ? reward.value.trim() : null,
+          tokenSymbol: inferRewardToken(reward),
+          tokenLogoUrl: cleanTokenLogoUrl(reward.tokenLogoUrl),
+          ...inferRewardRange(reward),
           odds: Math.max(0, Number(reward.odds || 0)),
           stock: reward.stock == null ? null : Math.max(0, Math.floor(Number(reward.stock))),
         }))
@@ -295,6 +345,9 @@ function parseOrders(value: unknown): PointsOrderConfig[] {
         reward: item.reward && typeof item.reward === "object" ? {
           name: String(item.reward.name || "Lumina reward"),
           value: typeof item.reward.value === "string" ? item.reward.value : null,
+          tokenSymbol: cleanTokenSymbol(item.reward.tokenSymbol),
+          tokenLogoUrl: cleanTokenLogoUrl(item.reward.tokenLogoUrl),
+          amount: amountOrNull(item.reward.amount),
         } : null,
         note: typeof item.note === "string" && item.note.trim() ? item.note.trim() : null,
         createdBy: typeof item.createdBy === "string" && item.createdBy.trim() ? item.createdBy.trim() : null,
@@ -359,11 +412,13 @@ export async function getPointsProducts() {
 
 export async function getPublicPointsProducts() {
   const now = Date.now();
-  if (publicProductsCache && publicProductsCache.expiresAt > now) {
+  if (PUBLIC_PRODUCTS_CACHE_MS > 0 && publicProductsCache && publicProductsCache.expiresAt > now) {
     return publicProductsCache.rows;
   }
   const rows = (await readStoredPublicProducts()).filter((product) => product.enabled).map(toPublicProduct);
-  publicProductsCache = { expiresAt: now + PUBLIC_PRODUCTS_CACHE_MS, rows };
+  if (PUBLIC_PRODUCTS_CACHE_MS > 0) {
+    publicProductsCache = { expiresAt: now + PUBLIC_PRODUCTS_CACHE_MS, rows };
+  }
   return rows;
 }
 
@@ -473,7 +528,20 @@ function pickBlindReward(product: PointsProductConfig) {
       break;
     }
   }
-  return { name: won.name || "Lumina reward", value: won.value ?? null };
+  const minAmount = amountOrNull(won.minAmount);
+  const maxAmount = amountOrNull(won.maxAmount);
+  const amount = minAmount != null && maxAmount != null
+    ? Number((minAmount + Math.random() * Math.max(0, maxAmount - minAmount)).toFixed(6))
+    : minAmount;
+  const tokenSymbol = inferRewardToken(won);
+  const value = amount != null && tokenSymbol ? `${amount.toLocaleString("en-US", { maximumFractionDigits: 6 })} ${tokenSymbol}` : won.value ?? null;
+  return {
+    name: value || won.name || "Lumina reward",
+    value,
+    tokenSymbol,
+    tokenLogoUrl: cleanTokenLogoUrl(won.tokenLogoUrl),
+    amount,
+  };
 }
 
 function normalizeClientOrderId(value?: string | null) {

@@ -3,7 +3,10 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { DEFAULT_SYSTEM_CONFIG, getSystemConfig } from "@/lib/admin/system-config";
 
-const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const CONFIG_CACHE = { headers: { "Cache-Control": "private, no-store, max-age=0" } };
 
 export function OPTIONS() {
   return optionsResponse();
