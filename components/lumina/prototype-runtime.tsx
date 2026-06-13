@@ -296,6 +296,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeMe();
       enhancePrototypeSystemConfig();
       enhancePrototypeAnalytics();
+      scheduleMeFallback(host, address, username);
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
@@ -947,6 +948,36 @@ function stripLegacyMeFallback(host: HTMLDivElement) {
   view.innerHTML =
     '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>' +
     '<div class="me-loading" style="margin:0 var(--pad-screen);color:var(--text-dim);font-size:14px;">Loading...</div>';
+}
+
+function scheduleMeFallback(host: HTMLDivElement, address: string | null, username?: string | null) {
+  window.setTimeout(() => {
+    const view = host.querySelector<HTMLElement>("#view-me");
+    if (!view || !view.querySelector(".me-loading")) return;
+    renderMeFallback(view, address, username);
+  }, 800);
+}
+
+function renderMeFallback(view: HTMLElement, address: string | null, username?: string | null) {
+  const short = shortenAddress(address);
+  const displayName = username || short || "World App";
+  const points = Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString();
+  view.innerHTML = [
+    '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>',
+    '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">',
+    displayName,
+    ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>',
+    short || "Connected",
+    '</span></div><span class="me-orb">World App connected</span></div><button type="button" class="me-points-chip" onclick="window.openPointsCenter && window.openPointsCenter()"><b id="mePointsBadge">',
+    points,
+    '</b><span>Points</span></button></div>',
+    '<div class="me-group-label">Support</div><div class="me-group"><div class="me-row" onclick="window.openFeedback && window.openFeedback()"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="lbl">Feedback</span><span class="chev">›</span></div></div>',
+    '<div class="me-group-label">Lumina Points</div><div class="me-group"><div class="me-row" onclick="window.openPointsCenter && window.openPointsCenter()"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Lumina Points</span><span class="val" id="pointsCenterValue">',
+    points,
+    '</span><span class="chev">›</span></div><div class="me-row" onclick="window.openPointsCenter && window.openPointsCenter(&quot;tasks&quot;)"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Task Center</span><span class="chev">›</span></div></div>',
+    '<div class="me-group-label">Preferences</div><div class="me-group"><div class="me-row" onclick="window.openMediaCenter && window.openMediaCenter()"><span class="ic">●</span><span class="lbl">Media Center</span><span class="chev">›</span></div><div class="me-row" onclick="window.openLangModal && window.openLangModal()"><span class="ic">◎</span><span class="lbl">Language</span><span class="val" id="langVal">English</span><span class="chev">›</span></div><div class="me-row"><span class="ic">◌</span><span class="lbl">Notifications</span><span id="meNotificationToggle" class="toggle" role="switch" aria-checked="false" onclick="requestLuminaNotifications && requestLuminaNotifications(event)"></span></div></div>',
+    '<div class="me-group-label">Legal</div><div class="me-group"><div class="me-row" onclick="window.__luminaOpenLegal && window.__luminaOpenLegal(&quot;privacy&quot;)"><span class="ic">◇</span><span class="lbl">Privacy Policy</span><span class="chev">›</span></div><div class="me-row" onclick="window.__luminaOpenLegal && window.__luminaOpenLegal(&quot;terms&quot;)"><span class="ic">◇</span><span class="lbl">Terms of Service</span><span class="chev">›</span></div><div class="me-row"><span class="ic">i</span><span class="lbl">Version</span><span class="val">Lumina v1.0.0</span></div></div>',
+  ].join("");
 }
 
 /**
