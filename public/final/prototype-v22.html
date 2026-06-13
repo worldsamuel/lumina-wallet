@@ -1713,9 +1713,7 @@
     var lastRead = 0;
     try { lastRead = parseInt(localStorage.getItem(ANN_READ_KEY) || "0"); } catch(e){}
     var maxId = list.reduce(function(m,a){ return Math.max(m, a.id||0); }, 0);
-    var bellDot = document.getElementById("bellDot");
-    if(!bellDot) return;
-    bellDot.style.display = (maxId > lastRead && list.length) ? "block" : "none";
+    document.getElementById("bellDot").style.display = (maxId > lastRead && list.length) ? "block" : "none";
   }
   var tagName = { notice:{ "zh-CN":"通知","en":"Notice" }, warning:{ "zh-CN":"提醒","en":"Warning" }, urgent:{ "zh-CN":"重要","en":"Urgent" } };
   function tName(tag){ var m=tagName[tag]||tagName.notice; return m[currentLang]||m["en"]||tag; }

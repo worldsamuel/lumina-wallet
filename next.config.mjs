@@ -20,7 +20,26 @@ const nextConfig = {
     return config;
   },
   async headers() {
+    const appShellNoStore = {
+      key: "Cache-Control",
+      value: "private, no-store, no-cache, must-revalidate, max-age=0",
+    };
+
     return [
+      ...[
+        "/",
+        "/me",
+        "/me/:path*",
+        "/earn",
+        "/earn/:path*",
+        "/swap",
+        "/send",
+        "/activity",
+        "/allassets",
+      ].map((source) => ({
+        source,
+        headers: [appShellNoStore],
+      })),
       {
         source: "/:path*",
         headers: [

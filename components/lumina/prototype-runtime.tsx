@@ -68,7 +68,6 @@ declare global {
     __luminaApplyBalancePrivacy?: () => void;
     __luminaWalletBaseTotalUsd?: number;
     __luminaEarnTotalUsd?: number;
-    __luminaPointsProfile?: unknown;
     __luminaComputeEarnTotalUsd?: () => number;
     __luminaRecomputeTotalWithEarn?: () => void;
     __luminaRenderLightweightChart?: (container: HTMLElement, candles: MarketChartCandle[], range?: string) => boolean;
@@ -77,8 +76,6 @@ declare global {
     __luminaMaybeOpenWelcomeBox?: () => void;
     __luminaForceWelcomeBoxCheck?: (address?: string | null) => void;
     __luminaOpenReceive?: () => void;
-    __luminaGetNotificationPermission?: () => Promise<"granted" | "denied" | "unsupported" | "unknown">;
-    __luminaRequestNotificationPermission?: () => Promise<"granted" | "denied" | "unsupported" | "unknown">;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
     __luminaSwapDebugObserver?: MutationObserver;
@@ -259,18 +256,15 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     scriptEl.text = prototypeScript;
     host.appendChild(scriptEl);
     window.__luminaUserAddress = address ?? "";
-    window.__luminaPointsProfile = undefined;
     window.__luminaForceWelcomeBoxCheck = forceWelcomeBoxCheck;
     resetPrototypePortfolio();
     installLegalSheet(host);
-    exposeMiniAppNotifications();
     exposeTokenTransfer(address, mutate);
     exposeEarnWalletConfirm();
     exposeMorphoTransactions();
 
     requestAnimationFrame(() => {
       updatePrototypeAddress(host, address, username);
-      enhancePrototypeMe();
       if (initialView === "detail") {
         (window as unknown as { openDetail?: (index: number) => void }).openDetail?.(0);
       } else if (initialView === "earn-detail") {
@@ -901,43 +895,6 @@ function updatePrototypeAddress(host: HTMLDivElement, address: string | null, us
   }
   const meAddr = host.querySelector(".me-addr");
   if (meAddr) meAddr.textContent = label;
-}
-
-function notificationPermissionStatus(payload: unknown): "granted" | "denied" | "unsupported" | "unknown" {
-  const text = JSON.stringify(payload ?? {}).toLowerCase();
-  if (/unsupported_permission|unavailable|not_available/.test(text)) return "unsupported";
-  if (/user_rejected|permission_disabled|denied|disabled|false/.test(text)) return "denied";
-  if (/already_granted|granted|enabled|true/.test(text) && /notifications/.test(text)) return "granted";
-  return "unknown";
-}
-
-function exposeMiniAppNotifications() {
-  window.__luminaGetNotificationPermission = async () => {
-    const miniKit = MiniKit as unknown as {
-      getPermissions?: () => Promise<unknown>;
-    };
-    if (!miniKit.getPermissions) return "unsupported";
-    try {
-      return notificationPermissionStatus(await miniKit.getPermissions());
-    } catch (error) {
-      return notificationPermissionStatus(error);
-    }
-  };
-
-  window.__luminaRequestNotificationPermission = async () => {
-    if (new URL(window.location.href).searchParams.get("mockWorld") === "1") return "granted";
-    const miniKit = MiniKit as unknown as {
-      requestPermission?: (input: { permission: "notifications" }) => Promise<unknown>;
-    };
-    if (!miniKit.requestPermission) return "unsupported";
-    try {
-      return notificationPermissionStatus(
-        await miniKit.requestPermission({ permission: "notifications" }),
-      );
-    } catch (error) {
-      return notificationPermissionStatus(error);
-    }
-  };
 }
 
 /**
@@ -3029,13 +2986,6 @@ function enhancePrototypeHome() {
           '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
           '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
           '<span class="home-points-gifts" aria-hidden="true"><span></span><span></span><span></span></span><span class="home-points-chev">›</span>';
-        if (window.__luminaUserAddress && (!window.__luminaHomePointsRefreshedAt || Date.now() - window.__luminaHomePointsRefreshedAt > 10000)) {
-          window.__luminaHomePointsRefreshedAt = Date.now();
-          window.setTimeout(function(){ if (typeof refreshPoints === "function") refreshPoints(); }, 0);
-        }
-      }
-      function renderHomePointsBanner(){
-        ensureHomePointsBanner();
       }
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
@@ -5192,9 +5142,6 @@ function enhancePrototypeMe() {
           language: { en:"Language", fr:"Langue", de:"Sprache", es:"Idioma", ja:"言語", "zh-CN":"语言", "zh-TW":"語言" },
           currency: { en:"Display currency", fr:"Devise d'affichage", de:"Anzeigewährung", es:"Moneda", ja:"表示通貨", "zh-CN":"显示货币", "zh-TW":"顯示貨幣" },
           notifications: { en:"Notifications", fr:"Notifications", de:"Benachrichtigungen", es:"Notificaciones", ja:"通知", "zh-CN":"通知", "zh-TW":"通知" },
-          notificationsOn: { en:"Notifications enabled", fr:"Notifications activées", de:"Benachrichtigungen aktiviert", es:"Notificaciones activadas", ja:"通知が有効です", "zh-CN":"通知已开启", "zh-TW":"通知已開啟" },
-          notificationsDenied: { en:"Notification permission is not enabled.", fr:"Autorisation de notification non activée.", de:"Benachrichtigungserlaubnis ist nicht aktiviert.", es:"El permiso de notificaciones no está activado.", ja:"通知権限が有効ではありません。", "zh-CN":"通知权限未开启", "zh-TW":"通知權限未開啟" },
-          notificationsUnsupported: { en:"Update World App to enable notifications.", fr:"Mettez à jour World App pour activer les notifications.", de:"Aktualisiere World App, um Benachrichtigungen zu aktivieren.", es:"Actualiza World App para activar notificaciones.", ja:"通知を有効にするには World App を更新してください。", "zh-CN":"请更新 World App 后再开启通知", "zh-TW":"請更新 World App 後再開啟通知" },
           legal: { en:"Legal", fr:"Legal", de:"Legal", es:"Legal", ja:"Legal", "zh-CN":"Legal", "zh-TW":"Legal" },
           privacy: { en:"Privacy Policy", fr:"Privacy Policy", de:"Privacy Policy", es:"Privacy Policy", ja:"Privacy Policy", "zh-CN":"Privacy Policy", "zh-TW":"Privacy Policy" },
           terms: { en:"Terms of Service", fr:"Terms of Service", de:"Terms of Service", es:"Terms of Service", ja:"Terms of Service", "zh-CN":"Terms of Service", "zh-TW":"Terms of Service" },
@@ -5235,46 +5182,8 @@ function enhancePrototypeMe() {
       function feedbackRow(label) {
         return '<div class="me-row" onclick="openFeedback()"><span class="ic feedback-ic">' + meIcon("feedback") + '<b id="feedbackUnreadDot">1</b></span><span class="lbl">' + label + '</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>';
       }
-      function notificationToggle(){
-        return document.getElementById("meNotificationToggle");
-      }
-      function setNotificationToggle(status){
-        var toggle = notificationToggle();
-        if (!toggle) return;
-        toggle.classList.toggle("on", status === "granted");
-        toggle.setAttribute("aria-checked", status === "granted" ? "true" : "false");
-      }
-      function syncNotificationToggle(){
-        if (!window.__luminaGetNotificationPermission) { setNotificationToggle("unsupported"); return; }
-        window.__luminaGetNotificationPermission()
-          .then(function(status){ setNotificationToggle(status); })
-          .catch(function(){ setNotificationToggle("unknown"); });
-      }
-      window.requestLuminaNotifications = async function(event){
-        if (event) event.stopPropagation();
-        var c = meCopy();
-        var toggle = notificationToggle();
-        if (!window.__luminaRequestNotificationPermission) {
-          setNotificationToggle("unsupported");
-          toast(c.notificationsUnsupported);
-          return;
-        }
-        if (toggle) toggle.classList.add("busy");
-        try {
-          var status = await window.__luminaRequestNotificationPermission();
-          setNotificationToggle(status);
-          if (status === "granted") toast(c.notificationsOn);
-          else if (status === "unsupported") toast(c.notificationsUnsupported);
-          else toast(c.notificationsDenied);
-        } catch(e) {
-          setNotificationToggle("denied");
-          toast(c.notificationsDenied);
-        } finally {
-          if (toggle) toggle.classList.remove("busy");
-        }
-      };
       function toggleHtml(){
-        return '<span id="meNotificationToggle" class="toggle" role="switch" aria-checked="false" onclick="requestLuminaNotifications(event)"></span>';
+        return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
       }
       function socialLinks(){
         try {
@@ -5293,8 +5202,8 @@ function enhancePrototypeMe() {
         return String(value || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
       }
       function linkIcon(label, logoUrl){
-        if (/^https?:\/\//i.test(String(logoUrl || ""))) {
-          return '<span class="media-icon has-img"><img src="' + safeAttr(logoUrl) + '" alt="' + safeAttr(label) + ' logo" /></span>';
+        if (/^https?:\\/\\//i.test(String(logoUrl || ""))) {
+          return '<span class="media-icon has-img"><img src="' + safeAttr(logoUrl) + '" alt="' + safeAttr(label) + ' logo" onerror="this.parentNode.textContent=\\'' + String(label || "?").slice(0, 1).toUpperCase() + '\\'"></span>';
         }
         return '<span class="media-icon">' + String(label || "?").slice(0, 1).toUpperCase() + '</span>';
       }
@@ -5310,7 +5219,7 @@ function enhancePrototypeMe() {
           var data = normalizeSocialItem(links[item[0]]);
           return data && data.url ? { key:item[0], label:item[1], url:data.url, logoUrl:data.logoUrl } : null;
         }).filter(Boolean).map(function(item){
-          return '<button class="media-row" data-media-url="' + safeAttr(item.url) + '" onclick="window.open(this.getAttribute(&quot;data-media-url&quot;), &quot;_blank&quot;)">' + linkIcon(item.label, item.logoUrl) + '<span>' + item.label + '</span><i>↗</i></button>';
+          return '<button class="media-row" onclick="window.open(\\'' + String(item.url).replace(/'/g, "%27") + '\\', \\'_blank\\')">' + linkIcon(item.label, item.logoUrl) + '<span>' + item.label + '</span><i>↗</i></button>';
         }).join("");
       }
       function ensureMediaModal(){
@@ -5368,28 +5277,11 @@ function enhancePrototypeMe() {
       function pointsActivityKey(){
         return "lumina_points_activity_total_" + String(window.__luminaUserAddress || "guest").toLowerCase();
       }
-      function pointsProfileCacheKey(){
-        return "lumina_points_profile_" + String(window.__luminaUserAddress || "guest").toLowerCase();
-      }
       function storedActivityPoints(){
         try { return Math.max(0, Math.floor(Number(localStorage.getItem(pointsActivityKey()) || 0))); } catch(e) { return 0; }
       }
       function storeActivityPoints(value){
         try { localStorage.setItem(pointsActivityKey(), String(Math.max(0, Math.floor(Number(value || 0))))); } catch(e) {}
-      }
-      function storedPointsProfile(){
-        try {
-          var raw = localStorage.getItem(pointsProfileCacheKey());
-          var data = raw ? JSON.parse(raw) : null;
-          return data && typeof data === "object" ? data : null;
-        } catch(e) {
-          return null;
-        }
-      }
-      function storePointsProfile(data){
-        try {
-          if (data && typeof data === "object") localStorage.setItem(pointsProfileCacheKey(), JSON.stringify(data));
-        } catch(e) {}
       }
       function pointsCoupons(){
         return pointsLocalRows("lumina_points_coupons_v1");
@@ -5444,7 +5336,6 @@ function enhancePrototypeMe() {
       function refreshPoints(){
         var badge = document.getElementById("mePointsBadge");
         var center = document.getElementById("pointsCenterValue");
-        if (!window.__luminaPointsProfile && window.__luminaUserAddress) window.__luminaPointsProfile = storedPointsProfile() || undefined;
         var profile = window.__luminaPointsProfile || {};
         var adjustmentTotal = Math.floor(Number(profile.adjustmentTotal || 0));
         var basePoints = Number.isFinite(Number(window.__luminaActivityPoints)) ? Math.max(0, Math.floor(Number(window.__luminaActivityPoints))) : storedActivityPoints();
@@ -5462,8 +5353,6 @@ function enhancePrototypeMe() {
           if (!Array.isArray(window.__luminaPointRecords)) window.__luminaPointRecords = [];
           if (badge) badge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           if (center) center.textContent = Number(window.__luminaPoints || 0).toLocaleString();
-          var homeBadge = document.getElementById("homePointsBannerValue");
-          if (homeBadge) homeBadge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           var shopBadge = document.getElementById("pointsShopBalance");
           if (shopBadge) shopBadge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           var vipNo = document.getElementById("pointsVipNo");
@@ -5477,7 +5366,6 @@ function enhancePrototypeMe() {
           .then(function(data){
             if (!data) return;
             window.__luminaPointsProfile = data;
-            storePointsProfile(data);
             setValue();
           })
           .catch(function(){});
@@ -5624,6 +5512,7 @@ function enhancePrototypeMe() {
           '</div>' +
           '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
             row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
+            row("points", c.taskCenter, "", "openPointsCenter(\\'tasks\\')") +
           '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
             row("media", c.mediaCenter, "", "openMediaCenter()") +
@@ -5632,13 +5521,12 @@ function enhancePrototypeMe() {
             row("bell", c.notifications, "", "", toggleHtml()) +
           '</div>' +
           '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
-            row("privacy", c.privacy, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(&quot;privacy&quot;)") +
-            row("terms", c.terms, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(&quot;terms&quot;)") +
+            row("privacy", c.privacy, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'privacy\\')") +
+            row("terms", c.terms, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'terms\\')") +
             row("version", c.version, "Lumina v1.0.0", "", "") +
           '</div>';
         ensureFeedbackModal();
         ensureMediaModal();
-        syncNotificationToggle();
         refreshPoints();
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
@@ -5928,7 +5816,7 @@ function enhancePrototypeMe() {
           if ((id === "share-friends" || id === "invite-friend") && navigator.share) {
             navigator.share({ title:"Lumina", text:"Join Lumina on World App", url:location.origin }).catch(function(){});
           }
-          if (/^https?:\/\//i.test(url)) { window.open(url, "_blank"); renderTaskPage(); return; }
+          if (/^https?:\\/\\//i.test(url)) { window.open(url, "_blank"); renderTaskPage(); return; }
           renderTaskPage();
         }
         window.__luminaCompleteTask = function(id){ completeTask(id, false); };
@@ -5954,7 +5842,7 @@ function enhancePrototypeMe() {
           var needsGo = !done && !visited && task.id !== "open-world-app" && (task.actionUrl || task.type === "swap" || task.type === "earn" || task.type === "social" || task.id === "open-mystery-box");
           var action = busy ? (copy.processing || "Processing...") : (done ? (copy.completed || "Completed") : (needsGo ? i18nText(task.actionLabelI18n, copy.go || "Go") : (copy.claim || "Claim")));
           var handler = needsGo ? "window.__luminaGoTask" : "window.__luminaCompleteTask";
-          return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" class="' + (busy ? "is-loading" : "") + '" data-task-id="' + escapeAttr(task.id) + '" ' + ((done || busy) ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(this.getAttribute(&quot;data-task-id&quot;))">' + escapeAttr(action) + '</button></div></div>';
+          return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" class="' + (busy ? "is-loading" : "") + '" ' + ((done || busy) ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
         }
         function renderTaskPage(){
           window.__luminaPointsCurrentView = "tasks";
@@ -5973,7 +5861,7 @@ function enhancePrototypeMe() {
           var daily = dailyTaskIds.map(function(id){ return allTasks.find(function(task){ return task.id === id; }); }).filter(Boolean);
           var more = allTasks.filter(function(task){ return daily.indexOf(task) < 0; });
           modal.innerHTML =
-            '<div class="task-page-head"><button type="button" class="points-close" onclick="this.closest(&quot;.points-shop-screen&quot;).remove()">‹</button><h1>' + escapeAttr(copy.taskCenter || "Task Center") + '</h1><span></span></div>' +
+            '<div class="task-page-head"><button type="button" class="points-close" onclick="document.getElementById(\\'pointsModal\\')&&document.getElementById(\\'pointsModal\\').remove()">‹</button><h1>' + escapeAttr(copy.taskCenter || "Task Center") + '</h1><span></span></div>' +
             '<section class="task-card checkin-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyCheckin) + '</h2><p>' + escapeAttr(copy.checkinHint) + '</p></div><button type="button">' + escapeAttr(copy.checkinCalendar) + ' ◴</button></div><div class="checkin-grid">' + dayCards + '</div><button class="checkin-main ' + (checkinBusy ? "is-loading" : "") + '" type="button" ' + ((doneToday || checkinBusy) ? "disabled" : "") + ' onclick="window.__luminaCompleteCheckin()">' + escapeAttr(checkinBusy ? (copy.processing || "Processing...") : (doneToday ? copy.completed : copy.checkIn)) + '</button></section>' +
             '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.dailyTasks) + '</h2><p>' + escapeAttr(copy.refreshDaily) + '</p></div></div><div class="task-list-card">' + (daily.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.noPoints) + '</div>') + '</div></section>' +
             '<section class="task-card"><div class="task-section-title"><div><h2>' + escapeAttr(copy.moreTasks) + '</h2></div></div><div class="task-list-card">' + (more.map(taskRow).join("") || '<div class="points-empty">' + escapeAttr(copy.comingSoon) + '</div>') + '</div><p class="task-coming">✦ ' + escapeAttr(copy.comingSoon) + ' ✦</p></section>';
@@ -5999,14 +5887,6 @@ function enhancePrototypeMe() {
           var value = cleanRewardText(reward && reward.value);
           var name = cleanRewardText(i18nText(reward && reward.nameI18n, reward && reward.name || ""));
           return value || name || "Lumina reward";
-        }
-        function blindRewardLogo(reward){
-          var logo = reward && reward.tokenLogoUrl ? String(reward.tokenLogoUrl) : "";
-          var symbol = reward && reward.tokenSymbol ? String(reward.tokenSymbol).toUpperCase() : "";
-          if (logo && (/^https?:\/\//i.test(logo) || logo.charAt(0) === "/")) {
-            return '<span class="blind-reward-logo"><img src="' + escapeAttr(logo) + '" alt="' + escapeAttr(symbol || "token") + '" /></span>';
-          }
-          return symbol ? '<span class="blind-reward-logo">' + escapeAttr(symbol.slice(0, 1)) + '</span>' : "";
         }
         window.__luminaOpenBlindBox = async function(productId){
           var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
@@ -6062,7 +5942,7 @@ function enhancePrototypeMe() {
           box.id = "blindBoxModal";
           box.className = "blind-box-modal open";
           box.onclick = function(event){ if (event.target === box) box.remove(); };
-          box.innerHTML = '<div class="blind-box-stage opening"><button type="button" class="blind-close" onclick="this.closest(&quot;.blind-open-modal&quot;).remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result pending"><small>' + escapeAttr(copy.openNow || "Opening") + '</small><strong>...</strong></div></div>';
+          box.innerHTML = '<div class="blind-box-stage opening"><button type="button" class="blind-close" onclick="document.getElementById(\\'blindBoxModal\\').remove()">×</button><div class="blind-box-lid"></div><div class="blind-box-cube"><span>?</span></div><div class="blind-rays"></div><div class="blind-result pending"><small>' + escapeAttr(copy.openNow || "Opening") + '</small><strong>...</strong></div></div>';
           document.body.appendChild(box);
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
@@ -6102,7 +5982,7 @@ function enhancePrototypeMe() {
             var failed = box.querySelector(".blind-result");
             if (failed) {
               failed.classList.remove("pending");
-              failed.innerHTML = '<small>' + escapeAttr(copy.openFailed || "Open failed") + '</small><strong>' + escapeAttr(openError) + '</strong><button type="button" data-product-id="' + escapeAttr(product.id) + '" onclick="window.__luminaOpenBlindBox(this.getAttribute(&quot;data-product-id&quot;))">' + escapeAttr(copy.retry || "Retry") + '</button>';
+              failed.innerHTML = '<small>' + escapeAttr(copy.openFailed || "Open failed") + '</small><strong>' + escapeAttr(openError) + '</strong><button type="button" onclick="window.__luminaOpenBlindBox(\\'' + escapeAttr(product.id) + '\\')">' + escapeAttr(copy.retry || "Retry") + '</button>';
             }
             toast(openError);
             pointsActionBusy(busyKey, false);
@@ -6113,7 +5993,7 @@ function enhancePrototypeMe() {
           if (result) {
             var rewardLabel = blindRewardLabel(won);
             result.classList.remove("pending");
-            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong class="blind-reward-line">' + blindRewardLogo(won) + '<span>' + escapeAttr(rewardLabel) + '</span></strong><button type="button" onclick="this.closest(&quot;.blind-open-modal&quot;).remove()">' + escapeAttr(copy.done || "Done") + '</button>';
+            result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(rewardLabel) + '</strong><button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
           }
           addPointsCoupon({ title: blindRewardLabel(won), value: "", source: productTitle(product) });
           pointsActionBusy(busyKey, false);
@@ -6132,8 +6012,7 @@ function enhancePrototypeMe() {
           if (!rewards.length) return '<li>' + escapeAttr(copy.rewardFallback || "Rewards are issued to your Lumina account after redemption.") + '</li>';
           return rewards.map(function(item){
             var title = i18nText(item.nameI18n, item.name || "Reward");
-            var range = item.minAmount != null && item.maxAmount != null ? (String(item.minAmount) + "-" + String(item.maxAmount) + (item.tokenSymbol ? " " + item.tokenSymbol : "")) : "";
-            return '<li>' + escapeAttr(title) + (range || item.value ? ' <b>' + escapeAttr(range || item.value) + '</b>' : '') + '</li>';
+            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
           }).join("");
         }
         async function buyProduct(productId){
@@ -6296,7 +6175,7 @@ function enhancePrototypeMe() {
           sheet.id = "pointsLedgerSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="this.closest(&quot;.points-ledger-sheet&quot;).remove()">×</button><h3>Points history</h3>' + (rows || '<p class="points-empty">No points records yet.</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsLedgerSheet\\').remove()">×</button><h3>Points history</h3>' + (rows || '<p class="points-empty">No points records yet.</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         window.__luminaOpenCoupons = function(){
@@ -6314,7 +6193,7 @@ function enhancePrototypeMe() {
           sheet.id = "pointsCouponsSheet";
           sheet.className = "points-mini-sheet open";
           sheet.onclick = function(event){ if (event.target === sheet) sheet.remove(); };
-          sheet.innerHTML = '<div><button class="blind-close" onclick="this.closest(&quot;.points-ledger-sheet&quot;).remove()">×</button><h3>' + escapeAttr(copy.box || "Box") + '</h3>' + (rows || '<p class="points-empty">' + escapeAttr(copy.noBoxRecords || "No box records yet. Buy or open a mystery box to see it here.") + '</p>') + '</div>';
+          sheet.innerHTML = '<div><button class="blind-close" onclick="document.getElementById(\\'pointsCouponsSheet\\').remove()">×</button><h3>' + escapeAttr(copy.box || "Box") + '</h3>' + (rows || '<p class="points-empty">' + escapeAttr(copy.noBoxRecords || "No box records yet. Buy or open a mystery box to see it here.") + '</p>') + '</div>';
           document.body.appendChild(sheet);
         };
         function renderProducts(products, active){
@@ -6381,7 +6260,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products?t=" + Date.now(), { cache: "no-store", headers: { "cache-control": "no-store" } });
+          var res = await fetch("/api/points-products?v=20260612");
           var data = await res.json().catch(function(){ return null; });
           if (res.ok && Array.isArray(data)) {
             products = data;
@@ -7069,7 +6948,7 @@ function enhancePrototypeDetail() {
 
 function runInPrototypeScope(source: string, errorLabel: string) {
   const script = document.createElement("script");
-  script.text = `try { (function(){ ${source} })(); } catch (error) { console.error(${JSON.stringify(errorLabel)}, error); }`;
+  script.text = `try { ${source} } catch (error) { console.error(${JSON.stringify(errorLabel)}, error); }`;
   document.body.appendChild(script);
   script.remove();
 }

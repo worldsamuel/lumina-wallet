@@ -1059,9 +1059,6 @@
   .welcome-rewards span i { color: #b8ff12; font-style: normal; }
   .welcome-rewards span b { font-size: 14px; }
   .welcome-rewards span small { color: rgba(255,255,255,.58); font-size: 10px; }
-  .blind-reward-line { display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
-  .blind-reward-logo { width: 28px; height: 28px; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; background: rgba(255,255,255,.12); color: #fff; font-size: 13px; font-weight: 900; flex-shrink: 0; }
-  .blind-reward-logo img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .welcome-open-btn { width: 100%; height: 54px; border: none; border-radius: 999px; background: linear-gradient(90deg, #9cff00, #d7ff12); color: #071003; font-size: 16px; font-weight: 950; box-shadow: 0 0 38px rgba(184,255,18,.24); }
   .welcome-later-btn { margin-top: 12px; border: none; background: transparent; color: rgba(255,255,255,.48); font-weight: 800; }
   .welcome-box-modal.opening .welcome-cube { animation: welcomeOpenShake .72s ease-in-out infinite; }
@@ -1127,7 +1124,6 @@
   /* 开关 */
   .toggle { width: 46px; height: 27px; border-radius: 999px; background: var(--surface-3); position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
   .toggle.on { background: var(--green); }
-  .toggle.busy { opacity: .68; pointer-events: none; }
   .toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 21px; height: 21px; border-radius: 50%; background: #fff; transition: transform .2s; }
   .toggle.on::after { transform: translateX(19px); }
   .me-logout { margin: 24px var(--pad-screen) 0; width: calc(100% - 2*var(--pad-screen)); background: var(--surface); border: 1px solid var(--line); color: var(--red); border-radius: var(--radius-md); padding: 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
