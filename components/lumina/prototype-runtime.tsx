@@ -295,13 +295,10 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeMe();
       enhancePrototypeSystemConfig();
       enhancePrototypeAnalytics();
-      ensureFullMePage(host, address, username);
       if (initialView === "allassets") {
         (window as unknown as { openAllAssets?: () => void }).openAllAssets?.();
       }
       setPrototypeReady(true);
-      window.setTimeout(() => ensureFullMePage(host, address, username), 900);
-      window.setTimeout(() => ensureFullMePage(host, address, username), 2500);
     });
 
     window.loginBack = () => {
@@ -941,200 +938,6 @@ function exposeMiniAppNotifications() {
       return notificationPermissionStatus(error);
     }
   };
-}
-
-function ensureFullMePage(host: HTMLDivElement, address: string | null, username?: string | null) {
-  const view = host.querySelector<HTMLElement>("#view-me");
-  if (!view || view.querySelector("#pointsCenterValue")) return;
-
-  ensurePrototypeCoreFallbacks();
-  ensureFallbackPointsCenter(address);
-
-  const pointsText = Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString();
-  const short = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Not connected";
-  const name = username || short;
-  view.innerHTML = [
-    '<div class="subhead" style="padding-bottom:14px"><h1>Me</h1></div>',
-    '<div class="me-card"><div class="me-avatar"></div><div class="me-info"><div class="me-name">',
-    escapeFallbackHtml(name),
-    ' <span class="v"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 1l2.4 1.7 2.9-.3 1.2 2.7 2.7 1.2-.3 2.9L23 12l-1.7 2.4.3 2.9-2.7 1.2-1.2 2.7-2.9-.3L12 23l-2.4-1.7-2.9.3-1.2-2.7-2.7-1.2.3-2.9L1 12l1.7-2.4-.3-2.9 2.7-1.2L6.3 2.7l2.9.3z"/><path d="M10.5 15.2l-2.7-2.7 1.4-1.4 1.3 1.3 4-4 1.4 1.4z" fill="#000"/></svg></span></div><div class="me-addr"><span>',
-    escapeFallbackHtml(short),
-    '</span><button type="button" class="me-copy-btn" data-me-copy-address="1" aria-label="Copy address"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div><span class="me-orb">World App connected</span></div><button type="button" class="me-points-chip" data-lumina-points-open="shop"><b id="mePointsBadge">',
-    pointsText,
-    "</b><span>Points</span></button></div>",
-    '<div class="me-group-label">Support</div><div class="me-group"><div class="me-row" data-me-action="feedback"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg></span><span class="lbl">Feedback</span><span class="chev">›</span></div></div>',
-    '<div class="me-group-label">Lumina Points</div><div class="me-group"><div class="me-row" data-lumina-points-open="shop"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Lumina Points</span><span class="val" id="pointsCenterValue">',
-    pointsText,
-    '</span><span class="chev">›</span></div><div class="me-row" data-lumina-points-open="tasks"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.9 6 6.6.9-4.8 4.7 1.1 6.5L12 17l-5.8 3.1 1.1-6.5-4.8-4.7 6.6-.9L12 2z"/></svg></span><span class="lbl">Task Center</span><span class="chev">›</span></div></div>',
-    '<div class="me-group-label">Preferences</div><div class="me-group"><div class="me-row" data-me-action="media"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.6l6.8-4.2M8.6 13.4l6.8 4.2"/></svg></span><span class="lbl">Media Center</span><span class="chev">›</span></div><div class="me-row" data-me-action="language"><span class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg></span><span class="lbl">Language</span><span class="val" id="langVal">English</span><span class="chev">›</span></div><div class="me-row" data-me-action="currency"><span class="ic">$</span><span class="lbl">Display currency</span><span class="val" id="currencyVal">USD</span><span class="chev">›</span></div><div class="me-row"><span class="ic">◌</span><span class="lbl">Notifications</span><span id="meNotificationToggle" class="toggle" role="switch" aria-checked="false" data-me-action="notifications"></span></div></div>',
-    '<div class="me-group-label">Legal</div><div class="me-group"><div class="me-row" data-me-action="privacy"><span class="ic">◇</span><span class="lbl">Privacy Policy</span><span class="chev">›</span></div><div class="me-row" data-me-action="terms"><span class="ic">◇</span><span class="lbl">Terms of Service</span><span class="chev">›</span></div><div class="me-row"><span class="ic">i</span><span class="lbl">Version</span><span class="val">Lumina v1.0.0</span></div></div>',
-  ].join("");
-  bindFullMeActions(view, address);
-  void refreshFallbackPoints(address);
-}
-
-function bindFullMeActions(view: HTMLElement, address: string | null) {
-  view.querySelectorAll<HTMLElement>("[data-lumina-points-open]").forEach((row) => {
-    row.addEventListener("click", () => {
-      const mode = row.dataset.luminaPointsOpen === "tasks" ? "tasks" : undefined;
-      (window as unknown as { openPointsCenter?: (mode?: string) => void }).openPointsCenter?.(mode);
-    });
-  });
-  view.querySelector<HTMLElement>("[data-me-copy-address]")?.addEventListener("click", (event) => {
-    event.stopPropagation();
-    const value = address || window.__luminaUserAddress || "";
-    void navigator.clipboard?.writeText(value).catch(() => undefined);
-    toastFromPrototype("Address copied");
-  });
-  view.querySelectorAll<HTMLElement>("[data-me-action]").forEach((node) => {
-    node.addEventListener("click", (event) => {
-      const action = node.dataset.meAction;
-      if (action === "feedback") return (window as unknown as { openFeedback?: () => void }).openFeedback?.();
-      if (action === "media") return (window as unknown as { openMediaCenter?: () => void }).openMediaCenter?.();
-      if (action === "language") return window.openLangModal?.();
-      if (action === "privacy") return window.__luminaOpenLegal?.("privacy");
-      if (action === "terms") return window.__luminaOpenLegal?.("terms");
-      if (action === "notifications") {
-        event.stopPropagation();
-        void window.__luminaRequestNotificationPermission?.().then((status) => {
-          node.classList.toggle("on", status === "granted");
-        });
-      }
-    });
-  });
-}
-
-function ensurePrototypeCoreFallbacks() {
-  const win = window as unknown as {
-    go?: (name: string) => void;
-    setTabByName?: (name: string) => void;
-    toast?: (message: string, tone?: string) => void;
-  };
-  if (typeof win.go !== "function") {
-    win.go = (name: string) => {
-      document.querySelectorAll(".view").forEach((view) => view.classList.remove("active"));
-      document.getElementById(`view-${name}`)?.classList.add("active");
-      window.scrollTo(0, 0);
-    };
-  }
-  if (typeof win.setTabByName !== "function") {
-    win.setTabByName = (name: string) => {
-      document.querySelectorAll<HTMLElement>(".tab").forEach((tab) => {
-        tab.classList.toggle("active", tab.dataset.n === name);
-      });
-    };
-  }
-  if (typeof win.toast !== "function") {
-    win.toast = (message: string) => toastFromPrototype(message);
-  }
-}
-
-function ensureFallbackPointsCenter(address: string | null) {
-  const win = window as unknown as { openPointsCenter?: (initialView?: string) => void };
-  if (typeof win.openPointsCenter === "function") return;
-
-  win.openPointsCenter = (initialView?: string) => {
-    document.getElementById("pointsModal")?.remove();
-    const modal = document.createElement("div");
-    modal.className = "points-shop-screen open";
-    modal.id = "pointsModal";
-    modal.innerHTML = [
-      '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><span></span></div>',
-      '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">Lumina VIP</em></div><button type="button" class="points-big"><span id="pointsShopBalance">',
-      Number((window as unknown as { __luminaPoints?: number }).__luminaPoints || 0).toLocaleString(),
-      "</span><i>›</i></button><small>Priority member card</small></div></div>",
-      initialView === "tasks"
-        ? '<section class="points-task-panel"><div class="points-shop-title"><h2>Task Center</h2></div><div class="points-task-list"><div class="points-task-row"><div><b>Daily Check-in</b><small>Check in daily to earn more points</small></div><button type="button" data-fallback-task="checkin">Check In</button></div><div class="points-task-row"><div><b>Daily Tasks</b><small>More tasks coming soon. Stay tuned.</small></div><button type="button" disabled>Go</button></div></div></section>'
-        : '<div class="points-shop-panel"><div class="points-shop-title"><h2>Product Center</h2><button type="button" data-fallback-task-center="1" class="points-task-view">Task Center</button></div><div class="points-products" id="fallbackPointsProducts"><div class="points-empty">Rewards are loading.</div></div></div>',
-    ].join("");
-    modal.addEventListener("click", (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      if (target.closest("[data-points-close]")) modal.remove();
-      if (target.closest("[data-fallback-task-center]")) win.openPointsCenter?.("tasks");
-      if (target.closest("[data-fallback-task]")) void fallbackCheckin(address);
-    });
-    document.body.appendChild(modal);
-    if (initialView !== "tasks") void renderFallbackProducts();
-  };
-}
-
-async function refreshFallbackPoints(address: string | null) {
-  const wallet = address || window.__luminaUserAddress || "";
-  if (!wallet) return;
-  try {
-    const res = await fetch(`/api/points-profile?address=${encodeURIComponent(wallet)}&t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { "cache-control": "no-store" },
-    });
-    const data = await res.json().catch(() => null);
-    if (!res.ok || !data) return;
-    const total = Math.max(0, Math.floor(Number(data.points ?? data.totalPoints ?? data.adjustmentTotal ?? 0)));
-    (window as unknown as { __luminaPoints?: number }).__luminaPoints = total;
-    updateFallbackPointBadges(total);
-  } catch {
-    // Keep the last rendered points if the API is temporarily unavailable.
-  }
-}
-
-function updateFallbackPointBadges(points: number) {
-  ["mePointsBadge", "pointsCenterValue", "homePointsBannerValue", "pointsShopBalance"].forEach((id) => {
-    const node = document.getElementById(id);
-    if (node) node.textContent = Number(points || 0).toLocaleString();
-  });
-}
-
-async function fallbackCheckin(address: string | null) {
-  const wallet = address || window.__luminaUserAddress || "";
-  if (!wallet) return;
-  try {
-    const res = await fetch("/api/points-checkin", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ address: wallet }),
-    });
-    const data = await res.json().catch(() => null);
-    if (res.ok && data) {
-      const points = Math.max(0, Math.floor(Number(data.totalPoints ?? data.points ?? 0)));
-      if (points) updateFallbackPointBadges(points);
-      toastFromPrototype("Checked in");
-    }
-  } catch {
-    toastFromPrototype("Check-in failed");
-  }
-}
-
-async function renderFallbackProducts() {
-  const box = document.getElementById("fallbackPointsProducts");
-  if (!box) return;
-  try {
-    const res = await fetch(`/api/points-products?t=${Date.now()}`, {
-      cache: "no-store",
-      headers: { "cache-control": "no-store" },
-    });
-    const data = await res.json().catch(() => null);
-    const products = Array.isArray(data) ? data : [];
-    box.innerHTML = products.length
-      ? products
-          .filter((item) => item && item.enabled !== false)
-          .slice(0, 20)
-          .map(
-            (item) =>
-              `<button type="button" class="points-product"><div class="points-product-art"><span>${escapeFallbackHtml(
-                String(item.tokenSymbol || item.category || "L").slice(0, 3),
-              )}</span></div><div class="points-product-body"><strong>${escapeFallbackHtml(
-                item.title || item.name || "Lumina reward",
-              )}</strong><div><div class="points-product-cost"><b>Lumina ${Number(item.points || 0).toLocaleString()}</b></div></div></div></button>`,
-          )
-          .join("")
-      : '<div class="points-empty">No rewards configured yet.</div>';
-  } catch {
-    box.innerHTML = '<div class="points-empty">Rewards are loading.</div>';
-  }
-}
-
-function escapeFallbackHtml(value: string) {
-  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] || ch);
 }
 
 /**
@@ -5821,7 +5624,6 @@ function enhancePrototypeMe() {
           '</div>' +
           '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
             row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
-            row("points", c.taskCenter, "", "openPointsCenter(&quot;tasks&quot;)") +
           '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
             row("media", c.mediaCenter, "", "openMediaCenter()") +
