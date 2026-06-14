@@ -6,9 +6,6 @@ const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_PRODUCTS_PUBLIC_KEY = "points_products_public";
 const POINTS_ORDERS_KEY = "points_orders";
 const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
-const PUBLIC_PRODUCTS_CACHE_MS = 30_000;
-
-let publicProductsCache: { expiresAt: number; rows: PointsProductConfig[] } | null = null;
 
 export type PointsProductConfig = {
   id: string;
@@ -239,7 +236,6 @@ async function readStoredPublicProducts() {
 
 async function writeStoredPublicProducts(products: PointsProductConfig[]) {
   const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder).map(stripProductForPublicStore);
-  publicProductsCache = null;
   await db.contentPage.upsert({
     where: { key: POINTS_PRODUCTS_PUBLIC_KEY },
     update: { bodyI18n: sorted as unknown as Prisma.InputJsonValue },
@@ -265,7 +261,6 @@ function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
 
 async function writeStoredProducts(products: PointsProductConfig[]) {
   const sorted = products.sort((a, b) => a.sortOrder - b.sortOrder);
-  publicProductsCache = null;
   await Promise.all([
     db.contentPage.upsert({
       where: { key: POINTS_PRODUCTS_KEY },
@@ -358,13 +353,7 @@ export async function getPointsProducts() {
 }
 
 export async function getPublicPointsProducts() {
-  const now = Date.now();
-  if (publicProductsCache && publicProductsCache.expiresAt > now) {
-    return publicProductsCache.rows;
-  }
-  const rows = (await readStoredPublicProducts()).filter((product) => product.enabled).map(toPublicProduct);
-  publicProductsCache = { expiresAt: now + PUBLIC_PRODUCTS_CACHE_MS, rows };
-  return rows;
+  return (await readStoredPublicProducts()).filter((product) => product.enabled).map(toPublicProduct);
 }
 
 export async function getPointsOrders(address: string) {
@@ -522,7 +511,6 @@ export async function purchasePointsProduct(input: { address: string; productId:
   latestOrders = [order, ...latestOrders.filter((item) => item.id !== order.id)];
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
   await writeStoredOrders(latestOrders);
-  publicProductsCache = null;
   writeStoredPublicProducts(products).catch((error) => {
     console.error("[points-products] failed to update product stock after purchase", error);
   });

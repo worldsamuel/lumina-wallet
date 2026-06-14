@@ -14,10 +14,10 @@ export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:points-products", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, {
       status: 429,
-      headers: { "Cache-Control": "private, no-store, max-age=0" },
+      headers: { "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate" },
     });
   }
   return jsonResponse(await getPublicPointsProducts(), {
-    headers: { "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120" },
+    headers: { "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate" },
   });
 }

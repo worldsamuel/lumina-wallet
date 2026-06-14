@@ -5540,6 +5540,21 @@ function enhancePrototypeMe() {
         var modal = document.createElement("div");
         modal.className = "points-shop-screen open";
         modal.id = "pointsModal";
+        var products = [];
+        var productsPollTimer = null;
+        var productsFetchInFlight = false;
+        var selectedProductId = null;
+        function stopProductPolling(){
+          if (productsPollTimer) {
+            clearInterval(productsPollTimer);
+            productsPollTimer = null;
+          }
+        }
+        var removePointsModal = modal.remove.bind(modal);
+        modal.remove = function(){
+          stopProductPolling();
+          removePointsModal();
+        };
         modal.onclick = function(event){ if(event.target && event.target.getAttribute && event.target.getAttribute("data-points-close") === "1") modal.remove(); };
         function escapeAttr(text){ return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; }); }
         function categoryLabel(key){
@@ -5639,6 +5654,50 @@ function enhancePrototypeMe() {
         }
         function productTitle(product){ return i18nText(product.titleI18n, product.title || "Lumina Reward"); }
         function productDescription(product, fallback){ return i18nText(product.descriptionI18n, product.description || fallback || ""); }
+        function activeProductCategory(){
+          var activeButton = modal.querySelector("[data-points-cat].sel");
+          return activeButton && activeButton.getAttribute ? activeButton.getAttribute("data-points-cat") || "all" : "all";
+        }
+        async function reloadPublicPointsProducts(renderAfter){
+          if (productsFetchInFlight) return products;
+          productsFetchInFlight = true;
+          try {
+            var res = await fetchWithTimeout("/api/points-products?t=" + Date.now(), {
+              cache: "no-store",
+              headers: { "cache-control": "no-store" },
+            }, 5000);
+            var data = await res.json().catch(function(){ return null; });
+            if (res.ok && Array.isArray(data)) {
+              products = data;
+              window.__luminaPointsProducts = products;
+              if (renderAfter && modal.isConnected && window.__luminaPointsCurrentView === "shop") {
+                if (selectedProductId) {
+                  if (products.some(function(item){ return item && item.id === selectedProductId; })) {
+                    renderProductDetail(selectedProductId);
+                  } else {
+                    selectedProductId = null;
+                    renderShop();
+                  }
+                } else {
+                  renderProducts(products, activeProductCategory());
+                }
+              }
+            }
+          } finally {
+            productsFetchInFlight = false;
+          }
+          return products;
+        }
+        function startProductPolling(){
+          if (productsPollTimer) return;
+          productsPollTimer = setInterval(function(){
+            if (!modal.isConnected || window.__luminaPointsCurrentView !== "shop") {
+              stopProductPolling();
+              return;
+            }
+            reloadPublicPointsProducts(true).catch(function(){});
+          }, 900);
+        }
         function checkinRewards(){
           var cfg = pointsSystemConfig();
           var rewards = cfg && cfg.pointsRules && Array.isArray(cfg.pointsRules.checkinRewards) ? cfg.pointsRules.checkinRewards : [];
@@ -5845,6 +5904,8 @@ function enhancePrototypeMe() {
           return '<div class="points-task-row"><span class="points-task-icon">' + taskIcon(task.type) + '</span><div class="points-task-mid"><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(desc) + '</small></div><div class="points-task-side"><strong>+' + Number(task.points || 0).toLocaleString() + ' Points</strong><button type="button" class="' + (busy ? "is-loading" : "") + '" ' + ((done || busy) ? "disabled" : "") + ' onclick="event.stopPropagation();' + handler + '(\\'' + escapeAttr(task.id) + '\\')">' + escapeAttr(action) + '</button></div></div>';
         }
         function renderTaskPage(){
+          stopProductPolling();
+          selectedProductId = null;
           window.__luminaPointsCurrentView = "tasks";
           var copy = meCopy();
           var streak = readCheckinStreak();
@@ -5889,7 +5950,7 @@ function enhancePrototypeMe() {
           return value || name || "Lumina reward";
         }
         window.__luminaOpenBlindBox = async function(productId){
-          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          var product = (products || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           var copy = meCopy();
           var busyKey = "open:" + product.id;
@@ -6016,7 +6077,7 @@ function enhancePrototypeMe() {
           }).join("");
         }
         async function buyProduct(productId){
-          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          var product = (products || []).find(function(item){ return item.id === productId; });
           if (!product) return;
           var copy = meCopy();
           var busyKey = "buy:" + product.id;
@@ -6046,7 +6107,7 @@ function enhancePrototypeMe() {
           window.__luminaPointsOrders = [tempOrder].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
           pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
-          renderProducts(window.__luminaPointsProducts || products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
+          renderProducts(products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
           renderHomePointsBanner();
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
@@ -6075,8 +6136,8 @@ function enhancePrototypeMe() {
                 if (!replacedOrder && !window.__luminaPointsOrders.some(function(order){ return order && order.id === data.order.id; })) window.__luminaPointsOrders.unshift(data.order);
               }
               if (data && data.product) {
-                window.__luminaPointsProducts = (Array.isArray(window.__luminaPointsProducts) ? window.__luminaPointsProducts : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
-                products = window.__luminaPointsProducts;
+                products = (Array.isArray(products) ? products : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
+                window.__luminaPointsProducts = products;
                 product = data.product;
               }
               reloadPointsOrders().catch(function(){ return []; });
@@ -6122,7 +6183,9 @@ function enhancePrototypeMe() {
           renderProductDetail(product.id);
         }
         function renderProductDetail(productId, errorText, pendingAction){
-          var product = (window.__luminaPointsProducts || []).find(function(item){ return item.id === productId; });
+          startProductPolling();
+          selectedProductId = productId;
+          var product = (products || []).find(function(item){ return item.id === productId; });
           if (!product || !modal) return;
           var copy = meCopy();
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
@@ -6216,6 +6279,8 @@ function enhancePrototypeMe() {
         var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
         var countries = ["global", "us", "cn", "jp", "kr", "sg", "hk", "eu", "ae"];
         function renderShop(){
+          startProductPolling();
+          selectedProductId = null;
           window.__luminaPointsCurrentView = "shop";
           var profile = window.__luminaPointsProfile || {};
           var vipNo = profile.luminaNo ? ("Lumina No." + profile.luminaNo) : "Lumina VIP";
@@ -6240,13 +6305,10 @@ function enhancePrototypeMe() {
               renderProducts(products, btn.getAttribute("data-points-cat") || "all");
             });
           });
+          reloadPublicPointsProducts(true).catch(function(){});
         }
         window.__luminaRenderPointsShop = renderShop;
         document.body.appendChild(modal);
-        if (Array.isArray(window.__luminaPointsProducts) && window.__luminaPointsProducts.some(function(item){ return item && item.id === "cash-surprise-50"; })) {
-          window.__luminaPointsProducts = fallbackPointsProducts();
-        }
-        var products = Array.isArray(window.__luminaPointsProducts) && window.__luminaPointsProducts.length ? window.__luminaPointsProducts : fallbackPointsProducts();
         window.__luminaPointsProducts = products;
         if (!Array.isArray(window.__luminaPointsOrders)) window.__luminaPointsOrders = [];
         if (initialView === "tasks") renderTaskPage(); else renderShop();
@@ -6260,14 +6322,7 @@ function enhancePrototypeMe() {
               if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
             }
           }
-          var res = await fetch("/api/points-products?v=20260612");
-          var data = await res.json().catch(function(){ return null; });
-          if (res.ok && Array.isArray(data)) {
-            products = data;
-            window.__luminaPointsProducts = products;
-            var active = (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") : "all";
-            renderProducts(products, active || "all");
-          }
+          await reloadPublicPointsProducts(true);
         } catch(e) {}
         try {
           if (window.__luminaUserAddress) {
