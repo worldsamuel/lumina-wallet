@@ -2988,7 +2988,7 @@ function enhancePrototypeHome() {
         existing.innerHTML =
           '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
           '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
-          '<span class="home-points-gifts" aria-hidden="true"><span></span><span></span><span></span></span><span class="home-points-chev">›</span>';
+          '<span class="home-points-gifts" aria-hidden="true"><span class="home-points-cube"><b>?</b><i>?</i><em>?</em></span><span class="home-points-spark s1"></span><span class="home-points-spark s2"></span><span class="home-points-spark s3"></span><span class="home-points-spark s4"></span></span><span class="home-points-chev">›</span>';
       }
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
