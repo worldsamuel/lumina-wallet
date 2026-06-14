@@ -76,6 +76,9 @@ declare global {
     __luminaMaybeOpenWelcomeBox?: () => void;
     __luminaForceWelcomeBoxCheck?: (address?: string | null) => void;
     __luminaOpenReceive?: () => void;
+    __luminaNotificationPermissionGranted?: boolean;
+    __luminaSyncNotificationPermission?: () => Promise<boolean>;
+    __luminaRequestNotificationPermission?: (event?: Event) => Promise<boolean>;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
     __luminaSwapDebugObserver?: MutationObserver;
@@ -5182,8 +5185,70 @@ function enhancePrototypeMe() {
       function feedbackRow(label) {
         return '<div class="me-row" onclick="openFeedback()"><span class="ic feedback-ic">' + meIcon("feedback") + '<b id="feedbackUnreadDot">1</b></span><span class="lbl">' + label + '</span><span class="chev"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg></span></div>';
       }
-      function toggleHtml(){
-        return '<span class="toggle on" onclick="event.stopPropagation();this.classList.toggle(\\'on\\')"></span>';
+      function notificationPermissionGranted(value){
+        if (value === true || value === "granted") return true;
+        if (!value || typeof value !== "object") return false;
+        return value.status === "granted" || value.enabled === true || value.permission === "granted" || value.value === "granted";
+      }
+      function updateNotificationToggle(granted){
+        window.__luminaNotificationPermissionGranted = !!granted;
+        var toggle = document.getElementById("luminaNotificationToggle");
+        if (toggle) toggle.classList.toggle("on", !!granted);
+      }
+      window.__luminaSyncNotificationPermission = async function(){
+        try {
+          if (!MiniKit.isInstalled()) {
+            updateNotificationToggle(false);
+            return false;
+          }
+          var result = await MiniKit.getPermissions();
+          var payload = (result && result.finalPayload) || result || {};
+          var permissions = payload.permissions || {};
+          var granted = notificationPermissionGranted(permissions.notifications);
+          updateNotificationToggle(granted);
+          return granted;
+        } catch(e) {
+          updateNotificationToggle(false);
+          return false;
+        }
+      };
+      window.__luminaRequestNotificationPermission = async function(event){
+        if (event) event.stopPropagation();
+        var toggle = document.getElementById("luminaNotificationToggle");
+        if (toggle) toggle.classList.add("is-loading");
+        try {
+          if (!MiniKit.isInstalled()) throw new Error("Open in World App to enable notifications.");
+          var current = await window.__luminaSyncNotificationPermission();
+          if (current) {
+            toast("Notifications enabled", "success");
+            return true;
+          }
+          var result = await MiniKit.requestPermission({ permission: "notifications" });
+          var payload = (result && result.finalPayload) || result || {};
+          if (payload.status === "error") {
+            var code = payload.error_code || payload.code || "permission_error";
+            if (code === "permission_disabled" || code === "mini_app_permission_not_enabled") {
+              throw new Error("Notifications are not enabled in Developer Portal.");
+            }
+            if (code === "already_granted") {
+              updateNotificationToggle(true);
+              return true;
+            }
+            throw new Error(code);
+          }
+          updateNotificationToggle(true);
+          toast("Notifications enabled", "success");
+          return true;
+        } catch(e) {
+          updateNotificationToggle(false);
+          toast(e && e.message ? e.message : "Unable to enable notifications");
+          return false;
+        } finally {
+          if (toggle) toggle.classList.remove("is-loading");
+        }
+      };
+      function notificationToggleHtml(){
+        return '<span id="luminaNotificationToggle" class="toggle" onclick="window.__luminaRequestNotificationPermission(event)"></span>';
       }
       function socialLinks(){
         try {
@@ -5518,7 +5583,7 @@ function enhancePrototypeMe() {
             row("media", c.mediaCenter, "", "openMediaCenter()") +
             row("language", c.language, langValue, "openLangModal()") +
             row("currency", c.currency, currencyValue, "openCurrencyModal()") +
-            row("bell", c.notifications, "", "", toggleHtml()) +
+            row("bell", c.notifications, "", "", notificationToggleHtml()) +
           '</div>' +
           '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
             row("privacy", c.privacy, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'privacy\\')") +
@@ -5528,6 +5593,7 @@ function enhancePrototypeMe() {
         ensureFeedbackModal();
         ensureMediaModal();
         refreshPoints();
+        if (window.__luminaSyncNotificationPermission) window.__luminaSyncNotificationPermission().catch(function(){});
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(false);
       }
       window.openPointsCenter = async function(initialView){
