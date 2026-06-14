@@ -4442,7 +4442,7 @@ function enhancePrototypeSwapQuote() {
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
 	            type: "swap",
-	            title: "Swap " + swapState.sell + " → " + swapState.buy,
+	            title: "Swap " + state.amountText + swapState.sell + " -" + shortAmount(latestSwapQuote.amountOut) + swapState.buy,
 	            subtitle: "Swap",
 	            amount: state.amountText + " " + swapState.sell,
 	            status: "Completed",
@@ -4905,6 +4905,11 @@ function enhancePrototypeActivity() {
         if (!value || /completed/i.test(String(value))) return activityCopy("completed");
         return value;
       }
+      function shortActivityAddress(value){
+        return String(value || "").replace(/0x[a-fA-F0-9]{40}/g, function(addr){
+          return addr.slice(0, 6) + "..." + addr.slice(-4);
+        });
+      }
       function activityTime(item){
         var raw = item && (item.createdAt || item.time || item.timestamp);
         if (!raw) return "";
@@ -5028,7 +5033,7 @@ function enhancePrototypeActivity() {
         var plus = a.type === "in" ? " plus" : "";
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
         var when = activityTime(a);
-        var subtitle = activitySubtitle(a.subtitle);
+        var subtitle = shortActivityAddress(activitySubtitle(a.subtitle));
         return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'' + activityCopy("pendingToast") + '\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
           '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s"><span>' + subtitle + '</span>' + (when ? '<span class="act-time">' + when + '</span>' : '') + '</div></div>' +

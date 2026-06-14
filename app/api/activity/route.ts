@@ -557,7 +557,7 @@ function mergeSwapActivity<
         ? `Deposit ${outgoing.tokenText}`
         : outgoingIsVaultShare
           ? `Withdraw ${incoming.tokenText}`
-          : `Swap ${outgoing.tokenText} → ${incoming.tokenText}`;
+          : `Swap ${compactActivityTokenText(outgoing.tokenText)} -${compactActivityTokenText(incoming.tokenText)}`;
       const subtitle = incomingIsVaultShare || outgoingIsVaultShare ? "Vault" : "Swap";
       const type = incomingIsVaultShare ? "in" : outgoingIsVaultShare ? "out" : "swap";
       rows.push({
@@ -576,6 +576,12 @@ function mergeSwapActivity<
     }
   }
   return rows;
+}
+
+function compactActivityTokenText(value: string) {
+  return String(value || "")
+    .trim()
+    .replace(/^([+-]?\d+(?:\.\d+)?)\s+([A-Za-z][A-Za-z0-9]{0,15})$/, "$1$2");
 }
 
 function newestCreatedAt<T extends { createdAt: string }>(items: T[]) {
