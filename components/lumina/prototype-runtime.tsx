@@ -5187,8 +5187,9 @@ function enhancePrototypeMe() {
       }
       function notificationPermissionGranted(value){
         if (value === true || value === "granted") return true;
+        if (value === "already_granted" || value === "enabled" || value === "on") return true;
         if (!value || typeof value !== "object") return false;
-        return value.status === "granted" || value.enabled === true || value.permission === "granted" || value.value === "granted";
+        return value.status === "granted" || value.status === "already_granted" || value.enabled === true || value.permission === "granted" || value.value === "granted";
       }
       function updateNotificationToggle(granted){
         window.__luminaNotificationPermissionGranted = !!granted;
@@ -5240,6 +5241,12 @@ function enhancePrototypeMe() {
           toast("Notifications enabled", "success");
           return true;
         } catch(e) {
+          var errorCode = (e && (e.error_code || e.code || e.message)) ? String(e.error_code || e.code || e.message) : "";
+          if (errorCode.indexOf("already_granted") >= 0) {
+            updateNotificationToggle(true);
+            toast("Notifications enabled", "success");
+            return true;
+          }
           updateNotificationToggle(false);
           toast(e && e.message ? e.message : "Unable to enable notifications");
           return false;
