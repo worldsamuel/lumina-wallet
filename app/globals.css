@@ -325,7 +325,7 @@
   #view-home .home-points-dot { position: absolute; z-index: 1; width: 5px; height: 5px; border-radius: 50%; background: #9cff93; box-shadow: 0 0 12px rgba(156,255,147,.9); animation: homeDotOrbit 6s linear infinite; }
   #view-home .home-points-dot.d2 { width: 4px; height: 4px; animation-duration: 8.5s; animation-delay: -2.2s; opacity: .82; }
   #view-home .home-points-dot.d3 { width: 3px; height: 3px; animation-duration: 10s; animation-delay: -4.6s; opacity: .7; }
-  #view-home .home-points-copy { position: relative; z-index: 1; min-width: 0; display: grid; gap: 5px; }
+  #view-home .home-points-copy { position: relative; z-index: 2; min-width: 0; display: grid; gap: 5px; }
   #view-home .home-points-copy b { font-size: 15px; font-weight: 900; line-height: 1.1; }
   #view-home .home-points-copy strong { display: flex; align-items: baseline; gap: 8px; color: #71f28a; font-size: clamp(26px, 8vw, 34px); line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; white-space: nowrap; }
   #view-home .home-points-copy em { color: rgba(255,255,255,.7); font-size: 14px; font-style: normal; font-weight: 800; }
@@ -333,7 +333,7 @@
   #view-home .home-points-actions { margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
   #view-home .home-points-actions i { min-height: 31px; padding: 0 13px; border: 1px solid rgba(255,255,255,.12); border-radius: 15px; display: inline-flex; align-items: center; background: rgba(6,8,7,.42); color: #fff; font-style: normal; font-size: 13px; font-weight: 900; }
   #view-home .home-points-actions i.gift { border-color: rgba(74,222,128,.14); background: rgba(74,222,128,.18); color: #9cf5aa; }
-  #view-home .home-points-gifts { position: absolute; z-index: 0; right: 50px; top: 38px; width: 82px; height: 76px; pointer-events: none; opacity: .9; filter: drop-shadow(0 0 18px rgba(109,255,124,.42)); }
+  #view-home .home-points-gifts { position: absolute; z-index: 0; right: 26px; top: 18px; width: 82px; height: 76px; pointer-events: none; opacity: .88; filter: drop-shadow(0 0 18px rgba(109,255,124,.42)); transform: scale(.88); transform-origin: top right; }
   #view-home .home-points-gifts::before { content: ""; position: absolute; left: 5px; right: 2px; top: 2px; bottom: 10px; border-radius: 50%; background: radial-gradient(circle, rgba(112,255,124,.34), transparent 64%); filter: blur(8px); }
   #view-home .home-points-gifts::after { content: ""; position: absolute; right: 12px; bottom: 1px; width: 56px; height: 18px; border-radius: 50%; border: 1px solid rgba(107,255,122,.42); border-top-color: rgba(170,255,108,.7); background: radial-gradient(ellipse at center, rgba(96,255,112,.18), transparent 68%); box-shadow: 0 0 18px rgba(103,255,122,.28); transform: perspective(80px) rotateX(64deg); }
   #view-home .home-points-cube { position: absolute; right: 18px; top: 15px; width: 39px; height: 39px; border-radius: 8px; background: linear-gradient(145deg, rgba(119,255,126,.36), rgba(21,62,27,.82) 46%, rgba(5,17,8,.96)); border: 1px solid rgba(141,255,137,.55); box-shadow: inset 0 0 18px rgba(124,255,140,.16), 0 0 22px rgba(105,255,122,.5); transform: rotate(-8deg) skewY(-8deg); }
@@ -358,7 +358,7 @@
     #view-home .home-points-orbit { left: 12px; width: 72px; height: 72px; }
     #view-home .home-points-orbit img { width: 52px; height: 52px; }
     #view-home .home-points-copy small { max-width: 190px; }
-    #view-home .home-points-gifts { right: 46px; top: 40px; transform: scale(.78); transform-origin: top right; opacity: .86; }
+    #view-home .home-points-gifts { right: 26px; top: 20px; transform: scale(.66); transform-origin: top right; opacity: .84; }
   }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }
