@@ -222,10 +222,7 @@ async function submitBuiltSwap(
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
   const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
-  // World App 强制 Permit2 approve expiration = 0
-  // 文档表述容易误导, 但实测 limit=0 是 World App 硬性要求
-  // 不要因为 Uniswap docs 说 0 = 立刻过期就改 - World App 有特殊语义
-  const permit2Expiration = 0;
+  const permit2Expiration = built.deadline ?? Math.floor(Date.now() / 1000) + 30 * 60;
   const permit2Param = {
     permitted: {
       token: quote.tokens.from.address,

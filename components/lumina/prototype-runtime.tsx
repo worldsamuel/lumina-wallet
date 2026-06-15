@@ -5440,9 +5440,7 @@ function enhancePrototypeMe() {
         try { localStorage.setItem(key, JSON.stringify(Array.isArray(rows) ? rows.slice(0, 80) : [])); } catch(e) {}
       }
       function pointsSpentTotal(){
-        return pointsLocalRows("lumina_points_ledger_v1").reduce(function(sum, row){
-          return sum + (row && row.type === "spend" ? Math.max(0, Number(row.points || 0)) : 0);
-        }, 0);
+        return 0;
       }
       function pointsActivityKey(){
         return "lumina_points_activity_total_" + String(window.__luminaUserAddress || "guest").toLowerCase();
