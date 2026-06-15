@@ -55,6 +55,7 @@ declare global {
     __luminaFriendlySwapError?: (error?: unknown) => string;
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
+    __luminaRefreshPoints?: () => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
       title?: string;
@@ -883,6 +884,9 @@ function updatePrototypeAddress(host: HTMLDivElement, address: string | null, us
   if (window.__luminaUserAddress) {
     [80, 700, 1800, 3600].forEach((delay) => {
       window.setTimeout(() => void forceWelcomeBoxCheck(window.__luminaUserAddress), delay);
+    });
+    [120, 900, 2200, 4200].forEach((delay) => {
+      window.setTimeout(() => window.__luminaRefreshPoints?.(), delay);
     });
   }
   window.__luminaUsername = username ?? "";
@@ -5546,10 +5550,21 @@ function enhancePrototypeMe() {
               setValue();
               return;
             }
+            if (!hasPointRecords && nextBasePoints <= 0) {
+              fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
+                .then(function(res){ return res.ok ? res.json() : []; })
+                .then(function(fullRows){
+                  fullRows = Array.isArray(fullRows) ? fullRows : [];
+                  setValue(pointsFromActivity(fullRows));
+                })
+                .catch(function(){ setValue(nextBasePoints); });
+              return;
+            }
             setValue(nextBasePoints);
           })
           .catch(function(){});
       }
+      window.__luminaRefreshPoints = refreshPoints;
       function updateFeedbackCopy(){
         var modal = document.getElementById("feedbackModal");
         if (!modal) return;
