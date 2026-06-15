@@ -33,9 +33,10 @@ type SourceQuote = {
 };
 
 type HoldstationQuote = NonNullable<Awaited<ReturnType<typeof buildHoldstationQuote>>>;
-type QuoteCacheEntry = { expiresAt: number; data: unknown };
+type QuoteCacheEntry = { expiresAt: number; staleUntil: number; data: unknown };
 
-const QUOTE_CACHE_TTL_MS = 5_000;
+const QUOTE_CACHE_TTL_MS = 8_000;
+const QUOTE_CACHE_STALE_MS = 90_000;
 const quoteCacheStore = globalThis as typeof globalThis & {
   __luminaSwapQuoteCache?: Map<string, QuoteCacheEntry>;
 };
@@ -67,13 +68,14 @@ export async function POST(req: NextRequest) {
     platformFeeConfig?.bps ?? 0,
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ? "hs-exec" : "no-hs-exec",
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true" ? "hs-ref" : "no-hs-ref",
-    process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE === "true" ? "v4-ref" : "no-v4-ref",
+    process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE !== "false" ? "v4-ref" : "no-v4-ref",
   ].join(":");
   const cached = quoteCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) {
+  const now = Date.now();
+  if (cached && cached.expiresAt > now) {
     return jsonResponse(cached.data, {
       headers: {
-        "Cache-Control": "private, max-age=3, stale-while-revalidate=5",
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
       },
     });
   }
@@ -83,20 +85,20 @@ export async function POST(req: NextRequest) {
   const enableHoldstationReference =
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ||
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true";
-  const enableV4Reference = process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE === "true";
+  const enableV4Reference = process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE !== "false";
   const [holdstation, v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
     enableHoldstationReference
       ? withTimeout(buildHoldstationQuote(parsed.from, parsed.to, parsed.amountText, parsed.slippageBps), 3_500).catch((error) => {
           console.warn("[SWAP] Holdstation quote failed", error);
           return null;
-        })
+      })
       : Promise.resolve(null),
-    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 3_500)
+    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
       .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
       .catch(() => null),
     hasCommunityToken || !enableV4Reference
       ? Promise.resolve(null)
-      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 3_500)
+      : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 2_500)
           .then((quote) => ({ source: "uniswap-v4" as const, ...quote }))
           .catch(() => null),
     reliableImpactReference ? fetchJson<OnchainPricesResponse>(req, "/api/prices/onchain").catch(() => null) : Promise.resolve(null),
@@ -110,6 +112,14 @@ export async function POST(req: NextRequest) {
   const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
 
   if (!main || !main.quote || Number(main.quote.amountOut) <= 0) {
+    if (cached && cached.staleUntil > Date.now()) {
+      return jsonResponse(withStaleQuote(cached.data), {
+        headers: {
+          "Cache-Control": "private, no-store",
+          "X-Lumina-Stale-Quote": "1",
+        },
+      });
+    }
     return jsonResponse(
       {
         error: "No executable swap route for this pair.",
@@ -167,11 +177,15 @@ export async function POST(req: NextRequest) {
     blocked: false,
     blockReason: undefined,
   };
-  quoteCache.set(cacheKey, { data: payload, expiresAt: Date.now() + QUOTE_CACHE_TTL_MS });
+  quoteCache.set(cacheKey, {
+    data: payload,
+    expiresAt: Date.now() + QUOTE_CACHE_TTL_MS,
+    staleUntil: Date.now() + QUOTE_CACHE_STALE_MS,
+  });
   if (quoteCache.size > 400) {
     const now = Date.now();
     for (const [key, value] of quoteCache) {
-      if (value.expiresAt <= now || quoteCache.size > 300) quoteCache.delete(key);
+      if (value.staleUntil <= now || quoteCache.size > 300) quoteCache.delete(key);
     }
   }
 
@@ -179,10 +193,21 @@ export async function POST(req: NextRequest) {
     payload,
     {
       headers: {
-        "Cache-Control": "private, max-age=3, stale-while-revalidate=5",
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
       },
     },
   );
+}
+
+function withStaleQuote(data: unknown) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return data;
+  const record = data as Record<string, unknown>;
+  const warnings = Array.isArray(record.warnings) ? record.warnings.filter((item): item is string => typeof item === "string") : [];
+  return {
+    ...record,
+    stale: true,
+    warnings: Array.from(new Set([...warnings, "stale_quote"])),
+  };
 }
 
 async function parseQuoteBody(body: QuoteBody | null) {

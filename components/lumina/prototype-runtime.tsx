@@ -4113,9 +4113,18 @@ function enhancePrototypeSwapQuote() {
         } catch(e) {
           if (seq !== quoteSeq) return;
           var msg = e && e.message ? e.message : "Quote failed";
-          if (/No Uniswap|No quote|not supported|Cannot resolve/i.test(msg)) msg = swapCopy("noRoute");
-          setQuoteState(msg, "impact-high");
+          if (/No Uniswap|No quote|not supported|Cannot resolve|No executable/i.test(msg)) msg = swapCopy("noRoute");
           setSwapDebug("quote:error", readableSwapError(e));
+          if (latestSwapQuote) {
+            var warn = document.getElementById("quoteWarning");
+            if (warn) {
+              warn.textContent = msg;
+              warn.classList.add("show");
+            }
+            setSwapButtonPending();
+            return latestSwapQuote;
+          }
+          setQuoteState(msg, "impact-high");
         } finally {
           if (activeQuotePromise === promise) activeQuotePromise = null;
         }

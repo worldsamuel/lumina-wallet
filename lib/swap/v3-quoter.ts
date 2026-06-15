@@ -5,6 +5,7 @@ import { SWAP_TOKENS, type SwapToken } from "./tokens";
 
 const UNISWAP_V3_QUOTER_V2 = "0x10158D43e6cc414deE1Bd1eB0EfC6a5cBCfF244c" as Address;
 const FEE_TIERS = [500, 3000, 10000] as const;
+const QUOTE_BATCH_SIZE = 3;
 const COMMON_TWO_HOP_FEES = [
   [3000, 3000],
   [10000, 3000],
@@ -97,9 +98,16 @@ export async function quoteV3(
 
 export async function quoteBestV3(fromToken: SwapToken, toToken: SwapToken, amountIn: bigint): Promise<SwapQuoteSet> {
   const cacheKey = routeCacheKey(fromToken, toToken);
-  const routes = orderRouteCandidates(buildRouteCandidates(fromToken, toToken), bestRouteCache.get(cacheKey));
-  const priorityCount = Math.min(routes.length, 18);
-  const priorityQuotes = await quoteRoutes(routes.slice(0, priorityCount), fromToken, toToken, amountIn);
+  const cachedRoute = bestRouteCache.get(cacheKey);
+  if (cachedRoute && cachedRoute.expiresAt > Date.now()) {
+    const cachedQuotes = await quoteRoutes([cachedRoute.route], fromToken, toToken, amountIn, 1_800);
+    const cachedBest = pickBestQuote(cachedQuotes);
+    if (cachedBest) return { bestQuote: cachedBest, allQuotes: cachedQuotes };
+  }
+
+  const routes = orderRouteCandidates(buildRouteCandidates(fromToken, toToken), cachedRoute);
+  const priorityCount = Math.min(routes.length, 12);
+  const priorityQuotes = await quoteRoutes(routes.slice(0, priorityCount), fromToken, toToken, amountIn, 2_500);
   let allQuotes = priorityQuotes;
   let bestQuote = pickBestQuote(allQuotes);
 
@@ -135,20 +143,28 @@ async function quoteV3Path(tokens: SwapToken[], fees: number[], amountIn: bigint
   };
 }
 
-async function quoteRoutes(routes: V3RouteCandidate[], fromToken: SwapToken, toToken: SwapToken, amountIn: bigint) {
-  return Promise.all(
-    routes.map(async (route) => {
-      try {
-        const quote =
-          route.tokens.length === 2
-            ? await withTimeout(quoteV3(fromToken, toToken, amountIn, route.fees[0] as (typeof FEE_TIERS)[number]), 2_500)
-            : await withTimeout(quoteV3Path(route.tokens, route.fees, amountIn, toToken.decimals), 2_500);
-        return { ok: true as const, ...quote };
-      } catch (error) {
-        return { ok: false as const, fee: route.fees[0] ?? 0, error: error instanceof Error ? error.message : "quote_failed" };
-      }
-    }),
-  );
+async function quoteRoutes(routes: V3RouteCandidate[], fromToken: SwapToken, toToken: SwapToken, amountIn: bigint, timeoutMs = 2_500) {
+  const quotes = [];
+  for (let index = 0; index < routes.length; index += QUOTE_BATCH_SIZE) {
+    const batch = routes.slice(index, index + QUOTE_BATCH_SIZE);
+    quotes.push(
+      ...(await Promise.all(
+        batch.map(async (route) => {
+          try {
+            const quote =
+              route.tokens.length === 2
+                ? await withTimeout(quoteV3(fromToken, toToken, amountIn, route.fees[0] as (typeof FEE_TIERS)[number]), timeoutMs)
+                : await withTimeout(quoteV3Path(route.tokens, route.fees, amountIn, toToken.decimals), timeoutMs);
+            return { ok: true as const, ...quote };
+          } catch (error) {
+            return { ok: false as const, fee: route.fees[0] ?? 0, error: error instanceof Error ? error.message : "quote_failed" };
+          }
+        }),
+      )),
+    );
+    if (pickBestQuote(quotes)) break;
+  }
+  return quotes;
 }
 
 function pickBestQuote(quotes: Awaited<ReturnType<typeof quoteRoutes>>) {
