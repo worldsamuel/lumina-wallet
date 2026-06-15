@@ -1324,11 +1324,23 @@ function enhancePrototypeEarn() {
         var lang = window.currentLang || "en";
         return (vault.description && (vault.description[lang] || vault.description.en)) || "";
       }
+      function positionAmount(pos){
+        if (!pos) return 0;
+        var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted, pos.sharesFormatted].map(function(value){
+          var n = Number(String(value || "0").replace(/,/g, ""));
+          return Number.isFinite(n) ? n : 0;
+        });
+        return Math.max.apply(Math, candidates);
+      }
+      function positionAmountText(pos, digits){
+        var amount = positionAmount(pos);
+        return fmtAmount(amount, digits || 6);
+      }
       function updateEarnHero(){
         var zh = (window.currentLang || "en") === "zh-CN";
         var totalEl = document.getElementById("earnTotal");
         if (totalEl) {
-          var active = morphoPositions.filter(function(p){ return Number(p.assetsFormatted || 0) > 0; }).length;
+          var active = morphoPositions.filter(nonZeroPosition).length;
           totalEl.textContent = active ? String(active) : "0";
         }
         var sub = document.querySelector(".earn-hero .sub");
@@ -1340,8 +1352,9 @@ function enhancePrototypeEarn() {
           claim.onclick = function(){ loadMorphoData(true); };
         }
       }
+      window.__luminaRenderEarnHero = updateEarnHero;
       function nonZeroPosition(pos){
-        return !!pos && String(pos.assets || pos.shares || "0") !== "0";
+        return !!pos && (String(pos.assets || pos.maxWithdraw || pos.shares || "0") !== "0" || positionAmount(pos) > 0);
       }
       function earnSnapshotKey(){
         var address = String(window.__luminaUserAddress || "").toLowerCase();
@@ -1409,9 +1422,9 @@ function enhancePrototypeEarn() {
             return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
           }) || pos;
           var sym = pos.asset && pos.asset.symbol ? pos.asset.symbol : (vault.asset && vault.asset.symbol) || "";
-          var amount = fmtAmount(pos.assetsFormatted, 6);
+          var amount = positionAmountText(pos, 6);
           var price = typeof prices !== "undefined" ? Number(prices[sym] || 0) : 0;
-          var usd = price ? " ≈ " + formatMoney(Number(pos.assetsFormatted || 0) * price) : "";
+          var usd = price ? " ≈ " + formatMoney(positionAmount(pos) * price) : "";
           var apy = vault.liveData ? " · " + fmtPct(vault.liveData.netApy) + " APY" : "";
           var idx = morphoVaults.findIndex(function(v){
             return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
@@ -1441,7 +1454,7 @@ function enhancePrototypeEarn() {
         }
         box.innerHTML = morphoVaults.map(function(vault, i){
           var pos = positionFor(vault);
-          var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + vault.asset.symbol : "—";
+          var deposited = pos ? positionAmountText(pos, 6) + " " + vault.asset.symbol : "—";
           var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
           return '<div class="prod" onclick="openEarn(' + i + ')">' +
             '<div class="top">' +
@@ -1509,7 +1522,7 @@ function enhancePrototypeEarn() {
       function renderEarnDetail(vault){
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
-        var deposited = pos ? fmtAmount(pos.assetsFormatted, 6) + " " + token : "—";
+        var deposited = pos ? positionAmountText(pos, 6) + " " + token : "—";
         var copy = {
           deposited: "Deposited ",
           amount: "Amount",
@@ -1541,7 +1554,7 @@ function enhancePrototypeEarn() {
         console.log("[EARN] Detail vault:", vault);
         console.log("[EARN] Detail position:", pos);
         console.log("[EARN] My deposit assets:", pos ? pos.assets : "0");
-        console.log("[EARN] My deposit human:", pos ? pos.assetsFormatted : "0");
+        console.log("[EARN] My deposit human:", pos ? positionAmount(pos) : "0");
         console.log("[EARN] Withdraw disabled:", !pos || Number(pos.shares || 0) <= 0);
         var annual = "—";
         var daily = "—";
@@ -1678,7 +1691,7 @@ function enhancePrototypeEarn() {
         mask.className = "modal-mask open morpho-withdraw-modal";
         mask.id = "morphoWithdrawMask";
         var available = fmtAmount(pos.maxWithdrawFormatted, 6);
-        var deposited = fmtAmount(pos.assetsFormatted, 6);
+        var deposited = positionAmountText(pos, 6);
         mask.innerHTML =
           '<div class="modal">' +
             '<div class="grab"></div>' +
@@ -1769,7 +1782,7 @@ function enhancePrototypeEarn() {
             });
             if (!sym && vault && vault.asset) sym = String(vault.asset.symbol || "").toUpperCase();
             var price = sym === "USDC" || sym === "USDT" || sym === "EURC" ? 1 : Number(prices && prices[sym] || 0);
-            var amount = Number(pos.assetsFormatted || 0);
+            var amount = positionAmount(pos);
             return sum + (Number.isFinite(amount) && price > 0 ? amount * price : 0);
           }, 0);
         }
@@ -2895,6 +2908,7 @@ function enhancePrototypeHome() {
               var sign = Number(change24hUsdNum) >= 0 ? "+" : "";
               subEl.textContent = sign + formatMoney(change24hUsdNum) + " (24h)";
             }
+            if (typeof window.__luminaRenderEarnHero === "function") window.__luminaRenderEarnHero();
             window.__luminaApplyBalancePrivacy();
           };
         }
@@ -4167,6 +4181,17 @@ function enhancePrototypeSwapQuote() {
 	        if (!(price > 0) && (symbol === "USDC" || symbol === "USDT" || symbol === "EURC")) price = 1;
 	        if (price > 0) asset.usdNum = (Number(amount) || 0) * price;
 	      }
+	      function protectSwapBalance(symbol, amount, mode){
+	        symbol = String(symbol || "").toUpperCase();
+	        var n = Number(amount);
+	        if (!symbol || !Number.isFinite(n)) return;
+	        window.__luminaPendingBalanceOverrides = window.__luminaPendingBalanceOverrides || {};
+	        window.__luminaPendingBalanceOverrides[symbol] = {
+	          amount: Math.max(0, n),
+	          mode: mode,
+	          expiresAt: Date.now() + 60 * 1000
+	        };
+	      }
 	      function optimisticallyApplySwapBalances(){
 	        if (!latestSwapQuote) return;
 	        var sell = String(swapState.sell || "").toUpperCase();
@@ -4175,9 +4200,13 @@ function enhancePrototypeSwapQuote() {
 	        var amountOut = Number(latestSwapQuote.amountOut || 0);
 	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
 	        var previousBuyBalance = balanceNumber(buy);
-	        updateAssetAmount(sell, balanceNumber(sell) - amountIn);
+	        var nextSellBalance = Math.max(0, balanceNumber(sell) - amountIn);
+	        var nextBuyBalance = previousBuyBalance + amountOut;
+	        updateAssetAmount(sell, nextSellBalance);
 	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        updateAssetAmount(buy, previousBuyBalance + amountOut);
+	        updateAssetAmount(buy, nextBuyBalance);
+	        protectSwapBalance(sell, nextSellBalance, "max");
+	        protectSwapBalance(buy, nextBuyBalance, "min");
 	        syncSwapQuotePriceToHome();
 	        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
 	        if (typeof renderAssets === "function") renderAssets();

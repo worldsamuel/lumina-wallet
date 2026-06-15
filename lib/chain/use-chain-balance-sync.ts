@@ -208,6 +208,50 @@ function syncBalancesToPrototype(
     tokenMarketCaps = ${JSON.stringify(marketCapMap)};
     (function(){
       try {
+        var pending = window.__luminaPendingBalanceOverrides || {};
+        Object.keys(pending).forEach(function(sym){
+          var item = pending[sym] || {};
+          var target = Number(item.amount);
+          var current = Number(String(balances[sym] || "0").replace(/,/g, "").replace(/^</, ""));
+          if (!Number.isFinite(target)) {
+            delete pending[sym];
+            return;
+          }
+          if (Date.now() > Number(item.expiresAt || 0)) {
+            delete pending[sym];
+            return;
+          }
+          if (item.mode === "max") {
+            if (Number.isFinite(current) && current <= target + 0.0000001) {
+              delete pending[sym];
+            } else {
+              balances[sym] = target.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits:8 });
+            }
+          } else if (item.mode === "min") {
+            if (Number.isFinite(current) && current + 0.0000001 >= target) {
+              delete pending[sym];
+            } else {
+              balances[sym] = target.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits:8 });
+            }
+          }
+          if (balances[sym] !== undefined) {
+            availMap[sym] = balances[sym] + " " + sym;
+            (assets || []).forEach(function(asset){
+              if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+              asset.amt = balances[sym] + " " + sym;
+              var amountNum = Number(String(balances[sym]).replace(/,/g, ""));
+              var price = Number(prices && prices[sym] || 0);
+              if (!(price > 0) && (sym === "USDC" || sym === "USDT" || sym === "EURC")) price = 1;
+              if (Number.isFinite(amountNum) && price > 0) asset.usdNum = amountNum * price;
+              asset.hasBalance = amountNum > 0;
+            });
+          }
+        });
+        window.__luminaPendingBalanceOverrides = pending;
+      } catch(e) {}
+    })();
+    (function(){
+      try {
         var recent = JSON.parse(localStorage.getItem("lumina_recent_swap_assets_v1") || "[]");
         if (!Array.isArray(recent)) return;
         var existing = new Set((assets || []).map(function(asset){ return String(asset && asset.sym || "").toUpperCase(); }));
@@ -248,6 +292,7 @@ function syncBalancesToPrototype(
     }
     if (typeof renderMoney === "function") renderMoney();
     if (typeof renderAssets === "function") renderAssets();
+    if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
     if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
     if (typeof refreshSwapLabels === "function") refreshSwapLabels();
   `);
