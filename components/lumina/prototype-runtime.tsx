@@ -1403,7 +1403,6 @@ function enhancePrototypeEarn() {
         if (!key) return;
         try {
           if (!Array.isArray(positions) || !positions.some(nonZeroPosition)) {
-            localStorage.removeItem(key);
             return;
           }
           localStorage.setItem(key, JSON.stringify({ positions: positions, savedAt: Date.now() }));
@@ -1428,7 +1427,7 @@ function enhancePrototypeEarn() {
             if (existing) return;
             return;
           }
-          if (existing) existing.remove();
+          if (existing) return;
           return;
         }
         if (!existing) {
@@ -4331,6 +4330,7 @@ function enhancePrototypeSwapQuote() {
 	        if (/TRANSFER_FROM_FAILED|transferFrom|transfer failed/i.test(text)) return swapCopy("sellRestricted");
 	        if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(text)) return swapCopy("refreshQuoteShort");
 	        if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(text)) return swapCopy("quoteExpiredShort");
+	        if (msg && msg !== "Swap failed" && !/^undefined$/i.test(String(msg))) return String(msg).slice(0, 120);
 	        return swapCopy("swapFailed");
 	      }
 	      function syncSwapQuotePriceToHome(){

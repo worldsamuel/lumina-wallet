@@ -122,15 +122,31 @@ export async function executeSwap(params: ExecuteSwapParams) {
     throw new Error("Phase 2 execution currently supports Holdstation and Uniswap V3 routes only.");
   }
 
-  const built = await buildSwapTxOnServer({
-    fromToken: freshQuote.tokens.from,
-    toToken: freshQuote.tokens.to,
-    fromAmountHuman: params.fromAmountHuman,
-    slippageBps: params.slippageBps,
-    userAddress: params.userAddress,
-    quote: freshQuote,
-  });
-  return await submitBuiltSwap(built, freshQuote, params, fromAmount, "primary");
+  let executableQuote = freshQuote;
+  let built: BuildTxResponse;
+  try {
+    built = await buildSwapTxOnServer({
+      fromToken: executableQuote.tokens.from,
+      toToken: executableQuote.tokens.to,
+      fromAmountHuman: params.fromAmountHuman,
+      slippageBps: params.slippageBps,
+      userAddress: params.userAddress,
+      quote: executableQuote,
+    });
+  } catch (error) {
+    if (!params.quote?.amountOutRaw) throw error;
+    executableQuote = await fetchFreshQuote(params);
+    if (executableQuote.blocked) throw new Error(executableQuote.blockReason || "Quote is blocked.");
+    built = await buildSwapTxOnServer({
+      fromToken: executableQuote.tokens.from,
+      toToken: executableQuote.tokens.to,
+      fromAmountHuman: params.fromAmountHuman,
+      slippageBps: params.slippageBps,
+      userAddress: params.userAddress,
+      quote: executableQuote,
+    });
+  }
+  return await submitBuiltSwap(built, executableQuote, params, fromAmount, "primary");
 }
 
 async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapParams) {
@@ -348,6 +364,7 @@ async function fetchFreshQuote(params: ExecuteSwapParams): Promise<QuoteResponse
       toSymbol: params.toToken.symbol,
       fromAmount: params.fromAmountHuman,
       slippageBps: params.slippageBps,
+      userAddress: params.userAddress,
     }),
   });
   const data = await response.json().catch(() => null);
@@ -430,6 +447,7 @@ function attachSwapDebug(error: unknown, debug: unknown) {
 
 export function friendlySwapError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || "Swap failed.");
+  if (/No executable|Unable to verify|transaction build|Fresh quote failed|Quote is blocked|quote failed/i.test(message)) return message;
   if (/invalid_token/i.test(message)) return "Token not active in World App Permit2 list";
   if (/invalid_contract/i.test(message)) return "Token not supported";
   if (/disallowed_operation/i.test(message)) return "Blocked by World App";
