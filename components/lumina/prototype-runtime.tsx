@@ -3751,6 +3751,13 @@ function enhancePrototypeSwapQuote() {
         var display = n.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits: digits });
         return display === "0" ? raw.replace(/(\\.\\d*?[1-9])0+$/, "$1").replace(/\\.0+$/, "") : display;
       }
+      function activitySwapAmount(value, symbol){
+        var raw = String(value == null ? "" : value).replace(/,/g, "").trim();
+        var n = Number(raw);
+        var token = String(symbol || "").toUpperCase();
+        if (!Number.isFinite(n)) return (raw || "—") + (token ? " " + token : "");
+        return n.toLocaleString("en-US", { useGrouping:false, minimumFractionDigits:3, maximumFractionDigits:3 }) + (token ? " " + token : "");
+      }
       function slippageBps(){
         var txt = (document.getElementById("slipTxt") && document.getElementById("slipTxt").textContent || "0.5%").replace("%", "");
         var n = Number(txt);
@@ -4442,7 +4449,7 @@ function enhancePrototypeSwapQuote() {
 	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
 	          if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
 	            type: "swap",
-	            title: "Swap " + state.amountText + swapState.sell + " -" + shortAmount(latestSwapQuote.amountOut) + swapState.buy,
+	            title: activitySwapAmount(state.amountText, swapState.sell) + " -> " + activitySwapAmount(latestSwapQuote.amountOut, swapState.buy),
 	            subtitle: "Swap",
 	            amount: state.amountText + " " + swapState.sell,
 	            status: "Completed",

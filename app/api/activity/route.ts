@@ -557,7 +557,7 @@ function mergeSwapActivity<
         ? `Deposit ${outgoing.tokenText}`
         : outgoingIsVaultShare
           ? `Withdraw ${incoming.tokenText}`
-          : `Swap ${compactActivityTokenText(outgoing.tokenText)} -${compactActivityTokenText(incoming.tokenText)}`;
+          : `${formatActivitySwapTokenText(outgoing.tokenText)} -> ${formatActivitySwapTokenText(incoming.tokenText)}`;
       const subtitle = incomingIsVaultShare || outgoingIsVaultShare ? "Vault" : "Swap";
       const type = incomingIsVaultShare ? "in" : outgoingIsVaultShare ? "out" : "swap";
       rows.push({
@@ -578,10 +578,14 @@ function mergeSwapActivity<
   return rows;
 }
 
-function compactActivityTokenText(value: string) {
-  return String(value || "")
-    .trim()
-    .replace(/^([+-]?\d+(?:\.\d+)?)\s+([A-Za-z][A-Za-z0-9]{0,15})$/, "$1$2");
+function formatActivitySwapTokenText(value: string) {
+  const text = String(value || "").trim();
+  const match = text.replace(/,/g, "").match(/^([+-]?\d+(?:\.\d+)?)\s+([A-Za-z][A-Za-z0-9]{0,15})$/);
+  if (!match) return text;
+  const amount = Number(match[1]);
+  const symbol = match[2].toUpperCase();
+  if (!Number.isFinite(amount)) return `${match[1]} ${symbol}`;
+  return `${amount.toLocaleString("en-US", { useGrouping: false, minimumFractionDigits: 3, maximumFractionDigits: 3 })} ${symbol}`;
 }
 
 function newestCreatedAt<T extends { createdAt: string }>(items: T[]) {
