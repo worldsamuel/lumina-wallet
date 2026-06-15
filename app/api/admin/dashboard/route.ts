@@ -1,9 +1,16 @@
-import { isAddress, type Address } from "viem";
+import { formatUnits, isAddress, parseAbi, type Address } from "viem";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { getRecentUserActivity } from "@/lib/admin/activity";
+import { countStoredActivities } from "@/lib/admin/activity-store";
 import { ensureFeedbackSchema } from "@/lib/admin/ensure-feedback-schema";
+import { publicClient } from "@/lib/chain";
 import { db } from "@/lib/db";
+import { ERC20_TOKENS } from "@/lib/tokens";
+
+const platformRevenueAddress = "0x600A84949F0F0023AdF6ed89cCcD2B2cECcf1077" as Address;
+const platformRevenueSymbols = ["WLD", "USDC", "EURC"] as const;
+const erc20BalanceAbi = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 export function OPTIONS() {
   return optionsResponse();
@@ -36,9 +43,15 @@ export async function GET() {
   } catch (error) {
     console.error("Failed to count dashboard transactions", error);
   }
-  const transactions = activity.length;
+  let [transactions, todayTransactions, platformRevenue] = await Promise.all([
+    countStoredActivities(),
+    countStoredActivities(today),
+    getPlatformRevenueBalances(),
+  ]);
+  if (!transactions && activity.length) transactions = activity.length;
   const todayIso = today.toISOString().slice(0, 10);
   const todayActivity = activity.filter((row) => row.createdAt.slice(0, 10) === todayIso);
+  if (!todayTransactions && todayActivity.length) todayTransactions = todayActivity.length;
   const feeNative = activity.reduce((sum, row) => sum + (row.feeNative || 0), 0);
   const todayFeeNative = todayActivity.reduce((sum, row) => sum + (row.feeNative || 0), 0);
   const volumeBySymbol = new Map<string, number>();
@@ -60,11 +73,6 @@ export async function GET() {
       amount: value,
       label: `${value.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${symbol}`,
     }));
-  const platformRevenue = [
-    { symbol: "WLD", amount: 0, label: "0 WLD" },
-    { symbol: "USDC", amount: 0, label: "0 USDC" },
-    { symbol: "ETH", amount: feeNative, label: `${feeNative.toLocaleString(undefined, { maximumFractionDigits: 6 })} ETH` },
-  ];
   const feeSeries = Array.from({ length: 7 }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() - (6 - index));
@@ -96,7 +104,7 @@ export async function GET() {
     totalUsers,
     todayUsers,
     transactions,
-    todayTransactions: todayActivity.length,
+    todayTransactions,
     transferVolumeLabel,
     transferVolumes,
     platformRevenue,
@@ -109,4 +117,35 @@ export async function GET() {
     todayVisits: isToday ? Number(counters.todayVisits || 0) : 0,
     feedbackNew,
   });
+}
+
+async function getPlatformRevenueBalances() {
+  return Promise.all(
+    platformRevenueSymbols.map(async (symbol) => {
+      const token = ERC20_TOKENS.find((item) => item.symbol === symbol);
+      if (!token) return { symbol, amount: 0, label: `0 ${symbol}` };
+      try {
+        const raw = await publicClient.readContract({
+          address: token.contractAddress,
+          abi: erc20BalanceAbi,
+          functionName: "balanceOf",
+          args: [platformRevenueAddress],
+        });
+        const amount = Number(formatUnits(raw, token.decimals));
+        return {
+          symbol,
+          amount: Number.isFinite(amount) ? amount : 0,
+          label: `${formatRevenueAmount(amount)} ${symbol}`,
+        };
+      } catch (error) {
+        console.error(`Failed to read platform revenue ${symbol}`, error);
+        return { symbol, amount: 0, label: `0 ${symbol}` };
+      }
+    }),
+  );
+}
+
+function formatRevenueAmount(amount: number) {
+  if (!Number.isFinite(amount) || amount <= 0) return "0";
+  return amount.toLocaleString(undefined, { maximumFractionDigits: amount < 1 ? 6 : 3 });
 }

@@ -65,3 +65,18 @@ export async function getStoredActivities(limit = 120) {
   `;
   return rows;
 }
+
+export async function countStoredActivities(since?: Date) {
+  await ensureActivityLogTable();
+  const rows = since
+    ? await db.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "ActivityLog"
+        WHERE "createdAt" >= ${since}
+      `
+    : await db.$queryRaw<Array<{ count: bigint }>>`
+        SELECT COUNT(*)::bigint AS count
+        FROM "ActivityLog"
+      `;
+  return Number(rows[0]?.count || 0n);
+}
