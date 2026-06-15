@@ -6169,7 +6169,7 @@ function enhancePrototypeMe() {
                 method: "POST",
                 cache: "no-store",
                 headers: { "content-type": "application/json", "cache-control": "no-store" },
-                body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id, clientOrderId:clientOrderId, availablePoints:fallbackAvailablePoints, allowPurchase:true }),
+                body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id, clientOrderId:clientOrderId, availablePoints:fallbackAvailablePoints, allowPurchase:false }),
               });
               var data = await res.json().catch(function(){ return null; });
               if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
@@ -6249,23 +6249,7 @@ function enhancePrototypeMe() {
           renderProductDetail(product.id, null, "buying");
           var previousPoints = Number(window.__luminaPoints || 0);
           var previousStock = Math.max(0, Math.floor(Number(product.stock || 0)));
-          var tempOrderId = "local-buy-" + product.id + "-" + Date.now();
-          var tempOrder = {
-            id: tempOrderId,
-            productId: product.id,
-            productTitle: productTitle(product),
-            type: product.type,
-            status: product.type === "blind_box" ? "purchased" : "redeemed",
-            createdAt: new Date().toISOString(),
-            localPending: true
-          };
-          updatePointsBalance(previousPoints - cost);
-          if (previousStock > 0) product.stock = previousStock - 1;
-          window.__luminaPointsOrders = [tempOrder].concat(Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []);
-          pointsActionBusy(busyKey, false);
-          renderProductDetail(product.id);
-          renderProducts(products, (modal.querySelector("[data-points-cat].sel") || {}).getAttribute ? modal.querySelector("[data-points-cat].sel").getAttribute("data-points-cat") || "all" : "all");
-          renderHomePointsBanner();
+          var tempOrderId = "buy-" + product.id + "-" + Date.now();
           try {
             if (!window.__luminaUserAddress) throw new Error("Wallet address required");
             window.__luminaPendingProductBuys = window.__luminaPendingProductBuys || {};
@@ -6280,62 +6264,34 @@ function enhancePrototypeMe() {
               return data;
             });
             window.__luminaPendingProductBuys[product.id] = { promise:requestPromise, clientOrderId:tempOrderId, availablePoints:previousPoints };
-            requestPromise.then(function(data){
-              if (data && data.order) {
-                var replacedOrder = false;
-                window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).map(function(order){
-                  if (order && String(order.status || "").toLowerCase() !== "opened" && (order.id === tempOrderId || (order.productId === product.id && order.localPending === true))) {
-                    replacedOrder = true;
-                    return data.order;
-                  }
-                  return order;
-                });
-                if (!replacedOrder && !window.__luminaPointsOrders.some(function(order){ return order && order.id === data.order.id; })) window.__luminaPointsOrders.unshift(data.order);
-              }
-              if (data && data.product) {
-                products = (Array.isArray(products) ? products : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
-                window.__luminaPointsProducts = products;
-                product = data.product;
-              }
-              reloadPointsOrders().catch(function(){ return []; });
-              if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] && window.__luminaPendingProductBuys[product.id].clientOrderId === tempOrderId) delete window.__luminaPendingProductBuys[product.id];
-              if (window.__luminaPointsCurrentView === "shop") renderProductDetail(product.id);
-            }).catch(async function(e){
-              var confirmedOrder = null;
-              try {
-                var freshOrders = await reloadPointsOrders();
-                confirmedOrder = (Array.isArray(freshOrders) ? freshOrders : []).find(function(order){
-                  return order && (order.id === tempOrderId || (order.productId === product.id && order.type === product.type && (order.status === "purchased" || order.status === "redeemed" || order.status === "opened")));
-                }) || null;
-              } catch(confirmError) {}
-              if (!confirmedOrder) {
-                var tempStillPending = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).some(function(order){
-                  return order && order.id === tempOrderId && order.localPending === true && String(order.status || "").toLowerCase() !== "opened";
-                });
-                if (tempStillPending) {
-                  updatePointsBalance(previousPoints);
-                  product.stock = previousStock;
-                  window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return !order || order.id !== tempOrderId; });
-                  toast(e && e.name === "AbortError" ? (copy.requestTimeout || "Request timed out. Please try again.") : (e && e.message ? e.message : "Purchase failed"));
-                }
-              }
-              if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] && window.__luminaPendingProductBuys[product.id].clientOrderId === tempOrderId) delete window.__luminaPendingProductBuys[product.id];
-              pointsActionBusy(busyKey, false);
-              if (window.__luminaPointsCurrentView === "shop") renderProductDetail(product.id);
-            });
+            var data = await requestPromise;
+            if (data && data.order) {
+              window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return order && order.id !== data.order.id; });
+              window.__luminaPointsOrders.unshift(data.order);
+            }
+            if (data && data.product) {
+              products = (Array.isArray(products) ? products : []).map(function(item){ return item && item.id === data.product.id ? data.product : item; });
+              window.__luminaPointsProducts = products;
+              product = data.product;
+            } else if (previousStock > 0) {
+              product.stock = previousStock - 1;
+            }
+            updatePointsBalance(previousPoints - cost);
+            addPointsLedger({ type:"spend", points:cost, title:productTitle(product), productId:product.id });
+            if (product.type !== "blind_box") addPointsCoupon({ title:productTitle(product), value:product.imageText || "", source:"Product Center" });
+            toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
+            await reloadPointsOrders().catch(function(){ return []; });
+            renderHomePointsBanner();
           } catch(e) {
             if (window.__luminaPendingProductBuys) delete window.__luminaPendingProductBuys[product.id];
             updatePointsBalance(previousPoints);
             product.stock = previousStock;
-            window.__luminaPointsOrders = (Array.isArray(window.__luminaPointsOrders) ? window.__luminaPointsOrders : []).filter(function(order){ return !order || order.id !== tempOrderId; });
             toast(e && e.name === "AbortError" ? (copy.requestTimeout || "Request timed out. Please try again.") : (e && e.message ? e.message : "Purchase failed"));
             pointsActionBusy(busyKey, false);
             renderProductDetail(product.id);
             return;
           }
-          addPointsLedger({ type:"spend", points:cost, title:product.title, productId:product.id });
-          if (product.type !== "blind_box") addPointsCoupon({ title:product.title, value:product.imageText || "", source:"Product Center" });
-          toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
+          if (window.__luminaPendingProductBuys && window.__luminaPendingProductBuys[product.id] && window.__luminaPendingProductBuys[product.id].clientOrderId === tempOrderId) delete window.__luminaPendingProductBuys[product.id];
           pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
         }

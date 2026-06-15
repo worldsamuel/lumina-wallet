@@ -507,13 +507,17 @@ export async function purchasePointsProduct(input: { address: string; productId:
     latestOrders = await readStoredOrders();
     const latestExisting = latestOrders.find((item) => item.id === clientOrderId && item.address === address && item.productId === product.id);
     if (latestExisting) return { order: latestExisting, product: toPublicProduct(product) };
+    if (limit > 0) {
+      const latestPurchased = latestOrders.filter((order) => order.address === address && order.productId === product.id).length;
+      if (latestPurchased >= limit) throw new Error("Purchase limit reached.");
+    }
   }
   latestOrders = [order, ...latestOrders.filter((item) => item.id !== order.id)];
   products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
-  await writeStoredOrders(latestOrders);
-  writeStoredPublicProducts(products).catch((error) => {
-    console.error("[points-products] failed to update product stock after purchase", error);
-  });
+  await Promise.all([
+    writeStoredOrders(latestOrders),
+    writeStoredPublicProducts(products),
+  ]);
   return { order, product: toPublicProduct(products[productIndex]) };
 }
 
