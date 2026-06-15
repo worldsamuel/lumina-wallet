@@ -4133,7 +4133,8 @@ function enhancePrototypeSwapQuote() {
               fromSymbol: swapState.sell,
               toSymbol: swapState.buy,
               fromAmount: amount,
-              slippageBps: slippageBps()
+              slippageBps: slippageBps(),
+              userAddress: window.__luminaUserAddress || undefined
             })
           });
           var data = await res.json();

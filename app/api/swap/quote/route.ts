@@ -9,6 +9,7 @@ import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 import type { SwapQuoteResult, SwapQuoteSet } from "@/lib/swap/quote-types";
 import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import type { SwapToken } from "@/lib/swap/tokens";
+import { quoteBestUniswapApi } from "@/lib/swap/uniswap-api";
 import { quoteBestV3 } from "@/lib/swap/v3-quoter";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
 import { applySwapOutputFee, getSwapPlatformFeeConfig } from "@/lib/swap/platform-fee";
@@ -26,6 +27,7 @@ type QuoteBody = {
   toToken?: string;
   fromAmount?: string;
   slippageBps?: number;
+  userAddress?: string;
 };
 
 type SourceQuote = {
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
     parsed.to.address.toLowerCase(),
     amountIn.toString(),
     parsed.slippageBps,
+    parsed.userAddress?.toLowerCase() ?? "no-user",
     platformFeeConfig?.bps ?? 0,
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ? "hs-exec" : "no-hs-exec",
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true" ? "hs-ref" : "no-hs-ref",
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest) {
           return null;
       })
       : Promise.resolve(null),
-    buildV3QuoteWithRetry(parsed.from, parsed.to, amountIn),
+    buildPrimaryUniswapQuote(parsed.from, parsed.to, amountIn, parsed.slippageBps, parsed.userAddress),
     hasCommunityToken || !enableV4Reference
       ? Promise.resolve(null)
       : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 2_500)
@@ -232,6 +235,33 @@ function withStaleQuote(data: unknown) {
   };
 }
 
+async function buildPrimaryUniswapQuote(
+  from: SwapToken,
+  to: SwapToken,
+  amountIn: bigint,
+  slippageBps: number,
+  userAddress: string | null,
+): Promise<SourceQuote | null> {
+  try {
+    const quote = await withTimeout(
+      quoteBestUniswapApi({
+        fromToken: from,
+        toToken: to,
+        amountIn,
+        slippageBps,
+        swapper: userAddress as `0x${string}` | null,
+      }),
+      2_500,
+    );
+    if (quote.bestQuote && Number(quote.bestQuote.amountOut) > 0) {
+      return { source: "uniswap-v3", ...quote };
+    }
+  } catch (error) {
+    console.warn("[SWAP] Uniswap API quote failed", error);
+  }
+  return buildV3QuoteWithRetry(from, to, amountIn);
+}
+
 async function buildV3QuoteWithRetry(from: SwapToken, to: SwapToken, amountIn: bigint): Promise<SourceQuote | null> {
   const attempts = [3_500, 3_000];
   for (let index = 0; index < attempts.length; index += 1) {
@@ -306,6 +336,7 @@ async function parseQuoteBody(body: QuoteBody | null) {
       to,
       amountText,
       slippageBps: Number.isFinite(slippageBps) && slippageBps > 0 ? Math.min(Math.round(slippageBps), 1_000) : 50,
+      userAddress: typeof body?.userAddress === "string" && /^0x[a-fA-F0-9]{40}$/.test(body.userAddress) ? body.userAddress : null,
     };
   } catch {
     return { error: "Invalid token amount." };
