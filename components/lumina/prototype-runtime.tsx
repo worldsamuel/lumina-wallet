@@ -1326,7 +1326,7 @@ function enhancePrototypeEarn() {
       }
       function positionAmount(pos){
         if (!pos) return 0;
-        var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted, pos.sharesFormatted].map(function(value){
+        var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted].map(function(value){
           var n = Number(String(value || "0").replace(/,/g, ""));
           return Number.isFinite(n) ? n : 0;
         });
@@ -1355,6 +1355,13 @@ function enhancePrototypeEarn() {
       window.__luminaRenderEarnHero = updateEarnHero;
       function nonZeroPosition(pos){
         return !!pos && (String(pos.assets || pos.maxWithdraw || pos.shares || "0") !== "0" || positionAmount(pos) > 0);
+      }
+      function walletBalanceForVault(vault, pos){
+        var direct = Number(pos && String(pos.walletBalanceFormatted || "0").replace(/,/g, ""));
+        if (Number.isFinite(direct) && direct > 0) return direct;
+        var symbol = vault && vault.asset && vault.asset.symbol ? String(vault.asset.symbol).toUpperCase() : "";
+        var fromBalances = Number(String((balances && symbol && balances[symbol]) || "0").replace(/,/g, ""));
+        return Number.isFinite(fromBalances) ? fromBalances : 0;
       }
       function earnSnapshotKey(){
         var address = String(window.__luminaUserAddress || "").toLowerCase();
@@ -1550,7 +1557,7 @@ function enhancePrototypeEarn() {
         }
         var cfg = systemConfig();
         var paused = !!vault.depositsPaused || cfg.morphoDepositEnabled === false;
-        var wallet = pos ? fmtAmount(pos.walletBalanceFormatted, 6) + " " + token : "—";
+        var wallet = fmtAmount(walletBalanceForVault(vault, pos), 6) + " " + token;
         console.log("[EARN] Detail vault:", vault);
         console.log("[EARN] Detail position:", pos);
         console.log("[EARN] My deposit assets:", pos ? pos.assets : "0");
@@ -1640,7 +1647,7 @@ function enhancePrototypeEarn() {
         var pos = vault ? positionFor(vault) : null;
         if (!vault || !Number.isFinite(n) || n <= 0) return toast("Enter an amount");
         if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
-        if (pos && Number(pos.walletBalanceFormatted || 0) < n) return toast("Insufficient " + vault.asset.symbol + " balance");
+        if (walletBalanceForVault(vault, pos) < n) return toast("Insufficient " + vault.asset.symbol + " balance");
         var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
         var confirmed = await confirmMorphoDeposit("You are depositing " + amount + " " + vault.asset.symbol + " into " + vault.displayName + " Vault. Current APY " + apy + ".");
         if (!confirmed) return;
