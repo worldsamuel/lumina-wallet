@@ -1419,9 +1419,9 @@ function enhancePrototypeEarn() {
         var existing = document.getElementById("homeEarningSection");
         var positions = earnPositions();
         if (!positions.length) {
+          if (hydrateEarnPositionsFromSnapshot()) return renderHomeEarningPositions();
           if (morphoLoading || morphoError) {
             if (existing) return;
-            if (hydrateEarnPositionsFromSnapshot()) return renderHomeEarningPositions();
             return;
           }
           if (existing) existing.remove();
@@ -1822,7 +1822,17 @@ function enhancePrototypeEarn() {
         var res = await fetch("/api/morpho/position/" + address, { cache: "no-store" });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
-        morphoPositions = Array.isArray(data.positions) ? data.positions : [];
+        var nextPositions = Array.isArray(data.positions) ? data.positions : [];
+        if (!nextPositions.some(nonZeroPosition)) {
+          var hadLivePositions = earnPositions().length > 0;
+          var restoredSnapshot = hydrateEarnPositionsFromSnapshot();
+          if (hadLivePositions || restoredSnapshot) {
+            updateHomeEarnTotal();
+            console.log("[EARN] Empty position response ignored for address:", address);
+            return;
+          }
+        }
+        morphoPositions = nextPositions;
         writeEarnSnapshot(morphoPositions);
         updateHomeEarnTotal();
         console.log("[EARN] Positions address:", address);
@@ -5527,7 +5537,17 @@ function enhancePrototypeMe() {
           .catch(function(){});
         fetch("/api/activity?address=" + encodeURIComponent(address) + "&fast=1&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){ setValue(pointsFromActivity(Array.isArray(rows) ? rows : [])); })
+          .then(function(rows){
+            rows = Array.isArray(rows) ? rows : [];
+            var nextBasePoints = pointsFromActivity(rows);
+            var hasPointRecords = Array.isArray(window.__luminaPointRecords) && window.__luminaPointRecords.length > 0;
+            var currentBasePoints = Math.max(0, Math.floor(Number(window.__luminaActivityPoints || basePoints || storedActivityPoints() || 0)));
+            if (!hasPointRecords && nextBasePoints <= 0 && currentBasePoints > 0) {
+              setValue();
+              return;
+            }
+            setValue(nextBasePoints);
+          })
           .catch(function(){});
       }
       function updateFeedbackCopy(){
