@@ -5815,6 +5815,11 @@ function enhancePrototypeMe() {
           var activeButton = modal.querySelector("[data-points-cat].sel");
           return activeButton && activeButton.getAttribute ? activeButton.getAttribute("data-points-cat") || "all" : "all";
         }
+        function renderCurrentPointsView(){
+          if (window.__luminaPointsCurrentView === "tasks") return renderTaskPage();
+          if (selectedProductId) return renderProductDetail(selectedProductId);
+          return renderShop();
+        }
         async function reloadPublicPointsProducts(renderAfter){
           if (productsFetchInFlight) return products;
           productsFetchInFlight = true;
@@ -5975,7 +5980,7 @@ function enhancePrototypeMe() {
           var busyKey = "task:" + id;
           if (pointsActionBusy(busyKey)) return;
           pointsActionBusy(busyKey, true);
-          if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
+          renderCurrentPointsView();
           try {
             var res = await fetch("/api/points-task/complete", {
               method: "POST",
@@ -5993,7 +5998,7 @@ function enhancePrototypeMe() {
             if (!silent) toast(e && e.message ? e.message : "Task is not complete yet.");
           }
           pointsActionBusy(busyKey, false);
-          if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
+          renderCurrentPointsView();
         }
         async function completeCheckin(){
           if (checkinDone()) return;
@@ -6028,7 +6033,7 @@ function enhancePrototypeMe() {
           var url = String(task.actionUrl || "");
           if (url === "/swap") { modal.remove(); go("swap"); setTabByName("Swap"); return; }
           if (url === "/earn") { modal.remove(); go("earn"); setTabByName("Earn"); return; }
-          if (id === "open-mystery-box") { renderShop(); return; }
+          if (id === "open-mystery-box") { renderCurrentPointsView(); return; }
           if ((id === "share-friends" || id === "invite-friend") && navigator.share) {
             navigator.share({ title:"Lumina", text:"Join Lumina on World App", url:location.origin }).catch(function(){});
           }
@@ -6432,7 +6437,7 @@ function enhancePrototypeMe() {
             if (profileRes.ok && profileData) {
               window.__luminaPointsProfile = profileData;
               refreshPoints();
-              if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
+              renderCurrentPointsView();
             }
           }
           await reloadPublicPointsProducts(true);
@@ -6440,7 +6445,7 @@ function enhancePrototypeMe() {
         try {
           if (window.__luminaUserAddress) {
             await reloadPointsOrders();
-            if (window.__luminaPointsCurrentView === "tasks") renderTaskPage(); else renderShop();
+            renderCurrentPointsView();
           }
         } catch(e) {}
       };
