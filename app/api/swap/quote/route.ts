@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
   }
 
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
-  const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
+  const reliableImpactReference = false;
   const enableHoldstationReference =
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ||
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true";
@@ -160,11 +160,13 @@ export async function POST(req: NextRequest) {
     hasCommunityToken || !reliableImpactReference
       ? await estimateRoundTripLossPercent(parsed.from, parsed.to, amountIn, netAmountOut)
       : null;
-  const deviationValues = reliableImpactReference
+  const quoteMeta = main.quote as SwapQuoteResult;
+  const apiPriceImpactPercent = typeof quoteMeta.priceImpactPercent === "number" ? quoteMeta.priceImpactPercent : null;
+  const deviationValues = reliableImpactReference && apiPriceImpactPercent === null
     ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
     : [];
   const closestDeviation = deviationValues.length ? Math.min(...deviationValues) : 0;
-  const priceImpactPercent = reliableImpactReference && deviationValues.length ? closestDeviation : null;
+  const priceImpactPercent = apiPriceImpactPercent !== null ? apiPriceImpactPercent / 100 : reliableImpactReference && deviationValues.length ? closestDeviation : null;
   const warnings: string[] = [];
   if (priceImpactPercent !== null && closestDeviation > 0.05) warnings.push("price_anomaly");
   if (priceImpactPercent !== null && priceImpactPercent > 0.1) warnings.push("low_liquidity");
@@ -186,7 +188,7 @@ export async function POST(req: NextRequest) {
     priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
     priceImpactAvailable: priceImpactPercent !== null,
     roundTripLossPercent: roundTripLossPercent === null ? null : Number((roundTripLossPercent * 100).toFixed(4)),
-    gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
+    gasEstimateUsd: typeof quoteMeta.gasEstimateUsd === "number" ? quoteMeta.gasEstimateUsd : gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
     feeTier: main.quote.fee,
     route: main.quote.route,
     tx: main.source === "holdstation" ? main.tx : undefined,

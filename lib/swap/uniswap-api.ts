@@ -94,6 +94,9 @@ function parseClassicRoute(data: UniswapApiQuoteResponse, outDecimals: number): 
     amountOut: formatUnits(BigInt(amountOutRaw), outDecimals),
     amountOutRaw,
     gasEstimate: quote?.gasUseEstimate ?? "0",
+    gasEstimateUsd: Number(quote?.gasFeeUSD ?? 0) || null,
+    priceImpactPercent: typeof quote?.priceImpact === "number" ? quote.priceImpact : null,
+    provider: "uniswap-api",
     fee: fees[0],
     route: {
       tokens,

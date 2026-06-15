@@ -8,6 +8,9 @@ export type SwapQuoteResult = {
   };
   sqrtPriceX96After?: string;
   gasEstimate: string;
+  provider?: "uniswap-api" | "local";
+  priceImpactPercent?: number | null;
+  gasEstimateUsd?: number | null;
 };
 
 export type SwapQuoteAttempt =
