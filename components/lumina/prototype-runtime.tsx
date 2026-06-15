@@ -1308,47 +1308,10 @@ function enhancePrototypeEarn() {
       function systemConfig(){
         try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
       }
-      function amountFromAssetText(value){
-        var match = String(value || "").replace(/,/g, "").match(/([0-9]+(?:\\.[0-9]+)?)/);
-        var n = match ? Number(match[1]) : 0;
-        return Number.isFinite(n) ? n : 0;
-      }
-      function vaultShareAssetFor(vault){
-        var assetSymbol = vault && vault.asset && vault.asset.symbol ? String(vault.asset.symbol).toUpperCase() : "";
-        var vaultAddress = vault && vault.address ? String(vault.address).toLowerCase() : "";
-        if (!Array.isArray(assets) || !assetSymbol) return null;
-        return assets.find(function(asset){
-          var sym = String(asset && asset.sym || "").toUpperCase();
-          var addr = String(asset && asset.address || "").toLowerCase();
-          if (vaultAddress && addr && addr === vaultAddress) return amountFromAssetText(asset.amt) > 0;
-          return sym.indexOf("RE7") === 0 && sym.indexOf(assetSymbol) >= 0 && amountFromAssetText(asset.amt) > 0;
-        }) || null;
-      }
-      function syntheticPositionFor(vault){
-        var shareAsset = vaultShareAssetFor(vault);
-        if (!shareAsset) return null;
-        var amount = amountFromAssetText(shareAsset.amt);
-        if (!(amount > 0)) return null;
-        return {
-          vaultAddress: vault.address,
-          displayName: vault.displayName,
-          asset: vault.asset,
-          shares: "1",
-          sharesFormatted: String(amount),
-          assets: "0",
-          assetsFormatted: "0",
-          maxWithdraw: "0",
-          maxWithdrawFormatted: "0",
-          walletBalanceFormatted: "0",
-          syntheticShare: true,
-          displayAmountFormatted: String(amount),
-          displaySymbol: String(shareAsset.sym || vault.asset.symbol).toUpperCase()
-        };
-      }
       function positionFor(vault){
         return morphoPositions.find(function(p){
           return String(p.vaultAddress).toLowerCase() === String(vault.address).toLowerCase();
-        }) || syntheticPositionFor(vault);
+        }) || null;
       }
       function vaultIcon(vault){
         if (vault && vault.imageUrl) return '<img src="' + escapeHtml(vault.imageUrl) + '" alt="">';
@@ -1363,7 +1326,6 @@ function enhancePrototypeEarn() {
       }
       function positionAmount(pos){
         if (!pos) return 0;
-        if (pos.syntheticShare) return 0;
         var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted].map(function(value){
           var n = Number(String(value || "0").replace(/,/g, ""));
           return Number.isFinite(n) ? n : 0;
@@ -1371,28 +1333,22 @@ function enhancePrototypeEarn() {
         return Math.max.apply(Math, candidates);
       }
       function positionAmountText(pos, digits){
-        if (pos && pos.syntheticShare) return fmtAmount(pos.displayAmountFormatted, digits || 6);
         var amount = positionAmount(pos);
         return fmtAmount(amount, digits || 6);
       }
+      function positionShareAmount(pos, digits){
+        var amount = Number(String(pos && pos.sharesFormatted || "0").replace(/,/g, ""));
+        return fmtAmount(Number.isFinite(amount) ? amount : 0, digits || 6);
+      }
       function positionDisplaySymbol(pos, fallback){
-        return (pos && pos.syntheticShare && pos.displaySymbol) ? pos.displaySymbol : fallback;
+        return (pos && pos.shareSymbol) ? String(pos.shareSymbol).toUpperCase() : fallback;
+      }
+      function positionDisplayAmount(pos, digits){
+        if (Number(String(pos && pos.shares || "0")) > 0) return positionShareAmount(pos, digits || 6);
+        return positionAmountText(pos, digits || 6);
       }
       function earnPositions(){
-        var byVault = {};
-        var rows = [];
-        (morphoPositions || []).filter(nonZeroPosition).forEach(function(pos){
-          var key = String(pos.vaultAddress || "").toLowerCase();
-          byVault[key] = true;
-          rows.push(pos);
-        });
-        (morphoVaults || []).forEach(function(vault){
-          var key = String(vault.address || "").toLowerCase();
-          if (byVault[key]) return;
-          var synthetic = syntheticPositionFor(vault);
-          if (synthetic && nonZeroPosition(synthetic)) rows.push(synthetic);
-        });
-        return rows;
+        return (morphoPositions || []).filter(nonZeroPosition);
       }
       function updateEarnHero(){
         var zh = (window.currentLang || "en") === "zh-CN";
@@ -1412,7 +1368,7 @@ function enhancePrototypeEarn() {
       }
       window.__luminaRenderEarnHero = updateEarnHero;
       function nonZeroPosition(pos){
-        return !!pos && (pos.syntheticShare || String(pos.assets || pos.maxWithdraw || pos.shares || "0") !== "0" || positionAmount(pos) > 0);
+        return !!pos && (String(pos.assets || pos.maxWithdraw || pos.shares || "0") !== "0" || positionAmount(pos) > 0);
       }
       function walletBalanceForVault(vault, pos){
         var direct = Number(pos && String(pos.walletBalanceFormatted || "0").replace(/,/g, ""));
@@ -1487,9 +1443,9 @@ function enhancePrototypeEarn() {
             return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
           }) || pos;
           var sym = pos.asset && pos.asset.symbol ? pos.asset.symbol : (vault.asset && vault.asset.symbol) || "";
-          var amount = positionAmountText(pos, 6);
+          var amount = positionDisplayAmount(pos, 6);
           var displaySym = positionDisplaySymbol(pos, sym);
-          var price = pos.syntheticShare ? 0 : (typeof prices !== "undefined" ? Number(prices[sym] || 0) : 0);
+          var price = typeof prices !== "undefined" ? Number(prices[sym] || 0) : 0;
           var usd = price ? " ≈ " + formatMoney(positionAmount(pos) * price) : "";
           var apy = vault.liveData ? " · " + fmtPct(vault.liveData.netApy) + " APY" : "";
           var idx = morphoVaults.findIndex(function(v){
@@ -1520,7 +1476,7 @@ function enhancePrototypeEarn() {
         }
         box.innerHTML = morphoVaults.map(function(vault, i){
           var pos = positionFor(vault);
-          var deposited = pos ? positionAmountText(pos, 6) + " " + positionDisplaySymbol(pos, vault.asset.symbol) : "—";
+          var deposited = pos ? positionDisplayAmount(pos, 6) + " " + positionDisplaySymbol(pos, vault.asset.symbol) : "—";
           var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
           return '<div class="prod" onclick="openEarn(' + i + ')">' +
             '<div class="top">' +
@@ -1588,7 +1544,7 @@ function enhancePrototypeEarn() {
       function renderEarnDetail(vault){
         var token = vault.asset.symbol;
         var pos = positionFor(vault);
-        var deposited = pos ? positionAmountText(pos, 6) + " " + positionDisplaySymbol(pos, token) : "—";
+        var deposited = pos ? positionDisplayAmount(pos, 6) + " " + positionDisplaySymbol(pos, token) : "—";
         var copy = {
           deposited: "Deposited ",
           amount: "Amount",
@@ -1757,7 +1713,7 @@ function enhancePrototypeEarn() {
         mask.className = "modal-mask open morpho-withdraw-modal";
         mask.id = "morphoWithdrawMask";
         var available = fmtAmount(pos.maxWithdrawFormatted, 6);
-        var deposited = positionAmountText(pos, 6);
+        var deposited = positionDisplayAmount(pos, 6);
         var depositedSymbol = positionDisplaySymbol(pos, vault.asset.symbol);
         mask.innerHTML =
           '<div class="modal">' +
