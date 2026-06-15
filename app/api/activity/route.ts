@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, parseAbi, parseAbiItem, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getStoredActivities, recordActivity } from "@/lib/admin/activity-store";
+import { getStoredActivitiesForAddress, recordActivity } from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
 import { VERIFIED_SWAP_TOKENS } from "@/lib/swap/tokens";
@@ -398,10 +398,9 @@ export async function GET(req: NextRequest) {
   const address = url.searchParams.get("address") ?? "";
   const fast = url.searchParams.get("fast") === "1";
   if (!isAddress(address)) return activityResponse([]);
-  const storedRows = await getStoredActivities(80)
+  const storedRows = await getStoredActivitiesForAddress(address, 120)
     .then((rows) =>
       rows
-        .filter((row) => !row.address || row.address.toLowerCase() === address.toLowerCase())
         .map((row) => ({
           hash: row.hash,
           type: row.type === "swap" ? "swap" : row.type === "send" ? "out" : "in",

@@ -66,6 +66,19 @@ export async function getStoredActivities(limit = 120) {
   return rows;
 }
 
+export async function getStoredActivitiesForAddress(address: string, limit = 120) {
+  await ensureActivityLogTable();
+  const lower = address.toLowerCase();
+  const rows = await db.$queryRaw<ActivityDbRow[]>`
+    SELECT "id", "type", "address", "amount", "hash", "status", "metadata", "createdAt"
+    FROM "ActivityLog"
+    WHERE LOWER(COALESCE("address", '')) = ${lower}
+    ORDER BY "createdAt" DESC
+    LIMIT ${limit}
+  `;
+  return rows;
+}
+
 export async function countStoredActivities(since?: Date) {
   await ensureActivityLogTable();
   const rows = since

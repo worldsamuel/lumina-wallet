@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   const address = String(req.nextUrl.searchParams.get("address") || "").toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) {
     return jsonResponse({ luminaNo: null, adjustmentTotal: 0, adjustments: [] }, {
-      headers: { "Cache-Control": "private, max-age=60" },
+      headers: { "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate" },
     });
   }
 
@@ -25,6 +25,6 @@ export async function GET(req: NextRequest) {
       adjustmentTotal,
       adjustments: adjustments.slice(0, 30),
     },
-    { headers: { "Cache-Control": "private, max-age=60" } },
+    { headers: { "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate" } },
   );
 }
