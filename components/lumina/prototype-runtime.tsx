@@ -5525,6 +5525,8 @@ function enhancePrototypeMe() {
           if (center) center.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           var shopBadge = document.getElementById("pointsShopBalance");
           if (shopBadge) shopBadge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
+          var homeBanner = document.getElementById("homePointsBannerValue");
+          if (homeBanner) homeBanner.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           var vipNo = document.getElementById("pointsVipNo");
           if (vipNo) vipNo.textContent = (window.__luminaPointsProfile && window.__luminaPointsProfile.luminaNo) ? ("Lumina No." + window.__luminaPointsProfile.luminaNo) : "Lumina VIP";
         }
