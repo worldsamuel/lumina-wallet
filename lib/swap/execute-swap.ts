@@ -222,7 +222,8 @@ async function submitBuiltSwap(
   const executableAmount = BigInt(executableQuote.amountInRaw ?? fromAmount.toString());
   const expectedOut = BigInt(executableQuote.amountOutRaw);
   const permit2Spender = built.permit2Spender ?? UNIVERSAL_ROUTER_ADDRESS;
-  const permit2Expiration = built.deadline ?? Math.floor(Date.now() / 1000) + 30 * 60;
+  // World App expects Permit2 approve expiration to be 0 in MiniKit transaction batches.
+  const permit2Expiration = 0;
   const permit2Param = {
     permitted: {
       token: quote.tokens.from.address,
