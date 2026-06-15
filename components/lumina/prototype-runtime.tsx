@@ -3695,6 +3695,7 @@ function enhancePrototypeSwapQuote() {
 	      var quoteTimer = null;
 	      var quoteSeq = 0;
 	      var latestSwapQuote = null;
+	      var latestQuoteKey = "";
 	      var latestQuoteAt = 0;
 	      var activeQuotePromise = null;
 	      var quoteCountdownTimer = null;
@@ -3978,6 +3979,18 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        var sell = document.getElementById("sellAmt");
 	        var amount = sell ? Number(String(sell.value || "").replace(/,/g, "")) : 0;
+	        if (!Number.isFinite(amount) || amount <= 0) {
+	          setSwapButtonState(swapCopy("confirmSwap"), true);
+	          return;
+	        }
+	        if (!quoteMatchesCurrent()) {
+	          setSwapButtonState(swapCopy("confirmSwap"), true);
+	          return;
+	        }
+	        if (latestSwapQuote && (latestSwapQuote.blocked || latestSwapQuote.stale)) {
+	          setSwapButtonState(swapCopy("confirmSwap"), true);
+	          return;
+	        }
 	        var price = tokenMeta(swapState.sell, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
 	        if (Number.isFinite(amount) && amount > 0 && Number.isFinite(Number(price)) && amount * Number(price) > swapMaxUsd) {
 	          setSwapButtonState(swapCopy("limit") + " $" + swapMaxUsd, true);
@@ -3988,6 +4001,21 @@ function enhancePrototypeSwapQuote() {
       function tokenInputForQuote(symbol){
         var meta = customTokens && customTokens[symbol] ? customTokens[symbol] : null;
         return meta && meta.address ? meta.address : symbol;
+      }
+      function normalizedQuoteAmount(value){
+        var n = Number(String(value == null ? "" : value).replace(/,/g, "").trim());
+        return Number.isFinite(n) && n > 0 ? n.toString() : "";
+      }
+      function currentQuoteKey(amount){
+        return [
+          String(tokenInputForQuote(swapState.sell) || "").toLowerCase(),
+          String(tokenInputForQuote(swapState.buy) || "").toLowerCase(),
+          normalizedQuoteAmount(amount == null ? (document.getElementById("sellAmt") || {}).value : amount),
+          String(slippageBps())
+        ].join("|");
+      }
+      function quoteMatchesCurrent(){
+        return !!(latestSwapQuote && latestQuoteKey && latestQuoteKey === currentQuoteKey());
       }
       function tokenLogoForSwap(symbol){
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : symbol);
@@ -4005,6 +4033,7 @@ function enhancePrototypeSwapQuote() {
 	        ensureQuoteBox();
 	        if (clearQuote !== false) {
 	          latestSwapQuote = null;
+	          latestQuoteKey = "";
 	          latestQuoteAt = 0;
 	        }
         var buy = document.getElementById("buyAmt");
@@ -4045,6 +4074,7 @@ function enhancePrototypeSwapQuote() {
 	      function applyQuote(data){
 	        ensureQuoteBox();
 	        latestSwapQuote = data;
+	        latestQuoteKey = data && data.__quoteKey ? data.__quoteKey : currentQuoteKey();
 	        latestQuoteAt = Date.now();
 	        highImpactAcknowledged = false;
 	        var buy = document.getElementById("buyAmt");
@@ -4079,6 +4109,12 @@ function enhancePrototypeSwapQuote() {
           return;
         }
         var seq = ++quoteSeq;
+        var requestedQuoteKey = currentQuoteKey(amount);
+        if (latestSwapQuote && latestQuoteKey !== requestedQuoteKey) {
+          latestSwapQuote = null;
+          latestQuoteKey = "";
+          latestQuoteAt = 0;
+        }
         setSwapDebug("quote:request", {
           fromToken: tokenInputForQuote(swapState.sell),
           toToken: tokenInputForQuote(swapState.buy),
@@ -4103,6 +4139,7 @@ function enhancePrototypeSwapQuote() {
           var data = await res.json();
           if (seq !== quoteSeq) return;
           if (!res.ok) throw new Error(data.error || "No quote");
+          data.__quoteKey = requestedQuoteKey;
           applyQuote(data);
           setSwapDebug("quote:success", data);
           return data;
@@ -4115,7 +4152,9 @@ function enhancePrototypeSwapQuote() {
           var msg = e && e.message ? e.message : "Quote failed";
           if (/No Uniswap|No quote|not supported|Cannot resolve|No executable/i.test(msg)) msg = swapCopy("noRoute");
           setSwapDebug("quote:error", readableSwapError(e));
-          if (latestSwapQuote) {
+          if (latestSwapQuote && latestQuoteKey === requestedQuoteKey) {
+            var retainedQuote = latestSwapQuote;
+            applyQuote(retainedQuote);
             var warn = document.getElementById("quoteWarning");
             if (warn) {
               warn.textContent = msg;
@@ -4411,6 +4450,9 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        if (slip <= 0) return { ok:false, error:swapCopy("slippageTooLow") };
 	        if (!latestSwapQuote) return { ok:false, error:swapCopy("quoteFirst") };
+	        if (!quoteMatchesCurrent()) return { ok:false, error:"报价已变化，请等待最新报价。" };
+	        if (quoteAgeSeconds() > SWAP_QUOTE_REFRESH_SECONDS) return { ok:false, error:swapCopy("refreshQuoteShort") };
+	        if (latestSwapQuote.blocked || latestSwapQuote.stale) return { ok:false, error:latestSwapQuote.blockReason || "当前报价不稳定，请重新获取报价。" };
 	        if (latestSwapQuote.source !== "uniswap-v3") return { ok:false, error:"当前交易对暂无可执行路由。" };
 	        if (amountUsd !== null && amountUsd > swapMaxUsd) return { ok:false, error:swapCopy("limit") + " $" + swapMaxUsd + ". " + swapCopy("reduceAmount") };
 	        var riskText = swapRiskText();

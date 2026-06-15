@@ -153,6 +153,10 @@ export async function POST(req: NextRequest) {
   const amountOut = formatUnits(netAmountOut, parsed.to.decimals);
   const amountOutNumber = Number(amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
+  const roundTripLossPercent =
+    hasCommunityToken || !reliableImpactReference
+      ? await estimateRoundTripLossPercent(parsed.from, parsed.to, amountIn, netAmountOut)
+      : null;
   const deviationValues = reliableImpactReference
     ? [deviation(quoteRate, chainlinkRate), deviation(quoteRate, coingeckoRate)].filter((value): value is number => value !== null)
     : [];
@@ -161,6 +165,9 @@ export async function POST(req: NextRequest) {
   const warnings: string[] = [];
   if (priceImpactPercent !== null && closestDeviation > 0.05) warnings.push("price_anomaly");
   if (priceImpactPercent !== null && priceImpactPercent > 0.1) warnings.push("low_liquidity");
+  if (roundTripLossPercent !== null && roundTripLossPercent > 0.15) warnings.push("low_liquidity");
+  const blocked = Boolean(roundTripLossPercent !== null && roundTripLossPercent > 0.15);
+  const blockReason = blocked ? "Pool liquidity is too thin. This swap may lose more than 15%." : undefined;
 
   const payload = {
     source: main.source,
@@ -175,6 +182,7 @@ export async function POST(req: NextRequest) {
     priceImpactPercent: priceImpactPercent === null ? null : Number((priceImpactPercent * 100).toFixed(4)),
     priceImpactLevel: priceImpactPercent === null ? "unknown" : impactLevel(priceImpactPercent * 100),
     priceImpactAvailable: priceImpactPercent !== null,
+    roundTripLossPercent: roundTripLossPercent === null ? null : Number((roundTripLossPercent * 100).toFixed(4)),
     gasEstimateUsd: gasUsd(main.quote.gasEstimate, gasPrice, chainlink?.ETH),
     feeTier: main.quote.fee,
     route: main.quote.route,
@@ -187,8 +195,8 @@ export async function POST(req: NextRequest) {
     },
     references: buildReferences(parsed.from, parsed.to, amountInNumber, holdstation, v3, v4, chainlink, coingecko, main.source),
     warnings,
-    blocked: false,
-    blockReason: undefined,
+    blocked,
+    blockReason,
   };
   quoteCache.set(cacheKey, {
     data: payload,
@@ -238,6 +246,21 @@ async function buildV3QuoteWithRetry(from: SwapToken, to: SwapToken, amountIn: b
     if (index < attempts.length - 1) await sleep(120);
   }
   return null;
+}
+
+async function estimateRoundTripLossPercent(from: SwapToken, to: SwapToken, amountIn: bigint, amountOut: bigint) {
+  if (amountIn <= 0n || amountOut <= 0n) return null;
+  try {
+    const reverse = await withTimeout(quoteBestV3(to, from, amountOut), 2_500);
+    const reverseOutRaw = reverse.bestQuote?.amountOutRaw;
+    if (!reverseOutRaw) return null;
+    const reverseOut = BigInt(reverseOutRaw);
+    if (reverseOut >= amountIn) return 0;
+    const lossBps = Number(((amountIn - reverseOut) * 10_000n) / amountIn);
+    return lossBps / 10_000;
+  } catch {
+    return null;
+  }
 }
 
 async function readQuoteFileCache(cacheKey: string): Promise<QuoteCacheEntry | null> {
