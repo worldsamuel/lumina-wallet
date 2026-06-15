@@ -4946,6 +4946,24 @@ function enhancePrototypeActivity() {
           return addr.slice(0, 6) + "..." + addr.slice(-4);
         });
       }
+      function formatActivityNumber(value){
+        var number = Number(String(value || "").replace(/,/g, ""));
+        if (!Number.isFinite(number)) return String(value || "");
+        var sign = number < 0 ? "-" : "";
+        var abs = Math.abs(number);
+        if (abs > 0 && abs < 0.001) return sign + "<0.001";
+        return sign + abs.toLocaleString("en-US", { useGrouping:false, minimumFractionDigits:3, maximumFractionDigits:3 });
+      }
+      function formatActivityTokenText(value){
+        return String(value || "").replace(/([+-]?\\d+(?:\\.\\d+)?)\\s*([A-Za-z][A-Za-z0-9]{0,15})\\b/g, function(_all, amount, symbol){
+          return formatActivityNumber(amount) + " " + String(symbol || "").toUpperCase();
+        });
+      }
+      function formatActivityTitle(value){
+        var text = String(value || "");
+        if (/^Swap\\s+/i.test(text)) text = text.replace(/^Swap\\s+/i, "");
+        return formatActivityTokenText(text);
+      }
       function activityTime(item){
         var raw = item && (item.createdAt || item.time || item.timestamp);
         if (!raw) return "";
@@ -5070,10 +5088,12 @@ function enhancePrototypeActivity() {
         var canOpen = a.hash && String(a.hash).indexOf("pending-") !== 0;
         var when = activityTime(a);
         var subtitle = shortActivityAddress(activitySubtitle(a.subtitle));
+        var title = a.type === "swap" ? formatActivityTitle(a.title) : a.title;
+        var amount = formatActivityTokenText(a.amount);
         return '<div class="act-item" onclick="' + (canOpen ? 'openExplorer(\\'' + a.hash + '\\')' : 'toast(\\'' + activityCopy("pendingToast") + '\\')') + '" style="cursor:pointer;">' +
           '<div class="act-ic ' + a.type + '">' + actIcon(a.type) + '</div>' +
-          '<div class="act-mid"><div class="t">' + a.title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s"><span>' + subtitle + '</span>' + (when ? '<span class="act-time">' + when + '</span>' : '') + '</div></div>' +
-          '<div class="act-amt"><div class="v' + plus + '">' + a.amount + '</div><div class="st">' + activityStatus(a.status) + '</div></div>' +
+          '<div class="act-mid"><div class="t">' + title + (canOpen ? ' <span style="color:var(--text-mute);font-size:11px;">↗</span>' : '') + '</div><div class="s"><span>' + subtitle + '</span>' + (when ? '<span class="act-time">' + when + '</span>' : '') + '</div></div>' +
+          '<div class="act-amt"><div class="v' + plus + '">' + amount + '</div><div class="st">' + activityStatus(a.status) + '</div></div>' +
         '</div>';
       }
       renderActivity = function(){
@@ -5092,7 +5112,7 @@ function enhancePrototypeActivity() {
           renderActivity();
           return;
         }
-        fetch("/api/activity?address=" + encodeURIComponent(address) + "&fast=1&t=" + Date.now(), { cache: "no-store" })
+        fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });

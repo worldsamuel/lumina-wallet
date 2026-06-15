@@ -11,8 +11,6 @@ const transferEvent = parseAbiItem("event Transfer(address indexed from, address
 const erc20MetaAbi = parseAbi(["function symbol() view returns (string)", "function decimals() view returns (uint8)"]);
 const tokenMetaCache = new Map<string, { symbol: string; decimals: number }>();
 const blockTimeCache = new Map<string, string>();
-const activityCache = new Map<string, { expiresAt: number; data: unknown }>();
-const ACTIVITY_CACHE_TTL_MS = 5_000;
 const activityLookbackBlocks = 1_000_000n;
 const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
@@ -79,7 +77,7 @@ function activityResponse(data: unknown, init?: ResponseInit) {
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      "Cache-Control": "private, max-age=8, stale-while-revalidate=12",
+      "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
     },
   });
 }
@@ -90,6 +88,8 @@ function shortAddress(address: string) {
 
 function formatTokenAmount(value: bigint, decimals: number) {
   const raw = formatUnits(value, decimals);
+  const parsed = Number(raw);
+  if (Number.isFinite(parsed)) return formatTransferNumber(parsed);
   const [whole, fraction = ""] = raw.split(".");
   const trimmed = fraction.slice(0, 3).replace(/0+$/, "");
   return trimmed ? `${whole}.${trimmed}` : whole;
@@ -98,8 +98,11 @@ function formatTokenAmount(value: bigint, decimals: number) {
 function formatTransferNumber(value: number) {
   if (!Number.isFinite(value) || value <= 0) return "0";
   if (value > 0 && value < 0.001) return "<0.001";
-  const formatted = value.toLocaleString(undefined, { maximumFractionDigits: value >= 1000 ? 2 : 6 });
-  return formatted.includes(".") ? formatted.replace(/\.?0+$/, "") : formatted;
+  return value.toLocaleString("en-US", {
+    useGrouping: false,
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
 }
 
 function parseHexNumber(value: string | undefined) {
@@ -395,9 +398,6 @@ export async function GET(req: NextRequest) {
   const address = url.searchParams.get("address") ?? "";
   const fast = url.searchParams.get("fast") === "1";
   if (!isAddress(address)) return activityResponse([]);
-  const cacheKey = address.toLowerCase();
-  const cached = activityCache.get(cacheKey);
-  if (cached && cached.expiresAt > Date.now()) return activityResponse(cached.data);
   const storedRows = await getStoredActivities(80)
     .then((rows) =>
       rows
@@ -480,7 +480,6 @@ export async function GET(req: NextRequest) {
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
     const output = allRows.slice(0, 80);
-    activityCache.set(cacheKey, { data: output, expiresAt: Date.now() + ACTIVITY_CACHE_TTL_MS });
     return activityResponse(output);
   } catch {
     console.warn("[activity] real activity unavailable");
@@ -513,7 +512,6 @@ export async function POST(req: NextRequest) {
 
   try {
     await recordActivity({ type, address, amount, hash, status, metadata: body?.metadata ?? {} });
-    if (address) activityCache.delete(address.toLowerCase());
     return jsonResponse({ ok: true });
   } catch {
     console.warn("[activity] record failed");
