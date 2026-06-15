@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+import { createHash } from "crypto";
+import { mkdir, readFile, writeFile } from "fs/promises";
 import { formatUnits, parseUnits } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
@@ -37,6 +39,7 @@ type QuoteCacheEntry = { expiresAt: number; staleUntil: number; data: unknown };
 
 const QUOTE_CACHE_TTL_MS = 8_000;
 const QUOTE_CACHE_STALE_MS = 90_000;
+const QUOTE_FILE_CACHE_DIR = "/tmp/lumina-swap-quote-cache";
 const quoteCacheStore = globalThis as typeof globalThis & {
   __luminaSwapQuoteCache?: Map<string, QuoteCacheEntry>;
 };
@@ -79,6 +82,16 @@ export async function POST(req: NextRequest) {
       },
     });
   }
+  const diskCached = await readQuoteFileCache(cacheKey);
+  if (diskCached && diskCached.expiresAt > now) {
+    quoteCache.set(cacheKey, diskCached);
+    return jsonResponse(diskCached.data, {
+      headers: {
+        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+        "X-Lumina-Quote-Cache": "shared",
+      },
+    });
+  }
 
   const hasCommunityToken = parsed.from.trust === "community" || parsed.to.trust === "community";
   const reliableImpactReference = hasReliablePriceReference(parsed.from) && hasReliablePriceReference(parsed.to);
@@ -93,9 +106,7 @@ export async function POST(req: NextRequest) {
           return null;
       })
       : Promise.resolve(null),
-    withTimeout(quoteBestV3(parsed.from, parsed.to, amountIn), 6_000)
-      .then((quote) => ({ source: "uniswap-v3" as const, ...quote }))
-      .catch(() => null),
+    buildV3QuoteWithRetry(parsed.from, parsed.to, amountIn),
     hasCommunityToken || !enableV4Reference
       ? Promise.resolve(null)
       : withTimeout(quoteBestV4(parsed.from, parsed.to, amountIn), 2_500)
@@ -112,8 +123,10 @@ export async function POST(req: NextRequest) {
   const coingeckoRate = referenceRate(parsed.from, parsed.to, coingecko);
 
   if (!main || !main.quote || Number(main.quote.amountOut) <= 0) {
-    if (cached && cached.staleUntil > Date.now()) {
-      return jsonResponse(withStaleQuote(cached.data), {
+    const staleCache = [cached, diskCached].find((entry): entry is QuoteCacheEntry => Boolean(entry && entry.staleUntil > Date.now()));
+    if (staleCache) {
+      quoteCache.set(cacheKey, staleCache);
+      return jsonResponse(withStaleQuote(staleCache.data), {
         headers: {
           "Cache-Control": "private, no-store",
           "X-Lumina-Stale-Quote": "1",
@@ -182,6 +195,7 @@ export async function POST(req: NextRequest) {
     expiresAt: Date.now() + QUOTE_CACHE_TTL_MS,
     staleUntil: Date.now() + QUOTE_CACHE_STALE_MS,
   });
+  await writeQuoteFileCache(cacheKey, quoteCache.get(cacheKey)!);
   if (quoteCache.size > 400) {
     const now = Date.now();
     for (const [key, value] of quoteCache) {
@@ -208,6 +222,49 @@ function withStaleQuote(data: unknown) {
     stale: true,
     warnings: Array.from(new Set([...warnings, "stale_quote"])),
   };
+}
+
+async function buildV3QuoteWithRetry(from: SwapToken, to: SwapToken, amountIn: bigint): Promise<SourceQuote | null> {
+  const attempts = [3_500, 3_000];
+  for (let index = 0; index < attempts.length; index += 1) {
+    try {
+      const quote = await withTimeout(quoteBestV3(from, to, amountIn), attempts[index]);
+      if (quote.bestQuote && Number(quote.bestQuote.amountOut) > 0) {
+        return { source: "uniswap-v3", ...quote };
+      }
+    } catch {
+      // Retry once because World Chain quoter/RPC occasionally returns a transient miss.
+    }
+    if (index < attempts.length - 1) await sleep(120);
+  }
+  return null;
+}
+
+async function readQuoteFileCache(cacheKey: string): Promise<QuoteCacheEntry | null> {
+  try {
+    const data = JSON.parse(await readFile(quoteFileCachePath(cacheKey), "utf8")) as QuoteCacheEntry;
+    if (!data || typeof data !== "object" || data.staleUntil <= Date.now()) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+async function writeQuoteFileCache(cacheKey: string, data: QuoteCacheEntry) {
+  try {
+    await mkdir(QUOTE_FILE_CACHE_DIR, { recursive: true });
+    await writeFile(quoteFileCachePath(cacheKey), JSON.stringify(data), "utf8");
+  } catch (error) {
+    console.warn("[SWAP] shared quote cache write failed", error);
+  }
+}
+
+function quoteFileCachePath(cacheKey: string) {
+  return `${QUOTE_FILE_CACHE_DIR}/${createHash("sha256").update(cacheKey).digest("hex")}.json`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function parseQuoteBody(body: QuoteBody | null) {
