@@ -3782,6 +3782,7 @@ function enhancePrototypeSwapQuote() {
           ,insufficientBalance: { en:"Insufficient balance", "zh-CN":"余额不足", "zh-TW":"餘額不足", fr:"Solde insuffisant", de:"Unzureichendes Guthaben", es:"Saldo insuficiente", ja:"残高不足" }
           ,slippageTooLow: { en:"Slippage cannot be 0. Please select at least 0.1%.", "zh-CN":"滑点不能设为 0,请至少选择 0.1%。", "zh-TW":"滑點不能設為 0,請至少選擇 0.1%。", fr:"Le slippage ne peut pas être 0. Sélectionnez au moins 0,1%.", de:"Slippage darf nicht 0 sein. Bitte mindestens 0,1% wählen.", es:"El slippage no puede ser 0. Selecciona al menos 0.1%.", ja:"スリッページは 0 にできません。0.1%以上を選択してください。" }
           ,safeMaxAdjusted: { en:"MAX was adjusted slightly to avoid World App signing failure. Quote refreshed.", "zh-CN":"已为 MAX 预留少量余额，避免 World App 签名失败。报价已刷新。", "zh-TW":"已為 MAX 預留少量餘額，避免 World App 簽名失敗。報價已刷新。", fr:"MAX a été légèrement ajusté pour éviter l'échec de signature World App. Devis actualisé.", de:"MAX wurde leicht angepasst, um World App-Signaturfehler zu vermeiden. Angebot aktualisiert.", es:"MAX se ajustó ligeramente para evitar fallos de firma en World App. Cotización actualizada.", ja:"World App の署名失敗を避けるため MAX を少し調整しました。見積もりを更新しました。" }
+          ,reserveWldForWorldApp: { en:"Keep at least 0.003 WLD for World App transaction fees. MAX has been adjusted.", "zh-CN":"需要至少保留 0.003 WLD 给 World App 交易费用，已调整 MAX。", "zh-TW":"需要至少保留 0.003 WLD 給 World App 交易費用，已調整 MAX。", fr:"Gardez au moins 0,003 WLD pour les frais World App. MAX a été ajusté.", de:"Mindestens 0,003 WLD für World App-Gebühren behalten. MAX wurde angepasst.", es:"Conserva al menos 0.003 WLD para comisiones de World App. MAX se ajustó.", ja:"World App の手数料用に 0.003 WLD 以上を残してください。MAX を調整しました。" }
           ,quoteFirst: { en:"Please get a quote first.", "zh-CN":"请先获取报价。", "zh-TW":"請先取得報價。", fr:"Veuillez d'abord obtenir un devis.", de:"Bitte zuerst ein Angebot abrufen.", es:"Obtén una cotización primero.", ja:"先に見積もりを取得してください。" }
           ,unsupportedToken: { en:"Token not supported", "zh-CN":"暂不支持此代币", "zh-TW":"暫不支援此代幣", fr:"Jeton non pris en charge", de:"Token nicht unterstützt", es:"Token no compatible", ja:"未対応のトークン" }
           ,worldAppBlocked: { en:"Blocked by World App", "zh-CN":"World App 已拦截", "zh-TW":"World App 已攔截", fr:"Bloqué par World App", de:"Von World App blockiert", es:"Bloqueado por World App", ja:"World App がブロック" }
@@ -4076,6 +4077,10 @@ function enhancePrototypeSwapQuote() {
         if (!Number.isFinite(decimals) || decimals < 0) decimals = 18;
         return Math.max(0, Math.min(8, decimals));
       }
+      function worldAppNativeReserve(symbol){
+        symbol = String(symbol || "").toUpperCase();
+        return symbol === "WLD" ? 0.003 : 0;
+      }
       function formatSwapInputAmount(value, symbol){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
         if (!Number.isFinite(n) || n <= 0) return "0";
@@ -4086,6 +4091,10 @@ function enhancePrototypeSwapQuote() {
       function safeMaxSwapAmount(symbol){
         var balance = balanceNumber(symbol);
         if (!Number.isFinite(balance) || balance <= 0) return "0";
+        var nativeReserve = worldAppNativeReserve(symbol);
+        if (nativeReserve > 0) {
+          return formatSwapInputAmount(Math.max(0, balance - nativeReserve), symbol);
+        }
         var decimals = maxInputDecimals(symbol);
         var precisionDust = Math.pow(10, -Math.min(6, Math.max(0, decimals)));
         var percentDust = balance * 0.0001;
@@ -4513,6 +4522,7 @@ function enhancePrototypeSwapQuote() {
 	        if (/disallowed_operation/i.test(text)) return swapCopy("worldAppBlocked");
 	        if (/permitted_amount_exceeds_slippage|permitted_amount_not_found/i.test(text)) return swapCopy("approvalFailed");
 	        if (/TRANSFER_FROM_FAILED|transferFrom|transfer failed/i.test(text)) return swapCopy("sellRestricted");
+	        if (/user_insufficient_funds_for_paymaster|insufficient_funds_for_paymaster|tx_count/i.test(text)) return swapCopy("reserveWldForWorldApp");
 	        if (/V3TooLittleReceived|TooLittleReceived|INSUFFICIENT_OUTPUT_AMOUNT/i.test(text)) return swapCopy("refreshQuoteShort");
 	        if (/TransactionDeadlinePassed|DeadlineExpired|EXPIRED/i.test(text)) return swapCopy("quoteExpiredShort");
 	        if (msg && msg !== "Swap failed" && !/^undefined$/i.test(String(msg))) return String(msg).slice(0, 120);
@@ -4622,6 +4632,18 @@ function enhancePrototypeSwapQuote() {
 	        if (!amount || !Number.isFinite(amount) || amount <= 0) return { ok:false, error:"Enter an amount greater than 0." };
 	        var balance = balanceNumber(swapState.sell);
 	        if (amount > balance) return { ok:false, error:swapCopy("insufficientBalance") };
+	        var nativeReserve = worldAppNativeReserve(swapState.sell);
+	        if (nativeReserve > 0 && amount > Math.max(0, balance - nativeReserve)) {
+	          var reserveSafeMax = safeMaxSwapAmount(swapState.sell);
+	          if (sell) {
+	            sell.value = reserveSafeMax;
+	            sell.dispatchEvent(new Event("input", { bubbles: true }));
+	          }
+	          latestSwapQuote = null;
+	          latestQuoteAt = 0;
+	          scheduleQuote();
+	          return { ok:false, error:swapCopy("reserveWldForWorldApp") };
+	        }
 	        var safeMaxText = safeMaxSwapAmount(swapState.sell);
 	        var safeMax = Number(safeMaxText);
 	        if (safeMax > 0 && amount > safeMax && amount <= balance) {
