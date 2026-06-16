@@ -3882,6 +3882,10 @@ function enhancePrototypeSwapQuote() {
         }
         return String(value);
       }
+      function isEarnVaultSymbol(symbol){
+        symbol = String(symbol || "").toUpperCase();
+        return /^RE7/.test(symbol) || symbol === "RE7USDC" || symbol === "RE7WLD";
+      }
       function swapDebugContext(extra){
         var sellSymbol = swapState && swapState.sell;
         var buySymbol = swapState && swapState.buy;
@@ -3953,6 +3957,34 @@ function enhancePrototypeSwapQuote() {
         if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
         try { return JSON.parse(localStorage.getItem("lumina_swap_debug_log") || "[]"); } catch(e) { return []; }
       }
+      function copySwapDebug(){
+        var text = JSON.stringify(readSwapDebug(), null, 2);
+        function done(ok){
+          var live = document.getElementById("swapDebugLive");
+          if (live) live.textContent = ok ? "copied · " + new Date().toLocaleTimeString() : "copy failed";
+          toast(ok ? "Debug copied" : "Copy failed");
+        }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(false); });
+            return;
+          }
+        } catch(e) {}
+        try {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "-9999px";
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          var ok = document.execCommand("copy");
+          ta.remove();
+          done(ok);
+        } catch(e) {
+          done(false);
+        }
+      }
       function openSwapDebug(){
         var existingModal = document.getElementById("swapDebugModal");
         if (existingModal) existingModal.remove();
@@ -3973,13 +4005,14 @@ function enhancePrototypeSwapQuote() {
           '<div class="modal send-confirm-sheet" style="width:calc(100vw - 22px);max-width:430px;max-height:78vh;overflow:auto;padding:18px;border-radius:22px;align-self:flex-end;">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">' +
               '<h3 style="margin:0;font-size:22px;">Swap Debug</h3>' +
-              '<button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button>' +
+              '<div style="display:flex;align-items:center;gap:8px;"><button id="swapDebugCopy" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(108,237,143,.55);background:rgba(108,237,143,.12);color:var(--green);padding:0 14px;font-size:12px;font-weight:900;">COPY</button><button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button></div>' +
             '</div>' +
             '<div id="swapDebugLive" style="margin-bottom:10px;color:var(--green);font-size:12px;font-weight:800;">ready</div>' +
             '<pre id="swapDebugPre" style="white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:#d9ffe0;font-size:11px;line-height:1.45;">' + escapeHtml(JSON.stringify(log, null, 2)) + '</pre>' +
           '</div>';
         document.body.appendChild(modal);
         document.getElementById("swapDebugClose").onclick = function(){ modal.remove(); };
+        document.getElementById("swapDebugCopy").onclick = function(event){ event.preventDefault(); event.stopPropagation(); copySwapDebug(); };
         modal.onclick = function(event){ if (event.target === modal) modal.remove(); };
       }
       function ensureSwapDebugButton(){
@@ -4037,7 +4070,21 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapMaxButton(){
         var sell = document.getElementById("sellAmt");
-        if (!sell || document.getElementById("swapMaxBtn")) return;
+        var existing = document.getElementById("swapMaxBtn") || document.querySelector("#view-swap .swap-max-btn");
+        if (existing) {
+          existing.id = "swapMaxBtn";
+          existing.style.pointerEvents = "auto";
+          existing.style.touchAction = "manipulation";
+          existing.onclick = function(event){
+            if (event) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+            fillSwapMax();
+          };
+          return;
+        }
+        if (!sell) return;
         var parent = sell.parentElement;
         if (!parent) return;
         var wrap = document.createElement("div");
