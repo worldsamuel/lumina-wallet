@@ -3926,20 +3926,54 @@ function enhancePrototypeSwapQuote() {
         }, extra || {});
       }
       function setSwapDebug(stage, detail){
-        return;
+        var item = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
+        window.__luminaSwapDebugLog = window.__luminaSwapDebugLog || [];
+        window.__luminaSwapDebugLog.unshift(item);
+        window.__luminaSwapDebugLog = window.__luminaSwapDebugLog.slice(0, 30);
+        try { localStorage.setItem("lumina_swap_debug_log", JSON.stringify(window.__luminaSwapDebugLog)); } catch(e) {}
+        var live = document.getElementById("swapDebugLive");
+        if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
       }
       function readSwapDebug(){
-        return null;
+        if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
+        try { return JSON.parse(localStorage.getItem("lumina_swap_debug_log") || "[]"); } catch(e) { return []; }
       }
       function openSwapDebug(){
         var existingModal = document.getElementById("swapDebugModal");
         if (existingModal) existingModal.remove();
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
+        var log = readSwapDebug();
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open";
+        modal.id = "swapDebugModal";
+        modal.innerHTML =
+          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 22px);max-width:430px;max-height:78vh;overflow:auto;padding:18px;border-radius:22px;align-self:flex-end;">' +
+            '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">' +
+              '<h3 style="margin:0;font-size:22px;">Swap Debug</h3>' +
+              '<button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button>' +
+            '</div>' +
+            '<div id="swapDebugLive" style="margin-bottom:10px;color:var(--green);font-size:12px;font-weight:800;">ready</div>' +
+            '<pre id="swapDebugPre" style="white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:#d9ffe0;font-size:11px;line-height:1.45;">' + escapeHtml(JSON.stringify(log, null, 2)) + '</pre>' +
+          '</div>';
+        document.body.appendChild(modal);
+        document.getElementById("swapDebugClose").onclick = function(){ modal.remove(); };
+        modal.onclick = function(event){ if (event.target === modal) modal.remove(); };
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) existing.remove();
+        if (existing) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapDebugBtn";
+        btn.textContent = "DEBUG";
+        btn.style.cssText = "position:fixed;right:12px;bottom:168px;z-index:160;border:1px solid rgba(108,237,143,.65);background:rgba(9,24,13,.96);color:#85f59a;border-radius:999px;padding:9px 12px;font-size:11px;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.45);pointer-events:auto;touch-action:manipulation;";
+        btn.onclick = function(event){
+          event.preventDefault();
+          event.stopPropagation();
+          openSwapDebug();
+        };
+        document.body.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
@@ -4677,13 +4711,41 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        if (window.__luminaSwapDirectEventsBound) return;
 	        window.__luminaSwapDirectEventsBound = true;
+	        function swapHitInfo(event){
+	          var point = event;
+	          if (event && event.changedTouches && event.changedTouches[0]) point = event.changedTouches[0];
+	          var hit = null;
+	          try { hit = document.elementFromPoint(point.clientX, point.clientY); } catch(e) {}
+	          var path = [];
+	          var node = hit;
+	          while (node && node.nodeType === 1 && path.length < 8) {
+	            path.push(String(node.tagName || "").toLowerCase() + (node.id ? "#" + node.id : "") + (node.className && typeof node.className === "string" ? "." + node.className.trim().replace(/\s+/g, ".") : ""));
+	            node = node.parentElement;
+	          }
+	          return {
+	            type: event && event.type,
+	            x: Math.round(point && point.clientX || 0),
+	            y: Math.round(point && point.clientY || 0),
+	            hit: hit ? {
+	              tag: hit.tagName,
+	              id: hit.id || "",
+	              className: typeof hit.className === "string" ? hit.className : "",
+	              text: String(hit.textContent || "").trim().slice(0, 80)
+	            } : null,
+	            path: path,
+	            swapBtn: btn ? { disabled: !!btn.disabled, ariaDisabled: btn.getAttribute("aria-disabled"), text: String(btn.textContent || "").trim() } : null,
+	            maxBtn: max ? { disabled: !!max.disabled, text: String(max.textContent || "").trim() } : null
+	          };
+	        }
 	        function captureSwapAction(event){
+	          var view = document.getElementById("view-swap");
+	          if (view && view.classList.contains("active")) setSwapDebug("tap:" + event.type, swapHitInfo(event));
 	          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
 	          if (!target) return;
-	          var view = document.getElementById("view-swap");
 	          if (!view || !view.classList.contains("active")) return;
 	          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
 	        }
+	        document.addEventListener("pointerdown", captureSwapAction, true);
 	        document.addEventListener("click", captureSwapAction, true);
 	        document.addEventListener("touchend", captureSwapAction, true);
 	      }
