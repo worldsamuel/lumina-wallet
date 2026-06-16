@@ -4000,8 +4000,9 @@ function enhancePrototypeSwapQuote() {
 	        var btn = document.getElementById("swapBtn");
 	        if (!btn) return;
 	        btn.classList.remove("quote-only");
-	        btn.disabled = !!disabled;
+	        btn.disabled = false;
 	        btn.setAttribute("aria-disabled", disabled ? "true" : "false");
+	        btn.dataset.swapDisabled = disabled ? "1" : "0";
 	        var span = btn.querySelector("span");
 	        if (span) span.textContent = label;
 	      }
@@ -4632,7 +4633,6 @@ function enhancePrototypeSwapQuote() {
 	        btn.__luminaSwapClickBound = true;
 	        btn.onclick = function(event){
 	          event.preventDefault();
-	          if (btn.disabled) return;
 	          handleSwapClick();
 	        };
 	      }
