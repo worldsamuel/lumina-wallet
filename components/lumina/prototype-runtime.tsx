@@ -4017,7 +4017,7 @@ function enhancePrototypeSwapQuote() {
 	          return;
 	        }
 	        if (!quoteMatchesCurrent()) {
-	          setSwapButtonState(swapCopy("confirmSwap"), true);
+	          setSwapButtonState(activeQuotePromise ? "Reading DEX route..." : swapCopy("confirmSwap"), false);
 	          return;
 	        }
 	        if (latestSwapQuote && (latestSwapQuote.blocked || latestSwapQuote.stale)) {
@@ -4558,10 +4558,10 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
-	        if (!latestSwapQuote && activeQuotePromise) {
+	        if ((!latestSwapQuote || !quoteMatchesCurrent()) && activeQuotePromise) {
 	          await activeQuotePromise;
 	        }
-	        if (!latestSwapQuote) {
+	        if (!latestSwapQuote || !quoteMatchesCurrent()) {
 	          await requestQuote();
 	        }
 	        var state = validateSwapSafety();
@@ -4626,6 +4626,16 @@ function enhancePrototypeSwapQuote() {
 	          swapSubmitting = false;
 	        }
 	      }
+	      function bindSwapButtonClick(){
+	        var btn = document.getElementById("swapBtn");
+	        if (!btn || btn.__luminaSwapClickBound) return;
+	        btn.__luminaSwapClickBound = true;
+	        btn.onclick = function(event){
+	          event.preventDefault();
+	          if (btn.disabled) return;
+	          handleSwapClick();
+	        };
+	      }
 	      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
       if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
         window.__luminaQuoteRefreshWrapped = true;
@@ -4639,6 +4649,7 @@ function enhancePrototypeSwapQuote() {
           setSwapPillLogo("buyDot", swapState.buy);
           ensureSwapMaxButton();
           ensureSwapDebugButton();
+          bindSwapButtonClick();
           scheduleQuote();
         };
       }
@@ -4742,6 +4753,7 @@ function enhancePrototypeSwapQuote() {
       };
       recalc = scheduleQuote;
 	      confirmSwap = handleSwapClick;
+      bindSwapButtonClick();
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
