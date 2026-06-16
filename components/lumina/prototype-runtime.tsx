@@ -4268,6 +4268,7 @@ function enhancePrototypeSwapQuote() {
 	        latestQuoteKey = data && data.__quoteKey ? data.__quoteKey : currentQuoteKey();
 	        latestQuoteAt = Date.now();
 	        highImpactAcknowledged = false;
+	        syncSwapQuotePriceToHome(data);
 	        var buy = document.getElementById("buyAmt");
         var rate = document.getElementById("rateTxt");
         var impact = document.getElementById("impactTxt");
@@ -4287,7 +4288,7 @@ function enhancePrototypeSwapQuote() {
           }
         }
         if (gas) gas.textContent = networkFeeText(data.gasEstimateUsd);
-        renderReferences(data);
+	        renderReferences(data);
         renderWarning(data);
         setSwapButtonPending();
       }
@@ -4528,6 +4529,43 @@ function enhancePrototypeSwapQuote() {
 	        if (msg && msg !== "Swap failed" && !/^undefined$/i.test(String(msg))) return String(msg).slice(0, 120);
 	        return swapCopy("swapFailed");
 	      }
+	      function stableSwapPrice(symbol){
+	        var sym = String(symbol || "").toUpperCase();
+	        return (sym === "USDC" || sym === "USDT" || sym === "EURC") ? 1 : 0;
+	      }
+	      function knownSwapPrice(symbol, quoted){
+	        var sym = String(symbol || "").toUpperCase();
+	        var stable = stableSwapPrice(sym);
+	        if (stable > 0) return stable;
+	        var metaPrice = Number(tokenMeta(sym, quoted).priceUsd || 0);
+	        if (metaPrice > 0) return metaPrice;
+	        if (sym === "WETH") return Number(prices && prices.ETH) || 0;
+	        if (sym === "WBTC" || sym === "BTC") return Number(prices && prices.BTC) || 0;
+	        return 0;
+	      }
+	      function setSwapDerivedPrice(symbol, price){
+	        var sym = String(symbol || "").toUpperCase();
+	        var n = Number(price || 0);
+	        if (!sym || !Number.isFinite(n) || n <= 0) return;
+	        if (stableSwapPrice(sym) > 0) n = 1;
+	        prices[sym] = n;
+	        if (customTokens && customTokens[sym]) customTokens[sym].priceUsd = n;
+	        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
+	        if (market) market.priceUsd = n;
+	        try {
+	          (window.__luminaMarketPrices || []).forEach(function(item){
+	            if (String(item && item.symbol || "").toUpperCase() === sym) {
+	              item.priceUsd = n;
+	              item.usd = n;
+	            }
+	          });
+	        } catch(e) {}
+	        (assets || []).forEach(function(asset){
+	          if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+	          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
+	          if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * n;
+	        });
+	      }
 	      function syncSwapQuotePriceToHome(){
 	        if (!latestSwapQuote) return;
 	        var sell = String(swapState.sell || "").toUpperCase();
@@ -4536,24 +4574,30 @@ function enhancePrototypeSwapQuote() {
 	        var amountOut = Number(latestSwapQuote.amountOut || 0);
 	        if (buy) upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
 	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
-	        var sellPrice = tokenMeta(sell, latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
-	        if (!(sellPrice > 0) && sell === "WETH") sellPrice = Number(prices && prices.ETH) || 0;
-	        if (!(sellPrice > 0) && (sell === "WBTC" || sell === "BTC")) sellPrice = Number(prices && prices.BTC) || 0;
-	        if (!(sellPrice > 0) && (sell === "USDC" || sell === "USDT" || sell === "EURC")) sellPrice = 1;
-	        if (!(sellPrice > 0)) return;
-	        var buyPrice = amountIn * sellPrice / amountOut;
-	        if (!Number.isFinite(buyPrice) || buyPrice <= 0) return;
-	        prices[buy] = buyPrice;
-	        if (customTokens && customTokens[buy]) customTokens[buy].priceUsd = buyPrice;
-	        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[buy];
-	        if (market) market.priceUsd = buyPrice;
-	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        (assets || []).forEach(function(asset){
-	          if (String(asset.sym || "").toUpperCase() !== buy) return;
-	          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
-	          if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * buyPrice;
-	        });
+	        var sellQuoted = latestSwapQuote.tokens && latestSwapQuote.tokens.from;
+	        var buyQuoted = latestSwapQuote.tokens && latestSwapQuote.tokens.to;
+	        var sellPrice = knownSwapPrice(sell, sellQuoted);
+	        var buyPrice = knownSwapPrice(buy, buyQuoted);
+	        if (!(buyPrice > 0) && sellPrice > 0) buyPrice = amountIn * sellPrice / amountOut;
+	        if (!(sellPrice > 0) && buyPrice > 0) sellPrice = amountOut * buyPrice / amountIn;
+	        if (sellPrice > 0) setSwapDerivedPrice(sell, sellPrice);
+	        if (buyPrice > 0) setSwapDerivedPrice(buy, buyPrice);
+	        upsertRecentSwapHomeAsset(buy, buyQuoted, amountOut);
 	        if (typeof renderAssets === "function") renderAssets();
+	      }
+	      function clearSwapFormAfterSuccess(){
+	        latestSwapQuote = null;
+	        latestQuoteKey = "";
+	        latestQuoteAt = 0;
+	        activeQuotePromise = null;
+	        quoteSeq++;
+	        var sellInput = document.getElementById("sellAmt");
+	        var buyInput = document.getElementById("buyAmt");
+	        if (sellInput) sellInput.value = "";
+	        if (buyInput) buyInput.value = "";
+	        setQuoteState(swapCopy("enterAmount"), undefined, false);
+	        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+	        setSwapButtonPending();
 	      }
 	      function minOutText(){
 	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
@@ -4781,7 +4825,7 @@ function enhancePrototypeSwapQuote() {
 	            hash: result.userOpHash || result.transactionHash || ("pending-" + Date.now())
 	          });
 	          optimisticallyApplySwapBalances();
-	          setSwapButtonState(swapCopy("confirmSwap"), false);
+	          clearSwapFormAfterSuccess();
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) {
 	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 1000);
@@ -6999,12 +7043,19 @@ function enhancePrototypeDetail() {
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
         var sym = String(asset && asset.sym || "").toUpperCase();
-        if (map[sym]) return map[sym];
+        var livePrice = priceForHome(sym);
+        if (map[sym]) {
+          if (livePrice > 0) map[sym].priceUsd = livePrice;
+          return map[sym];
+        }
         var address = assetMarketAddress(asset);
         if (address) {
           var values = Object.keys(map).map(function(key){ return map[key]; });
           for (var i = 0; i < values.length; i++) {
-            if (String(values[i] && values[i].address || "").toLowerCase() === address) return values[i];
+            if (String(values[i] && values[i].address || "").toLowerCase() === address) {
+              if (livePrice > 0) values[i].priceUsd = livePrice;
+              return values[i];
+            }
           }
         }
         if (asset && asset.poolAddress) {
@@ -7013,9 +7064,9 @@ function enhancePrototypeDetail() {
             name: asset.full || sym,
             address: address || asset.address || asset.contractAddr || null,
             poolAddress: asset.poolAddress,
-            priceUsd: Number(asset.usdNum || 0) > 0 && Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "")) > 0
+            priceUsd: livePrice > 0 ? livePrice : (Number(asset.usdNum || 0) > 0 && Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "")) > 0
               ? Number(asset.usdNum || 0) / Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""))
-              : (sym === "USDC" || sym === "EURC" ? 1 : null),
+              : (sym === "USDC" || sym === "EURC" || sym === "USDT" ? 1 : null)),
             change24h: null,
             volume24hUsd: 0,
             liquidityUsd: 1,
@@ -7046,6 +7097,42 @@ function enhancePrototypeDetail() {
           '<div class="market-stat-row"><span>' + detailCopy("volume24h") + '</span><b>' + compactUsd(market.volume24hUsd) + '</b></div>' +
           '<div class="market-stat-row"><span>' + detailCopy("liquidity") + '</span><b>' + compactUsd(market.liquidityUsd) + '</b></div>' +
           '</div>';
+      }
+      function latestKnownMarketPrice(asset) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        var price = priceForHome(sym);
+        if (price > 0) return price;
+        var market = marketForAsset(asset);
+        if (market && Number(market.priceUsd) > 0) return Number(market.priceUsd);
+        var amount = assetAmountNumber(asset);
+        if (amount > 0 && Number(asset && asset.usdNum) > 0) return Number(asset.usdNum) / amount;
+        return 0;
+      }
+      function normalizeCandlesToCurrentPrice(candles, asset) {
+        var current = latestKnownMarketPrice(asset);
+        if (!(current > 0) || !Array.isArray(candles) || !candles.length) return candles || [];
+        var last = candles[candles.length - 1] || {};
+        var lastClose = Number(last.close || last[4] || 0);
+        if (!(lastClose > 0)) return candles;
+        var drift = Math.abs(current - lastClose) / current;
+        if (drift < 0.025) return candles;
+        var factor = current / lastClose;
+        return candles.map(function(c){
+          if (Array.isArray(c)) {
+            var row = c.slice();
+            row[1] = Number(row[1] || 0) * factor;
+            row[2] = Number(row[2] || 0) * factor;
+            row[3] = Number(row[3] || 0) * factor;
+            row[4] = Number(row[4] || 0) * factor;
+            return row;
+          }
+          return Object.assign({}, c, {
+            open: Number(c.open || 0) * factor,
+            high: Number(c.high || 0) * factor,
+            low: Number(c.low || 0) * factor,
+            close: Number(c.close || 0) * factor
+          });
+        });
       }
 
       function renderMarketCard(asset) {
@@ -7096,8 +7183,9 @@ function enhancePrototypeDetail() {
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];
               if (candles.length) {
-                renderCandlesChart(chart, candles, range || "1D");
-                updateRangeChange(candles, range || "1D", asset);
+                var normalizedCandles = normalizeCandlesToCurrentPrice(candles, asset);
+                renderCandlesChart(chart, normalizedCandles, range || "1D", asset);
+                updateRangeChange(normalizedCandles, range || "1D", asset);
               } else {
                 chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
                 updateRangeChangeFromMarket(asset, range || "1D");
@@ -7118,8 +7206,9 @@ function enhancePrototypeDetail() {
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
             if (candles.length) {
-              renderCandlesChart(chart, candles, range || "1D");
-              updateRangeChange(candles, range || "1D", asset);
+              var normalizedCandles = normalizeCandlesToCurrentPrice(candles, asset);
+              renderCandlesChart(chart, normalizedCandles, range || "1D", asset);
+              updateRangeChange(normalizedCandles, range || "1D", asset);
             } else {
               renderHistory(detailCopy("emptyOhlcv"));
             }
@@ -7150,7 +7239,8 @@ function enhancePrototypeDetail() {
         pill.className = up ? "up" : "down";
         pill.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="' + (up ? "M7 17L17 7M9 7h8v8" : "M7 7l10 10M17 9v8H9") + '"/></svg>' + (up ? "+" : "") + Number(change).toFixed(1) + "%";
       }
-      function renderCandlesChart(chart, candles, range) {
+      function renderCandlesChart(chart, candles, range, asset) {
+        candles = normalizeCandlesToCurrentPrice(candles, asset);
         if (window.__luminaRenderLightweightChart && window.__luminaRenderLightweightChart(chart, candles, range || "1D")) return;
         chart.innerHTML = trendSvg(candles, range || "1D");
       }
@@ -7407,7 +7497,9 @@ function enhancePrototypeDetail() {
         document.getElementById("detTitle").textContent = asset.sym;
         document.getElementById("detName").textContent = asset.full || asset.sym;
         document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
-        document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
+        var detailUsd = assetUsdValue(asset);
+        if (detailUsd > 0) asset.usdNum = detailUsd;
+        document.getElementById("detUsd").textContent = "≈ " + formatFiat(detailUsd || 0);
         var pill = document.getElementById("detChangePill");
         renderMarketTables(asset);
         updateDetailVerifyBadge(asset);
