@@ -83,9 +83,6 @@ declare global {
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
     __luminaSwapDebugObserver?: MutationObserver;
-    confirmSwap?: () => void;
-    recalc?: () => void;
-    toggleSlip?: () => void;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -3957,20 +3954,21 @@ function enhancePrototypeSwapQuote() {
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
         if (existing) return;
-        var swapBtn = document.getElementById("swapBtn");
-        if (!swapBtn || !swapBtn.parentElement) return;
         var btn = document.createElement("button");
         btn.type = "button";
         btn.id = "swapDebugBtn";
         btn.innerHTML = '<span>Debug</span><small id="swapDebugStage">ready</small>';
-        btn.style.width = "calc(100% - 96px)";
-        btn.style.margin = "10px 48px 4px";
+        btn.style.position = "fixed";
+        btn.style.right = "16px";
+        btn.style.bottom = "132px";
+        btn.style.zIndex = "2147483647";
         btn.style.display = "flex";
-        btn.style.flexDirection = "row";
+        btn.style.flexDirection = "column";
         btn.style.alignItems = "center";
         btn.style.justifyContent = "center";
-        btn.style.gap = "8px";
-        btn.style.height = "40px";
+        btn.style.gap = "1px";
+        btn.style.minWidth = "72px";
+        btn.style.height = "44px";
         btn.style.border = "1px solid rgba(121,255,151,.85)";
         btn.style.borderRadius = "14px";
         btn.style.background = "rgba(10,24,15,.96)";
@@ -3981,7 +3979,7 @@ function enhancePrototypeSwapQuote() {
         btn.style.pointerEvents = "auto";
         btn.style.transform = "translateZ(0)";
         btn.onclick = openSwapDebug;
-        swapBtn.insertAdjacentElement("afterend", btn);
+        document.body.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
@@ -4774,7 +4772,7 @@ function enhancePrototypeSwapQuote() {
         if (!panel || panel.querySelector(".slip-back")) return;
         panel.insertAdjacentHTML("afterbegin", '<button type="button" class="slip-back" onclick="toggleSlip()" aria-label="Back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg><span>Back</span></button>');
       }
-      window.toggleSlip = function(){
+      toggleSlip = function(){
         var panel = document.getElementById("slipPanel");
         if (!panel) return;
         ensureSlipBack();
@@ -4783,8 +4781,8 @@ function enhancePrototypeSwapQuote() {
           setTimeout(function(){ panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 30);
         }
       };
-      window.recalc = scheduleQuote;
-	      window.confirmSwap = handleSwapClick;
+      recalc = scheduleQuote;
+	      confirmSwap = handleSwapClick;
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
