@@ -3892,20 +3892,93 @@ function enhancePrototypeSwapQuote() {
         }, extra || {});
       }
       function setSwapDebug(stage, detail){
-        return;
+        try {
+          var entry = swapDebugContext({
+            stage: stage,
+            detail: safeDebugValue(detail, 0)
+          });
+          var key = "lumina_swap_debug_log_v1";
+          var list = [];
+          try { list = JSON.parse(localStorage.getItem(key) || "[]"); } catch(e) { list = []; }
+          if (!Array.isArray(list)) list = [];
+          list.unshift(entry);
+          list = list.slice(0, 30);
+          localStorage.setItem(key, JSON.stringify(list));
+          window.__luminaLastSwapDebug = entry;
+          console.log("[SWAP DEBUG]", stage, entry);
+          var badge = document.getElementById("swapDebugStage");
+          if (badge) badge.textContent = stage;
+        } catch(e) {
+          console.warn("[SWAP DEBUG] write failed", e);
+        }
       }
       function readSwapDebug(){
-        return null;
+        try {
+          var list = JSON.parse(localStorage.getItem("lumina_swap_debug_log_v1") || "[]");
+          return Array.isArray(list) ? list : [];
+        } catch(e) {
+          return [];
+        }
       }
       function openSwapDebug(){
         var existingModal = document.getElementById("swapDebugModal");
         if (existingModal) existingModal.remove();
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
+        var logs = readSwapDebug();
+        var text = JSON.stringify(logs, null, 2);
+        var modal = document.createElement("div");
+        modal.className = "modal-mask open";
+        modal.id = "swapDebugModal";
+        modal.innerHTML =
+          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 20px);max-width:430px;max-height:82vh;padding:18px;border-radius:22px;position:relative;">' +
+            '<button id="swapDebugClose" aria-label="Close" style="position:absolute;right:12px;top:10px;width:34px;height:34px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;line-height:1;">×</button>' +
+            '<h3 style="margin:6px 42px 12px 0;font-size:22px;">Swap Debug</h3>' +
+            '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
+              '<button id="swapDebugCopy" class="btn-primary" style="height:38px;min-height:38px;padding:0 14px;font-size:14px;border-radius:14px;">Copy</button>' +
+              '<button id="swapDebugClear" class="btn-ghost" style="height:38px;min-height:38px;padding:0 14px;font-size:14px;border-radius:14px;">Clear</button>' +
+            '</div>' +
+            '<pre id="swapDebugText" style="white-space:pre-wrap;word-break:break-word;overflow:auto;max-height:58vh;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.32);border:1px solid var(--line);font-size:11px;line-height:1.45;color:#d7f7df;">' + text.replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", "\"":"&quot;", "'":"&#39;" })[ch]; }) + '</pre>' +
+          '</div>';
+        document.body.appendChild(modal);
+        document.getElementById("swapDebugClose").onclick = function(){ modal.remove(); };
+        document.getElementById("swapDebugCopy").onclick = function(){ copyTextToClipboard(text, "Swap debug copied"); };
+        document.getElementById("swapDebugClear").onclick = function(){
+          try { localStorage.removeItem("lumina_swap_debug_log_v1"); } catch(e) {}
+          modal.remove();
+          toast("Swap debug cleared");
+        };
+        modal.onclick = function(event){ if (event.target === modal) modal.remove(); };
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) existing.remove();
+        if (existing) return;
+        var swapView = document.getElementById("view-swap");
+        if (!swapView) return;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "swapDebugBtn";
+        btn.innerHTML = '<span>Debug</span><small id="swapDebugStage">ready</small>';
+        btn.style.position = "fixed";
+        btn.style.right = "14px";
+        btn.style.top = "86px";
+        btn.style.zIndex = "9999";
+        btn.style.display = "flex";
+        btn.style.flexDirection = "column";
+        btn.style.alignItems = "center";
+        btn.style.justifyContent = "center";
+        btn.style.gap = "1px";
+        btn.style.minWidth = "72px";
+        btn.style.height = "44px";
+        btn.style.border = "1px solid rgba(121,255,151,.55)";
+        btn.style.borderRadius = "14px";
+        btn.style.background = "rgba(10,24,15,.88)";
+        btn.style.color = "#87f59e";
+        btn.style.fontWeight = "800";
+        btn.style.fontSize = "12px";
+        btn.style.boxShadow = "0 10px 28px rgba(0,0,0,.35)";
+        btn.onclick = openSwapDebug;
+        document.body.appendChild(btn);
       }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
@@ -4306,6 +4379,7 @@ function enhancePrototypeSwapQuote() {
 	          error_code: error.error_code,
 	          data: error.data,
 	          details: error.details,
+	          debug: error.debug,
 	          cause: error.cause && (error.cause.message || error.cause.data || error.cause.code || error.cause.error_code)
 	        };
 	        try { out.serialized = JSON.stringify(error); } catch(e) {}
