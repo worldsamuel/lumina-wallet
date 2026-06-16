@@ -3519,7 +3519,8 @@ function enhancePrototypeMarket() {
         var resolvedVerified = resolvedStatus === "verified";
         market = Object.assign({}, existingMarket || {}, market, { status: resolvedStatus, verified: resolvedVerified });
         if (market.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(sym, market.logoUrl);
-        prices[sym] = market.priceUsd || 0;
+        if (Number(market.priceUsd) > 0) prices[sym] = Number(market.priceUsd);
+        else if (prices[sym] === undefined) prices[sym] = 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
         tokenFull[sym] = market.name || sym;
         tokenLogo[sym] = iconFor(sym, tokenLogo[sym] || market.symbol);
@@ -6911,6 +6912,28 @@ function enhancePrototypeDetail() {
         WLD: "0x2cfc85d8e48f8eab294be644d9e25c3030863003",
         USDC: "0x79a02482a880bce3f13e09da970dc34db4cd24d1"
       };
+      var coreDetailMarkets = {
+        WLD: {
+          symbol: "WLD",
+          name: "Worldcoin",
+          address: "0x2cfc85d8e48f8eab294be644d9e25c3030863003",
+          poolAddress: "0x610E319b3A3Ab56A0eD5562927D37c233774ba39",
+          priceUsd: null,
+          change24h: null,
+          volume24hUsd: 0,
+          liquidityUsd: 1
+        },
+        USDC: {
+          symbol: "USDC",
+          name: "USD Coin",
+          address: "0x79a02482a880bce3f13e09da970dc34db4cd24d1",
+          poolAddress: "",
+          priceUsd: 1,
+          change24h: 0,
+          volume24hUsd: 0,
+          liquidityUsd: 1
+        }
+      };
       var seriesByRange = {
         "1H": [44,46,45,48,47,50,49,53,52,56,55,58],
         "1D": [35,40,39,43,38,41,47,54,57,66,65,71,58,54,48,44,39,42,51,56,64,62,71,77,77,69,65,65],
@@ -6920,13 +6943,17 @@ function enhancePrototypeDetail() {
         "ALL": [18,20,24,23,28,32,31,36,40,45,43,50,54,53,59,64,62,69,72,76,74,81,79,86]
       };
 
-      function chartSvg(range, forceDown) {
+      function chartSvg(range, forceDown, asset) {
         var values = seriesByRange[range] || seriesByRange["1D"];
         var width = 430;
         var height = 230;
         var min = Math.min.apply(null, values);
         var max = Math.max.apply(null, values);
         var span = Math.max(1, max - min);
+        var price = 0;
+        try { price = asset ? latestKnownMarketPrice(asset) : 0; } catch(e) { price = 0; }
+        var lastValue = Number(values[values.length - 1] || 1);
+        var scale = price > 0 && lastValue > 0 ? price / lastValue : 0.01;
         var down = forceDown === true || values[values.length - 1] < values[0];
         var color = down ? "#f87171" : "#4ade80";
         var points = values.map(function(v, i) {
@@ -6939,8 +6966,9 @@ function enhancePrototypeDetail() {
         }).join(" ");
         var last = points[points.length - 1];
         var area = line + " L " + last[0].toFixed(1) + " 190 L 46 190 Z";
-        var topLabel = "$" + (max / 100).toFixed(4);
-        var bottomLabel = "$" + (min / 100).toFixed(4);
+        var topLabel = formatChartPrice(max * scale);
+        var bottomLabel = formatChartPrice(min * scale);
+        var lastLabel = formatChartPrice(price || lastValue * scale);
         return '<svg viewBox="0 0 '+width+' '+height+'" preserveAspectRatio="none" aria-hidden="true">' +
           '<defs><linearGradient id="luminaDetailArea" x1="0" y1="0" x2="0" y2="1">' +
           '<stop offset="0%" stop-color="' + color + '" stop-opacity="0.42"/>' +
@@ -6951,6 +6979,8 @@ function enhancePrototypeDetail() {
           '<path d="'+area+'" fill="url(#luminaDetailArea)"/>' +
           '<path d="'+line+'" fill="none" stroke="' + color + '" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>' +
           '<circle cx="' + last[0].toFixed(1) + '" cy="' + last[1].toFixed(1) + '" r="6" fill="' + color + '"/>' +
+          '<rect x="' + Math.max(300, last[0] - 22).toFixed(1) + '" y="' + (last[1] - 15).toFixed(1) + '" width="86" height="24" rx="6" fill="' + color + '"/>' +
+          '<text x="' + Math.max(343, last[0] + 21).toFixed(1) + '" y="' + (last[1] + 2).toFixed(1) + '" text-anchor="middle" fill="#07120b" font-size="12" font-weight="900">' + lastLabel.replace("$", "") + '</text>' +
           '<text x="18" y="213" fill="#9da39d" font-size="15">00:00</text>' +
           '<text x="202" y="213" fill="#9da39d" font-size="15">12:00</text>' +
           '<text x="372" y="213" fill="#9da39d" font-size="15">24:00</text>' +
@@ -7044,10 +7074,13 @@ function enhancePrototypeDetail() {
         var map = window.__luminaMarketBySymbol || {};
         var sym = String(asset && asset.sym || "").toUpperCase();
         var livePrice = priceForHome(sym);
+        var coreMarket = coreDetailMarkets[sym] ? Object.assign({}, coreDetailMarkets[sym], { priceUsd: livePrice > 0 ? livePrice : coreDetailMarkets[sym].priceUsd }) : null;
         if (map[sym]) {
           if (livePrice > 0) map[sym].priceUsd = livePrice;
+          if (coreMarket) map[sym] = Object.assign({}, coreMarket, map[sym], { priceUsd: livePrice > 0 ? livePrice : (map[sym].priceUsd || coreMarket.priceUsd) });
           return map[sym];
         }
+        if (coreMarket) return coreMarket;
         var address = assetMarketAddress(asset);
         if (address) {
           var values = Object.keys(map).map(function(key){ return map[key]; });
@@ -7107,6 +7140,42 @@ function enhancePrototypeDetail() {
         var amount = assetAmountNumber(asset);
         if (amount > 0 && Number(asset && asset.usdNum) > 0) return Number(asset.usdNum) / amount;
         return 0;
+      }
+      function applyMarketPricePayload(payload) {
+        if (!payload || typeof payload !== "object") return false;
+        var changed = false;
+        ["WLD","USDC","USDT","ETH","BTC","EURC"].forEach(function(sym){
+          var row = payload[sym];
+          var price = row && Number(row.usd || row.priceUsd || 0);
+          if (!(price > 0)) return;
+          prices[sym] = price;
+          var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
+          if (market) {
+            market.priceUsd = price;
+            if (row.usd_24h_change !== null && row.usd_24h_change !== undefined) market.change24h = row.usd_24h_change;
+          }
+          tokenChanges24h = tokenChanges24h || {};
+          if (row.usd_24h_change !== null && row.usd_24h_change !== undefined) tokenChanges24h[sym] = row.usd_24h_change;
+          changed = true;
+        });
+        return changed;
+      }
+      function refreshDetailLatestPrice(asset) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        if (!["WLD","USDC","USDT","ETH","BTC","EURC"].includes(sym)) return;
+        fetch("/api/prices/market?t=" + Date.now(), { cache: "no-store" })
+          .then(function(res){ return res.ok ? res.json() : null; })
+          .then(function(payload){
+            if (!applyMarketPricePayload(payload)) return;
+            var currentAsset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : asset;
+            if (!currentAsset || String(currentAsset.sym || "").toUpperCase() !== sym) return;
+            var detailUsd = assetUsdValue(currentAsset);
+            if (detailUsd > 0) currentAsset.usdNum = detailUsd;
+            var usd = document.getElementById("detUsd");
+            if (usd) usd.textContent = "≈ " + formatFiat(detailUsd || 0);
+            renderMarketChart(currentAsset, document.getElementById("detChangeLabel") ? document.getElementById("detChangeLabel").textContent || "1D" : "1D");
+          })
+          .catch(function(){});
       }
       function normalizeCandlesToCurrentPrice(candles, asset) {
         var current = latestKnownMarketPrice(asset);
@@ -7176,6 +7245,9 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         var address = assetMarketAddress(asset);
+        chart.innerHTML = chartSvg(range || "1D", false, asset);
+        updateRangeChangeFromMarket(asset, range || "1D");
+        return;
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"))
@@ -7506,6 +7578,7 @@ function enhancePrototypeDetail() {
         pill.className = "none";
         pill.textContent = detailCopy("noData");
         renderMarketCard(asset);
+        refreshDetailLatestPrice(asset);
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
