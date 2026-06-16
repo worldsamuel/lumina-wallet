@@ -516,6 +516,13 @@
   .swap-panel .swap-amount-wrap { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; max-width: calc(100% - 132px); }
   .swap-panel .swap-amount-wrap .amt-in { width: 100%; min-width: 0; flex: 1 1 auto; }
   .swap-max-btn { flex: 0 0 auto; min-width: 45px; height: 30px; border-radius: 999px; border: 1px solid rgba(108,237,143,0.42); background: rgba(108,237,143,0.11); color: var(--green); font-size: 12px; font-weight: 900; cursor: pointer; }
+  #view-swap #swapBtn,
+  #view-swap #swapMaxBtn {
+    pointer-events: auto !important;
+    touch-action: manipulation;
+    position: relative;
+    z-index: 45;
+  }
   .swap-panel .tk { display: flex; align-items: center; gap: 8px; background: var(--surface-3); border-radius: var(--radius-pill); padding: 8px 14px; font-weight: 700; cursor: pointer; flex: 0 0 auto; }
   .swap-panel .tk .dot2 { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; overflow: hidden; flex: 0 0 22px; color: #fff; font-size: 11px; font-weight: 900; }
   .swap-panel .tk .dot2 img, .swap-panel .tk .dot2 svg { width: 100%; height: 100%; object-fit: contain; display: block; }

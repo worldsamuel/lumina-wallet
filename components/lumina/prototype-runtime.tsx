@@ -3993,7 +3993,15 @@ function enhancePrototypeSwapQuote() {
         btn.id = "swapMaxBtn";
         btn.className = "swap-max-btn";
         btn.textContent = "MAX";
-        btn.onclick = fillSwapMax;
+        btn.style.pointerEvents = "auto";
+        btn.style.touchAction = "manipulation";
+        btn.onclick = function(event){
+          if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+          fillSwapMax();
+        };
         wrap.appendChild(btn);
       }
 	      function setSwapButtonState(label, disabled){
@@ -4001,6 +4009,9 @@ function enhancePrototypeSwapQuote() {
 	        if (!btn) return;
 	        btn.classList.remove("quote-only");
 	        btn.disabled = false;
+	        btn.removeAttribute("disabled");
+	        btn.style.pointerEvents = "auto";
+	        btn.style.touchAction = "manipulation";
 	        btn.setAttribute("aria-disabled", disabled ? "true" : "false");
 	        btn.dataset.swapDisabled = disabled ? "1" : "0";
 	        var span = btn.querySelector("span");
@@ -4627,14 +4638,54 @@ function enhancePrototypeSwapQuote() {
 	          swapSubmitting = false;
 	        }
 	      }
-	      function bindSwapButtonClick(){
-	        var btn = document.getElementById("swapBtn");
-	        if (!btn || btn.__luminaSwapClickBound) return;
-	        btn.__luminaSwapClickBound = true;
-	        btn.onclick = function(event){
+	      function unlockSwapControl(el){
+	        if (!el) return;
+	        el.disabled = false;
+	        el.removeAttribute("disabled");
+	        el.style.pointerEvents = "auto";
+	        el.style.touchAction = "manipulation";
+	        if (!el.style.zIndex) el.style.zIndex = "45";
+	        if (!el.style.position) el.style.position = "relative";
+	      }
+	      var lastSwapDirectActionAt = 0;
+	      function runSwapDirectAction(kind, target, event){
+	        if (event) {
 	          event.preventDefault();
-	          handleSwapClick();
-	        };
+	          event.stopPropagation();
+	          if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+	        }
+	        unlockSwapControl(target);
+	        var now = Date.now();
+	        if (now - lastSwapDirectActionAt < 350) return;
+	        lastSwapDirectActionAt = now;
+	        if (kind === "max") {
+	          fillSwapMax();
+	          return;
+	        }
+	        handleSwapClick();
+	      }
+	      function bindSwapInteractions(){
+	        var btn = document.getElementById("swapBtn");
+	        var max = document.getElementById("swapMaxBtn");
+	        unlockSwapControl(btn);
+	        unlockSwapControl(max);
+	        if (btn) {
+	          btn.onclick = function(event){ runSwapDirectAction("confirm", btn, event); };
+	        }
+	        if (max) {
+	          max.onclick = function(event){ runSwapDirectAction("max", max, event); };
+	        }
+	        if (window.__luminaSwapDirectEventsBound) return;
+	        window.__luminaSwapDirectEventsBound = true;
+	        function captureSwapAction(event){
+	          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
+	          if (!target) return;
+	          var view = document.getElementById("view-swap");
+	          if (!view || !view.classList.contains("active")) return;
+	          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
+	        }
+	        document.addEventListener("click", captureSwapAction, true);
+	        document.addEventListener("touchend", captureSwapAction, true);
 	      }
 	      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
       if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
@@ -4649,7 +4700,7 @@ function enhancePrototypeSwapQuote() {
           setSwapPillLogo("buyDot", swapState.buy);
           ensureSwapMaxButton();
           ensureSwapDebugButton();
-          bindSwapButtonClick();
+          bindSwapInteractions();
           scheduleQuote();
         };
       }
@@ -4657,7 +4708,7 @@ function enhancePrototypeSwapQuote() {
         var warn = document.getElementById("unvWarn");
         if (warn) warn.classList.remove("show");
         var btn = document.getElementById("swapBtn");
-        if (btn) btn.disabled = false;
+        if (btn) unlockSwapControl(btn);
       };
       if (!window.__luminaTokenModalKeyboardFix) {
         window.__luminaTokenModalKeyboardFix = true;
@@ -4753,7 +4804,7 @@ function enhancePrototypeSwapQuote() {
       };
       recalc = scheduleQuote;
 	      confirmSwap = handleSwapClick;
-      bindSwapButtonClick();
+      bindSwapInteractions();
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
