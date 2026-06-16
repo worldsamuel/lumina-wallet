@@ -5556,20 +5556,11 @@ function enhancePrototypeMe() {
       function refreshPoints(){
         var badge = document.getElementById("mePointsBadge");
         var center = document.getElementById("pointsCenterValue");
-        var profile = window.__luminaPointsProfile || {};
-        var adjustmentTotal = Math.floor(Number(profile.adjustmentTotal || 0));
-        var basePoints = Number.isFinite(Number(window.__luminaActivityPoints)) ? Math.max(0, Math.floor(Number(window.__luminaActivityPoints))) : storedActivityPoints();
-        if (!basePoints && Number(window.__luminaPoints || 0) > adjustmentTotal) {
-          basePoints = Math.max(0, Math.floor(Number(window.__luminaPoints || 0) - adjustmentTotal));
-        }
         function setValue(value){
-          if (value != null) {
-            basePoints = Math.max(0, Math.floor(Number(value || 0)));
-            window.__luminaActivityPoints = basePoints;
-            storeActivityPoints(basePoints);
-          }
-          adjustmentTotal = Math.floor(Number((window.__luminaPointsProfile || {}).adjustmentTotal || 0));
-          window.__luminaPoints = Math.max(0, Math.floor(basePoints + adjustmentTotal - pointsSpentTotal()));
+          var nextPoints = value == null
+            ? Math.floor(Number((window.__luminaPointsProfile || {}).adjustmentTotal || window.__luminaPoints || 0))
+            : Math.floor(Number(value || 0));
+          window.__luminaPoints = Math.max(0, nextPoints);
           if (!Array.isArray(window.__luminaPointRecords)) window.__luminaPointRecords = [];
           if (badge) badge.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           if (center) center.textContent = Number(window.__luminaPoints || 0).toLocaleString();
@@ -5588,31 +5579,7 @@ function enhancePrototypeMe() {
           .then(function(data){
             if (!data) return;
             window.__luminaPointsProfile = data;
-            setValue();
-          })
-          .catch(function(){});
-        fetch("/api/activity?address=" + encodeURIComponent(address) + "&fast=1&t=" + Date.now(), { cache: "no-store" })
-          .then(function(res){ return res.ok ? res.json() : []; })
-          .then(function(rows){
-            rows = Array.isArray(rows) ? rows : [];
-            var nextBasePoints = pointsFromActivity(rows);
-            var hasPointRecords = Array.isArray(window.__luminaPointRecords) && window.__luminaPointRecords.length > 0;
-            var currentBasePoints = Math.max(0, Math.floor(Number(window.__luminaActivityPoints || basePoints || storedActivityPoints() || 0)));
-            if (!hasPointRecords && nextBasePoints <= 0 && currentBasePoints > 0) {
-              setValue();
-              return;
-            }
-            if (!hasPointRecords && nextBasePoints <= 0) {
-              fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
-                .then(function(res){ return res.ok ? res.json() : []; })
-                .then(function(fullRows){
-                  fullRows = Array.isArray(fullRows) ? fullRows : [];
-                  setValue(pointsFromActivity(fullRows));
-                })
-                .catch(function(){ setValue(nextBasePoints); });
-              return;
-            }
-            setValue(nextBasePoints);
+            setValue(Number(data.adjustmentTotal || 0));
           })
           .catch(function(){});
       }

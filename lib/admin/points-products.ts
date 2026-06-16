@@ -348,6 +348,16 @@ async function writeStoredAdjustments(rows: PointsAdjustmentConfig[]) {
   return trimmed;
 }
 
+function currentPointsYearStart() {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), 0, 1, 0, 0, 0, 0)).getTime();
+}
+
+function isCurrentPointsYear(row: PointsAdjustmentConfig) {
+  const created = new Date(row.createdAt || 0).getTime();
+  return Number.isFinite(created) && created >= currentPointsYearStart();
+}
+
 export async function getPointsProducts() {
   return readStoredProducts();
 }
@@ -384,9 +394,10 @@ export async function updatePointsOrderRedemption(input: { id: string; redeemed:
 
 export async function getPointsAdjustments(address?: string) {
   const rows = await readStoredAdjustments();
-  if (!address) return rows;
+  const annualRows = rows.filter(isCurrentPointsYear);
+  if (!address) return annualRows;
   const normalized = address.toLowerCase();
-  return rows.filter((row) => row.address === normalized);
+  return annualRows.filter((row) => row.address === normalized);
 }
 
 export async function getPointsAdjustmentTotal(address: string) {
@@ -484,7 +495,8 @@ export async function purchasePointsProduct(input: { address: string; productId:
     if (existing) return { order: existing, product: toPublicProduct(product) };
   }
   if (product.stock <= 0) throw new Error("Product sold out.");
-  if (Math.floor(Number(input.availablePoints || 0)) < product.points) throw new Error("Not enough Lumina Points.");
+  const availablePoints = await getPointsAdjustmentTotal(address);
+  if (availablePoints < product.points) throw new Error("Not enough Lumina Points.");
   const limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
   if (limit > 0) {
     const purchased = orders.filter((order) => order.address === address && order.productId === product.id).length;
@@ -518,6 +530,12 @@ export async function purchasePointsProduct(input: { address: string; productId:
     writeStoredOrders(latestOrders),
     writeStoredPublicProducts(products),
   ]);
+  await addPointsAdjustment({
+    address,
+    points: -product.points,
+    note: `Purchase ${product.title}`,
+    createdBy: `points-purchase:${order.id}`,
+  });
   return { order, product: toPublicProduct(products[productIndex]) };
 }
 
