@@ -3893,7 +3893,6 @@ function enhancePrototypeSwapQuote() {
       }
       function setSwapDebug(stage, detail){
         try {
-          ensureSwapDebugButton();
           var entry = swapDebugContext({
             stage: stage,
             detail: safeDebugValue(detail, 0)
@@ -3954,14 +3953,16 @@ function enhancePrototypeSwapQuote() {
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
         if (existing) return;
+        var swapView = document.getElementById("view-swap");
+        if (!swapView) return;
         var btn = document.createElement("button");
         btn.type = "button";
         btn.id = "swapDebugBtn";
         btn.innerHTML = '<span>Debug</span><small id="swapDebugStage">ready</small>';
         btn.style.position = "fixed";
-        btn.style.right = "16px";
-        btn.style.bottom = "132px";
-        btn.style.zIndex = "2147483647";
+        btn.style.right = "14px";
+        btn.style.top = "86px";
+        btn.style.zIndex = "9999";
         btn.style.display = "flex";
         btn.style.flexDirection = "column";
         btn.style.alignItems = "center";
@@ -3969,15 +3970,13 @@ function enhancePrototypeSwapQuote() {
         btn.style.gap = "1px";
         btn.style.minWidth = "72px";
         btn.style.height = "44px";
-        btn.style.border = "1px solid rgba(121,255,151,.85)";
+        btn.style.border = "1px solid rgba(121,255,151,.55)";
         btn.style.borderRadius = "14px";
-        btn.style.background = "rgba(10,24,15,.96)";
+        btn.style.background = "rgba(10,24,15,.88)";
         btn.style.color = "#87f59e";
         btn.style.fontWeight = "800";
         btn.style.fontSize = "12px";
         btn.style.boxShadow = "0 10px 28px rgba(0,0,0,.35)";
-        btn.style.pointerEvents = "auto";
-        btn.style.transform = "translateZ(0)";
         btn.onclick = openSwapDebug;
         document.body.appendChild(btn);
       }
@@ -4174,7 +4173,6 @@ function enhancePrototypeSwapQuote() {
         setSwapButtonPending();
       }
       async function requestQuote(){
-        ensureSwapDebugButton();
         setSwapButtonPending();
         var sell = document.getElementById("sellAmt");
         var amount = sell ? String(sell.value || "").trim() : "";
@@ -4597,7 +4595,6 @@ function enhancePrototypeSwapQuote() {
 	        document.getElementById("swapSuccessOk").onclick = function(){ modal.remove(); go("activity"); setTabByName("Activity"); };
 	      }
 	      async function handleSwapClick(){
-	        ensureSwapDebugButton();
 	        if (swapSubmitting) return;
 	        if (!latestSwapQuote && activeQuotePromise) {
 	          await activeQuotePromise;
