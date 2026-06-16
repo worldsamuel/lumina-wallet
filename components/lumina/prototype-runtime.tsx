@@ -3926,13 +3926,28 @@ function enhancePrototypeSwapQuote() {
         }, extra || {});
       }
       function setSwapDebug(stage, detail){
-        var item = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
-        window.__luminaSwapDebugLog = window.__luminaSwapDebugLog || [];
-        window.__luminaSwapDebugLog.unshift(item);
-        window.__luminaSwapDebugLog = window.__luminaSwapDebugLog.slice(0, 30);
-        try { localStorage.setItem("lumina_swap_debug_log", JSON.stringify(window.__luminaSwapDebugLog)); } catch(e) {}
-        var live = document.getElementById("swapDebugLive");
-        if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
+        try {
+          var item;
+          try {
+            item = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
+          } catch(contextError) {
+            item = {
+              at: new Date().toISOString(),
+              page: "swap",
+              stage: stage,
+              detail: safeDebugValue(detail || {}, 0),
+              contextError: contextError && (contextError.message || String(contextError))
+            };
+          }
+          window.__luminaSwapDebugLog = window.__luminaSwapDebugLog || [];
+          window.__luminaSwapDebugLog.unshift(item);
+          window.__luminaSwapDebugLog = window.__luminaSwapDebugLog.slice(0, 30);
+          try { localStorage.setItem("lumina_swap_debug_log", JSON.stringify(window.__luminaSwapDebugLog)); } catch(e) {}
+          var live = document.getElementById("swapDebugLive");
+          if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
+          var pre = document.getElementById("swapDebugPre");
+          if (pre) pre.textContent = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
+        } catch(e) {}
       }
       function readSwapDebug(){
         if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
@@ -3943,6 +3958,13 @@ function enhancePrototypeSwapQuote() {
         if (existingModal) existingModal.remove();
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
+        setSwapDebug("debug:open", {
+          activeView: document.querySelector(".view.active") ? document.querySelector(".view.active").id : "",
+          sellValue: document.getElementById("sellAmt") ? document.getElementById("sellAmt").value : "",
+          buyValue: document.getElementById("buyAmt") ? document.getElementById("buyAmt").value : "",
+          swapBtn: !!document.getElementById("swapBtn"),
+          maxBtn: !!document.getElementById("swapMaxBtn")
+        });
         var log = readSwapDebug();
         var modal = document.createElement("div");
         modal.className = "modal-mask open";
@@ -4709,8 +4731,9 @@ function enhancePrototypeSwapQuote() {
 	        if (max) {
 	          max.onclick = function(event){ runSwapDirectAction("max", max, event); };
 	        }
-	        if (window.__luminaSwapDirectEventsBound) return;
-	        window.__luminaSwapDirectEventsBound = true;
+	        var bindVersion = "v20260616-debug2";
+	        if (window.__luminaSwapDirectEventsBound === bindVersion) return;
+	        window.__luminaSwapDirectEventsBound = bindVersion;
 	        function swapHitInfo(event){
 	          var point = event;
 	          if (event && event.changedTouches && event.changedTouches[0]) point = event.changedTouches[0];
@@ -4739,12 +4762,23 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        function captureSwapAction(event){
 	          var view = document.getElementById("view-swap");
-	          if (view && view.classList.contains("active")) setSwapDebug("tap:" + event.type, swapHitInfo(event));
+	          var activeSwap = !view || view.classList.contains("active") || !!document.getElementById("sellAmt");
+	          if (activeSwap) setSwapDebug("tap:" + event.type, swapHitInfo(event));
 	          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
 	          if (!target) return;
-	          if (!view || !view.classList.contains("active")) return;
+	          if (!activeSwap) return;
 	          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
 	        }
+	        function captureSwapInput(event){
+	          var target = event.target;
+	          if (!target || target.id !== "sellAmt") return;
+	          setSwapDebug("input:" + event.type, { value: target.value });
+	          scheduleQuote();
+	          setSwapButtonPending();
+	        }
+	        document.addEventListener("input", captureSwapInput, true);
+	        document.addEventListener("change", captureSwapInput, true);
+	        document.addEventListener("keyup", captureSwapInput, true);
 	        document.addEventListener("pointerdown", captureSwapAction, true);
 	        document.addEventListener("click", captureSwapAction, true);
 	        document.addEventListener("touchend", captureSwapAction, true);
