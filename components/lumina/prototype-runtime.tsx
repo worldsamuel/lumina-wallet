@@ -3983,6 +3983,22 @@ function enhancePrototypeSwapQuote() {
         btn.onclick = openSwapDebug;
         swapBtn.insertAdjacentElement("afterend", btn);
       }
+      function bindLiveSwapControls(){
+        var btn = document.getElementById("swapBtn");
+        if (btn) {
+          btn.onclick = function(event){
+            if (event && event.preventDefault) event.preventDefault();
+            return handleSwapClick();
+          };
+          btn.setAttribute("data-live-swap", "1");
+        }
+        window.confirmSwap = handleSwapClick;
+        window.recalc = scheduleQuote;
+        ensureSwapMaxButton();
+        ensureSwapDebugButton();
+        setSwapPillLogo("sellDot", swapState.sell);
+        setSwapPillLogo("buyDot", swapState.buy);
+      }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
         if (!Number.isFinite(n) || n <= 0) return "0";
@@ -4028,6 +4044,10 @@ function enhancePrototypeSwapQuote() {
         if (!parent) return;
         var wrap = document.createElement("div");
         wrap.className = "swap-amount-wrap";
+        wrap.style.display = "flex";
+        wrap.style.alignItems = "center";
+        wrap.style.gap = "10px";
+        wrap.style.flex = "1";
         parent.insertBefore(wrap, sell);
         wrap.appendChild(sell);
         var btn = document.createElement("button");
@@ -4035,6 +4055,18 @@ function enhancePrototypeSwapQuote() {
         btn.id = "swapMaxBtn";
         btn.className = "swap-max-btn";
         btn.textContent = "MAX";
+        btn.style.display = "inline-flex";
+        btn.style.alignItems = "center";
+        btn.style.justifyContent = "center";
+        btn.style.height = "34px";
+        btn.style.minWidth = "58px";
+        btn.style.borderRadius = "999px";
+        btn.style.border = "1px solid rgba(121,255,151,.65)";
+        btn.style.background = "rgba(64,181,96,.18)";
+        btn.style.color = "#87f59e";
+        btn.style.fontWeight = "900";
+        btn.style.fontSize = "13px";
+        btn.style.flexShrink = "0";
         btn.onclick = fillSwapMax;
         wrap.appendChild(btn);
       }
@@ -4093,7 +4125,11 @@ function enhancePrototypeSwapQuote() {
         return !!(latestSwapQuote && latestQuoteKey && latestQuoteKey === currentQuoteKey());
       }
       function tokenLogoForSwap(symbol){
+        symbol = String(symbol || "").toUpperCase();
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : symbol);
+        if (symbol === "WLD") return "◎";
+        if (symbol === "USDC") return "$";
+        if (symbol === "EURC") return "€";
         return tokenLogo && tokenLogo[symbol] ? tokenLogo[symbol] : String(symbol || "?").slice(0, 1);
       }
       function setSwapPillLogo(id, symbol){
@@ -4176,6 +4212,7 @@ function enhancePrototypeSwapQuote() {
         setSwapButtonPending();
       }
       async function requestQuote(){
+        bindLiveSwapControls();
         ensureSwapDebugButton();
         setSwapButtonPending();
         var sell = document.getElementById("sellAmt");
@@ -4599,6 +4636,7 @@ function enhancePrototypeSwapQuote() {
 	        document.getElementById("swapSuccessOk").onclick = function(){ modal.remove(); go("activity"); setTabByName("Activity"); };
 	      }
 	      async function handleSwapClick(){
+	        bindLiveSwapControls();
 	        ensureSwapDebugButton();
 	        if (swapSubmitting) return;
 	        if (!latestSwapQuote && activeQuotePromise) {
@@ -4783,8 +4821,7 @@ function enhancePrototypeSwapQuote() {
           setTimeout(function(){ panel.scrollIntoView({ block: "nearest", behavior: "smooth" }); }, 30);
         }
       };
-      window.recalc = scheduleQuote;
-	      window.confirmSwap = handleSwapClick;
+      bindLiveSwapControls();
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
