@@ -1,6 +1,7 @@
 import { formatUnits, type Address } from "viem";
 import { readWorldChainWithFallback } from "./chain";
 import { db } from "./db";
+import { RE7_VAULTS } from "./morpho/vaults";
 import { ERC20_TOKENS, TOKENS } from "./tokens";
 import worldChainTokenCatalog from "./swap/worldchain-token-catalog.json";
 
@@ -60,6 +61,7 @@ const ALCHEMY_BALANCE_TIMEOUT_MS = 1_200;
 const ALCHEMY_METADATA_TIMEOUT_MS = 900;
 const BALANCE_TOKEN_CONFIG_TTL_MS = 300_000;
 let cachedBalanceTokens: { expiresAt: number; data: BalanceTokenConfig[] } | null = null;
+const EARN_VAULT_ADDRESSES = new Set(RE7_VAULTS.map((vault) => vault.address.toLowerCase()));
 const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
   {
     symbol: "ORB",
@@ -92,6 +94,7 @@ function toBalance(token: BalanceTokenConfig | (typeof TOKENS)[number], balance:
 
 function toDiscoveredBalance(token: CatalogToken, balance: bigint): ChainBalance | null {
   if (!token.address || !token.symbol) return null;
+  if (isEarnVaultTokenAddress(token.address) || isEarnVaultTokenSymbol(token.symbol)) return null;
   const decimals = Number.isInteger(Number(token.decimals)) ? Number(token.decimals) : 18;
   const symbol = String(token.symbol).slice(0, 16);
   const name = String(token.name || symbol).slice(0, 60);
@@ -244,7 +247,7 @@ async function getBalanceTokens(): Promise<BalanceTokenConfig[]> {
   const seen = new Set<string>();
   const data = [...core, ...configured, ...LEGACY_BALANCE_TOKENS].filter((token): token is BalanceTokenConfig => {
     const address = token.contractAddress?.toLowerCase();
-    if (!address || seen.has(address)) return false;
+    if (!address || seen.has(address) || isEarnVaultTokenAddress(address) || isEarnVaultTokenSymbol(token.symbol)) return false;
     seen.add(address);
     return true;
   });
@@ -278,6 +281,7 @@ async function fetchDiscoveredTokenBalances(knownBalances: AlchemyTokenBalance[]
   const positiveBalances = balances
     .map((item) => {
       if (!item.contractAddress || !item.tokenBalance || item.error) return null;
+      if (isEarnVaultTokenAddress(item.contractAddress)) return null;
       const balance = parseAlchemyBalance(item.tokenBalance);
       if (balance <= 0n) return null;
       return { contractAddress: item.contractAddress, balance };
@@ -358,4 +362,12 @@ function parseAlchemyBalance(value: string) {
   } catch {
     return 0n;
   }
+}
+
+function isEarnVaultTokenAddress(address?: string | null) {
+  return Boolean(address && EARN_VAULT_ADDRESSES.has(address.toLowerCase()));
+}
+
+function isEarnVaultTokenSymbol(symbol?: string | null) {
+  return /^RE7/i.test(String(symbol || ""));
 }

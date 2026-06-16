@@ -89,12 +89,14 @@ export async function GET(
         args: [shares],
       };
     });
-    const assetResults = await readWorldChainWithFallback((client) =>
-      client.multicall({ allowFailure: true, contracts: assetContracts }),
-    );
-    const vaultMetaResults = await readWorldChainWithFallback((client) =>
-      client.multicall({ allowFailure: true, contracts: vaultMetaContracts }),
-    );
+    const [assetResults, vaultMetaResults] = await Promise.all([
+      readWorldChainWithFallback((client) =>
+        client.multicall({ allowFailure: true, contracts: assetContracts }),
+      ),
+      readWorldChainWithFallback((client) =>
+        client.multicall({ allowFailure: true, contracts: vaultMetaContracts }),
+      ),
+    ]);
 
     const positions = vaults.map((vault, index) => {
       const shares = resultBigInt(baseResults[index * 3], "vault shares");

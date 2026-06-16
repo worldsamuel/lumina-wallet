@@ -1855,16 +1855,30 @@ function enhancePrototypeEarn() {
         morphoError = "";
         hydrateEarnPositionsFromSnapshot();
         renderProducts();
-        try {
-          await loadMorphoVaults();
-          try {
-            await loadMorphoPositions();
-          } catch(e) {
-            hydrateEarnPositionsFromSnapshot();
+        var vaultFailed = false;
+        var positionFailed = false;
+        var vaultPromise = loadMorphoVaults().then(function(){
+          renderProducts();
+          renderHomeEarningPositions();
+        }).catch(function(e){
+          vaultFailed = true;
+          console.log("[EARN] Vault refresh failed:", e);
+        });
+        var positionPromise = loadMorphoPositions().then(function(){
+          renderProducts();
+          renderHomeEarningPositions();
+          if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+            openEarn(activeEarnIndex);
           }
-        } catch(e) {
-          morphoError = "Unable to load live vault data";
+        }).catch(function(e){
+          positionFailed = true;
           hydrateEarnPositionsFromSnapshot();
+          console.log("[EARN] Position refresh failed:", e);
+        });
+        try {
+          await Promise.allSettled([vaultPromise, positionPromise]);
+          if (vaultFailed && positionFailed) morphoError = "Unable to load live earn data";
+          else if (vaultFailed) morphoError = "Unable to load live vault data";
         } finally {
           morphoLoading = false;
           renderProducts();
@@ -1914,7 +1928,7 @@ function enhancePrototypeEarn() {
       if ((earnView && earnView.classList.contains("active")) || (earnDetailView && earnDetailView.classList.contains("active"))) {
         loadMorphoData(false);
       } else {
-        setTimeout(function(){ loadMorphoData(false); }, 800);
+        setTimeout(function(){ loadMorphoData(false); }, 200);
       }
     })();
   `;
@@ -2032,12 +2046,29 @@ function enhancePrototypeTokens() {
         symbol = String(symbol || "").toUpperCase();
         return !!symbol && symbol !== "23" && /[A-Z]/.test(symbol);
       }
+      var earnVaultTokenAddressSet = new Set([
+        "0x348831b46876d3df2db98bdec5e3b4083329ab9f",
+        "0xb1e80387ebe53ff75a89736097d34dc8d9e9045b",
+        "0x0db7e405278c2674f462ac9d9eb8b8346d1c1571",
+        "0xdaa79e066dee8c8c15ffb37b1157f7eb8e0d1b37",
+        "0x1c94c7a2c71ecf13104c31f49d5138edb099d25d",
+        "0xbc8c37467c5df9d50b42294b8628c25888becf61"
+      ]);
+      function isEarnVaultSymbol(symbol){
+        return /^RE7/i.test(String(symbol || "").toUpperCase());
+      }
+      function isEarnVaultToken(token){
+        var symbol = String(token && token.symbol || "").toUpperCase();
+        var address = String(token && (token.contractAddr || token.address) || "").toLowerCase();
+        var name = String(token && (token.name || token.displayName) || "");
+        return isEarnVaultSymbol(symbol) || earnVaultTokenAddressSet.has(address) || /^Re7/i.test(name);
+      }
       function sortedSwapSymbols(symbols){
         var pinned = ["WLD","USDC","USDT","WETH","WBTC","EURC"];
         var seen = new Set();
         return (symbols || []).filter(function(sym){
           sym = String(sym || "").toUpperCase();
-          if (!isCleanSwapSymbol(sym) || seen.has(sym)) return false;
+          if (!isCleanSwapSymbol(sym) || isEarnVaultSymbol(sym) || seen.has(sym)) return false;
           seen.add(sym);
           return true;
         }).sort(function(a, b){
@@ -2096,10 +2127,11 @@ function enhancePrototypeTokens() {
         var seen = new Set();
         return source.filter(function(token){
           var symbol = String(token && token.symbol || "").toUpperCase();
-          if (!isCleanSwapSymbol(symbol)) return false;
+          if (!isCleanSwapSymbol(symbol) || isEarnVaultToken(token)) return false;
           var configured = backendBySymbol[symbol];
           if (configured) {
             token = Object.assign({}, token, configured);
+            if (isEarnVaultToken(token)) return false;
             if (configured.status && configured.status !== "verified") return false;
           }
           if (token.status && token.status !== "verified") return false;
@@ -2113,6 +2145,7 @@ function enhancePrototypeTokens() {
       }
       function registerBackendToken(token){
         var symbol = String(token.symbol || "").toUpperCase();
+        if (isEarnVaultToken(token) || isEarnVaultSymbol(symbol)) return "";
         if (!symbol || symbol === "23") return "";
         window.__luminaBackendTokenBySymbol = window.__luminaBackendTokenBySymbol || {};
         window.__luminaBackendTokenBySymbol[symbol] = token;
@@ -2243,7 +2276,7 @@ function enhancePrototypeTokens() {
         var existingSymbols = new Set((assets || []).map(function(asset){ return String(asset && asset.sym || "").toUpperCase(); }));
         Object.keys(balances).forEach(function(symbol){
           var sym = String(symbol || "").toUpperCase();
-          if (!sym || sym === "23" || existingSymbols.has(sym)) return;
+          if (!sym || sym === "23" || isEarnVaultSymbol(sym) || existingSymbols.has(sym)) return;
           var amount = Number(String(balances[sym] || "0").replace(/,/g, ""));
           if (!Number.isFinite(amount) || amount <= 0) return;
           var price = priceFor(sym);
@@ -2284,6 +2317,7 @@ function enhancePrototypeTokens() {
         writeJson(importStoreKey, list);
       }
       function registerImportedToken(token){
+        if (isEarnVaultToken(token) || isEarnVaultSymbol(token && token.symbol)) return "";
         if (whitelistedAddresses().has(String(token.address || "").toLowerCase())) return token.symbol;
         var key = Object.keys(customTokens || {}).find(function(sym){
           return customTokens[sym] && String(customTokens[sym].address).toLowerCase() === String(token.address).toLowerCase();
@@ -4193,7 +4227,7 @@ function enhancePrototypeSwapQuote() {
 	      }
 	      function upsertRecentSwapHomeAsset(symbol, quoted, amountHint){
 	        symbol = String(symbol || "").toUpperCase();
-	        if (!symbol) return;
+	        if (!symbol || isEarnVaultSymbol(symbol) || isEarnVaultToken(quoted)) return;
 	        var meta = tokenMeta(symbol, quoted);
 	        var marketMeta = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[symbol];
 	        var tokenStatus = (marketMeta && marketMeta.status) || (quoted && quoted.status) || (customTokens && customTokens[symbol] && customTokens[symbol].status) || "pending";
@@ -4250,6 +4284,8 @@ function enhancePrototypeSwapQuote() {
 	        if (typeof renderAssets === "function") renderAssets();
 	      }
 	      function balanceNumber(symbol){
+	        symbol = String(symbol || "").toUpperCase();
+	        if (isEarnVaultSymbol(symbol)) return 0;
 	        var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
 	        var n = Number(raw.replace(/,/g, "").replace(/^</, ""));
 	        return Number.isFinite(n) ? n : 0;
@@ -4814,6 +4850,8 @@ function enhancePrototypeSend() {
         return null;
       }
       function balanceNumber(symbol){
+        symbol = String(symbol || "").toUpperCase();
+        if (/^RE7/i.test(symbol)) return 0;
         var raw = (typeof balances !== "undefined" && balances[symbol]) ? String(balances[symbol]) : "0";
         var n = Number(raw.replace(/,/g, "").replace(/^</, ""));
         return Number.isFinite(n) ? n : 0;
