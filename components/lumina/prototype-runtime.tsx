@@ -3933,6 +3933,8 @@ function enhancePrototypeSwapQuote() {
         try { localStorage.setItem("lumina_swap_debug_log", JSON.stringify(window.__luminaSwapDebugLog)); } catch(e) {}
         var live = document.getElementById("swapDebugLive");
         if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
+        var pre = document.getElementById("swapDebugPre");
+        if (pre) pre.textContent = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
       }
       function readSwapDebug(){
         if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
@@ -3943,6 +3945,13 @@ function enhancePrototypeSwapQuote() {
         if (existingModal) existingModal.remove();
         var old = document.getElementById("swapDebugModal");
         if (old) old.remove();
+        setSwapDebug("debug:open", {
+          activeView: document.querySelector(".view.active") && document.querySelector(".view.active").id,
+          sellExists: !!document.getElementById("sellAmt"),
+          buyExists: !!document.getElementById("buyAmt"),
+          swapBtnExists: !!document.getElementById("swapBtn"),
+          maxBtnExists: !!document.getElementById("swapMaxBtn")
+        });
         var log = readSwapDebug();
         var modal = document.createElement("div");
         modal.className = "modal-mask open";
@@ -4739,15 +4748,43 @@ function enhancePrototypeSwapQuote() {
 	        }
 	        function captureSwapAction(event){
 	          var view = document.getElementById("view-swap");
-	          if (view && view.classList.contains("active")) setSwapDebug("tap:" + event.type, swapHitInfo(event));
+	          setSwapDebug("tap:" + event.type, swapHitInfo(event));
 	          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
 	          if (!target) return;
-	          if (!view || !view.classList.contains("active")) return;
+	          if (view && !view.classList.contains("active") && !document.getElementById("sellAmt")) return;
 	          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
 	        }
 	        document.addEventListener("pointerdown", captureSwapAction, true);
 	        document.addEventListener("click", captureSwapAction, true);
 	        document.addEventListener("touchend", captureSwapAction, true);
+	      }
+	      function bindSwapFormEvents(){
+	        var sell = document.getElementById("sellAmt");
+	        var buy = document.getElementById("buyAmt");
+	        if (sell && !sell.__luminaSwapInputBound) {
+	          sell.__luminaSwapInputBound = true;
+	          var onAmount = function(event){
+	            setSwapDebug("input:" + (event && event.type || "manual"), { value: sell.value });
+	            scheduleQuote();
+	            setSwapButtonPending();
+	          };
+	          sell.addEventListener("input", onAmount, true);
+	          sell.addEventListener("change", onAmount, true);
+	          sell.addEventListener("keyup", onAmount, true);
+	          sell.addEventListener("paste", function(){ setTimeout(onAmount, 0); }, true);
+	          sell.oninput = onAmount;
+	        }
+	        if (buy) {
+	          buy.readOnly = true;
+	          buy.setAttribute("readonly", "readonly");
+	        }
+	        bindSwapInteractions();
+	        setSwapDebug("bind:swap-form", {
+	          sellValue: sell ? sell.value : null,
+	          buyValue: buy ? buy.value : null,
+	          swapBtn: !!document.getElementById("swapBtn"),
+	          maxBtn: !!document.getElementById("swapMaxBtn")
+	        });
 	      }
 	      var previousRefresh = typeof refreshSwapLabels === "function" ? refreshSwapLabels : null;
       if (previousRefresh && !window.__luminaQuoteRefreshWrapped) {
@@ -4762,7 +4799,7 @@ function enhancePrototypeSwapQuote() {
           setSwapPillLogo("buyDot", swapState.buy);
           ensureSwapMaxButton();
           ensureSwapDebugButton();
-          bindSwapInteractions();
+          bindSwapFormEvents();
           scheduleQuote();
         };
       }
@@ -4866,7 +4903,6 @@ function enhancePrototypeSwapQuote() {
       };
       recalc = scheduleQuote;
 	      confirmSwap = handleSwapClick;
-      bindSwapInteractions();
       document.querySelectorAll(".slip-opt").forEach(function(el){
         el.addEventListener("click", scheduleQuote);
       });
@@ -4876,6 +4912,7 @@ function enhancePrototypeSwapQuote() {
       resetInitialSwapAmounts();
       ensureSwapMaxButton();
       ensureSwapDebugButton();
+      bindSwapFormEvents();
       setSwapButtonPending();
       ensureQuoteBox();
       setSwapPillLogo("sellDot", swapState.sell);
