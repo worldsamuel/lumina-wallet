@@ -3951,18 +3951,55 @@ function enhancePrototypeSwapQuote() {
           if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
           var pre = document.getElementById("swapDebugPre");
           if (pre) pre.textContent = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
+          var textArea = document.getElementById("swapDebugText");
+          if (textArea) textArea.value = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
         } catch(e) {}
       }
       function readSwapDebug(){
         if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
         try { return JSON.parse(localStorage.getItem("lumina_swap_debug_log") || "[]"); } catch(e) { return []; }
       }
-      function copySwapDebug(){
+      function readSwapDebugText(){
+        var textArea = document.getElementById("swapDebugText");
+        if (textArea && textArea.value) return textArea.value;
+        var pre = document.getElementById("swapDebugPre");
+        if (pre && pre.textContent) return pre.textContent;
         var text = JSON.stringify(readSwapDebug(), null, 2);
+        return text && text !== "[]" ? text : "[debug log is empty]";
+      }
+      function copySwapDebug(){
+        var text = readSwapDebugText();
         function done(ok){
           var live = document.getElementById("swapDebugLive");
-          if (live) live.textContent = ok ? "copied · " + new Date().toLocaleTimeString() : "copy failed";
+          if (live) live.textContent = ok ? "copied " + text.length + " chars · " + new Date().toLocaleTimeString() : "copy failed";
           toast(ok ? "Debug copied" : "Copy failed");
+        }
+        try {
+          var ta = document.createElement("textarea");
+          ta.value = text;
+          ta.style.position = "fixed";
+          ta.style.left = "0";
+          ta.style.top = "0";
+          ta.style.width = "1px";
+          ta.style.height = "1px";
+          ta.style.opacity = "0.01";
+          ta.setAttribute("readonly", "readonly");
+          document.body.appendChild(ta);
+          ta.focus();
+          ta.select();
+          ta.setSelectionRange(0, ta.value.length);
+          var ok = document.execCommand("copy");
+          ta.remove();
+          if (ok) { done(true); return; }
+        } catch(e) {
+          try {
+            var temp = document.querySelector("textarea[readonly]");
+            if (temp) {
+              temp.focus();
+              temp.select();
+              temp.setSelectionRange(0, temp.value.length);
+            }
+          } catch(ignore) {}
         }
         try {
           if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -3970,20 +4007,16 @@ function enhancePrototypeSwapQuote() {
             return;
           }
         } catch(e) {}
-        try {
-          var ta = document.createElement("textarea");
-          ta.value = text;
-          ta.style.position = "fixed";
-          ta.style.left = "-9999px";
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          var ok = document.execCommand("copy");
-          ta.remove();
-          done(ok);
-        } catch(e) {
-          done(false);
-        }
+        done(false);
+      }
+      function selectSwapDebug(){
+        var textArea = document.getElementById("swapDebugText");
+        if (!textArea) return;
+        textArea.focus();
+        textArea.select();
+        textArea.setSelectionRange(0, textArea.value.length);
+        var live = document.getElementById("swapDebugLive");
+        if (live) live.textContent = "selected " + textArea.value.length + " chars";
       }
       function openSwapDebug(){
         var existingModal = document.getElementById("swapDebugModal");
@@ -4005,13 +4038,14 @@ function enhancePrototypeSwapQuote() {
           '<div class="modal send-confirm-sheet" style="width:calc(100vw - 22px);max-width:430px;max-height:78vh;overflow:auto;padding:18px;border-radius:22px;align-self:flex-end;">' +
             '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">' +
               '<h3 style="margin:0;font-size:22px;">Swap Debug</h3>' +
-              '<div style="display:flex;align-items:center;gap:8px;"><button id="swapDebugCopy" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(108,237,143,.55);background:rgba(108,237,143,.12);color:var(--green);padding:0 14px;font-size:12px;font-weight:900;">COPY</button><button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button></div>' +
+              '<div style="display:flex;align-items:center;gap:8px;"><button id="swapDebugSelect" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--text);padding:0 12px;font-size:12px;font-weight:900;">SELECT</button><button id="swapDebugCopy" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(108,237,143,.55);background:rgba(108,237,143,.12);color:var(--green);padding:0 14px;font-size:12px;font-weight:900;">COPY</button><button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button></div>' +
             '</div>' +
             '<div id="swapDebugLive" style="margin-bottom:10px;color:var(--green);font-size:12px;font-weight:800;">ready</div>' +
-            '<pre id="swapDebugPre" style="white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:#d9ffe0;font-size:11px;line-height:1.45;">' + escapeHtml(JSON.stringify(log, null, 2)) + '</pre>' +
+            '<textarea id="swapDebugText" readonly style="display:block;width:100%;min-height:48vh;white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:#d9ffe0;font-size:11px;line-height:1.45;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;">' + escapeHtml(JSON.stringify(log, null, 2)) + '</textarea>' +
           '</div>';
         document.body.appendChild(modal);
         document.getElementById("swapDebugClose").onclick = function(){ modal.remove(); };
+        document.getElementById("swapDebugSelect").onclick = function(event){ event.preventDefault(); event.stopPropagation(); selectSwapDebug(); };
         document.getElementById("swapDebugCopy").onclick = function(event){ event.preventDefault(); event.stopPropagation(); copySwapDebug(); };
         modal.onclick = function(event){ if (event.target === modal) modal.remove(); };
       }
