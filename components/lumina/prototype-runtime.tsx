@@ -7204,35 +7204,6 @@ function enhancePrototypeDetail() {
         });
       }
 
-      function fallbackCandlesForRange(range, asset) {
-        var values = seriesByRange[range] || seriesByRange["1D"];
-        var price = latestKnownMarketPrice(asset);
-        var lastValue = Number(values[values.length - 1] || 1);
-        var scale = price > 0 && lastValue > 0 ? price / lastValue : 0.01;
-        var now = Math.floor(Date.now() / 1000);
-        var step = range === "1H" ? 180 : range === "1D" ? 3600 : range === "1W" ? 14400 : range === "1Y" ? 86400 * 14 : 86400;
-        return values.map(function(value, index) {
-          var close = Math.max(0.0000001, Number(value || 0) * scale);
-          var prev = index > 0 ? Math.max(0.0000001, Number(values[index - 1] || value) * scale) : close * 0.992;
-          var open = prev;
-          var wiggle = close * (0.006 + (index % 3) * 0.002);
-          return {
-            timestamp: now - (values.length - index) * step,
-            open: open,
-            high: Math.max(open, close) + wiggle,
-            low: Math.max(0.0000001, Math.min(open, close) - wiggle),
-            close: close,
-            volume: 120 + (index % 5) * 45 + Math.abs(close - open) * 10000
-          };
-        });
-      }
-
-      function renderFallbackCandles(chart, asset, range) {
-        var candles = fallbackCandlesForRange(range || "1D", asset);
-        renderCandlesChart(chart, candles, range || "1D", asset);
-        updateRangeChange(candles, range || "1D", asset);
-      }
-
       function renderMarketCard(asset) {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
@@ -7285,11 +7256,13 @@ function enhancePrototypeDetail() {
                 renderCandlesChart(chart, normalizedCandles, range || "1D", asset);
                 updateRangeChange(normalizedCandles, range || "1D", asset);
               } else {
-                renderFallbackCandles(chart, asset, range || "1D");
+                chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
+                updateRangeChangeFromMarket(asset, range || "1D");
               }
             })
             .catch(function(){
-              renderFallbackCandles(chart, asset, range || "1D");
+              chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("historyFailed"));
+              updateRangeChangeFromMarket(asset, range || "1D");
             });
         }
         if (!market || !market.poolAddress) {
@@ -7306,11 +7279,11 @@ function enhancePrototypeDetail() {
               renderCandlesChart(chart, normalizedCandles, range || "1D", asset);
               updateRangeChange(normalizedCandles, range || "1D", asset);
             } else {
-              renderFallbackCandles(chart, asset, range || "1D");
+              renderHistory(detailCopy("emptyOhlcv"));
             }
           })
           .catch(function(){
-            renderFallbackCandles(chart, asset, range || "1D");
+            renderHistory(detailCopy("ohlcvFailed"));
           });
       }
       function updateRangeChange(candles, range, asset){
