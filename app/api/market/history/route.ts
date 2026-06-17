@@ -23,7 +23,7 @@ type HistoryCandle = {
 
 const cache = new Map<string, { expiresAt: number; candles: HistoryCandle[] }>();
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+  "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=30",
 };
 const SYMBOL_ALIASES: Record<string, string> = {
   WETH: "ETH",
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
   if (/^0x[a-fA-F0-9]{40}$/.test(address)) {
     const candles = await candlesForContract(address, symbol, range);
     if (candles.length) {
-      cache.set(key, { candles, expiresAt: Date.now() + 300_000 });
+      cache.set(key, { candles, expiresAt: Date.now() + 30_000 });
       return marketJson({ symbol, range, source: "geckoterminal", candles });
     }
     if (cached?.candles.length) {
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
 
   if (!id) {
     const candles = stablecoinCandles(symbol, range);
-    if (candles.length) cache.set(key, { candles, expiresAt: Date.now() + 300_000 });
+    if (candles.length) cache.set(key, { candles, expiresAt: Date.now() + 30_000 });
     return marketJson({ symbol, range, candles });
   }
 
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
 
     const response = await fetch(`${COINGECKO_MARKET_CHART_URL}/${id}/market_chart?${params}`, {
       headers,
-      next: { revalidate: 180 },
+      next: { revalidate: 30 },
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`CoinGecko market_chart responded ${response.status}`);
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     const body = (await response.json()) as CoinGeckoMarketChart;
     const candles = pricePointsToCandles(body.prices ?? [], body.total_volumes ?? []);
     const outputCandles = candles.length ? candles : stablecoinCandles(symbol, range);
-    cache.set(key, { candles: outputCandles, expiresAt: Date.now() + 300_000 });
+    cache.set(key, { candles: outputCandles, expiresAt: Date.now() + 30_000 });
     return marketJson({ symbol, range, source: "coingecko", candles: outputCandles });
   } catch {
     console.warn("[market/history] coingecko unavailable");

@@ -3,6 +3,10 @@ import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolTrades } from "@/lib/market-data";
 
+const MARKET_CACHE_HEADERS = {
+  "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=30",
+};
+
 export function OPTIONS() {
   return optionsResponse();
 }
@@ -21,9 +25,12 @@ export async function GET(req: NextRequest) {
 
   if (tradesResult.status === "rejected") console.warn("[market/token-detail] trades unavailable");
 
-  return jsonResponse({
-    pool,
-    token,
-    trades: tradesResult.status === "fulfilled" ? tradesResult.value : [],
-  });
+  return jsonResponse(
+    {
+      pool,
+      token,
+      trades: tradesResult.status === "fulfilled" ? tradesResult.value : [],
+    },
+    { headers: MARKET_CACHE_HEADERS },
+  );
 }

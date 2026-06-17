@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolOhlcv } from "@/lib/market-data";
 
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "public, max-age=30, s-maxage=120, stale-while-revalidate=600",
+  "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=30",
 };
 
 export function OPTIONS() {
