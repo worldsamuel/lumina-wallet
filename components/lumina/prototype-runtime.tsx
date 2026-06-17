@@ -7588,21 +7588,31 @@ function enhancePrototypeDetail() {
       function updateDetailContent(asset) {
         ensureDetailShell();
         var coin = document.getElementById("detCoin");
-        coin.innerHTML = detailTokenIcon(asset);
-        coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
-        document.getElementById("detTitle").textContent = asset.sym;
-        document.getElementById("detName").textContent = asset.full || asset.sym;
-        document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
+        if (coin) {
+          coin.innerHTML = detailTokenIcon(asset);
+          coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
+        }
+        var title = document.getElementById("detTitle");
+        var name = document.getElementById("detName");
+        var amount = document.getElementById("detAmt");
+        if (title) title.textContent = asset.sym;
+        if (name) name.textContent = asset.full || asset.sym;
+        if (amount) amount.textContent = asset.amt || ("0 " + asset.sym);
         var detailUsd = assetUsdValue(asset);
         if (detailUsd > 0) asset.usdNum = detailUsd;
-        document.getElementById("detUsd").textContent = "≈ " + formatFiat(detailUsd || 0);
+        var usd = document.getElementById("detUsd");
+        if (usd) usd.textContent = "≈ " + formatFiat(detailUsd || 0);
         var pill = document.getElementById("detChangePill");
-        renderMarketTables(asset);
-        updateDetailVerifyBadge(asset);
-        pill.className = "none";
-        pill.textContent = detailCopy("noData");
-        renderMarketCard(asset);
-        refreshDetailLatestPrice(asset);
+        var chart = document.getElementById("detChart");
+        if (chart) renderFallbackCandles(chart, asset, "1D");
+        try { renderMarketTables(asset); } catch(e) {}
+        try { updateDetailVerifyBadge(asset); } catch(e) {}
+        if (pill && !pill.textContent) {
+          pill.className = "none";
+          pill.textContent = detailCopy("noData");
+        }
+        try { renderMarketCard(asset); } catch(e) {}
+        try { refreshDetailLatestPrice(asset); } catch(e) {}
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
@@ -7625,7 +7635,7 @@ function enhancePrototypeDetail() {
               document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
               document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
               var chart = document.getElementById("detChart");
-              if (chart) chart.innerHTML = '<div class="market-detail-state">' + detailCopy("noData") + '</div>';
+              if (chart) renderFallbackCandles(chart, asset, "1D");
             } catch(inner) {}
             try { console.error("[DETAIL] openDetail failed", e); } catch(logErr) {}
           }
