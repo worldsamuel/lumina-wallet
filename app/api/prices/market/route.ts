@@ -4,8 +4,8 @@ import { type MarketPrice, type MarketPricesResponse, PRICE_SYMBOLS } from "@/li
 
 export const dynamic = "force-dynamic";
 
-const CACHE_TTL_MS = 30_000;
-const MARKET_CACHE_CONTROL = "public, max-age=30, s-maxage=30, stale-while-revalidate=30";
+const CACHE_TTL_MS = 10_000;
+const MARKET_CACHE_CONTROL = "public, max-age=10, s-maxage=10, stale-while-revalidate=10";
 const COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
 const VS_CURRENCIES = ["usd", "eur", "jpy", "cny", "hkd", "gbp"] as const;
 
@@ -52,7 +52,7 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
 
   const response = await fetch(`${COINGECKO_SIMPLE_PRICE_URL}?${params}`, {
     headers,
-    next: { revalidate: 30 },
+    next: { revalidate: 10 },
   });
   if (!response.ok) throw new Error(`CoinGecko simple/price responded ${response.status}`);
 

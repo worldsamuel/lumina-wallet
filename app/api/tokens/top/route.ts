@@ -5,8 +5,8 @@ import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
-const MARKET_CACHE = { headers: { "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=30" } };
-const TOKEN_TOP_CACHE_TTL_MS = 30_000;
+const MARKET_CACHE = { headers: { "Cache-Control": "public, max-age=10, s-maxage=10, stale-while-revalidate=10" } };
+const TOKEN_TOP_CACHE_TTL_MS = 10_000;
 const tokenTopCache = new Map<string, { expiresAt: number; data: unknown[] }>();
 
 export function OPTIONS() {

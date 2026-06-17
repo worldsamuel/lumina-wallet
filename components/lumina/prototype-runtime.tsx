@@ -56,6 +56,7 @@ declare global {
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshPoints?: () => void;
+    __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
       title?: string;
@@ -771,7 +772,11 @@ function exposeTokenTransfer(
       var balanceKey = `/api/balances?address=${address}`;
       void fetch(balanceKey + `&refresh=1&t=${Date.now()}`, { cache: "no-store" })
         .then(function(res){ return res.ok ? res.json() : null; })
-        .then(function(data){ if (data) void mutate(balanceKey, data, false); })
+        .then(function(data){
+          if (!data) return;
+          void mutate(balanceKey, data, false);
+          window.__luminaApplyChainBalanceRows?.(data.balances);
+        })
         .catch(function(){ void mutate(balanceKey); });
     }
     void mutate("/api/prices/market");
@@ -2455,6 +2460,35 @@ function enhancePrototypeTokens() {
       }
       window.__luminaRefreshImportedTokens = function(){
         refreshImportedBalances();
+      };
+      window.__luminaApplyChainBalanceRows = function(rows){
+        if (!Array.isArray(rows)) return;
+        rows.forEach(function(item){
+          var sym = String(item && item.symbol || "").toUpperCase();
+          if (!sym || isEarnVaultSymbol(sym)) return;
+          var amountText = formatImportedAmount(item.formatted || item.balanceFormatted || item.amountFormatted || item.amount || item.balance || "0");
+          balances[sym] = amountText;
+          availMap[sym] = amountText + " " + sym;
+          var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
+          (assets || []).forEach(function(asset){
+            if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+            asset.amt = amountText + " " + sym;
+            asset.hasBalance = amountNum > 0;
+            if (item.name) asset.full = item.name;
+            if (item.logo) asset.logo = item.logo;
+            if (item.contractAddress) {
+              asset.contractAddress = item.contractAddress;
+              asset.address = item.contractAddress;
+            }
+            var price = Number((prices && prices[sym]) || (sym === "USDC" || sym === "USDT" || sym === "EURC" ? 1 : 0));
+            if (Number.isFinite(amountNum) && price > 0) asset.usdNum = amountNum * price;
+          });
+        });
+        window.__luminaPendingBalanceOverrides = {};
+        if (typeof renderAssets === "function") renderAssets();
+        if (typeof renderAllAssets === "function") renderAllAssets();
+        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+        if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
       };
       function renderScanRows(risk){
         var checks = risk && Array.isArray(risk.checks) ? risk.checks : [];
@@ -4522,16 +4556,8 @@ function enhancePrototypeSwapQuote() {
 	        if (!(price > 0) && (symbol === "USDC" || symbol === "USDT" || symbol === "EURC")) price = 1;
 	        if (price > 0) asset.usdNum = (Number(amount) || 0) * price;
 	      }
-	      function protectSwapBalance(symbol, amount, mode){
-	        symbol = String(symbol || "").toUpperCase();
-	        var n = Number(amount);
-	        if (!symbol || !Number.isFinite(n)) return;
-	        window.__luminaPendingBalanceOverrides = window.__luminaPendingBalanceOverrides || {};
-	        window.__luminaPendingBalanceOverrides[symbol] = {
-	          amount: Math.max(0, n),
-	          mode: mode,
-	          expiresAt: Date.now() + 60 * 1000
-	        };
+      function protectSwapBalance(symbol, amount, mode){
+	        window.__luminaPendingBalanceOverrides = {};
 	      }
 	      function optimisticallyApplySwapBalances(){
 	        if (!latestSwapQuote) return;
@@ -4874,9 +4900,10 @@ function enhancePrototypeSwapQuote() {
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) {
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 1000);
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 4000);
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 10000);
+	            window.__luminaRefreshWalletData();
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 1200);
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 3500);
+	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 9000);
 	          }
 	        } catch(e) {
 	          setSwapDebug("execute:error", readableSwapError(e));
@@ -7125,11 +7152,22 @@ function enhancePrototypeDetail() {
         var value = amount > 0 && price > 0 ? amount * price : Number(asset.usdNum || 0);
         el.textContent = "≈ " + formatFiat(value || 0);
       }
-      function refreshDetailMarketPrice(asset) {
+      function redrawActiveDetailCandles(asset) {
+        var chart = document.getElementById("detChart");
+        if (!chart || !chart.__luminaLastCandles || !chart.__luminaLastCandles.length) return false;
+        var range = chart.dataset.marketRange || "1D";
+        var candles = syncCandlesWithLatestPrice(chart.__luminaLastCandles, asset);
+        chart.__luminaLastCandles = candles;
+        renderCandlesChart(chart, candles, range);
+        updateRangeChange(candles, range, asset);
+        return true;
+      }
+      function refreshDetailMarketPrice(asset, options) {
         var sym = String(asset && asset.sym || "").toUpperCase();
         if (!sym) return;
+        var force = options && options.force;
         var now = Date.now();
-        if (asset.__detailPriceRefreshAt && now - asset.__detailPriceRefreshAt < 12000) {
+        if (!force && asset.__detailPriceRefreshAt && now - asset.__detailPriceRefreshAt < 5000) {
           updateDetailFiat(asset);
           return;
         }
@@ -7164,7 +7202,7 @@ function enhancePrototypeDetail() {
               var view = document.getElementById("view-detail");
               var chart = document.getElementById("detChart");
               if (view && view.classList.contains("active") && chart && chart.dataset.marketRange) {
-                renderMarketChart(asset, chart.dataset.marketRange);
+                if (!redrawActiveDetailCandles(asset)) renderMarketChart(asset, chart.dataset.marketRange);
               }
             } else {
               updateDetailFiat(asset);
@@ -7275,6 +7313,7 @@ function enhancePrototypeDetail() {
               var candles = Array.isArray(data.candles) ? data.candles : [];
               if (candles.length) {
                 candles = syncCandlesWithLatestPrice(candles, asset);
+                chart.__luminaLastCandles = candles;
                 renderCandlesChart(chart, candles, range || "1D");
                 updateRangeChange(candles, range || "1D", asset);
               } else {
@@ -7298,6 +7337,7 @@ function enhancePrototypeDetail() {
             var candles = Array.isArray(data.candles) ? data.candles : [];
             if (candles.length) {
               candles = syncCandlesWithLatestPrice(candles, asset);
+              chart.__luminaLastCandles = candles;
               renderCandlesChart(chart, candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
@@ -7605,6 +7645,10 @@ function enhancePrototypeDetail() {
 
       function updateDetailContent(asset) {
         ensureDetailShell();
+        if (window.__luminaDetailPriceTimer) {
+          clearInterval(window.__luminaDetailPriceTimer);
+          window.__luminaDetailPriceTimer = null;
+        }
         var coin = document.getElementById("detCoin");
         coin.innerHTML = detailTokenIcon(asset);
         coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
@@ -7619,6 +7663,15 @@ function enhancePrototypeDetail() {
         pill.className = "none";
         pill.textContent = detailCopy("noData");
         renderMarketCard(asset);
+        window.__luminaDetailPriceTimer = setInterval(function(){
+          var view = document.getElementById("view-detail");
+          if (!view || !view.classList.contains("active")) {
+            clearInterval(window.__luminaDetailPriceTimer);
+            window.__luminaDetailPriceTimer = null;
+            return;
+          }
+          refreshDetailMarketPrice(asset, { force: true });
+        }, 8000);
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
