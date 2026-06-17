@@ -1330,7 +1330,7 @@ function enhancePrototypeEarn() {
       }
       function positionAmount(pos){
         if (!pos) return 0;
-        var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted].map(function(value){
+        var candidates = [pos.assetsFormatted, pos.maxWithdrawFormatted, pos.assetBalanceFormatted].map(function(value){
           var n = Number(String(value || "0").replace(/,/g, ""));
           return Number.isFinite(n) ? n : 0;
         });
@@ -1350,6 +1350,13 @@ function enhancePrototypeEarn() {
       function positionDisplayAmount(pos, digits){
         if (Number(String(pos && pos.shares || "0")) > 0) return positionShareAmount(pos, digits || 6);
         return positionAmountText(pos, digits || 6);
+      }
+      function hasWithdrawablePosition(pos){
+        if (!pos) return false;
+        if (positionAmount(pos) > 0) return true;
+        if (Number(String(pos.sharesFormatted || "0").replace(/,/g, "")) > 0) return true;
+        var rawShares = String(pos.shares || "").trim();
+        return !!rawShares && rawShares !== "0";
       }
       function earnPositions(){
         return (morphoPositions || []).filter(nonZeroPosition);
@@ -1372,7 +1379,7 @@ function enhancePrototypeEarn() {
       }
       window.__luminaRenderEarnHero = updateEarnHero;
       function nonZeroPosition(pos){
-        return !!pos && (String(pos.assets || pos.maxWithdraw || pos.shares || "0") !== "0" || positionAmount(pos) > 0);
+        return hasWithdrawablePosition(pos);
       }
       function walletBalanceForVault(vault, pos){
         var direct = Number(pos && String(pos.walletBalanceFormatted || "0").replace(/,/g, ""));
@@ -1415,6 +1422,62 @@ function enhancePrototypeEarn() {
         morphoPositions = snapshot.positions;
         updateHomeEarnTotal();
         return true;
+      }
+      function optimisticShareSymbol(vault, pos){
+        if (pos && pos.shareSymbol) return pos.shareSymbol;
+        var token = vault && vault.asset && vault.asset.symbol ? String(vault.asset.symbol).toUpperCase() : "";
+        return token ? "RE7" + token : "RE7";
+      }
+      function refreshEarnViews(){
+        writeEarnSnapshot(morphoPositions);
+        updateHomeEarnTotal();
+        renderProducts();
+        renderHomeEarningPositions();
+        if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+          renderEarnDetail(morphoVaults[activeEarnIndex]);
+        }
+      }
+      function upsertLocalEarnPosition(vault, amountText){
+        var amount = Number(String(amountText || "0").replace(/,/g, ""));
+        if (!vault || !Number.isFinite(amount) || amount <= 0) return;
+        var existing = positionFor(vault);
+        var nextAmount = positionAmount(existing) + amount;
+        var next = Object.assign({}, existing || {}, {
+          vaultAddress: vault.address,
+          displayName: vault.displayName,
+          asset: vault.asset,
+          assetsFormatted: String(nextAmount),
+          maxWithdrawFormatted: String(nextAmount),
+          sharesFormatted: String(nextAmount),
+          shares: existing && existing.shares ? existing.shares : "1",
+          shareSymbol: optimisticShareSymbol(vault, existing)
+        });
+        var replaced = false;
+        morphoPositions = (morphoPositions || []).map(function(pos){
+          if (String(pos.vaultAddress).toLowerCase() === String(vault.address).toLowerCase()) {
+            replaced = true;
+            return next;
+          }
+          return pos;
+        });
+        if (!replaced) morphoPositions.push(next);
+        refreshEarnViews();
+      }
+      function reduceLocalEarnPosition(vault, amountText, all){
+        if (!vault) return;
+        var amount = Number(String(amountText || "0").replace(/,/g, ""));
+        morphoPositions = (morphoPositions || []).map(function(pos){
+          if (String(pos.vaultAddress).toLowerCase() !== String(vault.address).toLowerCase()) return pos;
+          var current = positionAmount(pos);
+          var nextAmount = all ? 0 : Math.max(0, current - (Number.isFinite(amount) ? amount : 0));
+          return Object.assign({}, pos, {
+            assetsFormatted: String(nextAmount),
+            maxWithdrawFormatted: String(nextAmount),
+            sharesFormatted: String(nextAmount),
+            shares: nextAmount > 0 ? (pos.shares || "1") : "0"
+          });
+        }).filter(nonZeroPosition);
+        refreshEarnViews();
       }
       function renderHomeEarningPositions(){
         var assetList = document.getElementById("assetList");
@@ -1580,7 +1643,7 @@ function enhancePrototypeEarn() {
         console.log("[EARN] Detail position:", pos);
         console.log("[EARN] My deposit assets:", pos ? pos.assets : "0");
         console.log("[EARN] My deposit human:", pos ? positionAmount(pos) : "0");
-        console.log("[EARN] Withdraw disabled:", !pos || Number(pos.shares || 0) <= 0);
+        console.log("[EARN] Withdraw disabled:", !hasWithdrawablePosition(pos));
         var annual = "—";
         var daily = "—";
         var amount = "";
@@ -1597,7 +1660,7 @@ function enhancePrototypeEarn() {
           '<div class="morpho-provider-note">' + copy.curator + '</div>' +
           '<div class="earn-action-row">' +
             '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + copy.deposit + '</button>' +
-            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!pos || Number(pos.shares || 0) <= 0 ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
+            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!hasWithdrawablePosition(pos) ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
           '</div>' +
           (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + (cfg.morphoDepositEnabled === false ? "Deposits are temporarily paused by Lumina operations." : copy.pausedBody) + '</span></div>' : "") +
           '<div class="morpho-compliance">' +
@@ -1691,6 +1754,8 @@ function enhancePrototypeEarn() {
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           awaitingReceipt = true;
+          upsertLocalEarnPosition(vault, amount);
+          pollMorphoPositions();
           toast(morphoCopy("waitingConfirm") + " " + String(hash).slice(0, 18));
         } catch(e) {
           console.error("[EARN] error:", e);
@@ -1710,7 +1775,7 @@ function enhancePrototypeEarn() {
       window.openMorphoWithdrawModal = function(){
         var vault = morphoVaults[activeEarnIndex];
         var pos = vault ? positionFor(vault) : null;
-        if (!vault || !pos || Number(pos.shares || 0) <= 0) return;
+        if (!vault || !hasWithdrawablePosition(pos)) return;
         closeModal();
         var mask = document.createElement("div");
         mask.className = "modal-mask open morpho-withdraw-modal";
@@ -1754,15 +1819,21 @@ function enhancePrototypeEarn() {
         var vault = morphoVaults[activeEarnIndex];
         var pos = vault ? positionFor(vault) : null;
         var input = document.getElementById("morphoWithdrawAmount");
-        if (!vault || !pos) return;
+        if (!vault || !hasWithdrawablePosition(pos)) return;
         var body = { type: all ? "redeem" : "withdraw", vaultAddress: vault.address, userAddress: window.__luminaUserAddress || "" };
         if (all) {
-          body.shares = pos.shares;
+          if (pos.shares && String(pos.shares) !== "0") {
+            body.shares = pos.shares;
+          } else {
+            all = false;
+            body.type = "withdraw";
+            body.amount = String(positionAmount(pos));
+          }
         } else {
           var amount = input ? String(input.value || "").trim() : "";
           var n = Number(amount.replace(/,/g, ""));
           if (!Number.isFinite(n) || n <= 0) return toast("Enter an amount");
-          if (n > Number(pos.maxWithdrawFormatted || 0)) return toast("Vault liquidity is low. Try a smaller amount later.");
+          if (n > positionAmount(pos)) return toast("Vault liquidity is low. Try a smaller amount later.");
           body.amount = amount;
         }
         try {
@@ -1778,6 +1849,8 @@ function enhancePrototypeEarn() {
           var hash = payload && payload.userOpHash;
           if (!hash) throw new Error("No userOpHash: " + JSON.stringify(result));
           closeMorphoWithdrawModal();
+          reduceLocalEarnPosition(vault, all ? positionAmount(pos) : body.amount, all);
+          pollMorphoPositions();
           toast(morphoCopy("waitingConfirm") + " " + String(hash).slice(0, 18));
         } catch(e) {
           var msg = e && e.message ? e.message : "Withdraw failed";
@@ -4491,6 +4564,21 @@ function enhancePrototypeSwapQuote() {
 	        if (typeof renderAssets === "function") renderAssets();
 	        if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
 	      }
+	      function resetSwapFormAfterSuccess(){
+	        var sell = document.getElementById("sellAmt");
+	        var buy = document.getElementById("buyAmt");
+	        if (sell) sell.value = "";
+	        if (buy) buy.value = "—";
+	        if (quoteTimer) clearTimeout(quoteTimer);
+	        activeQuotePromise = null;
+	        latestSwapQuote = null;
+	        latestQuoteKey = "";
+	        latestQuoteAt = 0;
+	        highImpactAcknowledged = false;
+	        setQuoteState(swapCopy("enterAmount"));
+	        setSwapButtonPending();
+	        setSwapDebug("swap:reset-after-success", { sell: swapState.sell, buy: swapState.buy });
+	      }
 	      function readableSwapError(error){
 	        if (!error) return { message:"Unknown swap error" };
 	        var out = {
@@ -4771,16 +4859,29 @@ function enhancePrototypeSwapQuote() {
 	          setSwapButtonState(swapCopy("submitting"), true);
 	          var result = await promise;
 	          setSwapDebug("execute:submitted", result);
-	          window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
-	          if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
-	            type: "swap",
-	            title: activitySwapAmount(state.amountText, swapState.sell) + " -> " + activitySwapAmount(latestSwapQuote.amountOut, swapState.buy),
-	            subtitle: "Swap",
-	            amount: state.amountText + " " + swapState.sell,
-	            status: "Completed",
-	            hash: result.userOpHash || result.transactionHash || ("pending-" + Date.now())
-	          });
-	          optimisticallyApplySwapBalances();
+	          try {
+	            window.dispatchEvent(new CustomEvent("lumina:swap-userop", { detail: { userOpHash: result.userOpHash } }));
+	          } catch(postError) {
+	            setSwapDebug("execute:post-success-event-error", readableSwapError(postError));
+	          }
+	          try {
+	            if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({
+	              type: "swap",
+	              title: activitySwapAmount(state.amountText, swapState.sell) + " -> " + activitySwapAmount(latestSwapQuote.amountOut, swapState.buy),
+	              subtitle: "Swap",
+	              amount: state.amountText + " " + swapState.sell,
+	              status: "Completed",
+	              hash: result.userOpHash || result.transactionHash || ("pending-" + Date.now())
+	            });
+	          } catch(postError) {
+	            setSwapDebug("execute:post-success-activity-error", readableSwapError(postError));
+	          }
+	          try {
+	            optimisticallyApplySwapBalances();
+	          } catch(postError) {
+	            setSwapDebug("execute:post-success-balance-error", readableSwapError(postError));
+	          }
+	          resetSwapFormAfterSuccess();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
 	          if (window.__luminaRefreshWalletData) {
