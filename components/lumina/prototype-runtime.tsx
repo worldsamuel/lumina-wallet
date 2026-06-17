@@ -7245,6 +7245,9 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         var address = assetMarketAddress(asset);
+        chart.innerHTML = chartSvg(range || "1D", false, asset);
+        updateRangeChangeFromMarket(asset, range || "1D");
+        return;
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"))
