@@ -4125,18 +4125,7 @@ function enhancePrototypeSwapQuote() {
       }
       function ensureSwapDebugButton(){
         var existing = document.getElementById("swapDebugBtn");
-        if (existing) return;
-        var btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "swapDebugBtn";
-        btn.textContent = "DEBUG";
-        btn.style.cssText = "position:fixed;right:12px;bottom:168px;z-index:160;border:1px solid rgba(108,237,143,.65);background:rgba(9,24,13,.96);color:#85f59a;border-radius:999px;padding:9px 12px;font-size:11px;font-weight:900;box-shadow:0 12px 30px rgba(0,0,0,.45);pointer-events:auto;touch-action:manipulation;";
-        btn.onclick = function(event){
-          event.preventDefault();
-          event.stopPropagation();
-          openSwapDebug();
-        };
-        document.body.appendChild(btn);
+        if (existing) existing.remove();
       }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
@@ -7106,9 +7095,9 @@ function enhancePrototypeDetail() {
         var sym = String(asset && asset.sym || "").toUpperCase();
         var market = marketForAsset(asset);
         var candidates = [
-          market && market.priceUsd,
+          prices && prices[sym],
           window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
-          prices && prices[sym]
+          market && market.priceUsd
         ];
         for (var i = 0; i < candidates.length; i++) {
           var value = Number(candidates[i]);
@@ -7154,7 +7143,13 @@ function enhancePrototypeDetail() {
             var list = Array.isArray(results[1]) ? results[1] : [];
             var matched = null;
             try { registerMarketsFromPriceMeta(pricesPayload); } catch(e) {}
-            if (pricesPayload && pricesPayload[sym] && Number(pricesPayload[sym].usd) > 0) {
+            list.forEach(function(item){
+              if (!item || !item.symbol) return;
+              if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(item);
+              else if (typeof registerMarketToken === "function") registerMarketToken(item);
+              if (!matched && String(item.symbol || "").toUpperCase() === sym) matched = item;
+            });
+            if (!matched && pricesPayload && pricesPayload[sym] && Number(pricesPayload[sym].usd) > 0) {
               matched = Object.assign({}, window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] || {}, {
                 symbol: sym,
                 priceUsd: Number(pricesPayload[sym].usd),
@@ -7163,12 +7158,6 @@ function enhancePrototypeDetail() {
               if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(matched);
               else if (typeof registerMarketToken === "function") registerMarketToken(matched);
             }
-            list.forEach(function(item){
-              if (!item || !item.symbol) return;
-              if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(item);
-              else if (typeof registerMarketToken === "function") registerMarketToken(item);
-              if (!matched && String(item.symbol || "").toUpperCase() === sym) matched = item;
-            });
             if (matched && applyDetailPrice(asset, matched.priceUsd)) {
               updateDetailFiat(asset);
               updateDetailVerifyBadge(asset);
