@@ -6996,6 +6996,93 @@ function enhancePrototypeDetail() {
         badge.textContent = meta.text;
       }
 
+      function detailAssetAmount(asset) {
+        var raw = String(asset && asset.amt || "0").split(" ")[0].replace(/,/g, "");
+        var amount = Number(raw);
+        return Number.isFinite(amount) && amount > 0 ? amount : 0;
+      }
+      function latestDetailPrice(asset) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        var market = marketForAsset(asset);
+        var candidates = [
+          market && market.priceUsd,
+          window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
+          prices && prices[sym]
+        ];
+        for (var i = 0; i < candidates.length; i++) {
+          var value = Number(candidates[i]);
+          if (Number.isFinite(value) && value > 0) return value;
+        }
+        return 0;
+      }
+      function applyDetailPrice(asset, price) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        var value = Number(price);
+        if (!sym || !Number.isFinite(value) || value <= 0) return false;
+        var amount = detailAssetAmount(asset);
+        if (amount > 0) asset.usdNum = amount * value;
+        prices[sym] = value;
+        if (window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym]) {
+          window.__luminaMarketBySymbol[sym].priceUsd = value;
+        }
+        return true;
+      }
+      function updateDetailFiat(asset) {
+        var el = document.getElementById("detUsd");
+        if (!el || !asset) return;
+        var amount = detailAssetAmount(asset);
+        var price = latestDetailPrice(asset);
+        var value = amount > 0 && price > 0 ? amount * price : Number(asset.usdNum || 0);
+        el.textContent = "≈ " + formatFiat(value || 0);
+      }
+      function refreshDetailMarketPrice(asset) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        if (!sym) return;
+        var now = Date.now();
+        if (asset.__detailPriceRefreshAt && now - asset.__detailPriceRefreshAt < 12000) {
+          updateDetailFiat(asset);
+          return;
+        }
+        asset.__detailPriceRefreshAt = now;
+        Promise.all([
+          fetch("/api/prices/market?t=" + now, { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; }),
+          fetch("/api/tokens/top?mode=all&t=" + now, { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
+        ])
+          .then(function(results){
+            var pricesPayload = results[0];
+            var list = Array.isArray(results[1]) ? results[1] : [];
+            var matched = null;
+            try { registerMarketsFromPriceMeta(pricesPayload); } catch(e) {}
+            if (pricesPayload && pricesPayload[sym] && Number(pricesPayload[sym].usd) > 0) {
+              matched = Object.assign({}, window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] || {}, {
+                symbol: sym,
+                priceUsd: Number(pricesPayload[sym].usd),
+                change24h: pricesPayload[sym].usd_24h_change
+              });
+              if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(matched);
+              else if (typeof registerMarketToken === "function") registerMarketToken(matched);
+            }
+            list.forEach(function(item){
+              if (!item || !item.symbol) return;
+              if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(item);
+              else if (typeof registerMarketToken === "function") registerMarketToken(item);
+              if (!matched && String(item.symbol || "").toUpperCase() === sym) matched = item;
+            });
+            if (matched && applyDetailPrice(asset, matched.priceUsd)) {
+              updateDetailFiat(asset);
+              updateDetailVerifyBadge(asset);
+              var view = document.getElementById("view-detail");
+              var chart = document.getElementById("detChart");
+              if (view && view.classList.contains("active") && chart && chart.dataset.marketRange) {
+                renderMarketChart(asset, chart.dataset.marketRange);
+              }
+            } else {
+              updateDetailFiat(asset);
+            }
+          })
+          .catch(function(){ updateDetailFiat(asset); });
+      }
+
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
         var sym = String(asset && asset.sym || "").toUpperCase();
@@ -7013,8 +7100,8 @@ function enhancePrototypeDetail() {
             name: asset.full || sym,
             address: address || asset.address || asset.contractAddr || null,
             poolAddress: asset.poolAddress,
-            priceUsd: Number(asset.usdNum || 0) > 0 && Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "")) > 0
-              ? Number(asset.usdNum || 0) / Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""))
+            priceUsd: Number(asset.usdNum || 0) > 0 && detailAssetAmount(asset) > 0
+              ? Number(asset.usdNum || 0) / detailAssetAmount(asset)
               : (sym === "USDC" || sym === "EURC" ? 1 : null),
             change24h: null,
             volume24hUsd: 0,
@@ -7088,6 +7175,7 @@ function enhancePrototypeDetail() {
         var market = marketForAsset(asset);
         var chart = document.getElementById("detChart");
         if (!chart) return;
+        chart.dataset.marketRange = range || "1D";
         var address = assetMarketAddress(asset);
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
@@ -7096,6 +7184,7 @@ function enhancePrototypeDetail() {
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];
               if (candles.length) {
+                candles = syncCandlesWithLatestPrice(candles, asset);
                 renderCandlesChart(chart, candles, range || "1D");
                 updateRangeChange(candles, range || "1D", asset);
               } else {
@@ -7118,6 +7207,7 @@ function enhancePrototypeDetail() {
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
             if (candles.length) {
+              candles = syncCandlesWithLatestPrice(candles, asset);
               renderCandlesChart(chart, candles, range || "1D");
               updateRangeChange(candles, range || "1D", asset);
             } else {
@@ -7127,6 +7217,30 @@ function enhancePrototypeDetail() {
           .catch(function(){
             renderHistory(detailCopy("ohlcvFailed"));
           });
+      }
+      function syncCandlesWithLatestPrice(candles, asset) {
+        var price = latestDetailPrice(asset);
+        if (!Number.isFinite(price) || price <= 0 || !candles || !candles.length) return candles;
+        var next = candles.map(function(c){ return Array.isArray(c) ? c.slice() : Object.assign({}, c); });
+        var last = next[next.length - 1];
+        if (Array.isArray(last)) {
+          var open = Number(last[1] || price);
+          var high = Number(last[2] || price);
+          var low = Number(last[3] || price);
+          last[1] = open > 0 ? open : price;
+          last[2] = Math.max(high > 0 ? high : price, price);
+          last[3] = Math.min(low > 0 ? low : price, price);
+          last[4] = price;
+        } else {
+          var o = Number(last.open || price);
+          var h = Number(last.high || price);
+          var l = Number(last.low || price);
+          last.open = o > 0 ? o : price;
+          last.high = Math.max(h > 0 ? h : price, price);
+          last.low = Math.min(l > 0 ? l : price, price);
+          last.close = price;
+        }
+        return next;
       }
       function updateRangeChange(candles, range, asset){
         var pill = document.getElementById("detChangePill");
@@ -7407,7 +7521,8 @@ function enhancePrototypeDetail() {
         document.getElementById("detTitle").textContent = asset.sym;
         document.getElementById("detName").textContent = asset.full || asset.sym;
         document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
-        document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
+        updateDetailFiat(asset);
+        refreshDetailMarketPrice(asset);
         var pill = document.getElementById("detChangePill");
         renderMarketTables(asset);
         updateDetailVerifyBadge(asset);
