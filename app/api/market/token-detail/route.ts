@@ -4,7 +4,9 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { getPoolTrades } from "@/lib/market-data";
 
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "public, max-age=30, s-maxage=30, stale-while-revalidate=30",
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
 };
 
 export function OPTIONS() {

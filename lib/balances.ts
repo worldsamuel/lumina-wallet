@@ -152,9 +152,10 @@ export async function fetchBalances(userAddress: Address) {
     fetchAllAlchemyTokenBalances(userAddress).catch(() => [] as AlchemyTokenBalance[]),
   ]);
 
-  const configuredTokenBalances = alchemyBalances.length
-    ? configuredTokenBalancesFromAlchemy(balanceTokens, alchemyBalances)
-    : await fetchConfiguredTokenBalances(userAddress, balanceTokens);
+  const configuredTokenBalances = await fetchConfiguredTokenBalances(userAddress, balanceTokens).catch((error) => {
+    console.warn("[balances] configured token multicall failed, falling back to Alchemy", error);
+    return configuredTokenBalancesFromAlchemy(balanceTokens, alchemyBalances);
+  });
   const discoveredBalances = await fetchDiscoveredTokenBalances(alchemyBalances).catch(() => [] as ChainBalance[]);
   const rawConfiguredBalances = balanceTokens.map((token) => toBalance(token, configuredTokenBalances.get(token.contractAddress) ?? 0n));
   const erc20Balances = mergeAliasBalances(rawConfiguredBalances);

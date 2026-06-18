@@ -9,8 +9,8 @@ const GECKO_TOKENS_URL = `https://api.geckoterminal.com/api/v2/networks/${GECKO_
 const DEXSCREENER_API_URL = "https://api.dexscreener.com";
 const DEXSCREENER_CHAIN_IDS = ["worldchain", "world-chain"] as const;
 const WORLDSCAN_API_URL = "https://worldscan.org/api/v2";
-const CACHE_TTL_MS = 10_000;
-const OHLCV_CACHE_TTL_MS = 10_000;
+const CACHE_TTL_MS = 3_000;
+const OHLCV_CACHE_TTL_MS = 3_000;
 const MIN_LIQUIDITY_USD = 10;
 const MIN_VOLUME_24H_USD = 10;
 const EXCLUDED_TOP_SYMBOLS = new Set(["USDC", "USDT", "DAI", "USDCE", "ETH", "WETH", "WBTC"]);
@@ -207,7 +207,7 @@ async function fetchGeckoPage(page: number) {
   });
   const response = await fetch(`${GECKO_POOLS_URL}?${params}`, {
     headers: { accept: "application/json" },
-    next: { revalidate: 10 },
+    cache: "no-store",
   });
   if (!response.ok) throw new Error(`GeckoTerminal responded ${response.status}`);
   return (await response.json()) as GeckoResponse;
@@ -221,7 +221,7 @@ async function fetchTokenPools(tokenAddress: string) {
   });
   const response = await fetch(`${GECKO_TOKENS_URL}/${tokenAddress}/pools?${params}`, {
     headers: { accept: "application/json" },
-    next: { revalidate: 60 },
+    cache: "no-store",
     signal: AbortSignal.timeout(4_000),
   });
   if (!response.ok) throw new Error(`GeckoTerminal token pools responded ${response.status}`);
@@ -232,7 +232,7 @@ async function fetchDexScreenerTokenPairs(tokenAddress: string) {
   for (const chainId of DEXSCREENER_CHAIN_IDS) {
     const response = await fetch(`${DEXSCREENER_API_URL}/token-pairs/v1/${chainId}/${tokenAddress}`, {
       headers: { accept: "application/json" },
-      next: { revalidate: 10 },
+      cache: "no-store",
       signal: AbortSignal.timeout(3_500),
     }).catch(() => null);
     if (!response || !response.ok) continue;
@@ -578,7 +578,7 @@ export async function getPoolOhlcv(
   async function fetchOhlcv(requestParams: URLSearchParams) {
     const response = await fetch(`${GECKO_OHLCV_URL}/${poolAddress}/ohlcv/${safeTimeframe}?${requestParams}`, {
       headers: { accept: "application/json" },
-      next: { revalidate: 10 },
+      cache: "no-store",
       signal: AbortSignal.timeout(4_000),
     });
     if (!response.ok) throw new Error(`GeckoTerminal OHLCV responded ${response.status}`);

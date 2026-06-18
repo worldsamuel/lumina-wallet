@@ -5,8 +5,14 @@ import { ensureTokenControlColumns } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { getWorldChainMarkets, type WorldChainMarketMode } from "@/lib/market-data";
 
-const MARKET_CACHE = { headers: { "Cache-Control": "public, max-age=10, s-maxage=10, stale-while-revalidate=10" } };
-const TOKEN_TOP_CACHE_TTL_MS = 10_000;
+const MARKET_CACHE = {
+  headers: {
+    "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+    "Vercel-CDN-Cache-Control": "no-store",
+  },
+};
+const TOKEN_TOP_CACHE_TTL_MS = 3_000;
 const tokenTopCache = new Map<string, { expiresAt: number; data: unknown[] }>();
 
 export function OPTIONS() {

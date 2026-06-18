@@ -379,7 +379,9 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
 
   const handleSwapReceiptSuccess = useCallback(() => {
     setSwapUserOpHash("");
-    window.setTimeout(() => window.__luminaRefreshWalletData?.(), 6500);
+    [0, 700, 1600, 3000, 6500, 10000, 15000].forEach((delay) => {
+      window.setTimeout(() => window.__luminaRefreshWalletData?.(), delay);
+    });
     toastFromPrototype(prototypeText("swapSuccess"));
     window.dispatchEvent(new CustomEvent("lumina:swap-confirmed"));
   }, []);
@@ -2467,21 +2469,6 @@ function enhancePrototypeTokens() {
           var sym = String(item && item.symbol || "").toUpperCase();
           if (!sym || isEarnVaultSymbol(sym)) return;
           var amountText = formatImportedAmount(item.formatted || item.balanceFormatted || item.amountFormatted || item.amount || item.balance || "0");
-          try {
-            var pending = window.__luminaPendingBalanceOverrides && window.__luminaPendingBalanceOverrides[sym];
-            if (pending) {
-              var target = Number(pending.amount);
-              var current = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
-              var expired = Date.now() > Number(pending.expiresAt || 0);
-              if (expired || !Number.isFinite(target) || !Number.isFinite(current)) {
-                delete window.__luminaPendingBalanceOverrides[sym];
-              } else if ((pending.mode === "max" && current > target + 0.0000001) || (pending.mode === "min" && current + 0.0000001 < target)) {
-                amountText = formatImportedAmount(String(target));
-              } else {
-                delete window.__luminaPendingBalanceOverrides[sym];
-              }
-            }
-          } catch(e) {}
           balances[sym] = amountText;
           availMap[sym] = amountText + " " + sym;
           var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
@@ -4141,6 +4128,7 @@ function enhancePrototypeSwapQuote() {
         if (live) live.textContent = "selected " + textArea.value.length + " chars";
       }
       function openSwapDebug(){
+        return;
         var existingModal = document.getElementById("swapDebugModal");
         if (existingModal) existingModal.remove();
         var old = document.getElementById("swapDebugModal");
@@ -4570,36 +4558,13 @@ function enhancePrototypeSwapQuote() {
 	        if (!(price > 0) && (symbol === "USDC" || symbol === "USDT" || symbol === "EURC")) price = 1;
 	        if (price > 0) asset.usdNum = (Number(amount) || 0) * price;
 	      }
-      function protectSwapBalance(symbol, amount, mode){
-        symbol = String(symbol || "").toUpperCase();
-        var n = Number(amount);
-        if (!symbol || !Number.isFinite(n)) return;
-        window.__luminaPendingBalanceOverrides = window.__luminaPendingBalanceOverrides || {};
-        window.__luminaPendingBalanceOverrides[symbol] = {
-          amount: Math.max(0, n),
-          mode: mode,
-          expiresAt: Date.now() + 18 * 1000
-        };
-	      }
-	      function optimisticallyApplySwapBalances(){
-	        if (!latestSwapQuote) return;
-	        var sell = String(swapState.sell || "").toUpperCase();
-	        var buy = String(swapState.buy || "").toUpperCase();
-	        var amountIn = Number(latestSwapQuote.amountIn || 0);
-	        var amountOut = Number(latestSwapQuote.amountOut || 0);
-	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
-	        var previousBuyBalance = balanceNumber(buy);
-	        var nextSellBalance = Math.max(0, balanceNumber(sell) - amountIn);
-	        var nextBuyBalance = previousBuyBalance + amountOut;
-	        updateAssetAmount(sell, nextSellBalance);
-	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        updateAssetAmount(buy, nextBuyBalance);
-	        protectSwapBalance(sell, nextSellBalance, "max");
-	        protectSwapBalance(buy, nextBuyBalance, "min");
-	        syncSwapQuotePriceToHome();
-	        if (typeof refreshSwapLabels === "function") refreshSwapLabels();
-	        if (typeof renderAssets === "function") renderAssets();
-	        if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
+	      function refreshWalletAfterSwap(){
+	        var delays = [0, 700, 1600, 3000, 6000, 10000, 15000];
+	        delays.forEach(function(delay){
+	          setTimeout(function(){
+	            if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+	          }, delay);
+	        });
 	      }
 	      function resetSwapFormAfterSuccess(){
 	        var sell = document.getElementById("sellAmt");
@@ -4928,20 +4893,10 @@ function enhancePrototypeSwapQuote() {
 	          } catch(postError) {
 	            setSwapDebug("execute:post-success-activity-error", readableSwapError(postError));
 	          }
-	          try {
-	            optimisticallyApplySwapBalances();
-	          } catch(postError) {
-	            setSwapDebug("execute:post-success-balance-error", readableSwapError(postError));
-	          }
+	          refreshWalletAfterSwap();
 	          resetSwapFormAfterSuccess();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
 	          showSwapSuccess(result);
-	          if (window.__luminaRefreshWalletData) {
-	            window.__luminaRefreshWalletData();
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 1200);
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 3500);
-	            setTimeout(function(){ window.__luminaRefreshWalletData(); }, 9000);
-	          }
 	        } catch(e) {
 	          setSwapDebug("execute:error", readableSwapError(e));
 	          console.error("[SWAP] executeSwap failed", readableSwapError(e), e);
@@ -7161,7 +7116,6 @@ function enhancePrototypeDetail() {
         var candidates = [
           window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
           market && market.priceUsd,
-          asset && asset.priceUsd,
           prices && prices[sym]
         ];
         for (var i = 0; i < candidates.length; i++) {
@@ -7187,7 +7141,7 @@ function enhancePrototypeDetail() {
         if (!el || !asset) return;
         var amount = detailAssetAmount(asset);
         var price = latestDetailPrice(asset);
-        var value = amount > 0 && price > 0 ? amount * price : Number(asset.usdNum || 0);
+        var value = amount > 0 && price > 0 ? amount * price : 0;
         el.textContent = "≈ " + formatFiat(value || 0);
       }
       function redrawActiveDetailCandles(asset) {
@@ -7343,17 +7297,29 @@ function enhancePrototypeDetail() {
         if (!chart) return;
         chart.dataset.marketRange = range || "1D";
         var address = assetMarketAddress(asset);
+        function latestCandleClose(candles){
+          if (!candles || !candles.length) return 0;
+          var last = candles[candles.length - 1];
+          var close = Array.isArray(last) ? Number(last[4] || 0) : Number(last.close || 0);
+          return Number.isFinite(close) && close > 0 ? close : 0;
+        }
+        function applyCandles(candles){
+          var close = latestCandleClose(candles);
+          if (close > 0) applyDetailPrice(asset, close);
+          candles = syncCandlesWithLatestPrice(candles, asset);
+          chart.__luminaLastCandles = candles;
+          renderCandlesChart(chart, candles, range || "1D");
+          updateRangeChange(candles, range || "1D", asset);
+          updateDetailFiat(asset);
+        }
         function renderHistory(reason){
           chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
-          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D"))
+          fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D") + "&t=" + Date.now(), { cache: "no-store" })
             .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
             .then(function(data){
               var candles = Array.isArray(data.candles) ? data.candles : [];
               if (candles.length) {
-                candles = syncCandlesWithLatestPrice(candles, asset);
-                chart.__luminaLastCandles = candles;
-                renderCandlesChart(chart, candles, range || "1D");
-                updateRangeChange(candles, range || "1D", asset);
+                applyCandles(candles);
               } else {
                 chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
                 updateRangeChangeFromMarket(asset, range || "1D");
@@ -7369,15 +7335,12 @@ function enhancePrototypeDetail() {
           return;
         }
         chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
-        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || ""))
+        fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || "") + "&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
             var candles = Array.isArray(data.candles) ? data.candles : [];
             if (candles.length) {
-              candles = syncCandlesWithLatestPrice(candles, asset);
-              chart.__luminaLastCandles = candles;
-              renderCandlesChart(chart, candles, range || "1D");
-              updateRangeChange(candles, range || "1D", asset);
+              applyCandles(candles);
             } else {
               renderHistory(detailCopy("emptyOhlcv"));
             }
