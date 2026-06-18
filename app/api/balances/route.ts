@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress, type Address } from "viem";
 import { fetchBalances } from "@/lib/balances";
 
-const CACHE_TTL_MS = 5_000;
+const CACHE_TTL_MS = 1_000;
 const STALE_CACHE_TTL_MS = 10 * 60_000;
 
 type CachedBalances = {
@@ -13,7 +13,7 @@ type CachedBalances = {
 
 const balanceCache = new Map<string, CachedBalances>();
 
-const BALANCE_CACHE_HEADERS = { "Cache-Control": "private, max-age=5, stale-while-revalidate=10" };
+const BALANCE_CACHE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 const FRESH_BALANCE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
 
 function serializeBalances(balances: Awaited<ReturnType<typeof fetchBalances>>) {

@@ -206,7 +206,37 @@ function syncBalancesToPrototype(
     change24hUsdNum = ${JSON.stringify(changeUsd)};
     tokenChanges24h = ${JSON.stringify(changeMap)};
     tokenMarketCaps = ${JSON.stringify(marketCapMap)};
-    window.__luminaPendingBalanceOverrides = {};
+    (function(){
+      try {
+        var pending = window.__luminaPendingBalanceOverrides || {};
+        Object.keys(pending).forEach(function(sym){
+          var item = pending[sym] || {};
+          var target = Number(item.amount);
+          var current = Number(String(balances[sym] || "0").replace(/,/g, "").replace(/^</, ""));
+          if (!Number.isFinite(target) || !Number.isFinite(current) || Date.now() > Number(item.expiresAt || 0)) {
+            delete pending[sym];
+            return;
+          }
+          var shouldHold = (item.mode === "max" && current > target + 0.0000001) || (item.mode === "min" && current + 0.0000001 < target);
+          if (shouldHold) {
+            balances[sym] = target.toLocaleString("en-US", { useGrouping:false, maximumFractionDigits:8 });
+            availMap[sym] = balances[sym] + " " + sym;
+            (assets || []).forEach(function(asset){
+              if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+              asset.amt = balances[sym] + " " + sym;
+              var amountNum = Number(String(balances[sym]).replace(/,/g, ""));
+              var price = Number(prices && prices[sym] || 0);
+              if (!(price > 0) && (sym === "USDC" || sym === "USDT" || sym === "EURC")) price = 1;
+              if (Number.isFinite(amountNum) && price > 0) asset.usdNum = amountNum * price;
+              asset.hasBalance = amountNum > 0;
+            });
+          } else {
+            delete pending[sym];
+          }
+        });
+        window.__luminaPendingBalanceOverrides = pending;
+      } catch(e) {}
+    })();
     (function(){
       try {
         var recent = JSON.parse(localStorage.getItem("lumina_recent_swap_assets_v1") || "[]");

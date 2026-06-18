@@ -2467,6 +2467,21 @@ function enhancePrototypeTokens() {
           var sym = String(item && item.symbol || "").toUpperCase();
           if (!sym || isEarnVaultSymbol(sym)) return;
           var amountText = formatImportedAmount(item.formatted || item.balanceFormatted || item.amountFormatted || item.amount || item.balance || "0");
+          try {
+            var pending = window.__luminaPendingBalanceOverrides && window.__luminaPendingBalanceOverrides[sym];
+            if (pending) {
+              var target = Number(pending.amount);
+              var current = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
+              var expired = Date.now() > Number(pending.expiresAt || 0);
+              if (expired || !Number.isFinite(target) || !Number.isFinite(current)) {
+                delete window.__luminaPendingBalanceOverrides[sym];
+              } else if ((pending.mode === "max" && current > target + 0.0000001) || (pending.mode === "min" && current + 0.0000001 < target)) {
+                amountText = formatImportedAmount(String(target));
+              } else {
+                delete window.__luminaPendingBalanceOverrides[sym];
+              }
+            }
+          } catch(e) {}
           balances[sym] = amountText;
           availMap[sym] = amountText + " " + sym;
           var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
@@ -2484,7 +2499,6 @@ function enhancePrototypeTokens() {
             if (Number.isFinite(amountNum) && price > 0) asset.usdNum = amountNum * price;
           });
         });
-        window.__luminaPendingBalanceOverrides = {};
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderAllAssets === "function") renderAllAssets();
         if (typeof refreshSwapLabels === "function") refreshSwapLabels();
@@ -4557,7 +4571,15 @@ function enhancePrototypeSwapQuote() {
 	        if (price > 0) asset.usdNum = (Number(amount) || 0) * price;
 	      }
       function protectSwapBalance(symbol, amount, mode){
-	        window.__luminaPendingBalanceOverrides = {};
+        symbol = String(symbol || "").toUpperCase();
+        var n = Number(amount);
+        if (!symbol || !Number.isFinite(n)) return;
+        window.__luminaPendingBalanceOverrides = window.__luminaPendingBalanceOverrides || {};
+        window.__luminaPendingBalanceOverrides[symbol] = {
+          amount: Math.max(0, n),
+          mode: mode,
+          expiresAt: Date.now() + 18 * 1000
+        };
 	      }
 	      function optimisticallyApplySwapBalances(){
 	        if (!latestSwapQuote) return;
@@ -4639,23 +4661,38 @@ function enhancePrototypeSwapQuote() {
 	        var amountOut = Number(latestSwapQuote.amountOut || 0);
 	        if (buy) upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
 	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
+	        function setLiveSwapPrice(symbol, price){
+	          symbol = String(symbol || "").toUpperCase();
+	          price = Number(price);
+	          if (!symbol || !Number.isFinite(price) || price <= 0) return;
+	          prices[symbol] = price;
+	          if (customTokens && customTokens[symbol]) customTokens[symbol].priceUsd = price;
+	          var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[symbol];
+	          if (market) market.priceUsd = price;
+	          (assets || []).forEach(function(asset){
+	            if (String(asset.sym || "").toUpperCase() !== symbol) return;
+	            var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "").replace(/^</, ""));
+	            if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * price;
+	          });
+	        }
 	        var sellPrice = tokenMeta(sell, latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
 	        if (!(sellPrice > 0) && sell === "WETH") sellPrice = Number(prices && prices.ETH) || 0;
 	        if (!(sellPrice > 0) && (sell === "WBTC" || sell === "BTC")) sellPrice = Number(prices && prices.BTC) || 0;
 	        if (!(sellPrice > 0) && (sell === "USDC" || sell === "USDT" || sell === "EURC")) sellPrice = 1;
-	        if (!(sellPrice > 0)) return;
-	        var buyPrice = amountIn * sellPrice / amountOut;
-	        if (!Number.isFinite(buyPrice) || buyPrice <= 0) return;
-	        prices[buy] = buyPrice;
-	        if (customTokens && customTokens[buy]) customTokens[buy].priceUsd = buyPrice;
-	        var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[buy];
-	        if (market) market.priceUsd = buyPrice;
+	        var buyPrice = tokenMeta(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to).priceUsd;
+	        if (!(buyPrice > 0) && buy === "WETH") buyPrice = Number(prices && prices.ETH) || 0;
+	        if (!(buyPrice > 0) && (buy === "WBTC" || buy === "BTC")) buyPrice = Number(prices && prices.BTC) || 0;
+	        if (!(buyPrice > 0) && (buy === "USDC" || buy === "USDT" || buy === "EURC")) buyPrice = 1;
+	        if (sellPrice > 0) {
+	          setLiveSwapPrice(sell, sellPrice);
+	          setLiveSwapPrice(buy, amountIn * sellPrice / amountOut);
+	        } else if (buyPrice > 0) {
+	          setLiveSwapPrice(buy, buyPrice);
+	          setLiveSwapPrice(sell, amountOut * buyPrice / amountIn);
+	        } else {
+	          return;
+	        }
 	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        (assets || []).forEach(function(asset){
-	          if (String(asset.sym || "").toUpperCase() !== buy) return;
-	          var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, ""));
-	          if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * buyPrice;
-	        });
 	        if (typeof renderAssets === "function") renderAssets();
 	      }
 	      function minOutText(){
@@ -7122,9 +7159,10 @@ function enhancePrototypeDetail() {
         var sym = String(asset && asset.sym || "").toUpperCase();
         var market = marketForAsset(asset);
         var candidates = [
-          prices && prices[sym],
           window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
-          market && market.priceUsd
+          market && market.priceUsd,
+          asset && asset.priceUsd,
+          prices && prices[sym]
         ];
         for (var i = 0; i < candidates.length; i++) {
           var value = Number(candidates[i]);
@@ -7663,6 +7701,7 @@ function enhancePrototypeDetail() {
         pill.className = "none";
         pill.textContent = detailCopy("noData");
         renderMarketCard(asset);
+        setTimeout(function(){ refreshDetailMarketPrice(asset, { force: true }); }, 500);
         window.__luminaDetailPriceTimer = setInterval(function(){
           var view = document.getElementById("view-detail");
           if (!view || !view.classList.contains("active")) {
@@ -7671,7 +7710,7 @@ function enhancePrototypeDetail() {
             return;
           }
           refreshDetailMarketPrice(asset, { force: true });
-        }, 8000);
+        }, 3000);
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;
