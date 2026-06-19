@@ -2465,31 +2465,74 @@ function enhancePrototypeTokens() {
       };
       window.__luminaApplyChainBalanceRows = function(rows){
         if (!Array.isArray(rows)) return;
+        if (!Array.isArray(assets)) assets = [];
         rows.forEach(function(item){
           var sym = String(item && item.symbol || "").toUpperCase();
           if (!sym || isEarnVaultSymbol(sym)) return;
           var amountText = formatImportedAmount(item.formatted || item.balanceFormatted || item.amountFormatted || item.amount || item.balance || "0");
+          var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
+          if (!Number.isFinite(amountNum)) amountNum = 0;
+          var name = item.name || tokenFull[sym] || sym;
+          var logo = item.logo || tokenLogo[sym] || tokenInitial(sym);
+          var address = item.contractAddress || item.address || item.contractAddr || null;
+          var usdValueNum = Number(item.usdValue);
+          var price = Number((prices && prices[sym]) || (marketPrices && marketPrices[sym]) || 0);
+          if (!(price > 0) && Number.isFinite(usdValueNum) && usdValueNum > 0 && amountNum > 0) price = usdValueNum / amountNum;
+          if (!(price > 0) && (sym === "USDC" || sym === "USDT" || sym === "EURC")) price = 1;
+          if (price > 0) {
+            prices[sym] = price;
+            marketPrices[sym] = price;
+          }
+          tokenFull[sym] = name;
+          tokenLogo[sym] = logo;
+          if (address) contracts[sym] = address;
+          if (!dotColor[sym]) dotColor[sym] = "linear-gradient(135deg,#1b231e,#26362b)";
           balances[sym] = amountText;
           availMap[sym] = amountText + " " + sym;
-          var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
+          var found = false;
           (assets || []).forEach(function(asset){
             if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+            found = true;
             asset.amt = amountText + " " + sym;
             asset.hasBalance = amountNum > 0;
-            if (item.name) asset.full = item.name;
-            if (item.logo) asset.logo = item.logo;
-            if (item.contractAddress) {
-              asset.contractAddress = item.contractAddress;
-              asset.address = item.contractAddress;
-            }
-            var price = Number((prices && prices[sym]) || (sym === "USDC" || sym === "USDT" || sym === "EURC" ? 1 : 0));
-            if (Number.isFinite(amountNum) && price > 0) asset.usdNum = amountNum * price;
+            asset.full = name;
+            asset.logo = logo;
+            if (address) { asset.contractAddress = address; asset.address = address; }
+            if (price > 0) asset.usdNum = amountNum * price;
           });
+          var core = /^(WLD|USDC|USDT|EURC|WETH|WBTC|ETH|BTC)$/.test(sym);
+          if (!found && (amountNum > 0 || core)) {
+            assets.push({
+              sym: sym,
+              full: name,
+              amt: amountText + " " + sym,
+              usdNum: price > 0 ? amountNum * price : 0,
+              cls: item.className || (sym === "WLD" ? "wld" : sym === "USDC" ? "usdc" : "custom"),
+              logo: logo,
+              contractAddress: address,
+              address: address,
+              custom: !core,
+              hasBalance: amountNum > 0,
+              homeSwapAsset: true,
+              recentSwapAsset: !core
+            });
+          }
         });
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderAllAssets === "function") renderAllAssets();
         if (typeof refreshSwapLabels === "function") refreshSwapLabels();
         if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
+        if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
+        try {
+          var view = document.getElementById("view-detail");
+          var asset = assets && assets[currentDetailIdx] ? assets[currentDetailIdx] : null;
+          if (view && view.classList.contains("active") && asset) {
+            var amt = document.getElementById("detAmt");
+            if (amt) amt.textContent = asset.amt || ("0 " + asset.sym);
+            if (typeof updateDetailFiat === "function") updateDetailFiat(asset);
+            if (typeof redrawActiveDetailCandles === "function") redrawActiveDetailCandles(asset);
+          }
+        } catch(e) {}
       };
       function renderScanRows(risk){
         var checks = risk && Array.isArray(risk.checks) ? risk.checks : [];
@@ -7144,6 +7187,29 @@ function enhancePrototypeDetail() {
         var value = amount > 0 && price > 0 ? amount * price : 0;
         el.textContent = "≈ " + formatFiat(value || 0);
       }
+      function detailChartCacheKey(asset, range) {
+        var sym = String(asset && asset.sym || "").toUpperCase();
+        return sym ? "lumina_detail_candles_v1:" + sym + ":" + (range || "1D") : "";
+      }
+      function readDetailChartCache(asset, range) {
+        var key = detailChartCacheKey(asset, range);
+        if (!key) return [];
+        try {
+          var payload = JSON.parse(localStorage.getItem(key) || "null");
+          if (!payload || !Array.isArray(payload.candles) || !payload.candles.length) return [];
+          if (Date.now() - Number(payload.savedAt || 0) > 6 * 60 * 60 * 1000) return [];
+          return payload.candles;
+        } catch(e) {
+          return [];
+        }
+      }
+      function writeDetailChartCache(asset, range, candles) {
+        var key = detailChartCacheKey(asset, range);
+        if (!key || !Array.isArray(candles) || !candles.length) return;
+        try {
+          localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), candles: candles.slice(-120) }));
+        } catch(e) {}
+      }
       function redrawActiveDetailCandles(asset) {
         var chart = document.getElementById("detChart");
         if (!chart || !chart.__luminaLastCandles || !chart.__luminaLastCandles.length) return false;
@@ -7194,7 +7260,7 @@ function enhancePrototypeDetail() {
               var view = document.getElementById("view-detail");
               var chart = document.getElementById("detChart");
               if (view && view.classList.contains("active") && chart && chart.dataset.marketRange) {
-                if (!redrawActiveDetailCandles(asset)) renderMarketChart(asset, chart.dataset.marketRange);
+                redrawActiveDetailCandles(asset);
               }
             } else {
               updateDetailFiat(asset);
@@ -7296,6 +7362,7 @@ function enhancePrototypeDetail() {
         var chart = document.getElementById("detChart");
         if (!chart) return;
         chart.dataset.marketRange = range || "1D";
+        var hasExistingChart = !!(chart.__luminaLastCandles && chart.__luminaLastCandles.length);
         var address = assetMarketAddress(asset);
         function latestCandleClose(candles){
           if (!candles || !candles.length) return 0;
@@ -7308,12 +7375,27 @@ function enhancePrototypeDetail() {
           if (close > 0) applyDetailPrice(asset, close);
           candles = syncCandlesWithLatestPrice(candles, asset);
           chart.__luminaLastCandles = candles;
+          writeDetailChartCache(asset, range || "1D", candles);
           renderCandlesChart(chart, candles, range || "1D");
           updateRangeChange(candles, range || "1D", asset);
           updateDetailFiat(asset);
         }
+        function keepLastChart(reason){
+          var cached = hasExistingChart ? chart.__luminaLastCandles : readDetailChartCache(asset, range || "1D");
+          if (cached && cached.length) {
+            applyCandles(cached);
+            return true;
+          }
+          if (market && Number(market.priceUsd || 0) > 0) {
+            updateDetailFiat(asset);
+            updateRangeChangeFromMarket(asset, range || "1D");
+            chart.innerHTML = realChartUnavailable(asset, range || "1D", reason || detailCopy("noHistory"));
+            return true;
+          }
+          return false;
+        }
         function renderHistory(reason){
-          chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
+          if (!hasExistingChart) chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingHistory") + '</div>';
           fetch("/api/market/history?symbol=" + encodeURIComponent(asset.sym) + "&address=" + encodeURIComponent(address || "") + "&range=" + encodeURIComponent(range || "1D") + "&t=" + Date.now(), { cache: "no-store" })
             .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
             .then(function(data){
@@ -7321,20 +7403,22 @@ function enhancePrototypeDetail() {
               if (candles.length) {
                 applyCandles(candles);
               } else {
-                chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("noHistory"));
-                updateRangeChangeFromMarket(asset, range || "1D");
+                keepLastChart(reason || detailCopy("noHistory"));
               }
             })
             .catch(function(){
-              chart.innerHTML = liveMarketSummary(asset, range || "1D", reason || detailCopy("historyFailed"));
-              updateRangeChangeFromMarket(asset, range || "1D");
+              keepLastChart(reason || detailCopy("historyFailed"));
             });
         }
         if (!market || !market.poolAddress) {
           renderHistory(detailCopy("noDexPool"));
           return;
         }
-        chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
+        if (!hasExistingChart) {
+          var cached = readDetailChartCache(asset, range || "1D");
+          if (cached.length) applyCandles(cached);
+          else chart.innerHTML = '<div class="market-detail-state">' + detailCopy("loadingChart") + '</div>';
+        }
         fetch("/api/market/ohlcv?pool=" + encodeURIComponent(market.poolAddress) + "&range=" + encodeURIComponent(range || "1D") + "&token=" + encodeURIComponent(address || market.address || "") + "&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { candles: [] }; })
           .then(function(data){
@@ -7673,7 +7757,7 @@ function enhancePrototypeDetail() {
             return;
           }
           refreshDetailMarketPrice(asset, { force: true });
-        }, 3000);
+        }, 15000);
       }
 
       var previousOpenDetail = typeof openDetail === "function" ? openDetail : null;

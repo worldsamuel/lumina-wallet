@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import useSWR from "swr";
 import type { MarketPricesResponse, OnchainPricesResponse } from "@/lib/prices";
 
@@ -37,21 +37,20 @@ const fetcher = async <T,>(url: string) => {
  * Polls World Chain balances and syncs them into the mounted v22 prototype runtime.
  */
 export function useChainBalanceSync(enabled: boolean, userAddress: string | null) {
-  const portfolioPricesRef = useRef<Record<string, number>>({});
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
-    { dedupingInterval: 30_000, refreshInterval: 90_000, revalidateOnFocus: false, refreshWhenHidden: false },
+    { dedupingInterval: 1_000, refreshInterval: 12_000, revalidateOnFocus: true, refreshWhenHidden: false },
   );
   const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
-    dedupingInterval: 300_000,
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
+    dedupingInterval: 5_000,
+    refreshInterval: 30_000,
+    revalidateOnFocus: true,
   });
   const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
-    dedupingInterval: 300_000,
-    refreshInterval: 300_000,
-    revalidateOnFocus: false,
+    dedupingInterval: 5_000,
+    refreshInterval: 30_000,
+    revalidateOnFocus: true,
   });
 
   useEffect(() => {
@@ -75,7 +74,7 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     if (balances.isLoading && !balances.data) {
       const snapshot = readBalanceSnapshot(userAddress);
       if (snapshot?.balances?.length) {
-        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, portfolioPricesRef.current, true);
+        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, true);
         return;
       }
       renderBalanceSkeleton();
@@ -85,7 +84,7 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     if (balances.error) {
       const snapshot = readBalanceSnapshot(userAddress);
       if (snapshot?.balances?.length) {
-        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, portfolioPricesRef.current, true);
+        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, true);
       }
       renderBalanceError();
       return;
@@ -97,7 +96,6 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
       balances.data.balances,
       market.data,
       onchain.data,
-      portfolioPricesRef.current,
       Boolean(balances.data.stale),
     );
   }, [
@@ -117,22 +115,13 @@ function syncBalancesToPrototype(
   items: BalanceApiItem[],
   marketData?: MarketPricesResponse,
   onchainData?: OnchainPricesResponse,
-  portfolioPrices: Record<string, number> = {},
   stale = false,
 ) {
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
     const livePriceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
     const amount = Number.parseFloat(item.formatted || "0") || 0;
-    const previousPortfolioPrice = portfolioPrices[item.symbol];
-    const portfolioPriceUsd =
-      amount > 0 && previousPortfolioPrice > 0
-        ? previousPortfolioPrice
-        : livePriceUsd;
-    if (amount > 0 && livePriceUsd !== null && !(previousPortfolioPrice > 0)) {
-      portfolioPrices[item.symbol] = livePriceUsd;
-    }
-    const usdValue = portfolioPriceUsd === null ? null : amount * portfolioPriceUsd;
+    const usdValue = livePriceUsd === null ? null : amount * livePriceUsd;
     return {
       sym: item.symbol,
       full: item.name,
@@ -250,6 +239,7 @@ function syncBalancesToPrototype(
     if (typeof renderAssets === "function") renderAssets();
     if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
     if (typeof window.__luminaApplyBalancePrivacy === "function") window.__luminaApplyBalancePrivacy();
+    if (typeof window.__luminaApplyChainBalanceRows === "function") window.__luminaApplyChainBalanceRows(${JSON.stringify(items)});
     if (typeof refreshSwapLabels === "function") refreshSwapLabels();
   `);
 }
