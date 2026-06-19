@@ -348,7 +348,7 @@ function recordClientActivity(input: {
   return fetch("/api/activity", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ ...input, status: "completed" }),
+    body: JSON.stringify({ ...input, status: "pending" }),
   }).catch((error) => console.warn("[ACTIVITY] Failed to record swap", error));
 }
 

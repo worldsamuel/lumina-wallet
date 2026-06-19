@@ -24,6 +24,11 @@ const vaultMetaAbi = [
 ] as const;
 
 export const dynamic = "force-dynamic";
+const NO_STORE_HEADERS = {
+  "Cache-Control": "private, no-store, no-cache, must-revalidate, max-age=0",
+  Pragma: "no-cache",
+  Expires: "0",
+};
 
 export function OPTIONS() {
   return optionsResponse();
@@ -34,12 +39,12 @@ export async function GET(
   { params }: { params: { address: string } },
 ) {
   if (!rateLimit(req, "public:morpho-position", 120).ok) {
-    return jsonResponse({ error: "Too many requests." }, { status: 429 });
+    return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
   }
 
   const userAddress = params.address;
   if (!isAddress(userAddress)) {
-    return jsonResponse({ error: "Invalid wallet address." }, { status: 400 });
+    return jsonResponse({ error: "Invalid wallet address." }, { status: 400, headers: NO_STORE_HEADERS });
   }
 
   try {
@@ -122,10 +127,10 @@ export async function GET(
       };
     });
 
-    return jsonResponse({ address: userAddress, positions });
+    return jsonResponse({ address: userAddress, positions, updatedAt: new Date().toISOString() }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("Failed to read Morpho positions", error);
-    return jsonResponse({ error: "Unable to read Morpho positions." }, { status: 502 });
+    return jsonResponse({ error: "Unable to read Morpho positions." }, { status: 502, headers: NO_STORE_HEADERS });
   }
 }
 

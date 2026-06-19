@@ -8,6 +8,7 @@ import {
   createChart,
   CrosshairMode,
   HistogramSeries,
+  LineSeries,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { useSWRConfig } from "swr";
@@ -377,13 +378,21 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
   }, []);
 
   const handleSwapReceiptSuccess = useCallback(() => {
+    const hash = swapUserOpHash;
     setSwapUserOpHash("");
     [0, 700, 1600, 3000, 6500, 10000, 15000].forEach((delay) => {
       window.setTimeout(() => window.__luminaRefreshWalletData?.(), delay);
     });
+    if (hash) {
+      void fetch("/api/activity", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ type: "swap", address, hash, status: "completed" }),
+      }).catch(() => undefined);
+    }
     toastFromPrototype(prototypeText("swapSuccess"));
-    window.dispatchEvent(new CustomEvent("lumina:swap-confirmed"));
-  }, []);
+    window.dispatchEvent(new CustomEvent("lumina:swap-confirmed", { detail: { userOpHash: hash } }));
+  }, [address, swapUserOpHash]);
 
   const handleSwapReceiptError = useCallback((receiptError?: Error) => {
     setSwapUserOpHash("");
@@ -412,6 +421,19 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
           userOpHash={earnUserOpHash}
           onSuccess={handleEarnReceiptSuccess}
           onError={handleEarnReceiptError}
+        />
+      ) : null}
+      {swapUserOpHash ? (
+        <EarnTransactionStatus
+          userOpHash={swapUserOpHash}
+          onSuccess={handleSwapReceiptSuccess}
+          onError={handleSwapReceiptError}
+          timeoutMs={120_000}
+          onTimeout={() => {
+            setSwapUserOpHash("");
+            window.__luminaRefreshWalletData?.();
+          }}
+          labels={transactionStatusLabels("swap")}
         />
       ) : null}
     </>
@@ -457,29 +479,33 @@ function installLightweightChartRenderer() {
       container.replaceChildren();
 
       const width = Math.max(280, container.clientWidth || 360);
-      const height = Math.max(210, container.clientHeight || 230);
+      const height = Math.max(250, container.clientHeight || 260);
+      container.classList.add("lumina-market-terminal-chart");
+      const maHost = document.createElement("div");
+      maHost.className = "lumina-ma-legend";
+      container.appendChild(maHost);
       const chart = createChart(container, {
         width,
         height,
         autoSize: false,
         layout: {
-          background: { type: ColorType.Solid, color: "rgba(3, 5, 5, 0)" },
-          textColor: "#8f969f",
+          background: { type: ColorType.Solid, color: "#020303" },
+          textColor: "#8a8f98",
           fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
           fontSize: 11,
         },
         grid: {
-          vertLines: { color: "rgba(255,255,255,0.025)" },
-          horzLines: { color: "rgba(255,255,255,0.055)" },
+          vertLines: { color: "rgba(255,255,255,0.075)" },
+          horzLines: { color: "rgba(255,255,255,0.075)" },
         },
         crosshair: {
           mode: CrosshairMode.Magnet,
-          vertLine: { color: "rgba(74,222,128,0.22)", labelBackgroundColor: "#151b18" },
-          horzLine: { color: "rgba(74,222,128,0.18)", labelBackgroundColor: "#151b18" },
+          vertLine: { color: "rgba(255,255,255,0.24)", labelBackgroundColor: "#111315" },
+          horzLine: { color: "rgba(255,255,255,0.24)", labelBackgroundColor: "#111315" },
         },
         rightPriceScale: {
           borderVisible: false,
-          scaleMargins: { top: 0.08, bottom: 0.26 },
+          scaleMargins: { top: 0.12, bottom: 0.28 },
         },
         timeScale: {
           borderVisible: false,
@@ -498,16 +524,44 @@ function installLightweightChartRenderer() {
       });
 
       const candleSeries = chart.addSeries(CandlestickSeries, {
-        upColor: "#14d89a",
-        downColor: "#ff4d64",
-        borderUpColor: "#14d89a",
-        borderDownColor: "#ff4d64",
-        wickUpColor: "#72ffd0",
-        wickDownColor: "#ff8795",
+        upColor: "#b8ff2c",
+        downColor: "#ff42aa",
+        borderUpColor: "#b8ff2c",
+        borderDownColor: "#ff42aa",
+        wickUpColor: "#b8ff2c",
+        wickDownColor: "#ff42aa",
         priceLineVisible: true,
         lastValueVisible: true,
+        priceLineColor: "rgba(255,255,255,0.58)",
+        priceLineStyle: 2,
       });
       candleSeries.setData(data.map(({ volume: _volume, ...candle }) => candle));
+
+      const maConfigs = [
+        { period: 5, color: "#f6a22d" },
+        { period: 10, color: "#f0449a" },
+        { period: 20, color: "#37c6dd" },
+        { period: 30, color: "#e76620" },
+        { period: 60, color: "#9b45b6" },
+        { period: 120, color: "#58b66d" },
+      ];
+      const maLabels: string[] = [];
+      maConfigs.forEach((config) => {
+        const points = movingAverage(data, config.period);
+        if (points.length < 2) return;
+        chart.addSeries(LineSeries, {
+          color: config.color,
+          lineWidth: config.period <= 20 ? 2 : 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          crosshairMarkerVisible: false,
+        }).setData(points);
+        const last = points[points.length - 1]?.value;
+        if (Number.isFinite(last)) {
+          maLabels.push(`<span style="color:${config.color}">MA${config.period}: ${formatMaValue(last)}</span>`);
+        }
+      });
+      maHost.innerHTML = maLabels.join("");
 
       const volumeSeries = chart.addSeries(HistogramSeries, {
         priceFormat: { type: "volume" },
@@ -519,7 +573,7 @@ function installLightweightChartRenderer() {
         data.map((candle) => ({
           time: candle.time,
           value: candle.volume,
-          color: candle.close >= candle.open ? "rgba(20,216,154,0.38)" : "rgba(255,77,100,0.38)",
+          color: candle.close >= candle.open ? "rgba(184,255,44,0.45)" : "rgba(255,66,170,0.45)",
         })),
       );
       chart.priceScale("").applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
@@ -566,6 +620,27 @@ function normalizeMarketCandles(candles: MarketChartCandle[]) {
     });
   }
   return [...byTime.values()].sort((a, b) => Number(a.time) - Number(b.time));
+}
+
+function movingAverage(
+  data: Array<{ time: UTCTimestamp; close: number }>,
+  period: number,
+) {
+  const output: Array<{ time: UTCTimestamp; value: number }> = [];
+  let sum = 0;
+  data.forEach((point, index) => {
+    sum += point.close;
+    if (index >= period) sum -= data[index - period].close;
+    if (index >= period - 1) output.push({ time: point.time, value: sum / period });
+  });
+  return output;
+}
+
+function formatMaValue(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  if (value >= 1) return value.toFixed(value >= 100 ? 2 : 4);
+  if (value >= 0.01) return value.toFixed(4);
+  return value.toPrecision(4);
 }
 
 function formatChartAxisPrice(value: number) {
@@ -743,7 +818,7 @@ function exposeMorphoTransactions() {
         address: window.__luminaUserAddress || null,
         hash: userOpHash,
         amount: action,
-        status: "completed",
+        status: "pending",
         metadata: { action },
       }),
     }).catch((error) => console.warn("[ACTIVITY] Failed to record earn", error));
@@ -752,7 +827,7 @@ function exposeMorphoTransactions() {
       title: "Earn",
       subtitle: "Vault",
       amount: action,
-      status: "Completed",
+      status: "Pending",
       hash: userOpHash,
     });
     window.dispatchEvent(new CustomEvent("lumina:earn-userop", { detail: { userOpHash, action } }));
@@ -1357,12 +1432,30 @@ function enhancePrototypeEarn() {
         if (Number(String(pos && pos.shares || "0")) > 0) return positionShareAmount(pos, digits || 6);
         return positionAmountText(pos, digits || 6);
       }
-      function hasWithdrawablePosition(pos){
+      function rawAmountPositive(value){
+        try {
+          var text = String(value || "0").trim();
+          if (!text || text === "0") return false;
+          return BigInt(text) > 0n;
+        } catch(e) {
+          return Number(String(value || "0").replace(/,/g, "")) > 0;
+        }
+      }
+      function isPendingEarnPosition(pos){
+        return !!(pos && (pos.pendingLocal || pos.snapshotOnly));
+      }
+      function hasDisplayPosition(pos){
         if (!pos) return false;
         if (positionAmount(pos) > 0) return true;
         if (Number(String(pos.sharesFormatted || "0").replace(/,/g, "")) > 0) return true;
         var rawShares = String(pos.shares || "").trim();
         return !!rawShares && rawShares !== "0";
+      }
+      function hasWithdrawablePosition(pos){
+        if (!pos || isPendingEarnPosition(pos)) return false;
+        if (rawAmountPositive(pos.maxWithdraw)) return true;
+        if (rawAmountPositive(pos.shares)) return true;
+        return Number(String(pos.maxWithdrawFormatted || "0").replace(/,/g, "")) > 0;
       }
       function earnPositions(){
         return (morphoPositions || []).filter(nonZeroPosition);
@@ -1385,7 +1478,7 @@ function enhancePrototypeEarn() {
       }
       window.__luminaRenderEarnHero = updateEarnHero;
       function nonZeroPosition(pos){
-        return hasWithdrawablePosition(pos);
+        return hasDisplayPosition(pos);
       }
       function walletBalanceForVault(vault, pos){
         var direct = Number(pos && String(pos.walletBalanceFormatted || "0").replace(/,/g, ""));
@@ -1425,7 +1518,9 @@ function enhancePrototypeEarn() {
         if (earnPositions().length) return true;
         var snapshot = readEarnSnapshot();
         if (!snapshot) return false;
-        morphoPositions = snapshot.positions;
+        morphoPositions = snapshot.positions.map(function(pos){
+          return Object.assign({}, pos, { snapshotOnly: true, pendingLocal: !!pos.pendingLocal });
+        });
         updateHomeEarnTotal();
         return true;
       }
@@ -1448,14 +1543,19 @@ function enhancePrototypeEarn() {
         if (!vault || !Number.isFinite(amount) || amount <= 0) return;
         var existing = positionFor(vault);
         var nextAmount = positionAmount(existing) + amount;
+        var hadLivePosition = existing && hasWithdrawablePosition(existing);
         var next = Object.assign({}, existing || {}, {
           vaultAddress: vault.address,
           displayName: vault.displayName,
           asset: vault.asset,
           assetsFormatted: String(nextAmount),
-          maxWithdrawFormatted: String(nextAmount),
-          sharesFormatted: String(nextAmount),
-          shares: existing && existing.shares ? existing.shares : "1",
+          maxWithdrawFormatted: hadLivePosition ? (existing.maxWithdrawFormatted || "0") : "0",
+          sharesFormatted: hadLivePosition ? (existing.sharesFormatted || "0") : "0",
+          maxWithdraw: hadLivePosition ? (existing.maxWithdraw || "0") : "0",
+          shares: hadLivePosition ? (existing.shares || "0") : "0",
+          pendingLocal: !hadLivePosition,
+          pendingDepositFormatted: String(amount),
+          snapshotOnly: false,
           shareSymbol: optimisticShareSymbol(vault, existing)
         });
         var replaced = false;
@@ -1480,7 +1580,8 @@ function enhancePrototypeEarn() {
             assetsFormatted: String(nextAmount),
             maxWithdrawFormatted: String(nextAmount),
             sharesFormatted: String(nextAmount),
-            shares: nextAmount > 0 ? (pos.shares || "1") : "0"
+            shares: nextAmount > 0 ? (pos.shares || "0") : "0",
+            pendingWithdraw: true
           });
         }).filter(nonZeroPosition);
         refreshEarnViews();
@@ -1650,6 +1751,10 @@ function enhancePrototypeEarn() {
         console.log("[EARN] My deposit assets:", pos ? pos.assets : "0");
         console.log("[EARN] My deposit human:", pos ? positionAmount(pos) : "0");
         console.log("[EARN] Withdraw disabled:", !hasWithdrawablePosition(pos));
+        var withdrawable = hasWithdrawablePosition(pos);
+        var pendingNote = pos && isPendingEarnPosition(pos)
+          ? '<div class="earn-dev-note"><strong>Waiting for on-chain position</strong><span>Your deposit is visible locally. Withdrawal unlocks after World Chain confirms the vault shares.</span></div>'
+          : "";
         var annual = "—";
         var daily = "—";
         var amount = "";
@@ -1666,8 +1771,9 @@ function enhancePrototypeEarn() {
           '<div class="morpho-provider-note">' + copy.curator + '</div>' +
           '<div class="earn-action-row">' +
             '<button class="btn-primary" id="morphoDepositBtn" ' + (paused ? "disabled" : "") + ' onclick="depositMorpho()">' + copy.deposit + '</button>' +
-            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!hasWithdrawablePosition(pos) ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
+            '<button class="btn-ghost" id="morphoWithdrawBtn" ' + (!withdrawable ? "disabled" : "") + ' onclick="openMorphoWithdrawModal()">' + copy.withdraw + '</button>' +
           '</div>' +
+          pendingNote +
           (paused ? '<div class="earn-dev-note"><strong>' + copy.pausedTitle + '</strong><span>' + (cfg.morphoDepositEnabled === false ? "Deposits are temporarily paused by Lumina operations." : copy.pausedBody) + '</span></div>' : "") +
           '<div class="morpho-compliance">' +
             '<strong>' + copy.aboutTitle + '</strong>' +
@@ -1839,7 +1945,8 @@ function enhancePrototypeEarn() {
           var amount = input ? String(input.value || "").trim() : "";
           var n = Number(amount.replace(/,/g, ""));
           if (!Number.isFinite(n) || n <= 0) return toast("Enter an amount");
-          if (n > positionAmount(pos)) return toast("Vault liquidity is low. Try a smaller amount later.");
+          var maxWithdraw = Number(String(pos.maxWithdrawFormatted || "0").replace(/,/g, ""));
+          if (!Number.isFinite(maxWithdraw) || maxWithdraw <= 0 || n > maxWithdraw) return toast("Vault liquidity is low. Try a smaller amount later.");
           body.amount = amount;
         }
         try {
@@ -1909,12 +2016,18 @@ function enhancePrototypeEarn() {
           var hadLivePositions = earnPositions().length > 0;
           var restoredSnapshot = hydrateEarnPositionsFromSnapshot();
           if (hadLivePositions || restoredSnapshot) {
+            morphoPositions = (morphoPositions || []).map(function(pos){
+              if (pos.pendingLocal) return pos;
+              return Object.assign({}, pos, { snapshotOnly: true });
+            });
             updateHomeEarnTotal();
             console.log("[EARN] Empty position response ignored for address:", address);
             return;
           }
         }
-        morphoPositions = nextPositions;
+        morphoPositions = nextPositions.map(function(pos){
+          return Object.assign({}, pos, { liveConfirmed: true, pendingLocal: false, snapshotOnly: false });
+        });
         writeEarnSnapshot(morphoPositions);
         updateHomeEarnTotal();
         console.log("[EARN] Positions address:", address);
@@ -1975,7 +2088,7 @@ function enhancePrototypeEarn() {
           try {
             await window.__luminaRefreshMorphoPositions();
           } catch(e) {}
-          if (tries >= 6) clearInterval(timer);
+          if (tries >= 18) clearInterval(timer);
         }, 5000);
       }
       if (!window.__luminaMorphoRefreshTimer) {
@@ -3456,17 +3569,26 @@ function enhancePrototypeHome() {
         return rows;
       }
       function priceForHome(symbol){
-        var sym = String(symbol || "").toUpperCase();
+        var asset = typeof symbol === "object" ? symbol : null;
+        var sym = String((asset && asset.sym) || symbol || "").toUpperCase();
         try {
-          if (prices && Number(prices[sym]) > 0) return Number(prices[sym]);
+          var address = asset ? String(asset.contractAddress || asset.marketAddress || asset.address || asset.contractAddr || "").toLowerCase() : "";
+          var byAddress = window.__luminaMarketByAddress || {};
+          if (address && byAddress[address] && Number(byAddress[address].priceUsd) > 0) return Number(byAddress[address].priceUsd);
           if (sym === "WETH") return Number(prices && prices.ETH) || 0;
           if (sym === "WBTC" || sym === "BTC") return Number(prices && prices.BTC) || 0;
           if (sym === "USDC" || sym === "USDT" || sym === "EURC") return 1;
-          if (customTokens && customTokens[sym] && Number(customTokens[sym].priceUsd) > 0) return Number(customTokens[sym].priceUsd);
+          if (["WLD","ETH"].includes(sym) && prices && Number(prices[sym]) > 0) return Number(prices[sym]);
+          if (address && customTokens && customTokens[sym] && Number(customTokens[sym].priceUsd) > 0) return Number(customTokens[sym].priceUsd);
           var map = window.__luminaMarketBySymbol || {};
-          if (map[sym] && Number(map[sym].priceUsd) > 0) return Number(map[sym].priceUsd);
+          if (["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(sym) && map[sym] && Number(map[sym].priceUsd) > 0) return Number(map[sym].priceUsd);
           var markets = window.__luminaMarketPrices || [];
-          var market = markets.find(function(item){ return String(item.symbol || "").toUpperCase() === sym; });
+          var market = address
+            ? markets.find(function(item){ return String(item.address || item.tokenAddress || "").toLowerCase() === address; })
+            : null;
+          if (!market && ["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(sym)) {
+            market = markets.find(function(item){ return String(item.symbol || "").toUpperCase() === sym; });
+          }
           return market ? Number(market.priceUsd || market.usd || 0) : 0;
         } catch(e) { return 0; }
       }
@@ -3485,7 +3607,7 @@ function enhancePrototypeHome() {
       function assetUsdValue(asset){
         if (asset && Number(asset.portfolioUsdNum) > 0) return Number(asset.portfolioUsdNum);
         var amount = assetAmountNumber(asset);
-        var price = priceForHome(asset && asset.sym);
+        var price = priceForHome(asset);
         if (amount > 0 && price > 0) return amount * price;
         return Number(asset && asset.usdNum || 0);
       }
@@ -3625,6 +3747,14 @@ function enhancePrototypeMarket() {
   const source = `
     (function(){
       window.__luminaMarketBySymbol = window.__luminaMarketBySymbol || {};
+      window.__luminaMarketByAddress = window.__luminaMarketByAddress || {};
+      function isCoreMarketSymbol(symbol){
+        return ["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(String(symbol || "").toUpperCase());
+      }
+      function normalizedMarketAddress(value){
+        var address = String(value || "").toLowerCase();
+        return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
+      }
       function iconFor(symbol, fallback){
         if (window.__luminaTokenLogoHtml) return window.__luminaTokenLogoHtml(symbol, fallback);
         return "";
@@ -3680,26 +3810,30 @@ function enhancePrototypeMarket() {
         });
       }
       function registerMarketToken(market){
-        var sym = market.symbol;
+        var sym = String(market.symbol || "").toUpperCase();
+        if (!sym) return null;
+        var address = normalizedMarketAddress(market.address || market.tokenAddress || market.contractAddress);
         var existingMarket = window.__luminaMarketBySymbol[sym];
+        var existingByAddress = address ? window.__luminaMarketByAddress[address] : null;
         var explicitStatus = String(market.status || "").toLowerCase();
         var existingStatus = String(existingMarket && existingMarket.status || "").toLowerCase();
         var resolvedStatus = explicitStatus || existingStatus || (market.verified ? "verified" : "pending");
         var resolvedVerified = resolvedStatus === "verified";
-        market = Object.assign({}, existingMarket || {}, market, { status: resolvedStatus, verified: resolvedVerified });
+        market = Object.assign({}, existingMarket || {}, existingByAddress || {}, market, { symbol: sym, address: address || market.address || null, status: resolvedStatus, verified: resolvedVerified });
         if (market.logoUrl && window.__luminaSetTokenLogoUrl) window.__luminaSetTokenLogoUrl(sym, market.logoUrl);
-        prices[sym] = market.priceUsd || 0;
+        if (isCoreMarketSymbol(sym)) prices[sym] = market.priceUsd || 0;
         dotColor[sym] = sym === "WLD" ? "#fff" : "linear-gradient(135deg,#1b231e,#26362b)";
         tokenFull[sym] = market.name || sym;
         tokenLogo[sym] = iconFor(sym, tokenLogo[sym] || market.symbol);
         tokenChanges24h = tokenChanges24h || {};
         tokenChanges24h[sym] = market.change24h;
         window.__luminaMarketBySymbol[sym] = market;
-        if (market.address && customTokens && !["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(String(sym).toUpperCase())) {
+        if (address) window.__luminaMarketByAddress[address] = market;
+        if (address && customTokens && !isCoreMarketSymbol(sym)) {
           customTokens[sym] = {
             symbol: sym,
             name: market.name || sym,
-            address: market.address,
+            address: address,
             decimals: Number.isFinite(Number(market.decimals)) ? Number(market.decimals) : 18,
             logoUrl: market.logoUrl || null,
             priceUsd: Number(market.priceUsd || 0),
@@ -4697,6 +4831,17 @@ function enhancePrototypeSwapQuote() {
 	        document.getElementById("swapSuccessClose").onclick = function(){ modal.remove(); };
 	        document.getElementById("swapSuccessOk").onclick = function(){ modal.remove(); go("activity"); setTabByName("Activity"); };
 	      }
+	      function writePendingSwapBalanceOverlay(payload){
+	        try {
+	          var address = String(window.__luminaUserAddress || "").toLowerCase();
+	          if (!address || !payload) return;
+	          localStorage.setItem("lumina_pending_swap_balance_v1:" + address, JSON.stringify(Object.assign({}, payload, {
+	            address: address,
+	            savedAt: Date.now(),
+	            expiresAt: Date.now() + 2 * 60 * 1000
+	          })));
+	        } catch(e) {}
+	      }
 	      async function handleSwapClick(){
 	        if (swapSubmitting) return;
 	        if ((!latestSwapQuote || !quoteMatchesCurrent()) && activeQuotePromise) {
@@ -4752,7 +4897,7 @@ function enhancePrototypeSwapQuote() {
 	              title: activitySwapAmount(state.amountText, swapState.sell) + " -> " + activitySwapAmount(latestSwapQuote.amountOut, swapState.buy),
 	              subtitle: "Swap",
 	              amount: state.amountText + " " + swapState.sell,
-	              status: "Completed",
+	              status: "Pending",
 	              hash: result.userOpHash || result.transactionHash || ("pending-" + Date.now())
 	            });
 	          } catch(postError) {
@@ -4763,9 +4908,18 @@ function enhancePrototypeSwapQuote() {
 	            var boughtAmount = Number(latestSwapQuote && latestSwapQuote.amountOut || 0);
 	            var sellBefore = balanceNumber(swapState.sell);
 	            var buyBefore = balanceNumber(swapState.buy);
+	            var sellAfter = Math.max(0, sellBefore - (Number.isFinite(soldAmount) ? soldAmount : 0));
+	            var buyAfter = buyBefore + (Number.isFinite(boughtAmount) ? boughtAmount : 0);
+	            writePendingSwapBalanceOverlay({
+	              userOpHash: result.userOpHash || "",
+	              sellSymbol: swapState.sell,
+	              buySymbol: swapState.buy,
+	              sellAmount: String(sellAfter),
+	              buyAmount: String(buyAfter)
+	            });
 	            if (boughtAmount > 0) upsertRecentSwapHomeAsset(swapState.buy, toQuoted, boughtAmount);
-	            if (soldAmount > 0) updateAssetAmount(swapState.sell, Math.max(0, sellBefore - soldAmount));
-	            if (boughtAmount > 0) updateAssetAmount(swapState.buy, buyBefore + boughtAmount);
+	            if (soldAmount > 0) updateAssetAmount(swapState.sell, sellAfter);
+	            if (boughtAmount > 0) updateAssetAmount(swapState.buy, buyAfter);
 	            if (typeof renderAssets === "function") renderAssets();
 	            if (typeof renderAllAssets === "function") renderAllAssets();
 	            if (typeof refreshSwapLabels === "function") refreshSwapLabels();
@@ -5286,6 +5440,7 @@ function enhancePrototypeActivity() {
           empty: { en:"No activity yet", fr:"Aucune activité pour le moment", de:"Noch keine Aktivität", es:"Aún no hay actividad", ja:"アクティビティはまだありません", "zh-CN":"暂无活动", "zh-TW":"暫無活動" },
           swapRoute: { en:"Swap", fr:"Échange", de:"Swap", es:"Intercambio", ja:"スワップ", "zh-CN":"兑换", "zh-TW":"兌換" },
           completed: { en:"Completed", fr:"Terminé", de:"Abgeschlossen", es:"Completado", ja:"完了", "zh-CN":"已完成", "zh-TW":"已完成" },
+          pending: { en:"Pending", fr:"En attente", de:"Ausstehend", es:"Pendiente", ja:"保留中", "zh-CN":"待确认", "zh-TW":"待確認" },
           pendingToast: { en:"Transaction submitted. Waiting for confirmation.", fr:"Transaction envoyée. En attente de confirmation.", de:"Transaktion gesendet. Warten auf Bestätigung.", es:"Transacción enviada. Esperando confirmación.", ja:"取引を送信しました。確認待ちです。", "zh-CN":"交易已提交,等待确认。", "zh-TW":"交易已提交,等待確認。" }
         };
         return (copy[key] && (copy[key][lang] || copy[key].en)) || key;
@@ -5296,6 +5451,7 @@ function enhancePrototypeActivity() {
       }
       function activityStatus(value){
         if (!value || /completed/i.test(String(value))) return activityCopy("completed");
+        if (/pending|submitted|confirm/i.test(String(value))) return activityCopy("pending");
         return value;
       }
       function shortActivityAddress(value){
@@ -5341,6 +5497,18 @@ function enhancePrototypeActivity() {
       }
       function saveLocalActivity(rows){
         writeJson("lumina_local_activity", Array.isArray(rows) ? rows.slice(0, 50) : []);
+      }
+      if (!window.__luminaActivityStatusEventsBound) {
+        window.__luminaActivityStatusEventsBound = true;
+        window.addEventListener("lumina:swap-confirmed", function(event){
+          var hash = event && event.detail && event.detail.userOpHash;
+          if (!hash) return;
+          var rows = localActivity().map(function(item){
+            return String(item && item.hash || "") === String(hash) ? Object.assign({}, item, { status: "Completed" }) : item;
+          });
+          saveLocalActivity(rows);
+          renderActivity();
+        });
       }
       function normalizeActivityItem(item){
         return {
@@ -6969,13 +7137,25 @@ function enhancePrototypeDetail() {
         var amount = Number(raw);
         return Number.isFinite(amount) && amount > 0 ? amount : 0;
       }
+      function isCoreDetailSymbol(symbol) {
+        return ["WLD","USDC","USDT","ETH","WETH","BTC","WBTC","EURC"].includes(String(symbol || "").toUpperCase());
+      }
+      function assetMarketAddress(asset) {
+        var address = String(asset && (asset.contractAddress || asset.marketAddress || asset.address || asset.contractAddr) || "").toLowerCase();
+        return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
+      }
+      function sameMarketAddress(market, address) {
+        return !!address && String(market && (market.address || market.tokenAddress || market.contractAddress) || "").toLowerCase() === address;
+      }
       function latestDetailPrice(asset) {
         var sym = String(asset && asset.sym || "").toUpperCase();
         var market = marketForAsset(asset);
+        var address = assetMarketAddress(asset);
         var candidates = [
-          window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
           market && market.priceUsd,
-          prices && prices[sym]
+          address && window.__luminaMarketByAddress && window.__luminaMarketByAddress[address] && window.__luminaMarketByAddress[address].priceUsd,
+          isCoreDetailSymbol(sym) && window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] && window.__luminaMarketBySymbol[sym].priceUsd,
+          isCoreDetailSymbol(sym) && prices && prices[sym]
         ];
         for (var i = 0; i < candidates.length; i++) {
           var value = Number(candidates[i]);
@@ -6987,10 +7167,15 @@ function enhancePrototypeDetail() {
         var sym = String(asset && asset.sym || "").toUpperCase();
         var value = Number(price);
         if (!sym || !Number.isFinite(value) || value <= 0) return false;
+        var address = assetMarketAddress(asset);
+        if (!isCoreDetailSymbol(sym) && !address) return false;
         var amount = detailAssetAmount(asset);
         if (amount > 0) asset.usdNum = amount * value;
-        prices[sym] = value;
-        if (window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym]) {
+        if (isCoreDetailSymbol(sym)) prices[sym] = value;
+        if (address && window.__luminaMarketByAddress && window.__luminaMarketByAddress[address]) {
+          window.__luminaMarketByAddress[address].priceUsd = value;
+        }
+        if (isCoreDetailSymbol(sym) && window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym]) {
           window.__luminaMarketBySymbol[sym].priceUsd = value;
         }
         return true;
@@ -7005,7 +7190,9 @@ function enhancePrototypeDetail() {
       }
       function detailChartCacheKey(asset, range) {
         var sym = String(asset && asset.sym || "").toUpperCase();
-        return sym ? "lumina_detail_candles_v1:" + sym + ":" + (range || "1D") : "";
+        var address = assetMarketAddress(asset);
+        var key = address || sym;
+        return key ? "lumina_detail_candles_v2:" + key + ":" + (range || "1D") : "";
       }
       function readDetailChartCache(asset, range) {
         var key = detailChartCacheKey(asset, range);
@@ -7054,14 +7241,16 @@ function enhancePrototypeDetail() {
             var pricesPayload = results[0];
             var list = Array.isArray(results[1]) ? results[1] : [];
             var matched = null;
+            var address = assetMarketAddress(asset);
             try { registerMarketsFromPriceMeta(pricesPayload); } catch(e) {}
             list.forEach(function(item){
               if (!item || !item.symbol) return;
               if (window.__luminaRegisterMarketToken) window.__luminaRegisterMarketToken(item);
               else if (typeof registerMarketToken === "function") registerMarketToken(item);
-              if (!matched && String(item.symbol || "").toUpperCase() === sym) matched = item;
+              if (!matched && address && sameMarketAddress(item, address)) matched = item;
+              if (!matched && !address && isCoreDetailSymbol(sym) && String(item.symbol || "").toUpperCase() === sym) matched = item;
             });
-            if (!matched && pricesPayload && pricesPayload[sym] && Number(pricesPayload[sym].usd) > 0) {
+            if (!matched && isCoreDetailSymbol(sym) && pricesPayload && pricesPayload[sym] && Number(pricesPayload[sym].usd) > 0) {
               matched = Object.assign({}, window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym] || {}, {
                 symbol: sym,
                 priceUsd: Number(pricesPayload[sym].usd),
@@ -7087,36 +7276,18 @@ function enhancePrototypeDetail() {
 
       function marketForAsset(asset) {
         var map = window.__luminaMarketBySymbol || {};
+        var byAddress = window.__luminaMarketByAddress || {};
         var sym = String(asset && asset.sym || "").toUpperCase();
-        if (map[sym]) return map[sym];
         var address = assetMarketAddress(asset);
+        if (address && byAddress[address]) return byAddress[address];
         if (address) {
           var values = Object.keys(map).map(function(key){ return map[key]; });
           for (var i = 0; i < values.length; i++) {
             if (String(values[i] && values[i].address || "").toLowerCase() === address) return values[i];
           }
         }
-        if (asset && asset.poolAddress) {
-          return {
-            symbol: sym,
-            name: asset.full || sym,
-            address: address || asset.address || asset.contractAddr || null,
-            poolAddress: asset.poolAddress,
-            priceUsd: Number(asset.usdNum || 0) > 0 && detailAssetAmount(asset) > 0
-              ? Number(asset.usdNum || 0) / detailAssetAmount(asset)
-              : (sym === "USDC" || sym === "EURC" ? 1 : null),
-            change24h: null,
-            volume24hUsd: 0,
-            liquidityUsd: 1,
-            logoUrl: null,
-            verified: true
-          };
-        }
+        if (isCoreDetailSymbol(sym) && map[sym]) return map[sym];
         return null;
-      }
-      function assetMarketAddress(asset) {
-        var address = String(asset && (asset.contractAddress || asset.marketAddress || asset.address || asset.contractAddr) || "").toLowerCase();
-        return /^0x[a-f0-9]{40}$/.test(address) ? address : "";
       }
       function realChartUnavailable(asset, range, reason) {
         var sym = asset && asset.sym ? asset.sym : "token";

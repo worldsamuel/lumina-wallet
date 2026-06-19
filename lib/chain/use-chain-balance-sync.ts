@@ -237,6 +237,69 @@ function syncBalancesToPrototype(
         });
       } catch(e) {}
     })();
+    (function(){
+      try {
+        var key = "lumina_pending_swap_balance_v1:" + String(window.__luminaUserAddress || "").toLowerCase();
+        var pending = JSON.parse(localStorage.getItem(key) || "null");
+        if (!pending || Number(pending.expiresAt || 0) <= Date.now()) {
+          if (pending) localStorage.removeItem(key);
+          return;
+        }
+        var sellSym = String(pending.sellSymbol || "").toUpperCase();
+        var buySym = String(pending.buySymbol || "").toUpperCase();
+        var sellAmount = String(pending.sellAmount || "");
+        var buyAmount = String(pending.buyAmount || "");
+        var numberOf = function(value){
+          var n = Number(String(value || "0").replace(/,/g, ""));
+          return Number.isFinite(n) ? n : 0;
+        };
+        var sellTarget = numberOf(sellAmount);
+        var buyTarget = numberOf(buyAmount);
+        var sellChain = numberOf(balances && balances[sellSym]);
+        var buyChain = numberOf(balances && balances[buySym]);
+        if (sellSym && buySym && sellChain <= sellTarget + 0.000000001 && buyChain >= buyTarget - 0.000000001) {
+          localStorage.removeItem(key);
+          return;
+        }
+        var applyAmount = function(sym, amountText){
+          if (!sym || !amountText) return;
+          balances[sym] = amountText;
+          availMap[sym] = amountText + " " + sym;
+          var found = false;
+          (assets || []).forEach(function(asset){
+            if (String(asset && asset.sym || "").toUpperCase() !== sym) return;
+            found = true;
+            asset.amt = amountText + " " + sym;
+            var price = Number(prices && prices[sym] || 0);
+            var amount = numberOf(amountText);
+            if (price > 0 && amount >= 0) {
+              asset.usdNum = amount * price;
+              asset.portfolioUsdNum = amount * price;
+            }
+            asset.hasBalance = amount > 0;
+            asset.pendingSwapBalance = true;
+          });
+          if (!found && numberOf(amountText) > 0) {
+            assets.push({
+              sym: sym,
+              full: tokenFull[sym] || sym,
+              amt: amountText + " " + sym,
+              usdNum: 0,
+              portfolioUsdNum: 0,
+              cls: "custom",
+              logo: tokenLogo[sym] || sym.slice(0, 1),
+              custom: true,
+              hasBalance: true,
+              pendingSwapBalance: true,
+              recentSwapAsset: true,
+              homeSwapAsset: true
+            });
+          }
+        };
+        applyAmount(sellSym, sellAmount);
+        applyAmount(buySym, buyAmount);
+      } catch(e) {}
+    })();
     window.__luminaOnchainPrices = ${JSON.stringify(onchainData ?? null)};
     window.__luminaMarketPrices = ${JSON.stringify(marketData ?? null)};
     if (typeof renderGainers === "function") renderGainers(window.__luminaMarketPrices);
