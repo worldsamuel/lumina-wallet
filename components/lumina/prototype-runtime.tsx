@@ -83,7 +83,6 @@ declare global {
     __luminaRequestNotificationPermission?: (event?: Event) => Promise<boolean>;
     __luminaTxToastTimer?: ReturnType<typeof setTimeout>;
     __luminaMorphoRefreshTimer?: ReturnType<typeof setInterval>;
-    __luminaSwapDebugObserver?: MutationObserver;
     eruda?: { init: () => void };
     __luminaErudaInstalled?: boolean;
   }
@@ -2466,6 +2465,25 @@ function enhancePrototypeTokens() {
       window.__luminaApplyChainBalanceRows = function(rows){
         if (!Array.isArray(rows)) return;
         if (!Array.isArray(assets)) assets = [];
+        var incomingHasSymbol = false;
+        var incomingHasNonZero = false;
+        rows.forEach(function(item){
+          var sym = String(item && item.symbol || "").toUpperCase();
+          if (!sym || isEarnVaultSymbol(sym)) return;
+          incomingHasSymbol = true;
+          var amountText = formatImportedAmount(item.formatted || item.balanceFormatted || item.amountFormatted || item.amount || item.balance || "0");
+          var amountNum = Number(String(amountText).replace(/,/g, "").replace(/^</, ""));
+          if (Number.isFinite(amountNum) && amountNum > 0) incomingHasNonZero = true;
+        });
+        if (!incomingHasSymbol) return;
+        var existingHasNonZero = (assets || []).some(function(asset){
+          var sym = String(asset && asset.sym || "").toUpperCase();
+          if (!sym || isEarnVaultSymbol(sym)) return false;
+          var raw = String((asset && asset.amt) || (balances && balances[sym]) || "0").replace(sym, "").replace(/,/g, "").replace(/^</, "").trim();
+          var amountNum = Number(raw);
+          return Number.isFinite(amountNum) && amountNum > 0;
+        });
+        if (!incomingHasNonZero && existingHasNonZero) return;
         rows.forEach(function(item){
           var sym = String(item && item.symbol || "").toUpperCase();
           if (!sym || isEarnVaultSymbol(sym)) return;
@@ -4014,19 +4032,14 @@ function enhancePrototypeSwapQuote() {
         detail.insertAdjacentHTML("afterend", '<div class="quote-warning" id="quoteWarning"></div>');
         return document.getElementById("quoteWarning");
       }
-      function escapeDebugHtml(value){
-        return String(value == null ? "" : value).replace(/[&<>"']/g, function(ch){
-          return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch];
-        });
-      }
       function safeDebugValue(value, depth){
-        if (depth > 5) return "[depth-limit]";
+        if (depth > 2) return "[depth-limit]";
         if (value == null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
         if (value instanceof Error) return readableSwapError(value);
-        if (Array.isArray(value)) return value.slice(0, 24).map(function(item){ return safeDebugValue(item, depth + 1); });
+        if (Array.isArray(value)) return value.slice(0, 6).map(function(item){ return safeDebugValue(item, depth + 1); });
         if (typeof value === "object") {
           var out = {};
-          Object.keys(value).slice(0, 80).forEach(function(key){
+          Object.keys(value).slice(0, 16).forEach(function(key){
             if (/private|secret|mnemonic|seed/i.test(key)) return;
             try { out[key] = safeDebugValue(value[key], depth + 1); } catch(e) { out[key] = "[unreadable]"; }
           });
@@ -4038,173 +4051,20 @@ function enhancePrototypeSwapQuote() {
         symbol = String(symbol || "").toUpperCase();
         return /^RE7/.test(symbol) || symbol === "RE7USDC" || symbol === "RE7WLD";
       }
-      function swapDebugContext(extra){
-        var sellSymbol = swapState && swapState.sell;
-        var buySymbol = swapState && swapState.buy;
-        var sellMeta = null;
-        var buyMeta = null;
-        try { sellMeta = sellSymbol ? tokenMeta(sellSymbol, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.from) : null; } catch(e) {}
-        try { buyMeta = buySymbol ? tokenMeta(buySymbol, latestSwapQuote && latestSwapQuote.tokens && latestSwapQuote.tokens.to) : null; } catch(e) {}
-        return Object.assign({
-          at: new Date().toISOString(),
-          page: "swap",
-          sell: sellSymbol,
-          buy: buySymbol,
-          amount: (document.getElementById("sellAmt") && document.getElementById("sellAmt").value) || "",
-          receive: (document.getElementById("buyAmt") && document.getElementById("buyAmt").value) || "",
-          balance: sellSymbol ? balanceNumber(sellSymbol) : 0,
-          sellToken: sellMeta,
-          buyToken: buyMeta,
-          balances: {
-            sell: sellSymbol ? balanceNumber(sellSymbol) : 0,
-            buy: buySymbol ? balanceNumber(buySymbol) : 0
-          },
-          slippageBps: slippageBps(),
-          userAddress: window.__luminaUserAddress || "",
-          worldApp: !!window.MiniKit,
-          executionEnabled: swapExecutionEnabled,
-          quoteAgeSeconds: latestQuoteAt ? Math.floor((Date.now() - latestQuoteAt) / 1000) : null,
-          quote: latestSwapQuote ? {
-            source: latestSwapQuote.source,
-            amountIn: latestSwapQuote.amountIn,
-            amountOut: latestSwapQuote.amountOut,
-            rate: latestSwapQuote.rate,
-            fee: latestSwapQuote.fee,
-            platformFee: latestSwapQuote.platformFee || null,
-            feeConfig: latestSwapQuote.platformFee ? { bps: latestSwapQuote.platformFee.bps, recipient: latestSwapQuote.platformFee.recipient } : null,
-            routeSymbols: latestSwapQuote.routeSymbols,
-            priceImpactPercent: latestSwapQuote.priceImpactPercent,
-            priceImpactLevel: latestSwapQuote.priceImpactLevel,
-            priceImpactAvailable: latestSwapQuote.priceImpactAvailable,
-            blocked: latestSwapQuote.blocked,
-            blockReason: latestSwapQuote.blockReason
-          } : null
-        }, extra || {});
-      }
       function setSwapDebug(stage, detail){
         try {
-          var item;
-          try {
-            item = swapDebugContext({ stage: stage, detail: safeDebugValue(detail || {}, 0) });
-          } catch(contextError) {
-            item = {
-              at: new Date().toISOString(),
-              page: "swap",
-              stage: stage,
-              detail: safeDebugValue(detail || {}, 0),
-              contextError: contextError && (contextError.message || String(contextError))
-            };
-          }
-          window.__luminaSwapDebugLog = window.__luminaSwapDebugLog || [];
-          window.__luminaSwapDebugLog.unshift(item);
-          window.__luminaSwapDebugLog = window.__luminaSwapDebugLog.slice(0, 30);
-          try { localStorage.setItem("lumina_swap_debug_log", JSON.stringify(window.__luminaSwapDebugLog)); } catch(e) {}
-          var live = document.getElementById("swapDebugLive");
-          if (live) live.textContent = stage + " · " + new Date().toLocaleTimeString();
-          var pre = document.getElementById("swapDebugPre");
-          if (pre) pre.textContent = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
-          var textArea = document.getElementById("swapDebugText");
-          if (textArea) textArea.value = JSON.stringify(window.__luminaSwapDebugLog, null, 2);
+          window.__luminaSwapLastDebug = {
+            at: new Date().toISOString(),
+            stage: stage,
+            detail: safeDebugValue(detail || {}, 0)
+          };
         } catch(e) {}
-      }
-      function readSwapDebug(){
-        if (window.__luminaSwapDebugLog && window.__luminaSwapDebugLog.length) return window.__luminaSwapDebugLog;
-        try { return JSON.parse(localStorage.getItem("lumina_swap_debug_log") || "[]"); } catch(e) { return []; }
-      }
-      function readSwapDebugText(){
-        var textArea = document.getElementById("swapDebugText");
-        if (textArea && textArea.value) return textArea.value;
-        var pre = document.getElementById("swapDebugPre");
-        if (pre && pre.textContent) return pre.textContent;
-        var text = JSON.stringify(readSwapDebug(), null, 2);
-        return text && text !== "[]" ? text : "[debug log is empty]";
-      }
-      function copySwapDebug(){
-        var text = readSwapDebugText();
-        function done(ok){
-          var live = document.getElementById("swapDebugLive");
-          if (live) live.textContent = ok ? "copied " + text.length + " chars · " + new Date().toLocaleTimeString() : "copy failed";
-          toast(ok ? "Debug copied" : "Copy failed");
-        }
-        try {
-          var ta = document.createElement("textarea");
-          ta.value = text;
-          ta.style.position = "fixed";
-          ta.style.left = "0";
-          ta.style.top = "0";
-          ta.style.width = "1px";
-          ta.style.height = "1px";
-          ta.style.opacity = "0.01";
-          ta.setAttribute("readonly", "readonly");
-          document.body.appendChild(ta);
-          ta.focus();
-          ta.select();
-          ta.setSelectionRange(0, ta.value.length);
-          var ok = document.execCommand("copy");
-          ta.remove();
-          if (ok) { done(true); return; }
-        } catch(e) {
-          try {
-            var temp = document.querySelector("textarea[readonly]");
-            if (temp) {
-              temp.focus();
-              temp.select();
-              temp.setSelectionRange(0, temp.value.length);
-            }
-          } catch(ignore) {}
-        }
-        try {
-          if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(text).then(function(){ done(true); }).catch(function(){ done(false); });
-            return;
-          }
-        } catch(e) {}
-        done(false);
-      }
-      function selectSwapDebug(){
-        var textArea = document.getElementById("swapDebugText");
-        if (!textArea) return;
-        textArea.focus();
-        textArea.select();
-        textArea.setSelectionRange(0, textArea.value.length);
-        var live = document.getElementById("swapDebugLive");
-        if (live) live.textContent = "selected " + textArea.value.length + " chars";
-      }
-      function openSwapDebug(){
-        return;
-        var existingModal = document.getElementById("swapDebugModal");
-        if (existingModal) existingModal.remove();
-        var old = document.getElementById("swapDebugModal");
-        if (old) old.remove();
-        setSwapDebug("debug:open", {
-          activeView: document.querySelector(".view.active") ? document.querySelector(".view.active").id : "",
-          sellValue: document.getElementById("sellAmt") ? document.getElementById("sellAmt").value : "",
-          buyValue: document.getElementById("buyAmt") ? document.getElementById("buyAmt").value : "",
-          swapBtn: !!document.getElementById("swapBtn"),
-          maxBtn: !!document.getElementById("swapMaxBtn")
-        });
-        var log = readSwapDebug();
-        var modal = document.createElement("div");
-        modal.className = "modal-mask open";
-        modal.id = "swapDebugModal";
-        modal.innerHTML =
-          '<div class="modal send-confirm-sheet" style="width:calc(100vw - 22px);max-width:430px;max-height:78vh;overflow:auto;padding:18px;border-radius:22px;align-self:flex-end;">' +
-            '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;">' +
-              '<h3 style="margin:0;font-size:22px;">Swap Debug</h3>' +
-              '<div style="display:flex;align-items:center;gap:8px;"><button id="swapDebugSelect" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:var(--text);padding:0 12px;font-size:12px;font-weight:900;">SELECT</button><button id="swapDebugCopy" type="button" style="height:36px;border-radius:999px;border:1px solid rgba(108,237,143,.55);background:rgba(108,237,143,.12);color:var(--green);padding:0 14px;font-size:12px;font-weight:900;">COPY</button><button id="swapDebugClose" type="button" style="width:38px;height:38px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.08);color:var(--text);font-size:22px;">×</button></div>' +
-            '</div>' +
-            '<div id="swapDebugLive" style="margin-bottom:10px;color:var(--green);font-size:12px;font-weight:800;">ready</div>' +
-            '<textarea id="swapDebugText" readonly style="display:block;width:100%;min-height:48vh;white-space:pre-wrap;word-break:break-word;margin:0;padding:12px;border-radius:14px;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);color:#d9ffe0;font-size:11px;line-height:1.45;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;resize:vertical;">' + escapeHtml(JSON.stringify(log, null, 2)) + '</textarea>' +
-          '</div>';
-        document.body.appendChild(modal);
-        document.getElementById("swapDebugClose").onclick = function(){ modal.remove(); };
-        document.getElementById("swapDebugSelect").onclick = function(event){ event.preventDefault(); event.stopPropagation(); selectSwapDebug(); };
-        document.getElementById("swapDebugCopy").onclick = function(event){ event.preventDefault(); event.stopPropagation(); copySwapDebug(); };
-        modal.onclick = function(event){ if (event.target === modal) modal.remove(); };
       }
       function ensureSwapDebugButton(){
-        var existing = document.getElementById("swapDebugBtn");
-        if (existing) existing.remove();
+        var debugBtn = document.getElementById("swapDebugBtn");
+        if (debugBtn) debugBtn.remove();
+        var debugModal = document.getElementById("swapDebugModal");
+        if (debugModal) debugModal.remove();
       }
       function formatMaxAmount(value){
         var n = Number(String(value == null ? "" : value).replace(/,/g, "").replace(/^</, ""));
@@ -4936,6 +4796,28 @@ function enhancePrototypeSwapQuote() {
 	          } catch(postError) {
 	            setSwapDebug("execute:post-success-activity-error", readableSwapError(postError));
 	          }
+	          try {
+	            var soldAmount = Number(state.amountText || 0);
+	            var boughtAmount = Number(latestSwapQuote && latestSwapQuote.amountOut || 0);
+	            var sellBefore = balanceNumber(swapState.sell);
+	            var buyBefore = balanceNumber(swapState.buy);
+	            if (boughtAmount > 0) upsertRecentSwapHomeAsset(swapState.buy, toQuoted, boughtAmount);
+	            if (soldAmount > 0) updateAssetAmount(swapState.sell, Math.max(0, sellBefore - soldAmount));
+	            if (boughtAmount > 0) updateAssetAmount(swapState.buy, buyBefore + boughtAmount);
+	            if (typeof renderAssets === "function") renderAssets();
+	            if (typeof renderAllAssets === "function") renderAllAssets();
+	            if (typeof refreshSwapLabels === "function") refreshSwapLabels();
+	            if (typeof window.__luminaRefreshHomeTotalFromAssets === "function") window.__luminaRefreshHomeTotalFromAssets();
+	          } catch(postError) {
+	            setSwapDebug("execute:post-success-balance-error", readableSwapError(postError));
+	          }
+	          try {
+	            setTimeout(function(){
+	              if (typeof completeTask === "function") completeTask("make-swap", true);
+	            }, 1200);
+	          } catch(postError) {
+	            setSwapDebug("execute:post-success-points-error", readableSwapError(postError));
+	          }
 	          refreshWalletAfterSwap();
 	          resetSwapFormAfterSuccess();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
@@ -4986,51 +4868,23 @@ function enhancePrototypeSwapQuote() {
 	        if (max) {
 	          max.onclick = function(event){ runSwapDirectAction("max", max, event); };
 	        }
-	        var bindVersion = "v20260616-debug2";
-	        if (window.__luminaSwapDirectEventsBound === bindVersion) return;
-	        window.__luminaSwapDirectEventsBound = bindVersion;
-	        function swapHitInfo(event){
-	          var point = event;
-	          if (event && event.changedTouches && event.changedTouches[0]) point = event.changedTouches[0];
-	          var hit = null;
-	          try { hit = document.elementFromPoint(point.clientX, point.clientY); } catch(e) {}
-	          var path = [];
-	          var node = hit;
-	          while (node && node.nodeType === 1 && path.length < 8) {
-	            path.push(String(node.tagName || "").toLowerCase() + (node.id ? "#" + node.id : "") + (node.className && typeof node.className === "string" ? "." + node.className.trim().replace(/\s+/g, ".") : ""));
-	            node = node.parentElement;
-	          }
-	          return {
-	            type: event && event.type,
-	            x: Math.round(point && point.clientX || 0),
-	            y: Math.round(point && point.clientY || 0),
-	            hit: hit ? {
-	              tag: hit.tagName,
-	              id: hit.id || "",
-	              className: typeof hit.className === "string" ? hit.className : "",
-	              text: String(hit.textContent || "").trim().slice(0, 80)
-	            } : null,
-	            path: path,
-	            swapBtn: btn ? { disabled: !!btn.disabled, ariaDisabled: btn.getAttribute("aria-disabled"), text: String(btn.textContent || "").trim() } : null,
-	            maxBtn: max ? { disabled: !!max.disabled, text: String(max.textContent || "").trim() } : null
-	          };
-	        }
-	        function captureSwapAction(event){
-	          var view = document.getElementById("view-swap");
-	          var activeSwap = !view || view.classList.contains("active") || !!document.getElementById("sellAmt");
-	          if (activeSwap) setSwapDebug("tap:" + event.type, swapHitInfo(event));
-	          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
-	          if (!target) return;
-	          if (!activeSwap) return;
-	          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
+        var bindVersion = "v20260619-slim";
+        if (window.__luminaSwapDirectEventsBound === bindVersion) return;
+        window.__luminaSwapDirectEventsBound = bindVersion;
+        function captureSwapAction(event){
+          var view = document.getElementById("view-swap");
+          var activeSwap = !view || view.classList.contains("active") || !!document.getElementById("sellAmt");
+          var target = event.target && event.target.closest ? event.target.closest("#swapBtn,#swapMaxBtn") : null;
+          if (!target) return;
+          if (!activeSwap) return;
+          runSwapDirectAction(target.id === "swapMaxBtn" ? "max" : "confirm", target, event);
 	        }
 	        function captureSwapInput(event){
-	          var target = event.target;
-	          if (!target || target.id !== "sellAmt") return;
-	          setSwapDebug("input:" + event.type, { value: target.value });
-	          scheduleQuote();
-	          setSwapButtonPending();
-	        }
+          var target = event.target;
+          if (!target || target.id !== "sellAmt") return;
+          scheduleQuote();
+          setSwapButtonPending();
+        }
 	        document.addEventListener("input", captureSwapInput, true);
 	        document.addEventListener("change", captureSwapInput, true);
 	        document.addEventListener("keyup", captureSwapInput, true);

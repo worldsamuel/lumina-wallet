@@ -91,9 +91,17 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     }
 
     if (!balances.data?.balances) return;
-    writeBalanceSnapshot(userAddress, balances.data.balances);
+    const nextBalances = balances.data.balances;
+    if (!nextBalances.length || !hasPositiveBalanceRows(nextBalances)) {
+      const snapshot = readBalanceSnapshot(userAddress);
+      if (snapshot?.balances?.length && hasPositiveBalanceRows(snapshot.balances)) {
+        syncBalancesToPrototype(snapshot.balances, market.data, onchain.data, true);
+        return;
+      }
+    }
+    writeBalanceSnapshot(userAddress, nextBalances);
     syncBalancesToPrototype(
-      balances.data.balances,
+      nextBalances,
       market.data,
       onchain.data,
       Boolean(balances.data.stale),
@@ -120,7 +128,7 @@ function syncBalancesToPrototype(
   const assets = items.map((item) => {
     const formatted = formatTokenAmount(item.formatted);
     const livePriceUsd = pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData);
-    const amount = Number.parseFloat(item.formatted || "0") || 0;
+    const amount = numericBalance(item);
     const usdValue = livePriceUsd === null ? null : amount * livePriceUsd;
     return {
       sym: item.symbol,
@@ -316,7 +324,7 @@ function readBalanceSnapshot(userAddress: string | null): BalancesResponse | nul
 
 function writeBalanceSnapshot(userAddress: string | null, balances: BalanceApiItem[]) {
   const key = snapshotKey(userAddress);
-  if (!key || !balances.length) return;
+  if (!key || !balances.length || !hasPositiveBalanceRows(balances)) return;
   try {
     localStorage.setItem(
       key,
@@ -330,6 +338,19 @@ function writeBalanceSnapshot(userAddress: string | null, balances: BalanceApiIt
   } catch {
     // localStorage can be unavailable in restricted WebViews.
   }
+}
+
+function numericBalance(item: BalanceApiItem) {
+  const raw = String(item.formatted || item.balance || "0")
+    .replace(/,/g, "")
+    .replace(/^</, "")
+    .trim();
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function hasPositiveBalanceRows(items: BalanceApiItem[] | undefined | null) {
+  return Array.isArray(items) && items.some((item) => numericBalance(item) > 0);
 }
 
 function formatTokenAmount(value: string) {
