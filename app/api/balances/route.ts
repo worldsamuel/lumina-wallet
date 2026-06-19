@@ -13,8 +13,15 @@ type CachedBalances = {
 
 const balanceCache = new Map<string, CachedBalances>();
 
-const BALANCE_CACHE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
-const FRESH_BALANCE_HEADERS = { "Cache-Control": "private, no-store, max-age=0" };
+const BALANCE_CACHE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+};
+const FRESH_BALANCE_HEADERS = BALANCE_CACHE_HEADERS;
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function serializeBalances(balances: Awaited<ReturnType<typeof fetchBalances>>) {
   return balances.map((item) => ({
@@ -63,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
     return NextResponse.json(
       { error: "Unable to read on-chain balances. Please try again later." },
-      { status: 502 },
+      { status: 502, headers: BALANCE_CACHE_HEADERS },
     );
   }
 }

@@ -25,7 +25,8 @@ type BalancesResponse = {
 };
 
 const fetcher = async <T,>(url: string) => {
-  const response = await fetch(url);
+  const separator = url.includes("?") ? "&" : "?";
+  const response = await fetch(`${url}${separator}t=${Date.now()}`, { cache: "no-store" });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? "Unable to read on-chain data.");
@@ -168,7 +169,7 @@ function syncBalancesToPrototype(
   );
   availableMap.BTC ??= "0 BTC";
   const priceMap: Record<string, number | null> = Object.fromEntries(
-    items.map((item) => [item.symbol, pickOnchainPrice(item.symbol, onchainData) ?? pickMarketPrice(item.symbol, marketData)]),
+    items.map((item) => [item.symbol, pickMarketPrice(item.symbol, marketData) ?? pickOnchainPrice(item.symbol, onchainData)]),
   );
   priceMap.BTC ??= pickMarketPrice("BTC", marketData);
   const marketPriceMap: Record<string, number | null> = Object.fromEntries(

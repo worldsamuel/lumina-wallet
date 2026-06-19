@@ -3,6 +3,7 @@ import { readOraclePrices } from "@/lib/oracle";
 import type { OnchainPricesResponse } from "@/lib/prices";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 const CACHE_TTL_MS = 3_000;
 const MARKET_CACHE_HEADERS = {
@@ -34,7 +35,7 @@ export async function GET() {
 
     return NextResponse.json(
       { error: "Unable to fetch Chainlink oracle prices.", stale: true },
-      { status: 502 },
+      { status: 502, headers: MARKET_CACHE_HEADERS },
     );
   }
 }

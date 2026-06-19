@@ -15,6 +15,9 @@ const MARKET_CACHE = {
 const TOKEN_TOP_CACHE_TTL_MS = 3_000;
 const tokenTopCache = new Map<string, { expiresAt: number; data: unknown[] }>();
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export function OPTIONS() {
   return optionsResponse();
 }

@@ -42,11 +42,19 @@ type QuoteCacheEntry = { expiresAt: number; staleUntil: number; data: unknown };
 const QUOTE_CACHE_TTL_MS = 8_000;
 const QUOTE_CACHE_STALE_MS = 90_000;
 const QUOTE_FILE_CACHE_DIR = "/tmp/lumina-swap-quote-cache";
+const QUOTE_RESPONSE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+};
 const quoteCacheStore = globalThis as typeof globalThis & {
   __luminaSwapQuoteCache?: Map<string, QuoteCacheEntry>;
 };
 const quoteCache = quoteCacheStore.__luminaSwapQuoteCache ?? new Map<string, QuoteCacheEntry>();
 quoteCacheStore.__luminaSwapQuoteCache = quoteCache;
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export function OPTIONS() {
   return optionsResponse();
@@ -80,9 +88,7 @@ export async function POST(req: NextRequest) {
   const now = Date.now();
   if (cached && cached.expiresAt > now) {
     return jsonResponse(cached.data, {
-      headers: {
-        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
-      },
+      headers: QUOTE_RESPONSE_HEADERS,
     });
   }
   const diskCached = await readQuoteFileCache(cacheKey);
@@ -90,7 +96,7 @@ export async function POST(req: NextRequest) {
     quoteCache.set(cacheKey, diskCached);
     return jsonResponse(diskCached.data, {
       headers: {
-        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
+        ...QUOTE_RESPONSE_HEADERS,
         "X-Lumina-Quote-Cache": "shared",
       },
     });
@@ -131,7 +137,7 @@ export async function POST(req: NextRequest) {
       quoteCache.set(cacheKey, staleCache);
       return jsonResponse(withStaleQuote(staleCache.data), {
         headers: {
-          "Cache-Control": "private, no-store",
+          ...QUOTE_RESPONSE_HEADERS,
           "X-Lumina-Stale-Quote": "1",
         },
       });
@@ -144,7 +150,7 @@ export async function POST(req: NextRequest) {
         blocked: true,
         blockReason: "No executable swap route for this pair.",
       },
-      { status: 404 },
+      { status: 404, headers: QUOTE_RESPONSE_HEADERS },
     );
   }
 
@@ -219,9 +225,7 @@ export async function POST(req: NextRequest) {
   return jsonResponse(
     payload,
     {
-      headers: {
-        "Cache-Control": "private, max-age=5, stale-while-revalidate=30",
-      },
+      headers: QUOTE_RESPONSE_HEADERS,
     },
   );
 }
@@ -514,7 +518,9 @@ function gasUsd(gasEstimate: string, gasPriceWei: bigint, ethUsd: unknown) {
 }
 
 async function fetchJson<T>(req: NextRequest, path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(new URL(path, req.url), init);
+  const url = new URL(path, req.url);
+  url.searchParams.set("t", String(Date.now()));
+  const response = await fetch(url, { cache: "no-store", ...init });
   if (!response.ok) throw new Error(`${path} responded ${response.status}`);
   return (await response.json()) as T;
 }

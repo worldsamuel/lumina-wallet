@@ -35,6 +35,9 @@ const SYMBOL_ALIASES: Record<string, string> = {
 const ORB_ADDRESS = "0xf3f92a60e6004f3982f0fde0d43602fc0a30a0db";
 const ORB_POOL_ID = "0xee21af1d049211206b20b957d07794e7d0b140b3";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export function OPTIONS() {
   return optionsResponse();
 }

@@ -6,6 +6,11 @@ import { resolveSafeSwapToken } from "@/lib/swap/token-safety";
 import { quoteBestV4 } from "@/lib/swap/v4-quoter";
 
 const CACHE_TTL_MS = 5_000;
+const QUOTE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "CDN-Cache-Control": "no-store",
+  "Vercel-CDN-Cache-Control": "no-store",
+};
 const cache = new Map<string, { expiresAt: number; data: unknown }>();
 
 type QuoteBody = {
@@ -15,6 +20,9 @@ type QuoteBody = {
   toToken?: string;
   fromAmount?: string;
 };
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export function OPTIONS() {
   return optionsResponse();
@@ -58,8 +66,6 @@ async function parseQuoteBody(body: QuoteBody | null) {
 
 function quoteResponse(data: unknown) {
   return jsonResponse(data, {
-    headers: {
-      "Cache-Control": "public, s-maxage=5, stale-while-revalidate=5",
-    },
+    headers: QUOTE_HEADERS,
   });
 }

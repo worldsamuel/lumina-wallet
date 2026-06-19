@@ -2748,7 +2748,7 @@ function enhancePrototypeTokens() {
       if (viewAll) viewAll.onclick = function(event){ event.preventDefault(); window.openAllAssets(); };
 
       function syncBackendSwapTokens(){
-        fetch("/api/tokens")
+        fetch("/api/tokens?t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(list){
             if (!Array.isArray(list)) return;
@@ -4316,8 +4316,9 @@ function enhancePrototypeSwapQuote() {
         });
         setQuoteState(swapCopy("readingRoute"), undefined, false);
         var promise = (async function(){
-          var res = await fetch("/api/swap/quote", {
+          var res = await fetch("/api/swap/quote?t=" + Date.now(), {
             method: "POST",
+            cache: "no-store",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               fromToken: tokenInputForQuote(swapState.sell),
@@ -4522,46 +4523,7 @@ function enhancePrototypeSwapQuote() {
 	        return swapCopy("swapFailed");
 	      }
 	      function syncSwapQuotePriceToHome(){
-	        if (!latestSwapQuote) return;
-	        var sell = String(swapState.sell || "").toUpperCase();
-	        var buy = String(swapState.buy || "").toUpperCase();
-	        var amountIn = Number(latestSwapQuote.amountIn || 0);
-	        var amountOut = Number(latestSwapQuote.amountOut || 0);
-	        if (buy) upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        if (!sell || !buy || !(amountIn > 0) || !(amountOut > 0)) return;
-	        function setLiveSwapPrice(symbol, price){
-	          symbol = String(symbol || "").toUpperCase();
-	          price = Number(price);
-	          if (!symbol || !Number.isFinite(price) || price <= 0) return;
-	          prices[symbol] = price;
-	          if (customTokens && customTokens[symbol]) customTokens[symbol].priceUsd = price;
-	          var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[symbol];
-	          if (market) market.priceUsd = price;
-	          (assets || []).forEach(function(asset){
-	            if (String(asset.sym || "").toUpperCase() !== symbol) return;
-	            var amount = Number(String(asset.amt || "0").split(" ")[0].replace(/,/g, "").replace(/^</, ""));
-	            if (Number.isFinite(amount) && amount > 0) asset.usdNum = amount * price;
-	          });
-	        }
-	        var sellPrice = tokenMeta(sell, latestSwapQuote.tokens && latestSwapQuote.tokens.from).priceUsd;
-	        if (!(sellPrice > 0) && sell === "WETH") sellPrice = Number(prices && prices.ETH) || 0;
-	        if (!(sellPrice > 0) && (sell === "WBTC" || sell === "BTC")) sellPrice = Number(prices && prices.BTC) || 0;
-	        if (!(sellPrice > 0) && (sell === "USDC" || sell === "USDT" || sell === "EURC")) sellPrice = 1;
-	        var buyPrice = tokenMeta(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to).priceUsd;
-	        if (!(buyPrice > 0) && buy === "WETH") buyPrice = Number(prices && prices.ETH) || 0;
-	        if (!(buyPrice > 0) && (buy === "WBTC" || buy === "BTC")) buyPrice = Number(prices && prices.BTC) || 0;
-	        if (!(buyPrice > 0) && (buy === "USDC" || buy === "USDT" || buy === "EURC")) buyPrice = 1;
-	        if (sellPrice > 0) {
-	          setLiveSwapPrice(sell, sellPrice);
-	          setLiveSwapPrice(buy, amountIn * sellPrice / amountOut);
-	        } else if (buyPrice > 0) {
-	          setLiveSwapPrice(buy, buyPrice);
-	          setLiveSwapPrice(sell, amountOut * buyPrice / amountIn);
-	        } else {
-	          return;
-	        }
-	        upsertRecentSwapHomeAsset(buy, latestSwapQuote.tokens && latestSwapQuote.tokens.to, amountOut);
-	        if (typeof renderAssets === "function") renderAssets();
+	        return;
 	      }
 	      function minOutText(){
 	        var out = latestSwapQuote ? Number(latestSwapQuote.amountOut || 0) : 0;
@@ -7187,7 +7149,7 @@ function enhancePrototypeDetail() {
             var lookupUrl = /^0x[a-fA-F0-9]{40}$/.test(address)
               ? "/api/market/token?address=" + encodeURIComponent(address) + "&symbol=" + encodeURIComponent(asset.sym || "")
               : "/api/tokens/top?mode=all";
-            fetch(lookupUrl)
+            fetch(lookupUrl + (lookupUrl.indexOf("?") >= 0 ? "&" : "?") + "t=" + Date.now(), { cache: "no-store" })
               .then(function(res){ return res.ok ? res.json() : []; })
               .then(function(payload){
                 var markets = Array.isArray(payload) ? payload : (payload && payload.market ? [payload.market] : []);
@@ -7448,7 +7410,7 @@ function enhancePrototypeDetail() {
           return;
         }
         tradesBox.innerHTML = '<div class="detail-empty-row">' + detailCopy("loadingTrades") + '</div>';
-        fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address))
+        fetch("/api/market/token-detail?pool=" + encodeURIComponent(market.poolAddress) + "&token=" + encodeURIComponent(market.address) + "&t=" + Date.now(), { cache: "no-store" })
           .then(function(res){ return res.ok ? res.json() : { trades: [], holders: [] }; })
           .then(function(data){
             tradesBox.innerHTML = tradeRows(Array.isArray(data.trades) ? data.trades : [], asset);

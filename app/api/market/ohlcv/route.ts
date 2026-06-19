@@ -9,6 +9,9 @@ const MARKET_CACHE_HEADERS = {
   "Vercel-CDN-Cache-Control": "no-store",
 };
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export function OPTIONS() {
   return optionsResponse();
 }

@@ -5,9 +5,18 @@ import { ensureCoreTokens } from "@/lib/admin/ensure-token-schema";
 import { db } from "@/lib/db";
 import { TOKENS } from "@/lib/tokens";
 
-const TOKEN_CACHE_TTL_MS = 180_000;
-const TOKEN_CACHE_HEADERS = { headers: { "Cache-Control": "public, s-maxage=180, stale-while-revalidate=300" } };
+const TOKEN_CACHE_TTL_MS = 5_000;
+const TOKEN_CACHE_HEADERS = {
+  headers: {
+    "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+    "Vercel-CDN-Cache-Control": "no-store",
+  },
+};
 let cachedTokens: { expiresAt: number; data: unknown[] } | null = null;
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export function OPTIONS() {
   return optionsResponse();
