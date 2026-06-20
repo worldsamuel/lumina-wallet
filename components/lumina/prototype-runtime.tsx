@@ -57,6 +57,7 @@ declare global {
     __luminaRefreshWalletData?: () => void;
     __luminaRefreshActivity?: () => void;
     __luminaRefreshPoints?: () => void;
+    __luminaCompleteTask?: (id: string, silent?: boolean) => void;
     __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
@@ -392,6 +393,9 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
     }
     toastFromPrototype(prototypeText("swapSuccess"));
     window.dispatchEvent(new CustomEvent("lumina:swap-confirmed", { detail: { userOpHash: hash } }));
+    [1200, 3500, 7000].forEach((delay, index) => {
+      window.setTimeout(() => window.__luminaCompleteTask?.("make-swap", index < 2), delay);
+    });
   }, [address, swapUserOpHash]);
 
   const handleSwapReceiptError = useCallback((receiptError?: Error) => {
@@ -1593,12 +1597,6 @@ function enhancePrototypeEarn() {
         var positions = earnPositions();
         if (!positions.length) {
           if (hydrateEarnPositionsFromSnapshot()) return renderHomeEarningPositions();
-          if (morphoLoading || morphoError) {
-            if (existing) return;
-            return;
-          }
-          if (existing) return;
-          return;
         }
         if (!existing) {
           var section = document.createElement("div");
@@ -1611,6 +1609,17 @@ function enhancePrototypeEarn() {
         }
         var box = document.getElementById("homeEarningList");
         if (!box) return;
+        if (!positions.length) {
+          var firstVault = morphoVaults && morphoVaults.length ? morphoVaults[0] : null;
+          var title = morphoLoading ? "Loading Earn..." : (firstVault ? "Earn with Morpho" : "Earn");
+          var subtitle = morphoError || (firstVault ? ((firstVault.displayName || "Re7 vaults") + (firstVault.liveData ? " · " + fmtPct(firstVault.liveData.netApy) + " APY" : "")) : "View yield products");
+          box.innerHTML = '<div class="asset" onclick="go(\\'earn\\'); setTabByName(\\'Earn\\')">' +
+            '<div class="coin morpho-vault-ic">' + (firstVault ? vaultIcon(firstVault) : '<span>E</span>') + '</div>' +
+            '<div class="name"><div class="sym">' + title + '</div><div class="full">' + subtitle + '</div></div>' +
+            '<div class="vals"><div class="amt">Earn</div><div class="usd">View</div></div>' +
+          '</div>';
+          return;
+        }
         box.innerHTML = positions.map(function(pos){
           var vault = morphoVaults.find(function(v){
             return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
@@ -4927,13 +4936,6 @@ function enhancePrototypeSwapQuote() {
 	          } catch(postError) {
 	            setSwapDebug("execute:post-success-balance-error", readableSwapError(postError));
 	          }
-	          try {
-	            setTimeout(function(){
-	              if (typeof completeTask === "function") completeTask("make-swap", true);
-	            }, 1200);
-	          } catch(postError) {
-	            setSwapDebug("execute:post-success-points-error", readableSwapError(postError));
-	          }
 	          refreshWalletAfterSwap();
 	          resetSwapFormAfterSuccess();
 	          setSwapButtonState(swapCopy("confirmSwap"), false);
@@ -6530,7 +6532,7 @@ function enhancePrototypeMe() {
           if (/^https?:\\/\\//i.test(url)) { window.open(url, "_blank"); renderTaskPage(); return; }
           renderTaskPage();
         }
-        window.__luminaCompleteTask = function(id){ completeTask(id, false); };
+        window.__luminaCompleteTask = function(id, silent){ completeTask(id, !!silent); };
         window.__luminaCompleteCheckin = completeCheckin;
         window.__luminaGoTask = goTask;
         function taskIcon(type){
