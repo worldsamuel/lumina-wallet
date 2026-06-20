@@ -7218,7 +7218,7 @@ function enhancePrototypeDetail() {
       function redrawActiveDetailCandles(asset) {
         var chart = document.getElementById("detChart");
         if (!chart || !chart.__luminaLastCandles || !chart.__luminaLastCandles.length) return false;
-        var range = chart.dataset.marketRange || "1D";
+        var range = chart.dataset.marketRange || "1H";
         var candles = syncCandlesWithLatestPrice(chart.__luminaLastCandles, asset);
         chart.__luminaLastCandles = candles;
         renderCandlesChart(chart, candles, range);
@@ -7344,7 +7344,7 @@ function enhancePrototypeDetail() {
           updateRangeChange(null, "1D", asset);
           return;
         }
-        renderMarketChart(asset, "1D");
+        renderMarketChart(asset, "1H");
       }
       function renderMarketChart(asset, range) {
         var market = marketForAsset(asset);
@@ -7657,11 +7657,11 @@ function enhancePrototypeDetail() {
           '<section class="detail-v2-hero">' +
             '<div class="detail-v2-amount" id="detAmt">0 WLD</div>' +
             '<div class="detail-v2-fiat" id="detUsd">≈ $0.00</div>' +
-            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em id="detChangeLabel">1D</em><b id="detVerifyBadge" class="detail-verify-badge warn">未验证</b></div>' +
+            '<div class="detail-v2-change"><span id="detChangePill">+0.00%</span><em id="detChangeLabel">1H</em><b id="detVerifyBadge" class="detail-verify-badge warn">未验证</b></div>' +
           '</section>' +
           '<section class="detail-v2-chart-card">' +
             '<div class="detail-chart" id="detChart"></div>' +
-            '<div class="range-row detail-v2-ranges"><div class="range">1H</div><div class="range sel">1D</div><div class="range">1W</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
+            '<div class="range-row detail-v2-ranges"><div class="range sel">1H</div><div class="range">1D</div><div class="range">1W</div><div class="range">1Y</div><div class="range">ALL</div></div>' +
           '</section>' +
           '<div class="detail-actions detail-v2-actions">' +
             '<button class="btn-ghost detail-action-receive" onclick="window.__luminaOpenReceive && window.__luminaOpenReceive()"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v15"/><path d="M6 12l6 6 6-6"/><path d="M5 21h14"/></svg>' + detailCopy("receive") + '</button>' +
