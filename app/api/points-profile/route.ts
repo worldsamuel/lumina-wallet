@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { jsonResponse } from "@/lib/api/cors";
+import { getAlphaPointsProfile } from "@/lib/admin/alpha-points";
 import { getPointsAdjustments, getPointsAdjustmentTotal } from "@/lib/admin/points-products";
 import { db } from "@/lib/db";
 
@@ -11,6 +12,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  const alpha = await getAlphaPointsProfile(address).catch((error) => {
+    console.warn("[points-profile] alpha profile unavailable", error);
+    return null;
+  });
   const user = await db.user.findUnique({ where: { address } });
   const [adjustments, adjustmentTotal] = await Promise.all([
     getPointsAdjustments(address),
@@ -24,6 +29,7 @@ export async function GET(req: NextRequest) {
       luminaNo,
       adjustmentTotal,
       adjustments: adjustments.slice(0, 30),
+      alpha,
     },
     { headers: { "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate" } },
   );

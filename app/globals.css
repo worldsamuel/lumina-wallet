@@ -935,6 +935,18 @@
   .points-card-title em { color: rgba(194,255,207,.68); font-size: 12px; font-style: normal; font-weight: 850; letter-spacing: .6px; text-transform: uppercase; }
   .points-big { margin-top: 20px; border: none; background: transparent; color: #fff; display: inline-flex; align-items: center; gap: 10px; padding: 0; font-size: 42px; line-height: 1; font-weight: 950; }
   .points-big i { font-style: normal; color: #fff; font-size: 32px; transform: translateY(-1px); }
+  .points-alpha-card { margin: 12px 0 18px; padding: 16px; border: 1px solid rgba(255,255,255,.1); border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.018)); color: #fff; }
+  .points-alpha-card.eligible { border-color: rgba(74,222,128,.35); background: linear-gradient(180deg, rgba(74,222,128,.12), rgba(255,255,255,.022)); }
+  .points-alpha-card > div:first-child { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; align-items: end; }
+  .points-alpha-card span { color: #aeb6ae; font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .8px; }
+  .points-alpha-card strong { grid-row: 1 / 3; grid-column: 2; color: #fff; font-size: 32px; line-height: 1; font-weight: 950; }
+  .points-alpha-card small { color: var(--green); font-size: 13px; line-height: 1.25; font-weight: 850; }
+  .points-alpha-meter { margin-top: 13px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .points-alpha-meter i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #ff4fa2, #c9ff22, #4ade80); }
+  .points-alpha-card p { margin: 12px 0 0; display: flex; gap: 8px; flex-wrap: wrap; }
+  .points-alpha-card p b { min-height: 28px; display: inline-flex; align-items: center; padding: 0 9px; border-radius: 999px; background: rgba(255,255,255,.07); color: #dfe7df; font-size: 12px; line-height: 1; font-weight: 850; }
+  .points-alpha-detail { margin-top: 18px; }
+  .points-alpha-detail .points-alpha-card { margin: 0; }
   .coupon-card { position: relative; z-index: 1; min-width: 88px; height: 42px; border: 1px solid rgba(118,255,155,.22); border-radius: 15px; background: linear-gradient(135deg, rgba(74,222,128,.13), rgba(5,16,8,.68)); color: var(--green); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; padding: 0 9px; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
   .coupon-card span { color: #b7ffc8; font-size: 10px; font-weight: 850; text-align: left; }
   .coupon-card b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,.16); color: #fff; font-size: 12px; }

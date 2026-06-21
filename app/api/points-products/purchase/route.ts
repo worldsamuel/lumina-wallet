@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getPointsOrders, openBlindBoxOrder, purchasePointsProduct } from "@/lib/admin/points-products";
+import { assertAlphaBlindBoxEligibility } from "@/lib/admin/alpha-points";
+import { getPointsOrders, getPublicPointsProducts, openBlindBoxOrder, purchasePointsProduct } from "@/lib/admin/points-products";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,10 @@ export async function POST(req: NextRequest) {
   if (!productId) return jsonResponse({ error: "Product required." }, { status: 400 });
 
   try {
+    const product = (await getPublicPointsProducts()).find((item) => item.id === productId);
+    if (product?.type === "blind_box" && (body.action !== "open" || body.allowPurchase === true)) {
+      await assertAlphaBlindBoxEligibility(address);
+    }
     if (body.action === "open") {
       return jsonResponse(
         {

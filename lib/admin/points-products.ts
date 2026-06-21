@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { ALPHA_BOX_COST, ALPHA_BOX_DEFAULT_STOCK } from "@/lib/admin/alpha-config";
 import { calculateRulePoints, getSystemConfig, type PointsRuleKind } from "@/lib/admin/system-config";
 
 const POINTS_PRODUCTS_KEY = "points_products";
@@ -75,13 +76,13 @@ function defaultProducts(): PointsProductConfig[] {
       title: "WLD Mystery Box",
       titleI18n: { en: "WLD Mystery Box", "zh-CN": "WLD 盲盒", "zh-TW": "WLD 盲盒" },
       category: "shop",
-      points: 150,
+      points: ALPHA_BOX_COST,
       originalPoints: 1000,
       iconUrl: "/points/lumina-points-icon.png",
       imageText: null,
       badge: "Hot",
       countries: ["global"],
-      stock: 0,
+      stock: ALPHA_BOX_DEFAULT_STOCK,
       purchaseLimit: null,
       enabled: true,
       sortOrder: 5,
@@ -253,10 +254,21 @@ function publicAssetUrl(productId: string, field: "imageUrl" | "detailImageUrl" 
 function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
   return {
     ...product,
+    points: effectiveProductCost(product),
+    stock: effectiveProductStock(product),
     imageUrl: publicAssetUrl(product.id, "imageUrl", product.imageUrl),
     detailImageUrl: publicAssetUrl(product.id, "detailImageUrl", product.detailImageUrl),
     iconUrl: publicAssetUrl(product.id, "iconUrl", product.iconUrl),
   };
+}
+
+function effectiveProductCost(product: PointsProductConfig) {
+  return product.type === "blind_box" ? ALPHA_BOX_COST : Math.max(0, Math.floor(Number(product.points || 0)));
+}
+
+function effectiveProductStock(product: PointsProductConfig) {
+  if (product.type === "blind_box") return Math.max(ALPHA_BOX_DEFAULT_STOCK, Math.floor(Number(product.stock || 0)));
+  return Math.max(0, Math.floor(Number(product.stock || 0)));
 }
 
 async function writeStoredProducts(products: PointsProductConfig[]) {
@@ -494,9 +506,11 @@ export async function purchasePointsProduct(input: { address: string; productId:
     const existing = orders.find((order) => order.id === clientOrderId && order.address === address && order.productId === product.id);
     if (existing) return { order: existing, product: toPublicProduct(product) };
   }
-  if (product.stock <= 0) throw new Error("Product sold out.");
+  const productCost = effectiveProductCost(product);
+  const productStock = effectiveProductStock(product);
+  if (productStock <= 0) throw new Error("Product sold out.");
   const availablePoints = await getPointsAdjustmentTotal(address);
-  if (availablePoints < product.points) throw new Error("Not enough Lumina Points.");
+  if (availablePoints < productCost) throw new Error("Not enough Lumina Points.");
   const limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
   if (limit > 0) {
     const purchased = orders.filter((order) => order.address === address && order.productId === product.id).length;
@@ -507,7 +521,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
     address,
     productId: product.id,
     productTitle: product.title,
-    points: product.points,
+    points: productCost,
     type: product.type,
     status: "purchased",
     reward: product.type === "product" ? { name: product.title, value: product.imageText ?? null } : null,
@@ -525,14 +539,14 @@ export async function purchasePointsProduct(input: { address: string; productId:
     }
   }
   latestOrders = [order, ...latestOrders.filter((item) => item.id !== order.id)];
-  products[productIndex] = { ...product, stock: Math.max(0, product.stock - 1) };
+  products[productIndex] = { ...product, points: productCost, stock: Math.max(0, productStock - 1) };
   await Promise.all([
     writeStoredOrders(latestOrders),
     writeStoredPublicProducts(products),
   ]);
   await addPointsAdjustment({
     address,
-    points: -product.points,
+    points: -productCost,
     note: `Purchase ${product.title}`,
     createdBy: `points-purchase:${order.id}`,
   });
@@ -544,7 +558,7 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
   const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.type === "blind_box" && item.enabled);
   if (!product) throw new Error("Blind box unavailable.");
-  if (product.stock <= 0) throw new Error("Blind box sold out.");
+  if (effectiveProductStock(product) <= 0) throw new Error("Blind box sold out.");
   const order: PointsOrderConfig = {
     id: `airdrop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     address,
@@ -564,7 +578,7 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   const products = await readStoredPublicProducts();
   const index = products.findIndex((item) => item.id === product.id);
   if (index >= 0) {
-    products[index] = { ...products[index], stock: Math.max(0, products[index].stock - 1) };
+    products[index] = { ...products[index], stock: Math.max(0, effectiveProductStock(products[index]) - 1) };
   }
   await Promise.all([
     index >= 0 ? writeStoredPublicProducts(products) : Promise.resolve(products),

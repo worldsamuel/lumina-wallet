@@ -214,6 +214,7 @@ async function submitHoldstationSwap(quote: QuoteResponse, params: ExecuteSwapPa
       toToken: quote.tokens.to.symbol,
       fromAmount: params.fromAmountHuman,
       expectedOut: quote.amountOut,
+      amountUsd: estimateSwapUsd(params, quote),
     },
   });
 
@@ -326,6 +327,7 @@ async function submitBuiltSwap(
       toToken: quote.tokens.to.symbol,
       fromAmount: params.fromAmountHuman,
       expectedOut: executableQuote.amountOut,
+      amountUsd: estimateSwapUsd(params, executableQuote),
     },
   });
 
@@ -412,6 +414,15 @@ function estimateAmountUsd(amountHuman: string, priceUsd?: number) {
   const amount = Number(amountHuman.replace(/,/g, "").trim());
   if (!Number.isFinite(amount) || amount <= 0 || !priceUsd || priceUsd <= 0) return null;
   return amount * priceUsd;
+}
+
+function estimateSwapUsd(params: ExecuteSwapParams, quote: QuoteResponse) {
+  const fromUsd = estimateAmountUsd(params.fromAmountHuman, quote.tokens.from.priceUsd ?? params.fromToken.priceUsd);
+  if (fromUsd !== null) return Number(fromUsd.toFixed(6));
+  const outUsd = Number(quote.addons?.amountOutUsd);
+  if (Number.isFinite(outUsd) && outUsd > 0) return Number(outUsd.toFixed(6));
+  const toUsd = estimateAmountUsd(quote.amountOut, quote.tokens.to.priceUsd ?? params.toToken.priceUsd);
+  return toUsd === null ? null : Number(toUsd.toFixed(6));
 }
 
 function getSwapMaxUsd() {

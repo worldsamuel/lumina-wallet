@@ -6008,6 +6008,7 @@ function enhancePrototypeMe() {
           if (homeBanner) homeBanner.textContent = Number(window.__luminaPoints || 0).toLocaleString();
           var vipNo = document.getElementById("pointsVipNo");
           if (vipNo) vipNo.textContent = (window.__luminaPointsProfile && window.__luminaPointsProfile.luminaNo) ? ("Lumina No." + window.__luminaPointsProfile.luminaNo) : "Lumina VIP";
+          updateAlphaCard();
         }
         setValue();
         var address = window.__luminaUserAddress || "";
@@ -6022,6 +6023,44 @@ function enhancePrototypeMe() {
           .catch(function(){});
       }
       window.__luminaRefreshPoints = refreshPoints;
+      function alphaProfile(){
+        return (window.__luminaPointsProfile && window.__luminaPointsProfile.alpha) || {};
+      }
+      function alphaScore(){
+        return Math.max(0, Math.floor(Number(alphaProfile().score || 0)));
+      }
+      function alphaBoxCost(){
+        return Math.max(15, Math.floor(Number(alphaProfile().boxCost || 15)));
+      }
+      function alphaEligible(){
+        var alpha = alphaProfile();
+        return alpha && alpha.eligibleForBox === true;
+      }
+      function alphaNeedText(){
+        var alpha = alphaProfile();
+        var need = Math.max(0, Math.floor(Number(alpha.nextScoreNeeded || 0)));
+        if (need > 0) return "Need +" + need + " Alpha Score";
+        if (alpha.recentSwapOk === false) return "Swap once in " + Math.max(1, Math.floor(Number(alpha.recentSwapDays || 7))) + " days";
+        return "Eligible";
+      }
+      function alphaCardHtml(){
+        var alpha = alphaProfile();
+        var score = alphaScore();
+        var min = Math.max(30, Math.floor(Number(alpha.minScoreToOpenBox || 30)));
+        var balance = Math.max(0, Math.floor(Number(alpha.balanceScore || 0)));
+        var swap = Math.max(0, Math.floor(Number(alpha.swapScore || 0)));
+        var pct = Math.max(0, Math.min(100, Math.round((score / Math.max(1, min)) * 100)));
+        return '<div class="points-alpha-card ' + (alphaEligible() ? "eligible" : "") + '" id="pointsAlphaCard"><div><span>Alpha Score</span><strong id="pointsAlphaScore">' + score.toLocaleString() + '</strong><small id="pointsAlphaHint">' + safeAttr(alphaNeedText()) + '</small></div><div class="points-alpha-meter"><i style="width:' + pct + '%"></i></div><p><b>Balance +' + balance.toLocaleString() + '</b><b>Swap +' + swap.toLocaleString() + '</b><b>Box ' + alphaBoxCost().toLocaleString() + ' pts</b></p></div>';
+      }
+      function updateAlphaCard(){
+        var card = document.getElementById("pointsAlphaCard");
+        if (!card) return;
+        var score = document.getElementById("pointsAlphaScore");
+        var hint = document.getElementById("pointsAlphaHint");
+        if (score) score.textContent = alphaScore().toLocaleString();
+        if (hint) hint.textContent = alphaNeedText();
+        if (alphaEligible()) card.classList.add("eligible"); else card.classList.remove("eligible");
+      }
       function updateFeedbackCopy(){
         var modal = document.getElementById("feedbackModal");
         if (!modal) return;
@@ -6247,7 +6286,7 @@ function enhancePrototypeMe() {
             title:"WLD Mystery Box",
             titleI18n:{ en:"WLD Mystery Box", "zh-CN":"WLD 盲盒", "zh-TW":"WLD 盲盒", ja:"WLD Mystery Box" },
             category:"shop",
-            points:150,
+            points:15,
             originalPoints:1000,
             imageUrl:null,
             detailImageUrl:null,
@@ -6255,7 +6294,7 @@ function enhancePrototypeMe() {
             imageText:null,
             badge:"Hot",
             countries:["global"],
-            stock:0,
+            stock:10000,
             purchaseLimit:null,
             enabled:true,
             sortOrder:5,
@@ -6738,6 +6777,7 @@ function enhancePrototypeMe() {
           if (pointsActionBusy(busyKey)) return;
           if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
+          if (product.type === "blind_box" && !alphaEligible()) { toast(alphaNeedText()); renderProductDetail(productId, "alpha"); return; }
           if (Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
           var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
           if (limit > 0 && totalPurchasedCount(product.id) >= limit) { toast(copy.limitReached || "Purchase limit reached"); renderProductDetail(productId, "limit"); return; }
@@ -6812,21 +6852,26 @@ function enhancePrototypeMe() {
           if (isOpening) actionText = copy.opening || "Opening...";
           var limitReached = isBlind && limit > 0 && totalOwned >= limit && owned <= 0;
           var soldOutForAction = stock <= 0 && !(isBlind && owned > 0);
-          var disabled = isBuying || isOpening || limitReached || soldOutForAction;
+          var alphaBlocked = isBlind && owned <= 0 && !alphaEligible();
+          var disabled = isBuying || isOpening || limitReached || soldOutForAction || alphaBlocked;
           if (limitReached) actionText = copy.limitReached || "LIMIT REACHED";
           if (soldOutForAction) actionText = copy.soldOut || "SOLD OUT";
+          if (alphaBlocked) actionText = alphaNeedText();
           var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
           var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
           if (errorText === "limit") error = '<div class="points-detail-error">' + escapeAttr(copy.limitReached || "Purchase limit reached") + '</div>';
           if (errorText === "soldout") error = '<div class="points-detail-error">' + escapeAttr(copy.soldOut || "Sold out") + '</div>';
           if (errorText === "buyfirst") error = '<div class="points-detail-error">' + escapeAttr(copy.buyFirst || "Please buy this mystery box first") + '</div>';
+          if (errorText === "alpha") error = '<div class="points-detail-error">' + escapeAttr(alphaNeedText()) + '</div>';
           var boxInfo = isBlind ? '<small class="points-stock-line">' + escapeAttr(copy.boxQuantity || "Boxes") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(copy.limit || "Limit") + ': ' + totalOwned + '/' + limit : '') + '</small>' : "";
+          var alphaInfo = isBlind ? '<section class="points-alpha-detail">' + alphaCardHtml() + '</section>' : "";
           modal.innerHTML =
             '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
             '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product, "detail") + '</div>' +
             '<div class="points-detail-title"><div><h2>' + escapeAttr(productTitle(product)) + '</h2><p>' + subtitle + '</p></div></div>' +
             '<span class="points-policy">' + escapeAttr(copy.nonRefundable || "Non-refundable") + '</span>' +
+            alphaInfo +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
             '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
@@ -6898,6 +6943,7 @@ function enhancePrototypeMe() {
           modal.innerHTML =
             '<div class="points-shop-head"><button type="button" data-points-close="1" class="points-close">‹</button><span></span><span></span></div>' +
             '<div class="points-balance-card vip"><div class="points-vip-glow"></div><div class="points-vip-main"><div class="points-card-title"><b>Lumina Points</b><em id="pointsVipNo">' + vipNo + '</em></div><button type="button" class="points-big" onclick="window.__luminaOpenPointsLedger()"><span id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><i>›</i></button><small>' + escapeAttr(c.priorityCard || "Priority member card") + '</small></div><button type="button" class="coupon-card" onclick="window.__luminaOpenCoupons()"><span>' + escapeAttr(c.box || "Box") + '</span><b>' + ((window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).length + pointsCoupons().length) + '</b></button></div>' +
+            alphaCardHtml() +
             '<div class="points-shop-panel"><div class="points-shop-title"><h2>' + escapeAttr(c.productCenter || "Product Center") + '</h2><label class="points-region"><span>◎</span><select id="pointsRegionSelect">' + countries.map(function(key){ return '<option value="' + key + '"' + (key === selectedRegion ? " selected" : "") + '>' + countryLabel(key) + '</option>'; }).join("") + '</select></label></div><div class="points-tabs">' +
             categories.map(function(key, index){ return '<button type="button" class="' + (index === 0 ? "sel" : "") + '" data-points-cat="' + key + '">' + categoryLabel(key) + '</button>'; }).join("") +
             '</div><div class="points-products" id="pointsProductGrid"><div class="points-empty">' + c.noPoints + '</div></div></div>';
