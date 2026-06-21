@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { assertAlphaBlindBoxEligibility } from "@/lib/admin/alpha-points";
+import { assertAlphaBlindBoxEligibility, spendAlphaBlindBoxPoints } from "@/lib/admin/alpha-points";
 import { getPointsOrders, getPublicPointsProducts, openBlindBoxOrder, purchasePointsProduct } from "@/lib/admin/points-products";
 
 export const dynamic = "force-dynamic";
@@ -35,20 +35,30 @@ export async function POST(req: NextRequest) {
 
   try {
     const product = (await getPublicPointsProducts()).find((item) => item.id === productId);
-    if (product?.type === "blind_box" && (body.action !== "open" || body.allowPurchase === true)) {
+    const alphaProduct = product?.type === "blind_box" && product.alphaRequired === true;
+    if (alphaProduct && (body.action !== "open" || body.allowPurchase === true)) {
       await assertAlphaBlindBoxEligibility(address);
     }
     if (body.action === "open") {
+      const result = await openBlindBoxOrder({
+        address,
+        productId,
+        availablePoints: Number(body.availablePoints || 0),
+        clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
+        allowPurchase: body.allowPurchase === true,
+        skipPointDebit: alphaProduct,
+      });
+      if (alphaProduct && body.allowPurchase === true) {
+        await spendAlphaBlindBoxPoints({
+          address,
+          orderId: result.order.id,
+          productTitle: result.product.title,
+        });
+      }
       return jsonResponse(
         {
           ok: true,
-          ...(await openBlindBoxOrder({
-            address,
-            productId,
-            availablePoints: Number(body.availablePoints || 0),
-            clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
-            allowPurchase: body.allowPurchase === true,
-          })),
+          ...result,
         },
         { headers: NO_STORE_HEADERS },
       );
@@ -56,12 +66,23 @@ export async function POST(req: NextRequest) {
     return jsonResponse(
       {
         ok: true,
-        ...(await purchasePointsProduct({
-          address,
-          productId,
-          availablePoints: Number(body.availablePoints || 0),
-          clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
-        })),
+        ...(await (async () => {
+          const result = await purchasePointsProduct({
+            address,
+            productId,
+            availablePoints: Number(body.availablePoints || 0),
+            clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
+            skipPointDebit: alphaProduct,
+          });
+          if (alphaProduct) {
+            await spendAlphaBlindBoxPoints({
+              address,
+              orderId: result.order.id,
+              productTitle: result.product.title,
+            });
+          }
+          return result;
+        })()),
       },
       { headers: NO_STORE_HEADERS },
     );

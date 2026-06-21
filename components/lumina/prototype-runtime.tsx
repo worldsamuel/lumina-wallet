@@ -6036,6 +6036,9 @@ function enhancePrototypeMe() {
         var alpha = alphaProfile();
         return alpha && alpha.eligibleForBox === true;
       }
+      function productAlphaRequired(product){
+        return !!(product && product.type === "blind_box" && product.alphaRequired === true);
+      }
       function alphaNeedText(){
         var alpha = alphaProfile();
         var need = Math.max(0, Math.floor(Number(alpha.nextScoreNeeded || 0)));
@@ -6250,6 +6253,7 @@ function enhancePrototypeMe() {
           var map = {
             all:{ en:"All", "zh-CN":"全部", "zh-TW":"全部" },
             shop:{ en:"Shop", "zh-CN":"商城", "zh-TW":"商城" },
+            alpha:{ en:"Alpha", "zh-CN":"Alpha", "zh-TW":"Alpha" },
             travel:{ en:"Travel", "zh-CN":"旅行", "zh-TW":"旅行" },
             fitness:{ en:"Fitness", "zh-CN":"健身", "zh-TW":"健身" },
             dining:{ en:"Dining", "zh-CN":"餐饮", "zh-TW":"餐飲" },
@@ -6286,7 +6290,7 @@ function enhancePrototypeMe() {
             title:"WLD Mystery Box",
             titleI18n:{ en:"WLD Mystery Box", "zh-CN":"WLD 盲盒", "zh-TW":"WLD 盲盒", ja:"WLD Mystery Box" },
             category:"shop",
-            points:15,
+            points:150,
             originalPoints:1000,
             imageUrl:null,
             detailImageUrl:null,
@@ -6294,7 +6298,7 @@ function enhancePrototypeMe() {
             imageText:null,
             badge:"Hot",
             countries:["global"],
-            stock:10000,
+            stock:1000,
             purchaseLimit:null,
             enabled:true,
             sortOrder:5,
@@ -6304,6 +6308,32 @@ function enhancePrototypeMe() {
               { id:"1", name:"0.01 WLD", nameI18n:{ en:"0.01 WLD", "zh-CN":"0.01 WLD", "zh-TW":"0.01 WLD", ja:"0.01 WLD" }, value:"0.01 WLD", odds:9000, stock:null },
               { id:"2", name:"0.1 WLD", nameI18n:{ en:"0.1 WLD", "zh-CN":"0.1 WLD", "zh-TW":"0.1 WLD", ja:"0.1 WLD" }, value:"0.1 WLD", odds:900, stock:null },
               { id:"3", name:"1 WLD", nameI18n:{ en:"1 WLD", "zh-CN":"1 WLD", "zh-TW":"1 WLD", ja:"1 WLD" }, value:"1 WLD", odds:100, stock:null }
+            ]
+          },{
+            id:"alpha-token-mystery-box",
+            type:"blind_box",
+            title:"Alpha Token Mystery Box",
+            titleI18n:{ en:"Alpha Token Mystery Box", "zh-CN":"Alpha 代币盲盒", "zh-TW":"Alpha 代幣盲盒", ja:"Alpha Token Mystery Box" },
+            category:"alpha",
+            points:15,
+            originalPoints:null,
+            alphaRequired:true,
+            imageUrl:null,
+            detailImageUrl:null,
+            iconUrl:"/points/lumina-points-icon.png",
+            imageText:null,
+            badge:"Alpha",
+            countries:["global"],
+            stock:10000,
+            purchaseLimit:null,
+            enabled:true,
+            sortOrder:6,
+            description:"Open with Alpha Score from balance and swap activity only.",
+            descriptionI18n:{ en:"Open with Alpha Score from balance and swap activity only.", "zh-CN":"仅可使用余额和 Swap 产生的 Alpha 分开启。", "zh-TW":"僅可使用餘額和 Swap 產生的 Alpha 分開啟。", ja:"Balance and swap Alpha Score only." },
+            rewards:[
+              { id:"1", name:"0.01 WLD", value:"0.01 WLD", odds:9000, stock:null },
+              { id:"2", name:"0.1 WLD", value:"0.1 WLD", odds:900, stock:null },
+              { id:"3", name:"1 WLD", value:"1 WLD", odds:100, stock:null }
             ]
           }];
         }
@@ -6777,8 +6807,9 @@ function enhancePrototypeMe() {
           if (pointsActionBusy(busyKey)) return;
           if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
-          if (product.type === "blind_box" && !alphaEligible()) { toast(alphaNeedText()); renderProductDetail(productId, "alpha"); return; }
-          if (Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
+          var isAlphaBox = productAlphaRequired(product);
+          if (isAlphaBox && !alphaEligible()) { toast(alphaNeedText()); renderProductDetail(productId, "alpha"); return; }
+          if (!isAlphaBox && Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
           var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
           if (limit > 0 && totalPurchasedCount(product.id) >= limit) { toast(copy.limitReached || "Purchase limit reached"); renderProductDetail(productId, "limit"); return; }
           if (Math.floor(Number(product.stock || 0)) <= 0) { toast(copy.soldOut || "Sold out"); renderProductDetail(productId, "soldout"); return; }
@@ -6813,8 +6844,12 @@ function enhancePrototypeMe() {
             } else if (previousStock > 0) {
               product.stock = previousStock - 1;
             }
-            updatePointsBalance(previousPoints - cost);
-            addPointsLedger({ type:"spend", points:cost, title:productTitle(product), productId:product.id });
+            if (!isAlphaBox) {
+              updatePointsBalance(previousPoints - cost);
+              addPointsLedger({ type:"spend", points:cost, title:productTitle(product), productId:product.id });
+            } else {
+              refreshPoints();
+            }
             if (product.type !== "blind_box") addPointsCoupon({ title:productTitle(product), value:product.imageText || "", source:"Product Center" });
             toast(product.type === "blind_box" ? (copy.mysteryPurchased || "Mystery box purchased") : (copy.redeemed || "Redeemed"));
             await reloadPointsOrders().catch(function(){ return []; });
@@ -6840,6 +6875,7 @@ function enhancePrototypeMe() {
           var copy = meCopy();
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
           var isBlind = product.type === "blind_box";
+          var isAlphaBox = productAlphaRequired(product);
           var owned = purchasedCount(product.id);
           var totalOwned = totalPurchasedCount(product.id);
           var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
@@ -6852,7 +6888,7 @@ function enhancePrototypeMe() {
           if (isOpening) actionText = copy.opening || "Opening...";
           var limitReached = isBlind && limit > 0 && totalOwned >= limit && owned <= 0;
           var soldOutForAction = stock <= 0 && !(isBlind && owned > 0);
-          var alphaBlocked = isBlind && owned <= 0 && !alphaEligible();
+          var alphaBlocked = isAlphaBox && owned <= 0 && !alphaEligible();
           var disabled = isBuying || isOpening || limitReached || soldOutForAction || alphaBlocked;
           if (limitReached) actionText = copy.limitReached || "LIMIT REACHED";
           if (soldOutForAction) actionText = copy.soldOut || "SOLD OUT";
@@ -6865,7 +6901,7 @@ function enhancePrototypeMe() {
           if (errorText === "buyfirst") error = '<div class="points-detail-error">' + escapeAttr(copy.buyFirst || "Please buy this mystery box first") + '</div>';
           if (errorText === "alpha") error = '<div class="points-detail-error">' + escapeAttr(alphaNeedText()) + '</div>';
           var boxInfo = isBlind ? '<small class="points-stock-line">' + escapeAttr(copy.boxQuantity || "Boxes") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(copy.limit || "Limit") + ': ' + totalOwned + '/' + limit : '') + '</small>' : "";
-          var alphaInfo = isBlind ? '<section class="points-alpha-detail">' + alphaCardHtml() + '</section>' : "";
+          var alphaInfo = isAlphaBox ? '<section class="points-alpha-detail">' + alphaCardHtml() + '</section>' : "";
           modal.innerHTML =
             '<div class="points-detail-head"><button type="button" class="points-close" onclick="window.__luminaRenderPointsShop()">‹</button><span></span><span></span></div>' +
             '<div class="points-detail-hero ' + (isBlind ? "blind" : "") + '">' + productArt(product, "detail") + '</div>' +
@@ -6874,14 +6910,17 @@ function enhancePrototypeMe() {
             alphaInfo +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
-            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(copy.available || "Available") + ': <b id="pointsShopBalance">' + Number(window.__luminaPoints || 0).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
+            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(isAlphaBox ? "Alpha available" : (copy.available || "Available")) + ': <b id="pointsShopBalance">' + Number(isAlphaBox ? alphaScore() : (window.__luminaPoints || 0)).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
         }
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
         window.__luminaOpenPointsLedger = function(){
           var ledgerRows = [];
           (window.__luminaPointRecords || []).forEach(function(row){ ledgerRows.push({ title:row.title || (row.type === "swap" ? "Swap reward" : row.type === "earn" ? "Earn reward" : "Task reward"), date:row.date || "", points:Number(row.points || 0) }); });
-          (((window.__luminaPointsProfile || {}).adjustments) || []).forEach(function(row){ ledgerRows.push({ title:row.note || "Admin points adjustment", date:row.createdAt || "", points:Number(row.points || 0) }); });
+          (((window.__luminaPointsProfile || {}).adjustments) || []).forEach(function(row){
+            if (/^alpha:/i.test(String(row && row.createdBy || ""))) return;
+            ledgerRows.push({ title:row.note || "Admin points adjustment", date:row.createdAt || "", points:Number(row.points || 0) });
+          });
           pointsLocalRows("lumina_points_ledger_v1").forEach(function(row){
             var localPoints = row && row.type === "spend" ? -Math.abs(Number(row.points || 0)) : Number(row.points || 0);
             ledgerRows.push({ title:row.title || (localPoints < 0 ? "Redeemed" : "Task reward"), date:row.date || "", points:localPoints });
@@ -6927,11 +6966,12 @@ function enhancePrototypeMe() {
             var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
             var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
             var owned = totalPurchasedCount(product.id);
-            var meta = product.type === "blind_box" ? '<small class="points-product-meta">' + escapeAttr(c.box || "Box") + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(c.limit || "Limit") + ': ' + owned + '/' + limit : '') + '</small>' : "";
-            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div><div class="points-product-cost">' + luminaMark("sm") + '<b>Lumina ' + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div>' + meta + '</div></div></button>';
+            var isAlphaBox = productAlphaRequired(product);
+            var meta = product.type === "blind_box" ? '<small class="points-product-meta">' + escapeAttr(isAlphaBox ? "Alpha Box" : (c.box || "Box")) + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(c.limit || "Limit") + ': ' + owned + '/' + limit : '') + '</small>' : "";
+            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div><div class="points-product-cost">' + luminaMark("sm") + '<b>' + (isAlphaBox ? "Alpha " : "Lumina ") + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div>' + meta + '</div></div></button>';
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
-        var categories = ["all", "shop", "travel", "fitness", "dining", "cash"];
+        var categories = ["all", "shop", "alpha", "travel", "fitness", "dining", "cash"];
         var countries = ["global", "us", "cn", "jp", "kr", "sg", "hk", "eu", "ae"];
         function renderShop(){
           startProductPolling();

@@ -16,6 +16,7 @@ export type PointsProductConfig = {
   category: string;
   points: number;
   originalPoints?: number | null;
+  alphaRequired?: boolean;
   imageUrl?: string | null;
   detailImageUrl?: string | null;
   iconUrl?: string | null;
@@ -76,18 +77,43 @@ function defaultProducts(): PointsProductConfig[] {
       title: "WLD Mystery Box",
       titleI18n: { en: "WLD Mystery Box", "zh-CN": "WLD 盲盒", "zh-TW": "WLD 盲盒" },
       category: "shop",
-      points: ALPHA_BOX_COST,
+      points: 150,
       originalPoints: 1000,
       iconUrl: "/points/lumina-points-icon.png",
       imageText: null,
       badge: "Hot",
       countries: ["global"],
-      stock: ALPHA_BOX_DEFAULT_STOCK,
+      stock: 1000,
       purchaseLimit: null,
       enabled: true,
       sortOrder: 5,
       description: "Open your Lumina mystery box to reveal a WLD reward.",
       descriptionI18n: { en: "Open your Lumina mystery box to reveal a WLD reward.", "zh-CN": "打开 Lumina 盲盒，领取随机 WLD 奖励。", "zh-TW": "打開 Lumina 盲盒，領取隨機 WLD 獎勵。" },
+      rewards: [
+        { id: "1", name: "0.01 WLD", value: "0.01 WLD", odds: 9000, stock: null },
+        { id: "2", name: "0.1 WLD", value: "0.1 WLD", odds: 900, stock: null },
+        { id: "3", name: "1 WLD", value: "1 WLD", odds: 100, stock: null },
+      ],
+    },
+    {
+      id: "alpha-token-mystery-box",
+      type: "blind_box",
+      title: "Alpha Token Mystery Box",
+      titleI18n: { en: "Alpha Token Mystery Box", "zh-CN": "Alpha 代币盲盒", "zh-TW": "Alpha 代幣盲盒" },
+      category: "alpha",
+      points: ALPHA_BOX_COST,
+      originalPoints: null,
+      alphaRequired: true,
+      iconUrl: "/points/lumina-points-icon.png",
+      imageText: null,
+      badge: "Alpha",
+      countries: ["global"],
+      stock: ALPHA_BOX_DEFAULT_STOCK,
+      purchaseLimit: null,
+      enabled: true,
+      sortOrder: 6,
+      description: "Open with Alpha Score from balance and swap activity only.",
+      descriptionI18n: { en: "Open with Alpha Score from balance and swap activity only.", "zh-CN": "仅可使用余额和 Swap 产生的 Alpha 分开启。", "zh-TW": "僅可使用餘額和 Swap 產生的 Alpha 分開啟。" },
       rewards: [
         { id: "1", name: "0.01 WLD", value: "0.01 WLD", odds: 9000, stock: null },
         { id: "2", name: "0.1 WLD", value: "0.1 WLD", odds: 900, stock: null },
@@ -183,6 +209,7 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
     category: String(input.category || "shop").trim().toLowerCase(),
     points: Math.max(0, Math.floor(Number(input.points ?? 0))),
     originalPoints: input.originalPoints == null || input.originalPoints === 0 ? null : Math.max(0, Math.floor(Number(input.originalPoints))),
+    alphaRequired: input.alphaRequired === true,
     imageUrl: typeof input.imageUrl === "string" && input.imageUrl.trim() ? input.imageUrl.trim() : null,
     detailImageUrl: typeof input.detailImageUrl === "string" && input.detailImageUrl.trim() ? input.detailImageUrl.trim() : null,
     iconUrl: typeof input.iconUrl === "string" && input.iconUrl.trim() ? input.iconUrl.trim() : null,
@@ -207,6 +234,10 @@ function parseProducts(value: unknown): PointsProductConfig[] {
     .filter((item): item is Partial<PointsProductConfig> => !!item && typeof item === "object")
     .map(normalizeProduct)
     .filter((item) => item.id);
+  if (!rows.some((item) => item.alphaRequired === true)) {
+    const alphaDefault = defaultProducts().find((item) => item.alphaRequired === true);
+    if (alphaDefault) rows.push(alphaDefault);
+  }
   return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
@@ -263,11 +294,11 @@ function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
 }
 
 function effectiveProductCost(product: PointsProductConfig) {
-  return product.type === "blind_box" ? ALPHA_BOX_COST : Math.max(0, Math.floor(Number(product.points || 0)));
+  return product.alphaRequired === true ? ALPHA_BOX_COST : Math.max(0, Math.floor(Number(product.points || 0)));
 }
 
 function effectiveProductStock(product: PointsProductConfig) {
-  if (product.type === "blind_box") return Math.max(ALPHA_BOX_DEFAULT_STOCK, Math.floor(Number(product.stock || 0)));
+  if (product.alphaRequired === true) return Math.max(ALPHA_BOX_DEFAULT_STOCK, Math.floor(Number(product.stock || 0)));
   return Math.max(0, Math.floor(Number(product.stock || 0)));
 }
 
@@ -370,6 +401,10 @@ function isCurrentPointsYear(row: PointsAdjustmentConfig) {
   return Number.isFinite(created) && created >= currentPointsYearStart();
 }
 
+export function isAlphaPointsAdjustment(row: Pick<PointsAdjustmentConfig, "createdBy">) {
+  return String(row.createdBy || "").startsWith("alpha:");
+}
+
 export async function getPointsProducts() {
   return readStoredProducts();
 }
@@ -413,7 +448,9 @@ export async function getPointsAdjustments(address?: string) {
 }
 
 export async function getPointsAdjustmentTotal(address: string) {
-  return (await getPointsAdjustments(address)).reduce((sum, row) => sum + Math.floor(Number(row.points || 0)), 0);
+  return (await getPointsAdjustments(address))
+    .filter((row) => !isAlphaPointsAdjustment(row))
+    .reduce((sum, row) => sum + Math.floor(Number(row.points || 0)), 0);
 }
 
 export async function addPointsAdjustment(input: { address: string; points: number; note?: string | null; createdBy?: string | null }) {
@@ -493,7 +530,7 @@ function normalizeClientOrderId(value?: string | null) {
   return /^[a-zA-Z0-9:_-]{8,96}$/.test(id) ? id : null;
 }
 
-export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number; clientOrderId?: string | null }) {
+export async function purchasePointsProduct(input: { address: string; productId: string; availablePoints: number; clientOrderId?: string | null; skipPointDebit?: boolean }) {
   const address = input.address.toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
   const products = await readStoredPublicProducts();
@@ -510,7 +547,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
   const productStock = effectiveProductStock(product);
   if (productStock <= 0) throw new Error("Product sold out.");
   const availablePoints = await getPointsAdjustmentTotal(address);
-  if (availablePoints < productCost) throw new Error("Not enough Lumina Points.");
+  if (!input.skipPointDebit && availablePoints < productCost) throw new Error("Not enough Lumina Points.");
   const limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
   if (limit > 0) {
     const purchased = orders.filter((order) => order.address === address && order.productId === product.id).length;
@@ -544,12 +581,14 @@ export async function purchasePointsProduct(input: { address: string; productId:
     writeStoredOrders(latestOrders),
     writeStoredPublicProducts(products),
   ]);
-  await addPointsAdjustment({
-    address,
-    points: -productCost,
-    note: `Purchase ${product.title}`,
-    createdBy: `points-purchase:${order.id}`,
-  });
+  if (!input.skipPointDebit) {
+    await addPointsAdjustment({
+      address,
+      points: -productCost,
+      note: `Purchase ${product.title}`,
+      createdBy: `points-purchase:${order.id}`,
+    });
+  }
   return { order, product: toPublicProduct(products[productIndex]) };
 }
 
@@ -587,7 +626,7 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   return { order, product: toPublicProduct(product) };
 }
 
-export async function openBlindBoxOrder(input: { address: string; productId: string; availablePoints?: number; clientOrderId?: string | null; allowPurchase?: boolean }) {
+export async function openBlindBoxOrder(input: { address: string; productId: string; availablePoints?: number; clientOrderId?: string | null; allowPurchase?: boolean; skipPointDebit?: boolean }) {
   const address = input.address.toLowerCase();
   const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.enabled);
   if (!product || product.type !== "blind_box") throw new Error("Mystery box unavailable.");
@@ -599,6 +638,7 @@ export async function openBlindBoxOrder(input: { address: string; productId: str
       productId: product.id,
       availablePoints: Number(input.availablePoints || 0),
       clientOrderId: input.clientOrderId,
+      skipPointDebit: input.skipPointDebit,
     });
     orders = await readStoredOrders();
     index = orders.findIndex((order) => order.id === purchased.order.id && order.address === address && order.productId === product.id && order.status === "purchased");

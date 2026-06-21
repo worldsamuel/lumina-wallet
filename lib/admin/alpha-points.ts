@@ -15,6 +15,7 @@ type AlphaKind = "balance" | "swap";
 type AlphaBreakdown = {
   balanceScore: number;
   swapScore: number;
+  spentScore: number;
   recentSwapOk: boolean;
   portfolioUsd: number;
   swapUsdWindow: number;
@@ -61,6 +62,10 @@ function alphaKey(kind: AlphaKind, dayKey: string) {
 function isAlphaRow(row: PointsAdjustmentConfig, kind?: AlphaKind) {
   const prefix = kind ? `alpha:${kind}:` : "alpha:";
   return String(row.createdBy || "").startsWith(prefix);
+}
+
+function isAlphaSpendRow(row: PointsAdjustmentConfig) {
+  return String(row.createdBy || "").startsWith("alpha:spend:");
 }
 
 function rowTime(row: PointsAdjustmentConfig) {
@@ -193,6 +198,7 @@ async function alphaBreakdown(address: string, portfolioUsd = 0, swapUsdToday = 
   const rows = adjustments.filter((row) => isAlphaRow(row) && rowTime(row) >= windowStart);
   const balanceScore = rows.filter((row) => isAlphaRow(row, "balance")).reduce((sum, row) => sum + positivePoints(row), 0);
   const swapScore = rows.filter((row) => isAlphaRow(row, "swap")).reduce((sum, row) => sum + positivePoints(row), 0);
+  const spentScore = rows.filter(isAlphaSpendRow).reduce((sum, row) => sum + Math.abs(Math.min(0, Math.floor(Number(row.points || 0)))), 0);
   const recentSwapOk = rows.some((row) => isAlphaRow(row, "swap") && rowTime(row) >= recentSwapStart) ||
     activities.some((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= recentSwapStart);
   const swapUsdWindow = activities
@@ -202,6 +208,7 @@ async function alphaBreakdown(address: string, portfolioUsd = 0, swapUsdToday = 
   return {
     balanceScore,
     swapScore,
+    spentScore,
     recentSwapOk,
     portfolioUsd,
     swapUsdWindow,
@@ -217,7 +224,7 @@ export async function getAlphaPointsProfile(addressInput: string): Promise<Alpha
   const swapSync = await syncAlphaSwap(address);
   const breakdown = await alphaBreakdown(address, balanceSync?.portfolioUsd ?? 0, swapSync?.todayUsd ?? 0);
   const spendablePoints = await getPointsAdjustmentTotal(address);
-  const score = breakdown.balanceScore + breakdown.swapScore;
+  const score = Math.max(0, breakdown.balanceScore + breakdown.swapScore - breakdown.spentScore);
   return {
     enabled: true,
     ...breakdown,
@@ -240,8 +247,24 @@ export async function assertAlphaBlindBoxEligibility(address: string) {
   if (!profile.recentSwapOk) {
     throw new Error(`Complete one swap in the last ${ALPHA_RECENT_SWAP_DAYS} days to open a mystery box.`);
   }
-  if (profile.spendablePoints < ALPHA_BOX_COST) {
-    throw new Error(`Need ${ALPHA_BOX_COST} Lumina Points to open this mystery box.`);
-  }
   return profile;
+}
+
+export async function spendAlphaBlindBoxPoints(input: { address: string; orderId: string; productTitle?: string | null }) {
+  const address = String(input.address || "").toLowerCase();
+  if (!isAddress(address)) throw new Error("Invalid wallet address.");
+  const orderId = String(input.orderId || "").trim();
+  if (!orderId) throw new Error("Invalid Alpha order id.");
+  const uniqueKey = `alpha:spend:${orderId}`;
+  const existing = await getPointsAdjustments(address);
+  const spent = existing.find((row) => row.createdBy === uniqueKey);
+  if (spent) return { row: spent, points: Math.abs(spent.points), skipped: true };
+  await assertAlphaBlindBoxEligibility(address);
+  const row = await addPointsAdjustment({
+    address,
+    points: -ALPHA_BOX_COST,
+    note: `Open Alpha box${input.productTitle ? `: ${input.productTitle}` : ""}`,
+    createdBy: uniqueKey,
+  });
+  return { row, points: ALPHA_BOX_COST, skipped: false };
 }
