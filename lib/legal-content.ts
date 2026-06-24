@@ -1,6 +1,6 @@
 export type LegalLanguage = "en" | "zh-CN";
 
-export type LegalPageKind = "privacy" | "terms";
+export type LegalPageKind = "privacy" | "terms" | "alpha";
 
 export type LegalSection = {
   title: string;
@@ -278,6 +278,56 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         {
           title: "生效日期",
           body: ["本服务条款自 2026 年 5 月 29 日起生效。"],
+        },
+      ],
+    },
+  },
+  alpha: {
+    en: {
+      title: "Alpha Rules",
+      subtitle: "Balance, swap, and Alpha mystery box scoring",
+      effectiveDate: "June 23, 2026",
+      lastUpdated: "June 23, 2026",
+      sections: [
+        {
+          title: "Separate Score",
+          body: ["Alpha Score is separate from Lumina Points. Check-in, invite, and regular task points do not count toward Alpha token mystery boxes."],
+        },
+        {
+          title: "Balance Score",
+          body: ["Balance score is based on your wallet's estimated USD asset value and the active Alpha balance tiers configured by Lumina."],
+        },
+        {
+          title: "Swap Score",
+          body: ["Swap score is based on eligible completed swap volume. A completed small swap may receive the configured minimum swap score and remains subject to the daily cap."],
+        },
+        {
+          title: "Alpha Mystery Boxes",
+          body: ["Opening an Alpha token mystery box requires the configured minimum Alpha Score and a recent swap. Opening a box deducts the configured Alpha box cost."],
+        },
+      ],
+    },
+    "zh-CN": {
+      title: "Alpha 规则",
+      subtitle: "余额、Swap 与 Alpha 盲盒积分说明",
+      effectiveDate: "2026 年 6 月 23 日",
+      lastUpdated: "2026 年 6 月 23 日",
+      sections: [
+        {
+          title: "独立积分",
+          body: ["Alpha Score 与 Lumina Points 分开计算。签到、邀请、普通任务积分不进入 Alpha 代币盲盒积分。"],
+        },
+        {
+          title: "余额加分",
+          body: ["余额分根据钱包资产的预估美元价值和 Lumina 后台配置的 Alpha 余额档位计算。"],
+        },
+        {
+          title: "Swap 加分",
+          body: ["Swap 分根据有效完成的兑换交易量计算。小额已完成 Swap 可获得后台配置的保底分，并受每日上限限制。"],
+        },
+        {
+          title: "Alpha 代币盲盒",
+          body: ["打开 Alpha 代币盲盒需要达到后台配置的最低 Alpha Score，并满足近期 Swap 条件；开盒后扣除后台配置的 Alpha 分。"],
         },
       ],
     },

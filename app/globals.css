@@ -11,11 +11,11 @@
     --pad-screen: 20px; --gap: 12px; --phone-max: 430px;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body, #__next { min-height: 100%; background: var(--bg) !important; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
-  body { min-height: 100dvh; overflow-x: hidden; }
+  html, body, #__next { min-height: 100%; width: 100%; max-width: 100%; background: var(--bg) !important; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overscroll-behavior: none; overflow-x: hidden; }
+  body { min-height: 100dvh; overflow-x: hidden; touch-action: pan-y; }
   body::before { content: ""; position: fixed; inset: -120px 0 auto; height: 180px; background: var(--bg); z-index: -1; pointer-events: none; }
   button { font-family: inherit; }
-  .phone { max-width: var(--phone-max); margin: 0 auto; min-height: 100vh; background: var(--bg); position: relative; overflow: hidden; }
+  .phone { width: 100%; max-width: var(--phone-max); margin: 0 auto; min-height: 100vh; background: var(--bg); position: relative; overflow: hidden; overscroll-behavior-x: none; }
   .view { display: none; padding-bottom: 100px; }
   .view.active { display: block; animation: fade .25s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
@@ -914,7 +914,7 @@
   .points-record span { display: block; margin-top: 4px; color: var(--text-dim); font-size: 12px; }
   .points-record b { color: var(--green); font-size: 15px; font-weight: 950; }
   .points-empty { padding: 18px 10px; color: var(--text-mute); text-align: center; font-size: 13px; border: 1px dashed rgba(255,255,255,.08); border-radius: 16px; }
-  .points-shop-screen { position: fixed; inset: 0; z-index: 240; display: none; width: 100vw; max-width: 100vw; height: 100vh; overflow: auto; padding: calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom)); background: #020302; color: var(--text); }
+  .points-shop-screen { position: fixed; inset: 0; z-index: 240; display: none; width: 100%; max-width: 100vw; height: 100dvh; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-x: none; overscroll-behavior-y: contain; touch-action: pan-y; padding: calc(14px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom)); background: #020302; color: var(--text); }
   .points-shop-screen.open { display: block; }
   .points-shop-head { min-height: 54px; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: 8px; }
   .points-close { width: 40px; height: 40px; border: none; background: transparent; color: #fff; font-size: 34px; line-height: 1; display: grid; place-items: center; padding: 0; }
@@ -924,7 +924,7 @@
   .lumina-mark.sm { width: 20px; height: 20px; }
   .lumina-mark.lg { width: 46px; height: 46px; border: 1px solid rgba(255,255,255,.78); }
   .lumina-dot { width: 19px; height: 19px; border-radius: 50%; border: 1.5px solid var(--green); color: var(--green); display: inline-grid; place-items: center; font-size: 10px; font-weight: 950; line-height: 1; box-shadow: 0 0 16px rgba(74,222,128,.28); flex: 0 0 auto; }
-  .points-balance-card { margin-top: 20px; min-height: 122px; padding: 28px 22px; border: 1px solid rgba(74,222,128,.22); border-radius: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; background: radial-gradient(78% 100% at 74% -12%, rgba(74,222,128,.18), transparent 56%), radial-gradient(80% 120% at 90% 102%, rgba(74,222,128,.28), transparent 58%), linear-gradient(135deg, #0b0f0b, #060706); overflow: hidden; }
+  .points-balance-card { width: 100%; max-width: 100%; margin-top: 20px; min-height: 122px; padding: 28px 22px; border: 1px solid rgba(74,222,128,.22); border-radius: 22px; display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; background: radial-gradient(78% 100% at 74% -12%, rgba(74,222,128,.18), transparent 56%), radial-gradient(80% 120% at 90% 102%, rgba(74,222,128,.28), transparent 58%), linear-gradient(135deg, #0b0f0b, #060706); overflow: hidden; }
   .points-balance-card.vip { position: relative; min-height: 174px; margin-top: 16px; padding: 26px 24px 24px; border-radius: 26px; background: radial-gradient(100% 130% at 92% 22%, rgba(91,255,131,.32), transparent 48%), radial-gradient(85% 120% at 18% 104%, rgba(116,255,170,.12), transparent 58%), linear-gradient(128deg, #070907 0%, #101b12 52%, #071008 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 22px 70px rgba(0,0,0,.34); }
   .points-balance-card.vip::before { content: ""; position: absolute; inset: 14px; border-radius: 22px; border: 1px solid rgba(114,255,150,.12); pointer-events: none; }
   .points-balance-card.vip::after { content: "LUMINA"; position: absolute; right: 20px; bottom: 14px; color: rgba(255,255,255,.035); font-size: 34px; line-height: 1; font-weight: 950; letter-spacing: 3px; }
@@ -950,7 +950,7 @@
   .coupon-card { position: relative; z-index: 1; min-width: 88px; height: 42px; border: 1px solid rgba(118,255,155,.22); border-radius: 15px; background: linear-gradient(135deg, rgba(74,222,128,.13), rgba(5,16,8,.68)); color: var(--green); display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 6px; padding: 0 9px; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
   .coupon-card span { color: #b7ffc8; font-size: 10px; font-weight: 850; text-align: left; }
   .coupon-card b { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: rgba(74,222,128,.16); color: #fff; font-size: 12px; }
-  .points-shop-panel { margin: 2px -16px 0; padding: 24px 16px 0; border-radius: 26px 26px 0 0; background: #020302; box-shadow: 0 -18px 50px rgba(0,0,0,.44); }
+  .points-shop-panel { width: calc(100% + 32px); max-width: calc(100% + 32px); margin: 2px -16px 0; padding: 24px 16px 0; border-radius: 26px 26px 0 0; background: #020302; box-shadow: 0 -18px 50px rgba(0,0,0,.44); overflow-x: hidden; }
   .points-task-panel { margin: 18px -16px 0; padding: 22px 16px 4px; background: #020302; }
   .points-task-list { display: grid; gap: 10px; margin-top: 14px; }
   .points-task-row { min-height: 76px; display: grid; grid-template-columns: 42px minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: linear-gradient(180deg, #121412, #0b0c0b); }
@@ -992,11 +992,11 @@
   .points-region { margin-left: auto; transform: translateX(22px); border: none; background: transparent; color: #fff; font-size: 15px; font-weight: 850; white-space: nowrap; display: inline-flex; align-items: center; justify-content: flex-end; gap: 6px; }
   .points-region select { max-width: 128px; border: none; outline: none; background: transparent; color: #fff; font: inherit; font-weight: 900; appearance: none; padding-right: 12px; }
   .points-region select option { color: #111; background: #fff; }
-  .points-tabs { margin-top: 22px; display: flex; gap: 16px; overflow-x: auto; padding-bottom: 10px; scrollbar-width: none; }
+  .points-tabs { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px 12px; overflow-x: hidden; padding-bottom: 10px; scrollbar-width: none; touch-action: pan-y; }
   .points-tabs::-webkit-scrollbar { display: none; }
-  .points-tabs button { min-width: max-content; height: 38px; border: none; border-radius: 999px; background: transparent; color: #8f958f; padding: 0 14px; font-size: 17px; font-weight: 800; }
+  .points-tabs button { min-width: 0; height: 38px; border: none; border-radius: 999px; background: transparent; color: #8f958f; padding: 0 14px; font-size: 17px; font-weight: 800; white-space: nowrap; }
   .points-tabs button.sel { background: rgba(74,222,128,.15); color: var(--green); }
-  .points-products { margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+  .points-products { width: 100%; max-width: 100%; margin-top: 14px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; overflow-x: hidden; }
   .points-product { min-width: 0; min-height: 220px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: linear-gradient(180deg, #141514, #0d0e0d); color: var(--text); padding: 0; overflow: hidden; text-align: left; }
   .points-product-art { position: relative; height: 116px; display: grid; place-items: center; background: radial-gradient(circle at 50% 55%, rgba(74,222,128,.45), rgba(74,222,128,.14) 42%, rgba(0,0,0,.1) 72%), linear-gradient(135deg, #0c160e, #111); color: #66ff95; font-size: 34px; font-weight: 950; overflow: hidden; }
   .points-product:nth-child(even) .points-product-art { background: radial-gradient(circle at 50% 50%, rgba(255,65,160,.34), rgba(20,20,20,.2) 46%, rgba(0,0,0,.05) 72%), linear-gradient(135deg, #151515, #0d0e0d); color: #ff4aa8; }
@@ -1198,6 +1198,9 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
   overscroll-behavior-y: none;
 }
 

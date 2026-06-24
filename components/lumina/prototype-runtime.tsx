@@ -1003,6 +1003,7 @@ function appendLegalLinks(host: HTMLDivElement) {
     "<p>Review Lumina's public legal documents for World Mini App review and user transparency.</p>",
     '<button class="legal-link-row" type="button" data-legal-kind="privacy">Privacy Policy <span aria-hidden="true">›</span></button>',
     '<button class="legal-link-row" type="button" data-legal-kind="terms">Terms of Service <span aria-hidden="true">›</span></button>',
+    '<button class="legal-link-row" type="button" data-legal-kind="alpha">Alpha Rules <span aria-hidden="true">›</span></button>',
   ].join("");
   aboutContent.appendChild(wrapper);
   wrapper.querySelectorAll<HTMLButtonElement>("[data-legal-kind]").forEach((button) => {
@@ -1022,7 +1023,24 @@ function escapeLegalText(value: string) {
 }
 
 function legalDocumentHtml(kind: LegalPageKind) {
-  const doc = legalContent[kind].en;
+  let doc = legalContent[kind].en;
+  if (kind === "alpha") {
+    try {
+      const cfg = JSON.parse(localStorage.getItem("ww_system_config") || "{}");
+      const rules = cfg.alphaRules || {};
+      const lang = (window as Window & { currentLang?: string }).currentLang || "en";
+      const title = (rules.legalTitleI18n && (rules.legalTitleI18n[lang] || rules.legalTitleI18n.en)) || doc.title;
+      const body = (rules.legalBodyI18n && (rules.legalBodyI18n[lang] || rules.legalBodyI18n.en)) || "";
+      const paragraphs = String(body || "").split(/\n+/).map((item) => item.trim()).filter(Boolean);
+      if (paragraphs.length) {
+        doc = {
+          ...doc,
+          title,
+          sections: [{ title: doc.subtitle, body: paragraphs }],
+        };
+      }
+    } catch (error) {}
+  }
   const sections = doc.sections
     .map(
       (section) =>
@@ -1033,7 +1051,7 @@ function legalDocumentHtml(kind: LegalPageKind) {
     .join("");
 
   return [
-    `<div class="lumina-legal-kicker">${kind === "privacy" ? "How Lumina handles your data" : "Rules for using Lumina"}</div>`,
+    `<div class="lumina-legal-kicker">${kind === "privacy" ? "How Lumina handles your data" : kind === "alpha" ? "Alpha scoring and mystery box rules" : "Rules for using Lumina"}</div>`,
     `<h2>${escapeLegalText(doc.title)}</h2>`,
     `<p class="lumina-legal-subtitle">${escapeLegalText(doc.subtitle)}</p>`,
     `<div class="lumina-legal-date">Effective date: ${escapeLegalText(doc.effectiveDate)}</div>`,
@@ -1065,7 +1083,7 @@ function installLegalSheet(host: HTMLDivElement) {
   window.__luminaCloseLegal = close;
   window.__luminaOpenLegal = (kind) => {
     if (!content) return;
-    content.innerHTML = legalDocumentHtml(kind === "terms" ? "terms" : "privacy");
+    content.innerHTML = legalDocumentHtml(kind === "terms" || kind === "alpha" ? kind : "privacy");
     sheet.classList.add("open");
     document.body.classList.add("lumina-legal-open");
   };
@@ -6030,7 +6048,7 @@ function enhancePrototypeMe() {
         return Math.max(0, Math.floor(Number(alphaProfile().score || 0)));
       }
       function alphaBoxCost(){
-        return Math.max(15, Math.floor(Number(alphaProfile().boxCost || 15)));
+        return Math.max(0, Math.floor(Number(alphaProfile().boxCost || 15)));
       }
       function alphaEligible(){
         var alpha = alphaProfile();
@@ -6049,7 +6067,7 @@ function enhancePrototypeMe() {
       function alphaCardHtml(){
         var alpha = alphaProfile();
         var score = alphaScore();
-        var min = Math.max(30, Math.floor(Number(alpha.minScoreToOpenBox || 30)));
+        var min = Math.max(1, Math.floor(Number(alpha.minScoreToOpenBox || 30)));
         var balance = Math.max(0, Math.floor(Number(alpha.balanceScore || 0)));
         var swap = Math.max(0, Math.floor(Number(alpha.swapScore || 0)));
         var pct = Math.max(0, Math.min(100, Math.round((score / Math.max(1, min)) * 100)));
@@ -6213,6 +6231,7 @@ function enhancePrototypeMe() {
           '<div class="me-group-label">' + c.legal + '</div><div class="me-group">' +
             row("privacy", c.privacy, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'privacy\\')") +
             row("terms", c.terms, "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'terms\\')") +
+            row("points", "Alpha Rules", "", "window.__luminaOpenLegal && window.__luminaOpenLegal(\\'alpha\\')") +
             row("version", c.version, "Lumina v1.0.0", "", "") +
           '</div>';
         ensureFeedbackModal();

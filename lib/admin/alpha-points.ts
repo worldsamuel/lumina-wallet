@@ -1,7 +1,8 @@
 import { isAddress, type Address } from "viem";
 import { getStoredActivitiesForAddress } from "@/lib/admin/activity-store";
-import { ALPHA_BALANCE_TIERS, ALPHA_BOX_COST, ALPHA_MIN_SCORE_TO_OPEN_BOX, ALPHA_RECENT_SWAP_DAYS, ALPHA_SWAP_DAILY_CAP_POINTS, ALPHA_SWAP_USD_PER_POINT, ALPHA_WINDOW_DAYS } from "@/lib/admin/alpha-config";
+import { DEFAULT_ALPHA_RULES, normalizeAlphaRules, type AlphaRulesConfig } from "@/lib/admin/alpha-config";
 import { addPointsAdjustment, getPointsAdjustments, getPointsAdjustmentTotal, type PointsAdjustmentConfig } from "@/lib/admin/points-products";
+import { getSystemConfig } from "@/lib/admin/system-config";
 import { fetchBalances } from "@/lib/balances";
 import { COINGECKO_IDS } from "@/lib/tokens/coingecko-ids";
 
@@ -106,8 +107,13 @@ function finitePrice(value: unknown) {
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
-function balanceTierPoints(portfolioUsd: number) {
-  const tier = ALPHA_BALANCE_TIERS.find((item) => portfolioUsd >= item.minUsd);
+async function loadAlphaRules() {
+  const config = await getSystemConfig().catch(() => null);
+  return normalizeAlphaRules(config?.alphaRules || DEFAULT_ALPHA_RULES);
+}
+
+function balanceTierPoints(portfolioUsd: number, rules: AlphaRulesConfig) {
+  const tier = rules.balanceTiers.find((item) => portfolioUsd >= item.minUsd);
   return tier ? tier.points : 0;
 }
 
@@ -119,6 +125,8 @@ async function estimatePortfolioUsd(address: string) {
   return balances.reduce((sum, item) => {
     const amount = Number(item.formatted || 0);
     const price = finitePrice(prices[String(item.symbol || "").toUpperCase()]);
+    const existingUsd = finitePrice(item.usdValue);
+    if (existingUsd > 0) return sum + existingUsd;
     if (!Number.isFinite(amount) || amount <= 0 || price <= 0) return sum;
     return sum + amount * price;
   }, 0);
@@ -138,11 +146,11 @@ function activityAmountUsd(activity: Awaited<ReturnType<typeof getStoredActiviti
   return match ? finitePrice(match[1]) : 0;
 }
 
-async function syncAlphaBalance(address: string) {
+async function syncAlphaBalance(address: string, rules: AlphaRulesConfig) {
   const dayKey = utc8DayKey();
   const key = alphaKey("balance", dayKey);
   const portfolioUsd = await estimatePortfolioUsd(address);
-  const points = balanceTierPoints(portfolioUsd);
+  const points = rules.enabled ? balanceTierPoints(portfolioUsd, rules) : 0;
   if (points <= 0) return { portfolioUsd, row: null };
   const latest = await getPointsAdjustments(address);
   const awarded = latest
@@ -161,7 +169,7 @@ async function syncAlphaBalance(address: string) {
   return { portfolioUsd, row };
 }
 
-async function syncAlphaSwap(address: string) {
+async function syncAlphaSwap(address: string, rules: AlphaRulesConfig) {
   const dayKey = utc8DayKey();
   const key = alphaKey("swap", dayKey);
   const todayStart = startOfUtc8Day(dayKey).getTime();
@@ -169,7 +177,10 @@ async function syncAlphaSwap(address: string) {
   const todayUsd = activities
     .filter((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= todayStart)
     .reduce((sum, item) => sum + activityAmountUsd(item), 0);
-  const points = Math.min(ALPHA_SWAP_DAILY_CAP_POINTS, Math.floor(todayUsd / ALPHA_SWAP_USD_PER_POINT));
+  const todaySwapCount = activities.filter((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= todayStart).length;
+  const volumePoints = rules.swapUsdPerPoint > 0 ? Math.floor(todayUsd / rules.swapUsdPerPoint) : 0;
+  const minPoints = todaySwapCount > 0 ? Math.max(0, Math.floor(Number(rules.swapMinPoints || 0))) : 0;
+  const points = rules.enabled ? Math.min(rules.swapDailyCapPoints, Math.max(volumePoints, minPoints)) : 0;
   if (points <= 0) return { todayUsd, row: null };
   const latest = await getPointsAdjustments(address);
   const awarded = latest
@@ -188,9 +199,9 @@ async function syncAlphaSwap(address: string) {
   return { todayUsd, row };
 }
 
-async function alphaBreakdown(address: string, portfolioUsd = 0, swapUsdToday = 0): Promise<AlphaBreakdown> {
-  const windowStart = daysAgoStart(ALPHA_WINDOW_DAYS).getTime();
-  const recentSwapStart = daysAgoStart(ALPHA_RECENT_SWAP_DAYS).getTime();
+async function alphaBreakdown(address: string, rules: AlphaRulesConfig, portfolioUsd = 0, swapUsdToday = 0): Promise<AlphaBreakdown> {
+  const windowStart = daysAgoStart(rules.windowDays).getTime();
+  const recentSwapStart = daysAgoStart(rules.recentSwapDays).getTime();
   const [adjustments, activities] = await Promise.all([
     getPointsAdjustments(address),
     getStoredActivitiesForAddress(address, 300).catch(() => []),
@@ -220,32 +231,36 @@ async function alphaBreakdown(address: string, portfolioUsd = 0, swapUsdToday = 
 export async function getAlphaPointsProfile(addressInput: string): Promise<AlphaPointsProfile> {
   const address = String(addressInput || "").toLowerCase();
   if (!isAddress(address)) throw new Error("Invalid wallet address.");
-  const balanceSync = await syncAlphaBalance(address);
-  const swapSync = await syncAlphaSwap(address);
-  const breakdown = await alphaBreakdown(address, balanceSync?.portfolioUsd ?? 0, swapSync?.todayUsd ?? 0);
+  const rules = await loadAlphaRules();
+  const balanceSync = await syncAlphaBalance(address, rules);
+  const swapSync = await syncAlphaSwap(address, rules);
+  const breakdown = await alphaBreakdown(address, rules, balanceSync?.portfolioUsd ?? 0, swapSync?.todayUsd ?? 0);
   const spendablePoints = await getPointsAdjustmentTotal(address);
   const score = Math.max(0, breakdown.balanceScore + breakdown.swapScore - breakdown.spentScore);
   return {
-    enabled: true,
+    enabled: rules.enabled,
     ...breakdown,
     score,
-    windowDays: ALPHA_WINDOW_DAYS,
-    minScoreToOpenBox: ALPHA_MIN_SCORE_TO_OPEN_BOX,
-    boxCost: ALPHA_BOX_COST,
-    recentSwapDays: ALPHA_RECENT_SWAP_DAYS,
-    eligibleForBox: score >= ALPHA_MIN_SCORE_TO_OPEN_BOX && breakdown.recentSwapOk,
+    windowDays: rules.windowDays,
+    minScoreToOpenBox: rules.minScoreToOpenBox,
+    boxCost: rules.boxCost,
+    recentSwapDays: rules.recentSwapDays,
+    eligibleForBox: rules.enabled && score >= rules.minScoreToOpenBox && breakdown.recentSwapOk,
     spendablePoints,
-    nextScoreNeeded: Math.max(0, ALPHA_MIN_SCORE_TO_OPEN_BOX - score),
+    nextScoreNeeded: Math.max(0, rules.minScoreToOpenBox - score),
   };
 }
 
 export async function assertAlphaBlindBoxEligibility(address: string) {
   const profile = await getAlphaPointsProfile(address);
-  if (profile.score < ALPHA_MIN_SCORE_TO_OPEN_BOX) {
-    throw new Error(`Alpha Score ${ALPHA_MIN_SCORE_TO_OPEN_BOX} required. Need ${profile.nextScoreNeeded} more.`);
+  if (!profile.enabled) {
+    throw new Error("Alpha Score is currently disabled.");
+  }
+  if (profile.score < profile.minScoreToOpenBox) {
+    throw new Error(`Alpha Score ${profile.minScoreToOpenBox} required. Need ${profile.nextScoreNeeded} more.`);
   }
   if (!profile.recentSwapOk) {
-    throw new Error(`Complete one swap in the last ${ALPHA_RECENT_SWAP_DAYS} days to open a mystery box.`);
+    throw new Error(`Complete one swap in the last ${profile.recentSwapDays} days to open a mystery box.`);
   }
   return profile;
 }
@@ -259,12 +274,12 @@ export async function spendAlphaBlindBoxPoints(input: { address: string; orderId
   const existing = await getPointsAdjustments(address);
   const spent = existing.find((row) => row.createdBy === uniqueKey);
   if (spent) return { row: spent, points: Math.abs(spent.points), skipped: true };
-  await assertAlphaBlindBoxEligibility(address);
+  const profile = await assertAlphaBlindBoxEligibility(address);
   const row = await addPointsAdjustment({
     address,
-    points: -ALPHA_BOX_COST,
+    points: -profile.boxCost,
     note: `Open Alpha box${input.productTitle ? `: ${input.productTitle}` : ""}`,
     createdBy: uniqueKey,
   });
-  return { row, points: ALPHA_BOX_COST, skipped: false };
+  return { row, points: profile.boxCost, skipped: false };
 }

@@ -1,16 +1,10 @@
-import { requireAdmin } from "@/lib/api/admin-auth";
+import { NextRequest } from "next/server";
+import { auditLog, requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { getStoredActivities } from "@/lib/admin/activity-store";
-import {
-  ALPHA_BALANCE_TIERS,
-  ALPHA_BOX_COST,
-  ALPHA_MIN_SCORE_TO_OPEN_BOX,
-  ALPHA_RECENT_SWAP_DAYS,
-  ALPHA_SWAP_DAILY_CAP_POINTS,
-  ALPHA_SWAP_USD_PER_POINT,
-  ALPHA_WINDOW_DAYS,
-} from "@/lib/admin/alpha-config";
+import { normalizeAlphaRules } from "@/lib/admin/alpha-config";
 import { getAllPointsOrders, getPointsAdjustments } from "@/lib/admin/points-products";
+import { getSystemConfig, updateSystemConfig } from "@/lib/admin/system-config";
 import { db } from "@/lib/db";
 
 export function OPTIONS() {
@@ -54,6 +48,8 @@ function isAlpha(kind: "balance" | "swap" | null, createdBy?: string | null) {
 export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  const systemConfig = await getSystemConfig();
+  const alphaRules = normalizeAlphaRules(systemConfig.alphaRules);
 
   const [users, adjustments, orders, activities] = await Promise.all([
     db.user.findMany({
@@ -66,8 +62,8 @@ export async function GET() {
     getStoredActivities(500),
   ]);
 
-  const windowStart = startOfRollingWindow(ALPHA_WINDOW_DAYS);
-  const recentSwapStart = startOfRollingWindow(ALPHA_RECENT_SWAP_DAYS);
+  const windowStart = startOfRollingWindow(alphaRules.windowDays);
+  const recentSwapStart = startOfRollingWindow(alphaRules.recentSwapDays);
   const byAddress = new Map<string, AlphaRow>();
 
   function ensure(addressInput: string) {
@@ -138,19 +134,13 @@ export async function GET() {
 
   const rows = Array.from(byAddress.values())
     .sort((a, b) => b.score - a.score || rowTime(b.lastActivityAt) - rowTime(a.lastActivityAt));
-  const eligible = rows.filter((row) => row.score >= ALPHA_MIN_SCORE_TO_OPEN_BOX && row.recentSwapOk).length;
+  const eligible = rows.filter((row) => row.score >= alphaRules.minScoreToOpenBox && row.recentSwapOk).length;
   const active = rows.filter((row) => row.score > 0).length;
   const totalScore = rows.reduce((sum, row) => sum + row.score, 0);
 
   return jsonResponse({
     config: {
-      windowDays: ALPHA_WINDOW_DAYS,
-      minScoreToOpenBox: ALPHA_MIN_SCORE_TO_OPEN_BOX,
-      boxCost: ALPHA_BOX_COST,
-      recentSwapDays: ALPHA_RECENT_SWAP_DAYS,
-      swapUsdPerPoint: ALPHA_SWAP_USD_PER_POINT,
-      swapDailyCapPoints: ALPHA_SWAP_DAILY_CAP_POINTS,
-      balanceTiers: ALPHA_BALANCE_TIERS,
+      ...alphaRules,
     },
     stats: {
       users: rows.length,
@@ -167,4 +157,17 @@ export async function GET() {
       .sort((a, b) => rowTime(b.createdAt) - rowTime(a.createdAt))
       .slice(0, 120),
   });
+}
+
+export async function PATCH(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+
+  const body = (await req.json().catch(() => ({}))) as { alphaRules?: unknown };
+  if (!body || typeof body.alphaRules !== "object" || body.alphaRules === null) {
+    return jsonResponse({ error: "Invalid Alpha rules." }, { status: 400 });
+  }
+  const config = await updateSystemConfig({ alphaRules: body.alphaRules });
+  await auditLog(admin.id, "update_alpha_rules", "system_config", body.alphaRules);
+  return jsonResponse({ config: normalizeAlphaRules(config.alphaRules) });
 }

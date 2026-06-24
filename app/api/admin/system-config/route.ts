@@ -28,6 +28,7 @@ export async function PATCH(req: NextRequest) {
     welcomeBox?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
+    alphaRules?: unknown;
     socialLinks?: {
       x?: unknown;
       telegram?: unknown;
@@ -51,6 +52,7 @@ export async function PATCH(req: NextRequest) {
     pointsHomeBanner: typeof body.pointsHomeBanner === "object" && body.pointsHomeBanner !== null ? body.pointsHomeBanner : undefined,
     pointsRules: typeof body.pointsRules === "object" && body.pointsRules !== null ? body.pointsRules : undefined,
     pointsTasks: Array.isArray(body.pointsTasks) ? body.pointsTasks : undefined,
+    alphaRules: typeof body.alphaRules === "object" && body.alphaRules !== null ? body.alphaRules : undefined,
     socialLinks: typeof body.socialLinks === "object" && body.socialLinks !== null ? body.socialLinks : undefined,
   });
   await auditLog(admin.id, "update_system_config", "system_config", body);

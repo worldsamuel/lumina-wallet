@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { DEFAULT_ALPHA_RULES, normalizeAlphaRules, type AlphaRulesConfig } from "@/lib/admin/alpha-config";
 
 export type SystemConfig = {
   maintenance: boolean;
@@ -21,6 +22,7 @@ export type SystemConfig = {
   };
   pointsRules: PointsRulesConfig;
   pointsTasks: PointsTaskConfig[];
+  alphaRules: AlphaRulesConfig;
   socialLinks: {
     x: SocialLinkConfig;
     telegram: SocialLinkConfig;
@@ -73,12 +75,13 @@ export type SocialLinkConfig = {
   logoUrl: string | null;
 };
 
-type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsHomeBanner" | "pointsRules" | "pointsTasks">> & {
+type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsHomeBanner" | "pointsRules" | "pointsTasks" | "alphaRules">> & {
   socialLinks?: unknown;
   welcomeBox?: unknown;
   pointsHomeBanner?: unknown;
   pointsRules?: unknown;
   pointsTasks?: unknown;
+  alphaRules?: unknown;
 };
 
 export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
@@ -220,6 +223,7 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       sortOrder: 9,
     },
   ],
+  alphaRules: DEFAULT_ALPHA_RULES,
   socialLinks: {
     x: { url: null, logoUrl: null },
     telegram: { url: null, logoUrl: null },
@@ -252,6 +256,7 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
     welcomeBox: normalizeWelcomeBox(source.welcomeBox),
     pointsRules: normalizePointsRules(source.pointsRules),
     pointsTasks: normalizePointsTasks(source.pointsTasks),
+    alphaRules: normalizeAlphaRules(source.alphaRules),
     socialLinks: normalizeSocialLinks(source.socialLinks),
   };
 }
@@ -481,6 +486,7 @@ function mergeSystemConfigPatch(
     pointsHomeBanner?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
+    alphaRules?: unknown;
   };
   const next: Partial<SystemConfig> = { ...cleaned };
 
@@ -498,6 +504,10 @@ function mergeSystemConfigPatch(
 
   if (Array.isArray(cleaned.pointsTasks)) {
     next.pointsTasks = cleaned.pointsTasks as PointsTaskConfig[];
+  }
+
+  if (isRecord(cleaned.alphaRules)) {
+    next.alphaRules = { ...current.alphaRules, ...cleanUndefinedFields(cleaned.alphaRules) };
   }
 
   if (isRecord(cleaned.socialLinks)) {
