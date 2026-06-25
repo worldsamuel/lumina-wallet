@@ -282,11 +282,11 @@ function publicAssetUrl(productId: string, field: "imageUrl" | "detailImageUrl" 
   return `/api/points-products/image/${encodeURIComponent(productId)}?field=${field}`;
 }
 
-function toPublicProduct(product: PointsProductConfig): PointsProductConfig {
+function toPublicProduct(product: PointsProductConfig, issuedCount = 0): PointsProductConfig {
   return {
     ...product,
     points: effectiveProductCost(product),
-    stock: effectiveProductStock(product),
+    stock: effectiveProductStock(product, issuedCount),
     imageUrl: publicAssetUrl(product.id, "imageUrl", product.imageUrl),
     detailImageUrl: publicAssetUrl(product.id, "detailImageUrl", product.detailImageUrl),
     iconUrl: publicAssetUrl(product.id, "iconUrl", product.iconUrl),
@@ -297,9 +297,16 @@ function effectiveProductCost(product: PointsProductConfig) {
   return product.alphaRequired === true ? ALPHA_BOX_COST : Math.max(0, Math.floor(Number(product.points || 0)));
 }
 
-function effectiveProductStock(product: PointsProductConfig) {
-  if (product.alphaRequired === true) return Math.max(ALPHA_BOX_DEFAULT_STOCK, Math.floor(Number(product.stock || 0)));
+function effectiveProductStock(product: PointsProductConfig, issuedCount = 0) {
+  if (product.alphaRequired === true) {
+    const configuredStock = Math.max(0, Math.floor(Number(product.stock || ALPHA_BOX_DEFAULT_STOCK)));
+    return Math.max(0, configuredStock - Math.max(0, Math.floor(Number(issuedCount || 0))));
+  }
   return Math.max(0, Math.floor(Number(product.stock || 0)));
+}
+
+function issuedOrderCount(orders: PointsOrderConfig[], productId: string) {
+  return orders.filter((order) => order.productId === productId && order.type === "blind_box").length;
 }
 
 async function writeStoredProducts(products: PointsProductConfig[]) {
@@ -406,11 +413,22 @@ export function isAlphaPointsAdjustment(row: Pick<PointsAdjustmentConfig, "creat
 }
 
 export async function getPointsProducts() {
-  return readStoredProducts();
+  const [products, orders] = await Promise.all([readStoredProducts(), readStoredOrders()]);
+  return products.map((product) => {
+    if (product.alphaRequired !== true) return product;
+    return {
+      ...product,
+      points: effectiveProductCost(product),
+      stock: effectiveProductStock(product, issuedOrderCount(orders, product.id)),
+    };
+  });
 }
 
 export async function getPublicPointsProducts() {
-  return (await readStoredPublicProducts()).filter((product) => product.enabled).map(toPublicProduct);
+  const [products, orders] = await Promise.all([readStoredProducts(), readStoredOrders()]);
+  return products
+    .filter((product) => product.enabled)
+    .map((product) => toPublicProduct(product, product.alphaRequired === true ? issuedOrderCount(orders, product.id) : 0));
 }
 
 export async function getPointsOrders(address: string) {
@@ -541,10 +559,10 @@ export async function purchasePointsProduct(input: { address: string; productId:
   const clientOrderId = normalizeClientOrderId(input.clientOrderId);
   if (clientOrderId) {
     const existing = orders.find((order) => order.id === clientOrderId && order.address === address && order.productId === product.id);
-    if (existing) return { order: existing, product: toPublicProduct(product) };
+    if (existing) return { order: existing, product: toPublicProduct(product, product.alphaRequired === true ? issuedOrderCount(orders, product.id) : 0) };
   }
   const productCost = effectiveProductCost(product);
-  const productStock = effectiveProductStock(product);
+  const productStock = effectiveProductStock(product, product.alphaRequired === true ? issuedOrderCount(orders, product.id) : 0);
   if (productStock <= 0) throw new Error("Product sold out.");
   const availablePoints = await getPointsAdjustmentTotal(address);
   if (!input.skipPointDebit && availablePoints < productCost) throw new Error("Not enough Lumina Points.");
@@ -569,14 +587,16 @@ export async function purchasePointsProduct(input: { address: string; productId:
   if (clientOrderId) {
     latestOrders = await readStoredOrders();
     const latestExisting = latestOrders.find((item) => item.id === clientOrderId && item.address === address && item.productId === product.id);
-    if (latestExisting) return { order: latestExisting, product: toPublicProduct(product) };
+    if (latestExisting) return { order: latestExisting, product: toPublicProduct(product, product.alphaRequired === true ? issuedOrderCount(latestOrders, product.id) : 0) };
     if (limit > 0) {
       const latestPurchased = latestOrders.filter((order) => order.address === address && order.productId === product.id).length;
       if (latestPurchased >= limit) throw new Error("Purchase limit reached.");
     }
   }
   latestOrders = [order, ...latestOrders.filter((item) => item.id !== order.id)];
-  products[productIndex] = { ...product, points: productCost, stock: Math.max(0, productStock - 1) };
+  products[productIndex] = product.alphaRequired === true
+    ? { ...product, points: productCost }
+    : { ...product, points: productCost, stock: Math.max(0, productStock - 1) };
   await Promise.all([
     writeStoredOrders(latestOrders),
     writeStoredPublicProducts(products),
@@ -589,7 +609,7 @@ export async function purchasePointsProduct(input: { address: string; productId:
       createdBy: `points-purchase:${order.id}`,
     });
   }
-  return { order, product: toPublicProduct(products[productIndex]) };
+  return { order, product: toPublicProduct(products[productIndex], product.alphaRequired === true ? issuedOrderCount(latestOrders, product.id) : 0) };
 }
 
 export async function airdropBlindBox(input: { address: string; productId: string; note?: string | null; createdBy?: string | null }) {
@@ -597,7 +617,8 @@ export async function airdropBlindBox(input: { address: string; productId: strin
   if (!/^0x[a-f0-9]{40}$/.test(address)) throw new Error("Invalid wallet address.");
   const product = (await readStoredPublicProducts()).find((item) => item.id === input.productId && item.type === "blind_box" && item.enabled);
   if (!product) throw new Error("Blind box unavailable.");
-  if (effectiveProductStock(product) <= 0) throw new Error("Blind box sold out.");
+  const orders = await readStoredOrders();
+  if (effectiveProductStock(product, product.alphaRequired === true ? issuedOrderCount(orders, product.id) : 0) <= 0) throw new Error("Blind box sold out.");
   const order: PointsOrderConfig = {
     id: `airdrop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     address,
@@ -612,18 +633,17 @@ export async function airdropBlindBox(input: { address: string; productId: strin
     createdAt: new Date().toISOString(),
     openedAt: null,
   };
-  const orders = await readStoredOrders();
   orders.unshift(order);
   const products = await readStoredPublicProducts();
   const index = products.findIndex((item) => item.id === product.id);
-  if (index >= 0) {
+  if (index >= 0 && products[index].alphaRequired !== true) {
     products[index] = { ...products[index], stock: Math.max(0, effectiveProductStock(products[index]) - 1) };
   }
   await Promise.all([
     index >= 0 ? writeStoredPublicProducts(products) : Promise.resolve(products),
     writeStoredOrders(orders),
   ]);
-  return { order, product: toPublicProduct(product) };
+  return { order, product: toPublicProduct(product, product.alphaRequired === true ? issuedOrderCount(orders, product.id) : 0) };
 }
 
 export async function openBlindBoxOrder(input: { address: string; productId: string; availablePoints?: number; clientOrderId?: string | null; allowPurchase?: boolean; skipPointDebit?: boolean }) {
