@@ -7822,6 +7822,18 @@ function enhancePrototypeDetail() {
         try { return formatMoney(value || 0); } catch(e) { return "$" + Number(value || 0).toFixed(2); }
       }
 
+      function formatDetailBalance(asset) {
+        var symbol = String(asset && asset.sym || "");
+        var raw = String(asset && asset.amt || "0").replace(symbol, "").replace(/,/g, "").trim();
+        var amount = Number(raw);
+        if (!Number.isFinite(amount)) amount = 0;
+        return amount.toLocaleString("en-US", {
+          useGrouping: false,
+          minimumFractionDigits: 3,
+          maximumFractionDigits: 3
+        }) + " " + symbol;
+      }
+
       function updateDetailContent(asset) {
         ensureDetailShell();
         if (window.__luminaDetailPriceTimer) {
@@ -7833,7 +7845,7 @@ function enhancePrototypeDetail() {
         coin.className = "detail-v2-token-icon coin " + (asset.cls || "custom");
         document.getElementById("detTitle").textContent = asset.sym;
         document.getElementById("detName").textContent = asset.full || asset.sym;
-        document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
+        document.getElementById("detAmt").textContent = formatDetailBalance(asset);
         updateDetailFiat(asset);
         refreshDetailMarketPrice(asset);
         var pill = document.getElementById("detChangePill");
@@ -7864,14 +7876,14 @@ function enhancePrototypeDetail() {
           go("detail"); setTabByName(detailReturnTab(window.__luminaDetailReturnView));
           try {
             updateDetailContent(asset);
-            renderRange("1D");
+            renderRange("1H");
             updateExplorer();
           } catch(e) {
             try {
               ensureDetailShell();
               document.getElementById("detTitle").textContent = asset.sym;
               document.getElementById("detName").textContent = asset.full || asset.sym;
-              document.getElementById("detAmt").textContent = asset.amt || ("0 " + asset.sym);
+              document.getElementById("detAmt").textContent = formatDetailBalance(asset);
               document.getElementById("detUsd").textContent = "≈ " + formatFiat(asset.usdNum || 0);
               var chart = document.getElementById("detChart");
               if (chart) chart.innerHTML = '<div class="market-detail-state">' + detailCopy("noData") + '</div>';

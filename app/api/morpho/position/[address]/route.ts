@@ -29,6 +29,20 @@ const NO_STORE_HEADERS = {
   Pragma: "no-cache",
   Expires: "0",
 };
+const POSITION_CACHE_TTL_MS = 2_000;
+const POSITION_STALE_TTL_MS = 10 * 60_000;
+type PositionResponse = {
+  address: string;
+  positions: Array<Record<string, unknown>>;
+  updatedAt: string;
+  stale?: boolean;
+  warning?: string;
+};
+const positionCache = new Map<string, {
+  expiresAt: number;
+  staleUntil: number;
+  data: PositionResponse;
+}>();
 
 export function OPTIONS() {
   return optionsResponse();
@@ -46,70 +60,53 @@ export async function GET(
   if (!isAddress(userAddress)) {
     return jsonResponse({ error: "Invalid wallet address." }, { status: 400, headers: NO_STORE_HEADERS });
   }
+  const cacheKey = userAddress.toLowerCase();
+  const cached = positionCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return jsonResponse(cached.data, { headers: NO_STORE_HEADERS });
+  }
 
   try {
     const vaults = await getEnabledEarnVaults();
-    const contracts = vaults.flatMap((vault) => [
-      {
-        address: vault.address as Address,
-        abi: METAMORPHO_ABI,
-        functionName: "balanceOf",
-        args: [userAddress as Address],
-      },
-      {
-        address: vault.address as Address,
-        abi: METAMORPHO_ABI,
-        functionName: "maxWithdraw",
-        args: [userAddress as Address],
-      },
-      {
-        address: vault.asset.address as Address,
-        abi: ERC20_APPROVE_ABI,
-        functionName: "balanceOf",
-        args: [userAddress as Address],
-      },
-    ]);
-
-    const baseResults = await readWorldChainWithFallback((client) =>
-      client.multicall({ allowFailure: true, contracts }),
-    );
-    const vaultMetaContracts = vaults.flatMap((vault) => [
-      {
-        address: vault.address as Address,
-        abi: vaultMetaAbi,
-        functionName: "decimals",
-      },
-      {
-        address: vault.address as Address,
-        abi: vaultMetaAbi,
-        functionName: "symbol",
-      },
-    ]);
-    const assetContracts = vaults.map((vault, index) => {
-      const shares = resultBigInt(baseResults[index * 3], "vault shares");
-      return {
-        address: vault.address as Address,
-        abi: METAMORPHO_ABI,
-        functionName: "convertToAssets",
-        args: [shares],
-      };
-    });
-    const [assetResults, vaultMetaResults] = await Promise.all([
-      readWorldChainWithFallback((client) =>
-        client.multicall({ allowFailure: true, contracts: assetContracts }),
-      ),
-      readWorldChainWithFallback((client) =>
-        client.multicall({ allowFailure: true, contracts: vaultMetaContracts }),
-      ),
-    ]);
-
-    const positions = vaults.map((vault, index) => {
-      const shares = resultBigInt(baseResults[index * 3], "vault shares");
-      const maxWithdraw = resultBigInt(baseResults[index * 3 + 1], "max withdraw");
-      const walletBalance = resultBigInt(baseResults[index * 3 + 2], "wallet balance");
-      const assets = resultBigInt(assetResults[index], "vault assets");
-      const vaultDecimals = resultNumber(vaultMetaResults[index * 2], "vault decimals", 18);
-      const vaultSymbol = resultString(vaultMetaResults[index * 2 + 1], "vault symbol", `RE7${vault.asset.symbol}`);
+    const positions = await Promise.all(vaults.map(async (vault) => {
+      const [shares, maxWithdraw, walletBalance, vaultDecimals, vaultSymbol] = await Promise.all([
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address as Address,
+          abi: METAMORPHO_ABI,
+          functionName: "balanceOf",
+          args: [userAddress as Address],
+        })),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address as Address,
+          abi: METAMORPHO_ABI,
+          functionName: "maxWithdraw",
+          args: [userAddress as Address],
+        })),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.asset.address as Address,
+          abi: ERC20_APPROVE_ABI,
+          functionName: "balanceOf",
+          args: [userAddress as Address],
+        })),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address as Address,
+          abi: vaultMetaAbi,
+          functionName: "decimals",
+        })).then(Number).catch(() => 18),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address as Address,
+          abi: vaultMetaAbi,
+          functionName: "symbol",
+        })).then((value) => String(value).trim().slice(0, 24)).catch(() => `RE7${vault.asset.symbol}`),
+      ]);
+      const assets = shares > 0n
+        ? await readWorldChainWithFallback((client) => client.readContract({
+            address: vault.address as Address,
+            abi: METAMORPHO_ABI,
+            functionName: "convertToAssets",
+            args: [shares],
+          }))
+        : 0n;
       return {
         vaultAddress: vault.address,
         displayName: vault.displayName,
@@ -125,45 +122,27 @@ export async function GET(
         walletBalance: walletBalance.toString(),
         walletBalanceFormatted: formatUnits(walletBalance, vault.asset.decimals),
       };
-    });
+    }));
 
-    return jsonResponse({ address: userAddress, positions, updatedAt: new Date().toISOString() }, { headers: NO_STORE_HEADERS });
+    const data: PositionResponse = { address: userAddress, positions, updatedAt: new Date().toISOString() };
+    positionCache.set(cacheKey, {
+      data,
+      expiresAt: Date.now() + POSITION_CACHE_TTL_MS,
+      staleUntil: Date.now() + POSITION_STALE_TTL_MS,
+    });
+    return jsonResponse(data, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("Failed to read Morpho positions", error);
+    if (cached && cached.staleUntil > Date.now()) {
+      return jsonResponse(
+        {
+          ...cached.data,
+          stale: true,
+          warning: "Using the last successful on-chain Earn position snapshot.",
+        },
+        { headers: NO_STORE_HEADERS },
+      );
+    }
     return jsonResponse({ error: "Unable to read Morpho positions." }, { status: 502, headers: NO_STORE_HEADERS });
   }
-}
-
-function resultBigInt(
-  result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined,
-  label: string,
-) {
-  if (result?.status === "success" && typeof result.result === "bigint") return result.result;
-  console.warn(`[morpho] Unable to read ${label}; using 0`);
-  return 0n;
-}
-
-function resultNumber(
-  result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined,
-  label: string,
-  fallback: number,
-) {
-  if (result?.status === "success") {
-    const value = Number(result.result);
-    if (Number.isFinite(value)) return value;
-  }
-  console.warn(`[morpho] Unable to read ${label}; using ${fallback}`);
-  return fallback;
-}
-
-function resultString(
-  result: { status: "success"; result: unknown } | { status: "failure"; error: Error } | undefined,
-  label: string,
-  fallback: string,
-) {
-  if (result?.status === "success" && typeof result.result === "string" && result.result.trim()) {
-    return result.result.trim().slice(0, 24);
-  }
-  console.warn(`[morpho] Unable to read ${label}; using ${fallback}`);
-  return fallback;
 }

@@ -556,7 +556,7 @@
   .detail-v2-tools { display: flex; justify-content: flex-end; align-items: center; gap: 12px; color: #8f958f; }
   .detail-v2-tools button { width: 30px; height: 34px; display: grid; place-items: center; border: none; background: transparent; color: inherit; cursor: pointer; }
   .detail-v2-hero { text-align: center; padding: 28px 0 22px; }
-  .detail-v2-amount { font-size: clamp(28px, 7.8vw, 38px); line-height: 1; font-weight: 900; letter-spacing: 0; white-space: nowrap; }
+  .detail-v2-amount { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: clamp(28px, 7.8vw, 38px); line-height: 1; font-weight: 900; letter-spacing: 0; white-space: nowrap; }
   .detail-v2-fiat { margin-top: 12px; color: #8d938d; font-size: 16px; font-weight: 750; }
   .detail-v2-change { margin-top: 16px; display: flex; justify-content: center; align-items: center; gap: 10px; color: #8d938d; font-size: 15px; font-weight: 800; flex-wrap: wrap; }
   .detail-v2-change span { display: inline-flex; align-items: center; gap: 6px; min-height: 31px; padding: 0 11px; border-radius: 10px; font-size: 16px; font-weight: 900; }
