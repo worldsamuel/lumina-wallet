@@ -295,15 +295,15 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         },
         {
           title: "Balance Score",
-          body: ["Balance score is based on your wallet's estimated USD asset value and the active Alpha balance tiers configured by Lumina."],
+          body: ["Balance score is based on your wallet's estimated USD asset value and the active Alpha balance tiers configured by Lumina. Balance score is only effective when the user also has qualifying swap score."],
         },
         {
           title: "Swap Score",
-          body: ["Swap score is based on eligible completed swap volume. A completed small swap may receive the configured minimum swap score and remains subject to the daily cap."],
+          body: ["Swap score is based on eligible completed swap volume. A completed small swap may receive the configured minimum swap score and remains subject to the daily cap. Swap score is only effective when the user also has qualifying balance score."],
         },
         {
           title: "Alpha Mystery Boxes",
-          body: ["Opening an Alpha token mystery box requires the configured minimum Alpha Score and a recent swap. Opening a box deducts the configured Alpha box cost."],
+          body: ["Opening an Alpha token mystery box requires both balance score and swap score to be positive, the configured minimum Alpha Score, and a recent swap. Opening a box deducts the configured Alpha box cost."],
         },
       ],
     },
@@ -319,15 +319,15 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         },
         {
           title: "余额加分",
-          body: ["余额分根据钱包资产的预估美元价值和 Lumina 后台配置的 Alpha 余额档位计算。"],
+          body: ["余额分根据钱包资产的预估美元价值和 Lumina 后台配置的 Alpha 余额档位计算。余额分必须与有效 Swap 分同时达标后才计入有效 Alpha Score。"],
         },
         {
           title: "Swap 加分",
-          body: ["Swap 分根据有效完成的兑换交易量计算。小额已完成 Swap 可获得后台配置的保底分，并受每日上限限制。"],
+          body: ["Swap 分根据有效完成的兑换交易量计算。小额已完成 Swap 可获得后台配置的保底分，并受每日上限限制。Swap 分必须与有效余额分同时达标后才计入有效 Alpha Score。"],
         },
         {
           title: "Alpha 代币盲盒",
-          body: ["打开 Alpha 代币盲盒需要达到后台配置的最低 Alpha Score，并满足近期 Swap 条件；开盒后扣除后台配置的 Alpha 分。"],
+          body: ["打开 Alpha 代币盲盒需要余额分和 Swap 分都大于 0，达到后台配置的最低 Alpha Score，并满足近期 Swap 条件；开盒后扣除后台配置的 Alpha 分。"],
         },
       ],
     },

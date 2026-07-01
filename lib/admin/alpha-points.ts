@@ -146,11 +146,25 @@ function activityAmountUsd(activity: Awaited<ReturnType<typeof getStoredActiviti
   return match ? finitePrice(match[1]) : 0;
 }
 
+async function todaySwapStats(address: string, rules: AlphaRulesConfig) {
+  const dayKey = utc8DayKey();
+  const todayStart = startOfUtc8Day(dayKey).getTime();
+  const activities = await getStoredActivitiesForAddress(address, 300).catch(() => []);
+  const swaps = activities.filter((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= todayStart);
+  const todayUsd = swaps.reduce((sum, item) => sum + activityAmountUsd(item), 0);
+  const volumePoints = rules.swapUsdPerPoint > 0 ? Math.floor(todayUsd / rules.swapUsdPerPoint) : 0;
+  const minPoints = swaps.length > 0 ? Math.max(0, Math.floor(Number(rules.swapMinPoints || 0))) : 0;
+  const points = rules.enabled ? Math.min(rules.swapDailyCapPoints, Math.max(volumePoints, minPoints)) : 0;
+  return { todayUsd, count: swaps.length, points };
+}
+
 async function syncAlphaBalance(address: string, rules: AlphaRulesConfig) {
   const dayKey = utc8DayKey();
   const key = alphaKey("balance", dayKey);
   const portfolioUsd = await estimatePortfolioUsd(address);
   const points = rules.enabled ? balanceTierPoints(portfolioUsd, rules) : 0;
+  const swapStats = points > 0 ? await todaySwapStats(address, rules) : { points: 0 };
+  if (swapStats.points <= 0) return { portfolioUsd, row: null };
   if (points <= 0) return { portfolioUsd, row: null };
   const latest = await getPointsAdjustments(address);
   const awarded = latest
@@ -172,31 +186,32 @@ async function syncAlphaBalance(address: string, rules: AlphaRulesConfig) {
 async function syncAlphaSwap(address: string, rules: AlphaRulesConfig) {
   const dayKey = utc8DayKey();
   const key = alphaKey("swap", dayKey);
-  const todayStart = startOfUtc8Day(dayKey).getTime();
-  const activities = await getStoredActivitiesForAddress(address, 300).catch(() => []);
-  const todayUsd = activities
-    .filter((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= todayStart)
-    .reduce((sum, item) => sum + activityAmountUsd(item), 0);
-  const todaySwapCount = activities.filter((item) => String(item.type || "").toLowerCase() === "swap" && activityTime(item.createdAt) >= todayStart).length;
-  const volumePoints = rules.swapUsdPerPoint > 0 ? Math.floor(todayUsd / rules.swapUsdPerPoint) : 0;
-  const minPoints = todaySwapCount > 0 ? Math.max(0, Math.floor(Number(rules.swapMinPoints || 0))) : 0;
-  const points = rules.enabled ? Math.min(rules.swapDailyCapPoints, Math.max(volumePoints, minPoints)) : 0;
-  if (points <= 0) return { todayUsd, row: null };
+  const [swapStats, portfolioUsd] = await Promise.all([
+    todaySwapStats(address, rules),
+    estimatePortfolioUsd(address),
+  ]);
+  const points = swapStats.points;
+  if (points <= 0 || balanceTierPoints(portfolioUsd, rules) <= 0) return { todayUsd: swapStats.todayUsd, row: null };
   const latest = await getPointsAdjustments(address);
   const awarded = latest
     .filter((row) => String(row.createdBy || "").startsWith(key))
     .reduce((sum, row) => sum + positivePoints(row), 0);
   const delta = points - awarded;
-  if (delta <= 0) return { todayUsd, row: null };
+  if (delta <= 0) return { todayUsd: swapStats.todayUsd, row: null };
   const deltaKey = `${key}:${points}`;
-  if (latest.some((row) => row.createdBy === deltaKey)) return { todayUsd, row: null };
+  if (latest.some((row) => row.createdBy === deltaKey)) return { todayUsd: swapStats.todayUsd, row: null };
   const row = await addPointsAdjustment({
     address,
     points: delta,
-    note: `Alpha swap score ($${todayUsd.toFixed(2)})`,
+    note: `Alpha swap score ($${swapStats.todayUsd.toFixed(2)})`,
     createdBy: deltaKey,
   });
-  return { todayUsd, row };
+  return { todayUsd: swapStats.todayUsd, row };
+}
+
+function effectiveAlphaScore(breakdown: Pick<AlphaBreakdown, "balanceScore" | "swapScore" | "spentScore">) {
+  if (breakdown.balanceScore <= 0 || breakdown.swapScore <= 0) return 0;
+  return Math.max(0, breakdown.balanceScore + breakdown.swapScore - breakdown.spentScore);
 }
 
 async function alphaBreakdown(address: string, rules: AlphaRulesConfig, portfolioUsd = 0, swapUsdToday = 0): Promise<AlphaBreakdown> {
@@ -236,7 +251,7 @@ export async function getAlphaPointsProfile(addressInput: string): Promise<Alpha
   const swapSync = await syncAlphaSwap(address, rules);
   const breakdown = await alphaBreakdown(address, rules, balanceSync?.portfolioUsd ?? 0, swapSync?.todayUsd ?? 0);
   const spendablePoints = await getPointsAdjustmentTotal(address);
-  const score = Math.max(0, breakdown.balanceScore + breakdown.swapScore - breakdown.spentScore);
+  const score = effectiveAlphaScore(breakdown);
   return {
     enabled: rules.enabled,
     ...breakdown,
@@ -245,7 +260,7 @@ export async function getAlphaPointsProfile(addressInput: string): Promise<Alpha
     minScoreToOpenBox: rules.minScoreToOpenBox,
     boxCost: rules.boxCost,
     recentSwapDays: rules.recentSwapDays,
-    eligibleForBox: rules.enabled && score >= rules.minScoreToOpenBox && breakdown.recentSwapOk,
+    eligibleForBox: rules.enabled && breakdown.balanceScore > 0 && breakdown.swapScore > 0 && score >= rules.minScoreToOpenBox && breakdown.recentSwapOk,
     spendablePoints,
     nextScoreNeeded: Math.max(0, rules.minScoreToOpenBox - score),
   };

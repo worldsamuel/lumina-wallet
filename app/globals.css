@@ -1047,6 +1047,8 @@
   .points-mini-sheet > div { position: relative; width: min(390px, 100%); max-height: 72vh; overflow: auto; padding: 22px; border: 1px solid rgba(255,255,255,.1); border-radius: 26px; background: linear-gradient(180deg, #151715, #070807); box-shadow: 0 -20px 60px rgba(0,0,0,.5); }
   .points-mini-sheet h3 { margin: 2px 42px 16px 0; color: #fff; font-size: 24px; line-height: 1.1; }
   .points-ledger-row, .coupon-row { min-height: 62px; display: flex; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(255,255,255,.07); }
+  .coupon-section { margin-top: 12px; }
+  .coupon-section h4 { margin: 0; padding: 10px 0 2px; color: #fff; font-size: 13px; font-weight: 900; }
   .points-ledger-row span { flex: 1; min-width: 0; }
   .points-ledger-row b, .coupon-row b { display: block; color: #fff; font-size: 14px; line-height: 1.25; }
   .points-ledger-row small, .coupon-row small { display: block; margin-top: 4px; color: #8e958e; font-size: 12px; line-height: 1.2; }

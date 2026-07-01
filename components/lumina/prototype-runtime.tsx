@@ -6059,6 +6059,9 @@ function enhancePrototypeMe() {
       }
       function alphaNeedText(){
         var alpha = alphaProfile();
+        if (Number(alpha.balanceScore || 0) <= 0 && Number(alpha.swapScore || 0) <= 0) return "Need Balance + Swap score";
+        if (Number(alpha.balanceScore || 0) <= 0) return "Need Balance score";
+        if (Number(alpha.swapScore || 0) <= 0) return "Need Swap score";
         var need = Math.max(0, Math.floor(Number(alpha.nextScoreNeeded || 0)));
         if (need > 0) return "Need +" + need + " Alpha Score";
         if (alpha.recentSwapOk === false) return "Swap once in " + Math.max(1, Math.floor(Number(alpha.recentSwapDays || 7))) + " days";
@@ -6956,14 +6959,22 @@ function enhancePrototypeMe() {
         };
         window.__luminaOpenCoupons = function(){
           var copy = meCopy();
-          var serverRows = (window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).map(function(order){
+          var alphaRows = [];
+          var normalRows = [];
+          (window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).forEach(function(order){
             var reward = order.reward || {};
             var title = order.status === "opened" ? (reward.name || "Opened mystery box") : "Unopened mystery box";
             var detail = order.status === "opened" ? (reward.value || order.productTitle || "Reward revealed") : (order.productTitle || "Ready to open");
-            return '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(detail) + '</small></div><em>' + escapeAttr(order.status === "opened" ? "Opened" : "Ready") + '</em></div>';
-          }).join("");
-          var localRows = pointsCoupons().map(function(row){ return '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(row.title || "Lumina box") + '</b><small>' + escapeAttr(row.value || row.source || "Reward record") + '</small></div><em>' + escapeAttr(row.status || "Opened") + '</em></div>'; }).join("");
-          var rows = serverRows + localRows;
+            var html = '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(detail) + '</small></div><em>' + escapeAttr(order.status === "opened" ? "Opened" : "Ready") + '</em></div>';
+            if (String(order.productId || "") === "alpha-token-mystery-box") alphaRows.push(html);
+            else normalRows.push(html);
+          });
+          pointsCoupons().forEach(function(row){
+            normalRows.push('<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(row.title || "Lumina box") + '</b><small>' + escapeAttr(row.value || row.source || "Reward record") + '</small></div><em>' + escapeAttr(row.status || "Opened") + '</em></div>');
+          });
+          var rows =
+            '<section class="coupon-section"><h4>Lumina Points Box</h4>' + (normalRows.join("") || '<p class="points-empty">' + escapeAttr(copy.noBoxRecords || "No box records yet. Buy or open a mystery box to see it here.") + '</p>') + '</section>' +
+            '<section class="coupon-section"><h4>Alpha Token Box</h4>' + (alphaRows.join("") || '<p class="points-empty">No Alpha box records yet.</p>') + '</section>';
           var old = document.getElementById("pointsCouponsSheet"); if (old) old.remove();
           var sheet = document.createElement("div");
           sheet.id = "pointsCouponsSheet";

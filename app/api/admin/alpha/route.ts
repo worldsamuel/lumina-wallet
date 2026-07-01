@@ -45,6 +45,11 @@ function isAlpha(kind: "balance" | "swap" | null, createdBy?: string | null) {
   return String(createdBy || "").startsWith(prefix);
 }
 
+function effectiveScore(row: Pick<AlphaRow, "balanceScore" | "swapScore" | "spendPoints">) {
+  if (row.balanceScore <= 0 || row.swapScore <= 0) return 0;
+  return Math.max(0, row.balanceScore + row.swapScore - row.spendPoints);
+}
+
 export async function GET() {
   const admin = await requireAdmin();
   if (!admin) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
@@ -54,7 +59,6 @@ export async function GET() {
   const [users, adjustments, orders, activities] = await Promise.all([
     db.user.findMany({
       orderBy: { lastLoginAt: "desc" },
-      take: 1000,
       select: { address: true, worldId: true, createdAt: true, lastLoginAt: true },
     }),
     getPointsAdjustments(),
@@ -117,6 +121,7 @@ export async function GET() {
     const row = ensure(order.address);
     if (!row) return;
     if (order.type === "blind_box") {
+      if (order.productId !== "alpha-token-mystery-box") return;
       if (order.status === "opened") row.boxesOpened += 1;
       else row.boxesPending += 1;
     }
@@ -133,8 +138,9 @@ export async function GET() {
   });
 
   const rows = Array.from(byAddress.values())
+    .map((row) => ({ ...row, score: effectiveScore(row) }))
     .sort((a, b) => b.score - a.score || rowTime(b.lastActivityAt) - rowTime(a.lastActivityAt));
-  const eligible = rows.filter((row) => row.score >= alphaRules.minScoreToOpenBox && row.recentSwapOk).length;
+  const eligible = rows.filter((row) => row.balanceScore > 0 && row.swapScore > 0 && row.score >= alphaRules.minScoreToOpenBox && row.recentSwapOk).length;
   const active = rows.filter((row) => row.score > 0).length;
   const totalScore = rows.reduce((sum, row) => sum + row.score, 0);
 

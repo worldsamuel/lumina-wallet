@@ -57,8 +57,8 @@ type BalanceTokenConfig = {
 
 const WORLD_CHAIN_ALCHEMY_RPC =
   process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
-const ALCHEMY_BALANCE_TIMEOUT_MS = 1_200;
-const ALCHEMY_METADATA_TIMEOUT_MS = 900;
+const ALCHEMY_BALANCE_TIMEOUT_MS = 3_500;
+const ALCHEMY_METADATA_TIMEOUT_MS = 2_500;
 const BALANCE_TOKEN_CONFIG_TTL_MS = 300_000;
 let cachedBalanceTokens: { expiresAt: number; data: BalanceTokenConfig[] } | null = null;
 const EARN_VAULT_ADDRESSES = new Set(RE7_VAULTS.map((vault) => vault.address.toLowerCase()));
@@ -168,13 +168,13 @@ export async function fetchBalances(userAddress: Address) {
     configured.map((item) => item.contractAddress?.toLowerCase()).filter(Boolean),
   );
 
-  return [
+  return uniquifyBalanceSymbols([
     ...configured,
     ...discoveredBalances.filter((item) => {
       const address = item.contractAddress?.toLowerCase();
       return address && !configuredAddresses.has(address) && item.balance > 0n;
     }),
-  ];
+  ]);
 }
 
 async function fetchConfiguredTokenBalances(userAddress: Address, balanceTokens: BalanceTokenConfig[]) {
@@ -312,7 +312,7 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
   const out: AlchemyTokenBalance[] = [];
   let pageKey: string | undefined;
 
-  for (let page = 0; page < 8; page += 1) {
+  for (let page = 0; page < 12; page += 1) {
     const params = [...baseParams];
     if (pageKey) params.push({ pageKey });
     const response = await fetch(WORLD_CHAIN_ALCHEMY_RPC, {
@@ -337,6 +337,22 @@ async function fetchAlchemyTokenBalancePages(baseParams: unknown[]) {
   }
 
   return out;
+}
+
+function uniquifyBalanceSymbols(items: ChainBalance[]) {
+  const seen = new Set<string>();
+  return items.map((item) => {
+    const symbol = String(item.symbol || "").toUpperCase();
+    const address = item.contractAddress?.toLowerCase();
+    if (!seen.has(symbol)) {
+      seen.add(symbol);
+      return { ...item, symbol };
+    }
+    const suffix = address ? address.slice(-4).toUpperCase() : String(seen.size + 1);
+    const uniqueSymbol = `${symbol}_${suffix}`;
+    seen.add(uniqueSymbol);
+    return { ...item, symbol: uniqueSymbol, name: item.name || symbol };
+  });
 }
 
 function mergeAliasBalances(items: ChainBalance[]) {
