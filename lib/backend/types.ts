@@ -55,6 +55,21 @@ export type BackendSystemConfig = {
     tasksLabelI18n?: Record<string, string>;
     boxLabelI18n?: Record<string, string>;
   };
+  welcomeBox?: {
+    enabled?: boolean;
+    totalCount?: number;
+    minPoints?: number;
+    maxPoints?: number;
+  };
+  ico?: {
+    enabled?: boolean;
+    treasuryAddress?: string;
+    rate?: number;
+    minWld?: number;
+    launchAt?: string | null;
+    headlineI18n?: Record<string, string>;
+    subtitleI18n?: Record<string, string>;
+  };
   socialLinks?: {
     x?: BackendSocialLink | string | null;
     telegram?: BackendSocialLink | string | null;

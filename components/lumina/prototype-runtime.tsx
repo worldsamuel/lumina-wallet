@@ -64,6 +64,7 @@ declare global {
     __luminaRefreshActivity?: () => void;
     __luminaRefreshPoints?: () => void;
     __luminaCompleteTask?: (id: string, silent?: boolean) => void;
+    __luminaIcoCountdownTimer?: ReturnType<typeof setInterval>;
     __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
@@ -174,6 +175,8 @@ type WelcomeBoxConfig = {
 
 function openWelcomeBoxFallback(config: WelcomeBoxConfig, address: string) {
   if (typeof document === "undefined" || document.getElementById("welcomeBoxModal")) return;
+  const seenKey = "lumina_welcome_box_seen_" + String(address || "guest").toLowerCase();
+  try { if (window.localStorage.getItem(seenKey) === "done") return; } catch {}
   const min = Math.max(0, Math.floor(Number(config.minPoints ?? 50)));
   const max = Math.max(min, Math.floor(Number(config.maxPoints ?? 500)));
   const rewards = [min, Math.max(min, Math.round((min + max) / 3)), Math.max(min, Math.round(((min + max) * 2) / 3)), max];
@@ -207,7 +210,13 @@ function openWelcomeBoxFallback(config: WelcomeBoxConfig, address: string) {
         body: JSON.stringify({ address }),
       });
       const data = await res.json().catch(() => null);
+      if (data && data.claimed) {
+        try { window.localStorage.setItem(seenKey, "done"); } catch {}
+        modal.remove();
+        return;
+      }
       if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
+      try { window.localStorage.setItem(seenKey, "done"); } catch {}
       const result = modal.querySelector(".welcome-box-card");
       if (result) {
         result.innerHTML =
@@ -228,13 +237,18 @@ async function forceWelcomeBoxCheck(address?: string | null) {
   if (typeof window === "undefined") return;
   const wallet = String(address || window.__luminaUserAddress || "").toLowerCase();
   if (!/^0x[a-f0-9]{40}$/.test(wallet) || document.getElementById("welcomeBoxModal")) return;
+  try { if (window.localStorage.getItem("lumina_welcome_box_seen_" + wallet) === "done") return; } catch {}
   window.__luminaMaybeOpenWelcomeBox?.();
   window.setTimeout(async () => {
     if (document.getElementById("welcomeBoxModal")) return;
     try {
       const res = await fetch("/api/welcome-box?address=" + encodeURIComponent(wallet), { cache: "no-store" });
       const data = await res.json().catch(() => null);
-      if (!res.ok || !data || data.claimed || !data.config || data.config.enabled === false || Number(data.config.totalCount || 0) <= 0) return;
+      if (data && data.claimed) {
+        try { window.localStorage.setItem("lumina_welcome_box_seen_" + wallet, "done"); } catch {}
+        return;
+      }
+      if (!res.ok || !data || !data.config || data.config.enabled === false || Number(data.config.totalCount || 0) <= 0) return;
       openWelcomeBoxFallback(data.config, wallet);
     } catch {
       // The in-prototype checker remains the fallback when the direct probe fails.
@@ -3381,7 +3395,10 @@ function enhancePrototypeHome() {
           treasuryAddress: String(ico.treasuryAddress || luminaIcoDefaults.treasuryAddress || "").trim(),
           rate: Math.max(1, Number(ico.rate || luminaIcoDefaults.rate || 1000)),
           minWld: Math.max(0.001, Number(ico.minWld || 0.1)),
-          hardCap: Math.max(0, Number(ico.hardCap || 1000000))
+          hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
+          launchAt: ico.launchAt || null,
+          headline: homeBannerText(ico.headlineI18n, "Owning LUMINA may be your smartest choice."),
+          subtitle: homeBannerText(ico.subtitleI18n, "Reserve your allocation before the public launch begins.")
         };
       }
       function luminaIcoAllocation(){
@@ -3423,9 +3440,9 @@ function enhancePrototypeHome() {
       function ensureHomePointsBanner(){
         var home = document.getElementById("view-home");
         if (!home) return;
-        var cfg = homePointsBannerConfig();
         var slider = document.getElementById("homePromoSlider");
-        if (!cfg.enabled) { if (slider) slider.remove(); return; }
+        var ico = luminaIcoConfig();
+        if (!ico.enabled) { if (slider) slider.remove(); return; }
         if (!slider) {
           var section = home.querySelector(".section-head");
           if (!section) return;
@@ -3436,28 +3453,39 @@ function enhancePrototypeHome() {
           slider.className = "home-promo-slider";
           slider.innerHTML =
             '<div class="home-promo-track">' +
-              '<button type="button" id="homePointsBanner" class="home-points-banner"></button>' +
               '<button type="button" id="homeIcoBanner" class="home-points-banner home-ico-banner"></button>' +
-            '</div>' +
-            '<div class="home-promo-dots" id="homePromoDots"><button type="button" class="active"></button><button type="button"></button></div>';
+            '</div>';
           section.insertAdjacentElement("beforebegin", slider);
-          attachHomePromoSlider(slider);
         }
-        var existing = document.getElementById("homePointsBanner");
         var icoBanner = document.getElementById("homeIcoBanner");
-        if (existing) existing.onclick = function(){ if (typeof window.openPointsCenter === "function") window.openPointsCenter(); };
-        existing.innerHTML =
-          '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
-          '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
-          '<span class="home-points-gifts" aria-hidden="true"><span class="home-points-cube"><b>?</b><i>?</i><em>?</em></span><span class="home-points-spark s1"></span><span class="home-points-spark s2"></span><span class="home-points-spark s3"></span><span class="home-points-spark s4"></span></span><span class="home-points-chev">›</span>';
         if (icoBanner) {
-          var ico = luminaIcoConfig();
           icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
           icoBanner.innerHTML =
-            '<span class="home-ico-orb"><i>L</i><b></b></span>' +
-            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>Send WLD to the treasury address and receive LUMINA token allocation.</small><span class="home-points-actions"><i>WLD Pay</i><i class="gift">Get LUMINA</i></span></span>' +
+            '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
+            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>WLD Pay</i><i class="gift">Reserve</i></span></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
         }
+      }
+      function icoCountdownParts(launchAt){
+        var target = launchAt ? new Date(launchAt).getTime() : 0;
+        var diff = target ? Math.max(0, target - Date.now()) : 0;
+        var total = Math.floor(diff / 1000);
+        var days = Math.floor(total / 86400);
+        var hours = Math.floor((total % 86400) / 3600);
+        var mins = Math.floor((total % 3600) / 60);
+        var secs = total % 60;
+        function pad(n){ return String(n).padStart(2, "0"); }
+        return { active: Boolean(target && diff > 0), days: days, hours: pad(hours), mins: pad(mins), secs: pad(secs) };
+      }
+      function renderIcoCountdown(ico){
+        var el = document.getElementById("icoCountdown");
+        if (!el) return;
+        var c = icoCountdownParts(ico.launchAt);
+        if (!c.active) {
+          el.innerHTML = '<span>ICO Status</span><b>LIVE</b>';
+          return;
+        }
+        el.innerHTML = '<span>Launch countdown</span><b>' + c.days + 'D ' + c.hours + ':' + c.mins + ':' + c.secs + '</b>';
       }
       window.openLuminaIco = async function(){
         var old = document.getElementById("luminaIcoSheet");
@@ -3473,9 +3501,10 @@ function enhancePrototypeHome() {
           '<div class="lumina-ico-page">' +
             '<button type="button" class="lumina-ico-close" id="icoCloseBtn">×</button>' +
             '<section class="lumina-ico-hero">' +
-              '<div class="lumina-ico-token"><span>L</span><i></i></div>' +
-              '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>Send WLD to the treasury address and receive your LUMINA token allocation.</p></div>' +
+              '<div class="lumina-ico-token"><img src="/points/lumina-points-icon.png" alt="" /></div>' +
+              '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
             '</section>' +
+            '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
             '<section class="lumina-ico-stats">' +
               '<div><span>Rate</span><b>1 WLD = ' + Number(ico.rate).toLocaleString() + '</b><small>LUMINA</small></div>' +
               '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
@@ -3486,17 +3515,20 @@ function enhancePrototypeHome() {
               '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(ico.minWld * ico.rate).toLocaleString() + ' LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay WLD and reserve LUMINA" : "Configure treasury address first") + '</button>' +
-              '<p class="lumina-ico-note">The allocation is recorded after World App confirms the WLD transfer. Final token distribution follows Lumina ICO rules.</p>' +
+              '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
             '</section>' +
           '</div>';
         document.body.appendChild(sheet);
-        var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
+        var close = function(){ clearInterval(window.__luminaIcoCountdownTimer); sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
         sheet.onclick = function(event){ if (event.target === sheet) close(); };
         document.getElementById("icoCloseBtn").onclick = close;
         var input = document.getElementById("icoWldAmount");
         var receive = document.getElementById("icoReceiveAmount");
         var pay = document.getElementById("icoPayBtn");
         var copy = document.getElementById("icoCopyTreasury");
+        renderIcoCountdown(ico);
+        clearInterval(window.__luminaIcoCountdownTimer);
+        window.__luminaIcoCountdownTimer = setInterval(function(){ renderIcoCountdown(ico); }, 1000);
         function amount(){
           var value = Number(String(input.value || "").replace(/,/g, ""));
           return Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -3570,7 +3602,7 @@ function enhancePrototypeHome() {
           if (tries < 30) window.setTimeout(function(){ maybeOpenWelcomeBox(tries + 1); }, 500);
           return;
         }
-        var box = welcomeBoxConfig();
+        try { if (localStorage.getItem(welcomeBoxKey()) === "done") return; } catch(e) {}
         fetch("/api/welcome-box?address=" + encodeURIComponent(window.__luminaUserAddress), { cache:"no-store" })
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){
@@ -3580,9 +3612,7 @@ function enhancePrototypeHome() {
             }
             openWelcomeBox(data.config);
           })
-          .catch(function(){
-            if (box.enabled && box.totalCount > 0) openWelcomeBox(box);
-          });
+          .catch(function(){});
       }
       window.__luminaMaybeOpenWelcomeBox = maybeOpenWelcomeBox;
       function openWelcomeBox(box){
@@ -3617,6 +3647,11 @@ function enhancePrototypeHome() {
             body: JSON.stringify({ address: window.__luminaUserAddress || "" })
           });
           var data = await res.json().catch(function(){ return null; });
+          if (data && data.claimed) {
+            try { localStorage.setItem(welcomeBoxKey(), "done"); } catch(e) {}
+            window.__luminaCloseWelcomeBox && window.__luminaCloseWelcomeBox();
+            return;
+          }
           if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
           try { localStorage.setItem(welcomeBoxKey(), "done"); } catch(e) {}
           var result = modal.querySelector(".welcome-box-card");

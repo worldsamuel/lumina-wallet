@@ -316,17 +316,17 @@
   #view-home .action .ring { width: clamp(54px, 15.5vw, 64px); height: clamp(54px, 15.5vw, 64px); margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.06) !important; background: #0f1110; color: var(--green); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.02), 0 12px 34px rgba(0,0,0,0.3) !important; }
   #view-home .action .ring svg { width: 30px; height: 30px; stroke-width: 1.9; }
   #view-home .action .lbl { color: #fff; font-size: 14px; font-weight: 650; }
-  #view-home .home-promo-slider { width: calc(100% - (var(--pad-screen) * 2)); margin: 8px var(--pad-screen) 8px; overflow: visible; }
+  #view-home .home-promo-slider { width: calc(100% - (var(--pad-screen) * 2)); margin: 4px var(--pad-screen) 8px; overflow: visible; }
   #view-home .home-promo-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   #view-home .home-promo-track::-webkit-scrollbar { display: none; }
   #view-home .home-promo-track .home-points-banner { flex: 0 0 100%; width: 100%; margin: 0; scroll-snap-align: start; }
   #view-home .home-promo-dots { height: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   #view-home .home-promo-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,255,255,.2); transition: width .18s ease, background .18s ease; }
   #view-home .home-promo-dots button.active { width: 18px; background: var(--green); }
-  #view-home .home-points-banner { position: relative; width: calc(100% - (var(--pad-screen) * 2)); min-height: 154px; margin: 8px var(--pad-screen) 8px; padding: 16px 54px 14px 116px; border: 1px solid rgba(128,255,159,.18); border-radius: 18px; display: grid; align-items: center; overflow: hidden; text-align: left; color: #fff; background: radial-gradient(circle at 14% 48%, rgba(93,255,126,.22), transparent 28%), radial-gradient(circle at 84% 70%, rgba(143,255,128,.18), transparent 24%), linear-gradient(112deg, #0b100c, #101a12 58%, #0a0d0b); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 46px rgba(0,0,0,.26); cursor: pointer; }
+  #view-home .home-points-banner { position: relative; width: calc(100% - (var(--pad-screen) * 2)); min-height: 128px; margin: 8px var(--pad-screen) 8px; padding: 14px 48px 13px 104px; border: 1px solid rgba(128,255,159,.18); border-radius: 18px; display: grid; align-items: center; overflow: hidden; text-align: left; color: #fff; background: radial-gradient(circle at 14% 48%, rgba(93,255,126,.22), transparent 28%), radial-gradient(circle at 84% 70%, rgba(143,255,128,.18), transparent 24%), linear-gradient(112deg, #0b100c, #101a12 58%, #0a0d0b); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 46px rgba(0,0,0,.26); cursor: pointer; }
   #view-home .home-points-banner::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 18% 22%, rgba(167,255,169,.9) 0 1px, transparent 2px), radial-gradient(circle at 76% 78%, rgba(167,255,169,.85) 0 1px, transparent 2px), linear-gradient(90deg, rgba(74,222,128,.08), transparent 36%, rgba(74,222,128,.07)); pointer-events: none; }
-  #view-home .home-points-orbit { position: absolute; left: 18px; top: 50%; width: 82px; height: 82px; transform: translateY(-50%); border-radius: 50%; display: grid; place-items: center; background: transparent; box-shadow: none; overflow: visible; }
-  #view-home .home-points-orbit img { position: relative; z-index: 2; display: block; width: 58px; height: 58px; border-radius: 50%; clip-path: circle(49% at 50% 50%); object-fit: cover; background: #020502; box-shadow: 0 0 0 1px rgba(125,255,143,.16), 0 0 28px rgba(112,255,143,.34); filter: none; }
+  #view-home .home-points-orbit { position: absolute; left: 18px; top: 50%; width: 76px; height: 76px; transform: translateY(-50%); border-radius: 50%; display: grid; place-items: center; background: transparent; box-shadow: none; overflow: visible; }
+  #view-home .home-points-orbit img { position: relative; z-index: 2; display: block; width: 54px; height: 54px; border-radius: 50%; clip-path: circle(49% at 50% 50%); object-fit: cover; background: #020502; box-shadow: 0 0 0 1px rgba(125,255,143,.16), 0 0 28px rgba(112,255,143,.34); filter: none; }
   #view-home .home-points-ring { position: absolute; inset: 6px; border-radius: 50%; border: 1px solid rgba(123,255,146,.25); border-top-color: rgba(210,255,61,.9); border-right-color: transparent; animation: homeRingSpin 8s linear infinite; }
   #view-home .home-points-ring.r2 { inset: 0; opacity: .52; animation-duration: 12s; animation-direction: reverse; border-color: rgba(124,255,146,.12); border-left-color: rgba(110,255,179,.72); }
   #view-home .home-points-dot { position: absolute; z-index: 1; width: 5px; height: 5px; border-radius: 50%; background: #9cff93; box-shadow: 0 0 12px rgba(156,255,147,.9); animation: homeDotOrbit 6s linear infinite; }
@@ -334,7 +334,7 @@
   #view-home .home-points-dot.d3 { width: 3px; height: 3px; animation-duration: 10s; animation-delay: -4.6s; opacity: .7; }
   #view-home .home-points-copy { position: relative; z-index: 2; min-width: 0; display: grid; gap: 5px; }
   #view-home .home-points-copy b { font-size: 15px; font-weight: 900; line-height: 1.1; }
-  #view-home .home-points-copy strong { display: flex; align-items: baseline; gap: 8px; color: #71f28a; font-size: clamp(26px, 8vw, 34px); line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #view-home .home-points-copy strong { display: flex; align-items: baseline; gap: 8px; color: #71f28a; font-size: clamp(22px, 6.5vw, 30px); line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; white-space: nowrap; }
   #view-home .home-points-copy em { color: rgba(255,255,255,.7); font-size: 14px; font-style: normal; font-weight: 800; }
   #view-home .home-points-copy small { max-width: 230px; color: #aeb8b0; font-size: 13px; line-height: 1.35; font-weight: 650; }
   #view-home .home-points-actions { margin-top: 5px; display: flex; gap: 8px; flex-wrap: wrap; }
@@ -368,16 +368,18 @@
   #view-home .home-ico-rays i:nth-child(2) { inset: 25px; border-color: rgba(255,255,255,.2); }
   #view-home .home-ico-rays i:nth-child(3) { left: 38px; top: -5px; width: 8px; height: 8px; border: 0; background: #caff5a; box-shadow: 0 0 16px rgba(202,255,90,.95); }
   .lumina-ico-sheet { align-items: flex-end; padding: 16px 12px 0; }
-  .lumina-ico-page { position: relative; width: min(430px, 100%); max-height: 88vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(136,255,143,.2); border-radius: 30px 30px 0 0; background: radial-gradient(circle at 80% 0%, rgba(117,255,120,.2), transparent 34%), linear-gradient(180deg, #101510, #050605); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
-  .lumina-ico-close { position: absolute; z-index: 4; right: 18px; top: 16px; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.06); color: #fff; font-size: 24px; line-height: 1; }
-  .lumina-ico-hero { position: relative; min-height: 210px; padding: 34px 26px 22px; display: grid; align-content: end; gap: 18px; overflow: hidden; }
-  .lumina-ico-hero::before { content: ""; position: absolute; right: -74px; top: -56px; width: 210px; height: 210px; border-radius: 50%; border: 1px solid rgba(151,255,122,.24); box-shadow: inset 0 0 60px rgba(91,255,124,.16); }
-  .lumina-ico-token { position: relative; width: 92px; height: 92px; border-radius: 32px; display: grid; place-items: center; background: radial-gradient(circle at 36% 28%, #d6ff64, #52e682 38%, #071009 72%); box-shadow: 0 0 50px rgba(105,255,122,.32), inset 0 0 0 1px rgba(255,255,255,.16); }
-  .lumina-ico-token span { color: #031007; font-size: 44px; font-weight: 950; }
-  .lumina-ico-token i { position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.42); border-radius: 26px; transform: rotate(18deg); }
+  .lumina-ico-page { position: relative; width: min(430px, 100%); max-height: 82vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(136,255,143,.2); border-radius: 28px 28px 0 0; background: radial-gradient(circle at 80% 0%, rgba(117,255,120,.18), transparent 30%), linear-gradient(180deg, #101510, #050605); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
+  .lumina-ico-close { position: absolute; z-index: 4; right: 16px; top: 14px; width: 36px; height: 36px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.06); color: #fff; font-size: 24px; line-height: 1; }
+  .lumina-ico-hero { position: relative; min-height: 154px; padding: 24px 24px 16px; display: grid; grid-template-columns: 70px 1fr; align-items: end; gap: 16px; overflow: hidden; }
+  .lumina-ico-hero::before { content: ""; position: absolute; right: -68px; top: -72px; width: 184px; height: 184px; border-radius: 50%; border: 1px solid rgba(151,255,122,.24); box-shadow: inset 0 0 54px rgba(91,255,124,.14); }
+  .lumina-ico-token { position: relative; width: 70px; height: 70px; border-radius: 50%; display: grid; place-items: center; background: #020502; box-shadow: 0 0 0 1px rgba(125,255,143,.2), 0 0 38px rgba(105,255,122,.32); overflow: hidden; }
+  .lumina-ico-token img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .lumina-ico-hero em { display: block; margin-bottom: 8px; color: #9dffa8; font-size: 12px; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-  .lumina-ico-hero h2 { margin: 0; font-size: 38px; line-height: 1; font-weight: 950; letter-spacing: 0; }
-  .lumina-ico-hero p { max-width: 320px; margin: 12px 0 0; color: rgba(255,255,255,.72); font-size: 15px; line-height: 1.45; font-weight: 700; }
+  .lumina-ico-hero h2 { margin: 0; font-size: 31px; line-height: 1; font-weight: 950; letter-spacing: 0; }
+  .lumina-ico-hero p { max-width: 300px; margin: 9px 0 0; color: rgba(255,255,255,.72); font-size: 14px; line-height: 1.42; font-weight: 750; }
+  .lumina-ico-countdown { margin: 0 18px 12px; padding: 12px 14px; border: 1px solid rgba(126,255,140,.12); border-radius: 18px; display: flex; align-items: center; justify-content: space-between; background: rgba(124,255,138,.07); }
+  .lumina-ico-countdown span { color: rgba(255,255,255,.52); font-size: 12px; font-weight: 850; }
+  .lumina-ico-countdown b { color: #9cffaa; font-size: 17px; font-weight: 950; font-variant-numeric: tabular-nums; }
   .lumina-ico-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 18px 14px; }
   .lumina-ico-stats div, .lumina-ico-panel { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.045); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
   .lumina-ico-stats div { padding: 15px; }
@@ -397,9 +399,9 @@
   @keyframes homeRingSpin { to { transform: rotate(360deg); } }
   @keyframes homeDotOrbit { from { transform: rotate(0deg) translateX(40px) rotate(0deg); } to { transform: rotate(360deg) translateX(40px) rotate(-360deg); } }
   @media (max-width: 390px) {
-    #view-home .home-points-banner { min-height: 148px; padding-left: 96px; padding-right: 40px; }
-    #view-home .home-points-orbit { left: 12px; width: 72px; height: 72px; }
-    #view-home .home-points-orbit img { width: 52px; height: 52px; }
+    #view-home .home-points-banner { min-height: 124px; padding-left: 92px; padding-right: 38px; }
+    #view-home .home-points-orbit { left: 12px; width: 70px; height: 70px; }
+    #view-home .home-points-orbit img { width: 50px; height: 50px; }
     #view-home .home-points-copy small { max-width: 190px; }
     #view-home .home-points-gifts { right: 26px; top: 20px; transform: scale(.66); transform-origin: top right; opacity: .84; }
     #view-home .home-ico-orb { left: 12px; width: 72px; height: 72px; border-radius: 24px; }

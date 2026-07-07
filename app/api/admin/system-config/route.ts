@@ -26,6 +26,7 @@ export async function PATCH(req: NextRequest) {
     swapNetworkFeeLabel?: string | null;
     pointsHomeBanner?: unknown;
     welcomeBox?: unknown;
+    ico?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
     alphaRules?: unknown;
@@ -49,6 +50,7 @@ export async function PATCH(req: NextRequest) {
         ? body.swapNetworkFeeLabel
         : undefined,
     welcomeBox: typeof body.welcomeBox === "object" && body.welcomeBox !== null ? body.welcomeBox : undefined,
+    ico: typeof body.ico === "object" && body.ico !== null ? body.ico : undefined,
     pointsHomeBanner: typeof body.pointsHomeBanner === "object" && body.pointsHomeBanner !== null ? body.pointsHomeBanner : undefined,
     pointsRules: typeof body.pointsRules === "object" && body.pointsRules !== null ? body.pointsRules : undefined,
     pointsTasks: Array.isArray(body.pointsTasks) ? body.pointsTasks : undefined,

@@ -20,6 +20,15 @@ export type SystemConfig = {
     minPoints: number;
     maxPoints: number;
   };
+  ico: {
+    enabled: boolean;
+    treasuryAddress: string;
+    rate: number;
+    minWld: number;
+    launchAt: string | null;
+    headlineI18n: Record<string, string>;
+    subtitleI18n: Record<string, string>;
+  };
   pointsRules: PointsRulesConfig;
   pointsTasks: PointsTaskConfig[];
   alphaRules: AlphaRulesConfig;
@@ -75,9 +84,10 @@ export type SocialLinkConfig = {
   logoUrl: string | null;
 };
 
-type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "pointsHomeBanner" | "pointsRules" | "pointsTasks" | "alphaRules">> & {
+type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "ico" | "pointsHomeBanner" | "pointsRules" | "pointsTasks" | "alphaRules">> & {
   socialLinks?: unknown;
   welcomeBox?: unknown;
+  ico?: unknown;
   pointsHomeBanner?: unknown;
   pointsRules?: unknown;
   pointsTasks?: unknown;
@@ -105,6 +115,21 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     totalCount: 1000,
     minPoints: 50,
     maxPoints: 500,
+  },
+  ico: {
+    enabled: true,
+    treasuryAddress: process.env.NEXT_PUBLIC_LUMINA_ICO_TREASURY_ADDRESS || "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
+    rate: 1000,
+    minWld: 0.1,
+    launchAt: null,
+    headlineI18n: {
+      en: "Owning LUMINA may be your smartest choice.",
+      "zh-CN": "拥有 LUMINA，将会是你最明智的选择。",
+    },
+    subtitleI18n: {
+      en: "Reserve your allocation before the public launch begins.",
+      "zh-CN": "在公开上线前锁定你的 LUMINA 额度。",
+    },
   },
   pointsRules: {
     enabled: true,
@@ -254,6 +279,7 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
         : DEFAULT_SYSTEM_CONFIG.swapNetworkFeeLabel,
     pointsHomeBanner: normalizePointsHomeBanner(source.pointsHomeBanner),
     welcomeBox: normalizeWelcomeBox(source.welcomeBox),
+    ico: normalizeIco(source.ico),
     pointsRules: normalizePointsRules(source.pointsRules),
     pointsTasks: normalizePointsTasks(source.pointsTasks),
     alphaRules: normalizeAlphaRules(source.alphaRules),
@@ -270,6 +296,31 @@ function normalizePointsHomeBanner(value: unknown): SystemConfig["pointsHomeBann
     subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),
     tasksLabelI18n: cleanI18n(source.tasksLabelI18n, fallback.tasksLabelI18n.en),
     boxLabelI18n: cleanI18n(source.boxLabelI18n, fallback.boxLabelI18n.en),
+  };
+}
+
+function cleanAddress(value: unknown, fallback: string) {
+  const address = typeof value === "string" ? value.trim() : "";
+  return /^0x[a-fA-F0-9]{40}$/.test(address) ? address : fallback;
+}
+
+function cleanIsoDate(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function normalizeIco(value: unknown): SystemConfig["ico"] {
+  const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["ico"]> : {};
+  const fallback = DEFAULT_SYSTEM_CONFIG.ico;
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
+    treasuryAddress: cleanAddress(source.treasuryAddress, fallback.treasuryAddress),
+    rate: Math.max(1, Number(source.rate ?? fallback.rate)),
+    minWld: Math.max(0.001, Number(source.minWld ?? fallback.minWld)),
+    launchAt: cleanIsoDate(source.launchAt) || fallback.launchAt,
+    headlineI18n: cleanI18n(source.headlineI18n, fallback.headlineI18n.en),
+    subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),
   };
 }
 
@@ -483,6 +534,7 @@ function mergeSystemConfigPatch(
   const cleaned = cleanUndefinedFields(patch as Record<string, unknown>) as Partial<SystemConfig> & {
     socialLinks?: unknown;
     welcomeBox?: unknown;
+    ico?: unknown;
     pointsHomeBanner?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
@@ -492,6 +544,10 @@ function mergeSystemConfigPatch(
 
   if (isRecord(cleaned.welcomeBox)) {
     next.welcomeBox = { ...current.welcomeBox, ...cleanUndefinedFields(cleaned.welcomeBox) };
+  }
+
+  if (isRecord(cleaned.ico)) {
+    next.ico = { ...current.ico, ...cleanUndefinedFields(cleaned.ico) };
   }
 
   if (isRecord(cleaned.pointsHomeBanner)) {
