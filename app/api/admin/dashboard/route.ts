@@ -1,4 +1,4 @@
-import { formatUnits, isAddress, parseAbi, type Address } from "viem";
+import { formatUnits, parseAbi, type Address } from "viem";
 import { requireAdmin } from "@/lib/api/admin-auth";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { getRecentUserActivity } from "@/lib/admin/activity";
@@ -23,30 +23,21 @@ export async function GET() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [totalUsers, todayUsers, users] = await Promise.all([
+  const [totalUsers, todayUsers] = await Promise.all([
     db.user.count(),
     db.user.count({ where: { createdAt: { gte: today } } }),
-    db.user.findMany({
-      orderBy: { lastLoginAt: "desc" },
-      take: 200,
-      select: { address: true },
-    }),
   ]);
-
-  const addresses = users
-    .map((user) => user.address)
-    .filter((address): address is Address => isAddress(address));
 
   let activity: Awaited<ReturnType<typeof getRecentUserActivity>> = [];
   try {
-    activity = await getRecentUserActivity(addresses, 200);
+    activity = await getRecentUserActivity([], 200);
   } catch (error) {
     console.error("Failed to count dashboard transactions", error);
   }
   let [transactions, todayTransactions, platformRevenue] = await Promise.all([
     countStoredActivities(),
     countStoredActivities(today),
-    getPlatformRevenueBalances(),
+    withTimeout(getPlatformRevenueBalances(), 3_500, fallbackPlatformRevenueBalances()),
   ]);
   if (!transactions && activity.length) transactions = activity.length;
   const todayIso = today.toISOString().slice(0, 10);
@@ -117,6 +108,20 @@ export async function GET() {
     todayVisits: isToday ? Number(counters.todayVisits || 0) : 0,
     feedbackNew,
   });
+}
+
+function fallbackPlatformRevenueBalances() {
+  return platformRevenueSymbols.map((symbol) => ({ symbol, amount: 0, label: `0 ${symbol}` }));
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T) {
+  return Promise.race([
+    promise.catch((error) => {
+      console.error("Dashboard optional request failed", error);
+      return fallback;
+    }),
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs)),
+  ]);
 }
 
 async function getPlatformRevenueBalances() {
