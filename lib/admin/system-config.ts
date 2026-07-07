@@ -25,6 +25,7 @@ export type SystemConfig = {
     treasuryAddress: string;
     rate: number;
     minWld: number;
+    maxWld: number;
     launchAt: string | null;
     headlineI18n: Record<string, string>;
     subtitleI18n: Record<string, string>;
@@ -121,14 +122,15 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     treasuryAddress: process.env.NEXT_PUBLIC_LUMINA_ICO_TREASURY_ADDRESS || "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
     rate: 1000,
     minWld: 0.1,
-    launchAt: null,
+    maxWld: 100,
+    launchAt: "2026-09-07T00:00:00.000Z",
     headlineI18n: {
       en: "Owning LUMINA may be your smartest choice.",
       "zh-CN": "拥有 LUMINA，将会是你最明智的选择。",
     },
     subtitleI18n: {
-      en: "Reserve your allocation before the public launch begins.",
-      "zh-CN": "在公开上线前锁定你的 LUMINA 额度。",
+      en: "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 100 WLD.",
+      "zh-CN": "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 100 WLD 额度。",
     },
   },
   pointsRules: {
@@ -318,6 +320,7 @@ function normalizeIco(value: unknown): SystemConfig["ico"] {
     treasuryAddress: cleanAddress(source.treasuryAddress, fallback.treasuryAddress),
     rate: Math.max(1, Number(source.rate ?? fallback.rate)),
     minWld: Math.max(0.001, Number(source.minWld ?? fallback.minWld)),
+    maxWld: Math.max(0.001, Number(source.maxWld ?? fallback.maxWld)),
     launchAt: cleanIsoDate(source.launchAt) || fallback.launchAt,
     headlineI18n: cleanI18n(source.headlineI18n, fallback.headlineI18n.en),
     subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),

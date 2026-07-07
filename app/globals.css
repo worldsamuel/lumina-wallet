@@ -368,32 +368,36 @@
   #view-home .home-ico-rays i:nth-child(2) { inset: 25px; border-color: rgba(255,255,255,.2); }
   #view-home .home-ico-rays i:nth-child(3) { left: 38px; top: -5px; width: 8px; height: 8px; border: 0; background: #caff5a; box-shadow: 0 0 16px rgba(202,255,90,.95); }
   .lumina-ico-sheet { align-items: flex-end; padding: 16px 12px 0; }
-  .lumina-ico-page { position: relative; width: min(430px, 100%); max-height: 82vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(136,255,143,.2); border-radius: 28px 28px 0 0; background: radial-gradient(circle at 80% 0%, rgba(117,255,120,.18), transparent 30%), linear-gradient(180deg, #101510, #050605); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
+  .lumina-ico-page { position: relative; width: min(430px, 100%); max-height: 74vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(136,255,143,.2); border-radius: 28px 28px 0 0; background: radial-gradient(circle at 80% 0%, rgba(117,255,120,.18), transparent 30%), linear-gradient(180deg, #101510, #050605); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
   .lumina-ico-close { position: absolute; z-index: 4; right: 16px; top: 14px; width: 36px; height: 36px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.06); color: #fff; font-size: 24px; line-height: 1; }
-  .lumina-ico-hero { position: relative; min-height: 154px; padding: 24px 24px 16px; display: grid; grid-template-columns: 70px 1fr; align-items: end; gap: 16px; overflow: hidden; }
+  .lumina-ico-hero { position: relative; min-height: 124px; padding: 18px 22px 12px; display: grid; grid-template-columns: 58px 1fr; align-items: end; gap: 14px; overflow: hidden; }
   .lumina-ico-hero::before { content: ""; position: absolute; right: -68px; top: -72px; width: 184px; height: 184px; border-radius: 50%; border: 1px solid rgba(151,255,122,.24); box-shadow: inset 0 0 54px rgba(91,255,124,.14); }
-  .lumina-ico-token { position: relative; width: 70px; height: 70px; border-radius: 50%; display: grid; place-items: center; background: #020502; box-shadow: 0 0 0 1px rgba(125,255,143,.2), 0 0 38px rgba(105,255,122,.32); overflow: hidden; }
+  .lumina-ico-token { position: relative; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: #020502; box-shadow: 0 0 0 1px rgba(125,255,143,.2), 0 0 38px rgba(105,255,122,.32); overflow: hidden; }
   .lumina-ico-token img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .lumina-ico-hero em { display: block; margin-bottom: 8px; color: #9dffa8; font-size: 12px; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
-  .lumina-ico-hero h2 { margin: 0; font-size: 31px; line-height: 1; font-weight: 950; letter-spacing: 0; }
-  .lumina-ico-hero p { max-width: 300px; margin: 9px 0 0; color: rgba(255,255,255,.72); font-size: 14px; line-height: 1.42; font-weight: 750; }
-  .lumina-ico-countdown { margin: 0 18px 12px; padding: 12px 14px; border: 1px solid rgba(126,255,140,.12); border-radius: 18px; display: flex; align-items: center; justify-content: space-between; background: rgba(124,255,138,.07); }
+  .lumina-ico-hero h2 { margin: 0; font-size: 27px; line-height: 1; font-weight: 950; letter-spacing: 0; }
+  .lumina-ico-hero p { max-width: 300px; margin: 7px 0 0; color: rgba(255,255,255,.72); font-size: 13px; line-height: 1.35; font-weight: 750; }
+  .lumina-ico-countdown { margin: 0 16px 10px; padding: 10px 12px; border: 1px solid rgba(126,255,140,.12); border-radius: 16px; display: flex; align-items: center; justify-content: space-between; background: rgba(124,255,138,.07); }
   .lumina-ico-countdown span { color: rgba(255,255,255,.52); font-size: 12px; font-weight: 850; }
   .lumina-ico-countdown b { color: #9cffaa; font-size: 17px; font-weight: 950; font-variant-numeric: tabular-nums; }
-  .lumina-ico-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 18px 14px; }
+  .lumina-ico-info { margin: 0 16px 10px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.08); border-radius: 16px; display: grid; gap: 3px; background: rgba(255,255,255,.04); }
+  .lumina-ico-info b { color: #fff; font-size: 15px; font-weight: 950; }
+  .lumina-ico-info span { color: #9cffaa; font-size: 12px; font-weight: 900; }
+  .lumina-ico-info small { color: rgba(255,255,255,.5); font-size: 11px; font-weight: 750; }
+  .lumina-ico-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 10px; }
   .lumina-ico-stats div, .lumina-ico-panel { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.045); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
   .lumina-ico-stats div { padding: 15px; }
   .lumina-ico-stats span, .lumina-ico-panel label, .lumina-ico-preview span, .lumina-ico-address span { display: block; color: rgba(255,255,255,.52); font-size: 12px; font-weight: 850; }
   .lumina-ico-stats b { display: block; margin-top: 8px; font-size: 18px; line-height: 1.1; font-weight: 950; }
   .lumina-ico-stats small { display: block; margin-top: 4px; color: #7cf28a; font-size: 11px; font-weight: 900; }
-  .lumina-ico-panel { margin: 0 18px 18px; padding: 18px; }
-  .lumina-ico-input { height: 62px; margin-top: 10px; padding: 0 16px; border: 1px solid rgba(144,255,151,.16); border-radius: 18px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.24); }
-  .lumina-ico-input input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: 28px; line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; }
+  .lumina-ico-panel { margin: 0 16px 16px; padding: 14px; }
+  .lumina-ico-input { height: 54px; margin-top: 8px; padding: 0 14px; border: 1px solid rgba(144,255,151,.16); border-radius: 16px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.24); }
+  .lumina-ico-input input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: 24px; line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; }
   .lumina-ico-input span { color: #91f79c; font-size: 15px; font-weight: 950; }
   .lumina-ico-preview, .lumina-ico-address { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .lumina-ico-preview b { color: #fff; font-size: 17px; font-weight: 950; text-align: right; }
   .lumina-ico-address button { min-width: 0; border: 0; border-radius: 12px; padding: 8px 10px; background: rgba(124,255,138,.12); color: #9cffaa; font-size: 12px; font-weight: 900; }
-  .lumina-ico-pay { width: 100%; min-height: 54px; margin-top: 18px; border: 0; border-radius: 18px; background: linear-gradient(135deg, #78f08a, #caff5a); color: #041006; font-size: 15px; font-weight: 950; box-shadow: 0 16px 32px rgba(104,255,128,.2); }
+  .lumina-ico-pay { width: 100%; min-height: 50px; margin-top: 14px; border: 0; border-radius: 16px; background: linear-gradient(135deg, #78f08a, #caff5a); color: #041006; font-size: 14px; font-weight: 950; box-shadow: 0 16px 32px rgba(104,255,128,.2); }
   .lumina-ico-pay:disabled { opacity: .48; box-shadow: none; }
   .lumina-ico-note { margin: 14px 2px 0; color: rgba(255,255,255,.48); font-size: 12px; line-height: 1.5; }
   @keyframes homeRingSpin { to { transform: rotate(360deg); } }

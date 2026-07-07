@@ -66,6 +66,7 @@ export type BackendSystemConfig = {
     treasuryAddress?: string;
     rate?: number;
     minWld?: number;
+    maxWld?: number;
     launchAt?: string | null;
     headlineI18n?: Record<string, string>;
     subtitleI18n?: Record<string, string>;

@@ -3395,10 +3395,11 @@ function enhancePrototypeHome() {
           treasuryAddress: String(ico.treasuryAddress || luminaIcoDefaults.treasuryAddress || "").trim(),
           rate: Math.max(1, Number(ico.rate || luminaIcoDefaults.rate || 1000)),
           minWld: Math.max(0.001, Number(ico.minWld || 0.1)),
+          maxWld: Math.max(0.001, Number(ico.maxWld || 100)),
           hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
-          launchAt: ico.launchAt || null,
+          launchAt: ico.launchAt || "2026-09-07T00:00:00.000Z",
           headline: homeBannerText(ico.headlineI18n, "Owning LUMINA may be your smartest choice."),
-          subtitle: homeBannerText(ico.subtitleI18n, "Reserve your allocation before the public launch begins.")
+          subtitle: homeBannerText(ico.subtitleI18n, "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 100 WLD.")
         };
       }
       function luminaIcoAllocation(){
@@ -3505,6 +3506,7 @@ function enhancePrototypeHome() {
               '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
             '</section>' +
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
+            '<section class="lumina-ico-info"><b>September 7</b><span>Airdrop + Exchange Listing</span><small>Max allocation ' + Number(ico.maxWld || 100).toLocaleString() + ' WLD per wallet</small></section>' +
             '<section class="lumina-ico-stats">' +
               '<div><span>Rate</span><b>1 WLD = ' + Number(ico.rate).toLocaleString() + '</b><small>LUMINA</small></div>' +
               '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
@@ -3535,8 +3537,11 @@ function enhancePrototypeHome() {
         }
         function refresh(){
           var wld = amount();
+          var remaining = Math.max(0, Number(ico.maxWld || 100) - Number(allocation.wld || 0));
           receive.textContent = Number(wld * ico.rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
-          pay.disabled = !treasury || wld < ico.minWld;
+          pay.disabled = !treasury || wld < ico.minWld || wld > remaining;
+          if (wld > remaining) pay.textContent = "Max " + remaining.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " WLD remaining";
+          else pay.textContent = treasury ? "Pay WLD and reserve LUMINA" : "Configure treasury address first";
         }
         input.oninput = refresh;
         if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast("Treasury address copied", "success"); }); };
@@ -3545,6 +3550,8 @@ function enhancePrototypeHome() {
           if (!treasury) { toast("ICO treasury address is not configured."); return; }
           if (!window.__luminaUserAddress) { toast("Please connect wallet first."); return; }
           if (wld < ico.minWld) { toast("Minimum " + ico.minWld + " WLD"); return; }
+          var remaining = Math.max(0, Number(ico.maxWld || 100) - Number(allocation.wld || 0));
+          if (wld > remaining) { toast("Maximum allocation is " + Number(ico.maxWld || 100).toLocaleString() + " WLD per wallet."); return; }
           if (!window.__luminaSendToken) { toast("World App payment is unavailable."); return; }
           pay.disabled = true;
           pay.textContent = "Waiting for World App...";
