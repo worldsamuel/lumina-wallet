@@ -316,6 +316,13 @@
   #view-home .action .ring { width: clamp(54px, 15.5vw, 64px); height: clamp(54px, 15.5vw, 64px); margin-bottom: 8px; border: 1px solid rgba(255,255,255,0.06) !important; background: #0f1110; color: var(--green); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.02), 0 12px 34px rgba(0,0,0,0.3) !important; }
   #view-home .action .ring svg { width: 30px; height: 30px; stroke-width: 1.9; }
   #view-home .action .lbl { color: #fff; font-size: 14px; font-weight: 650; }
+  #view-home .home-promo-slider { width: calc(100% - (var(--pad-screen) * 2)); margin: 8px var(--pad-screen) 8px; overflow: visible; }
+  #view-home .home-promo-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #view-home .home-promo-track::-webkit-scrollbar { display: none; }
+  #view-home .home-promo-track .home-points-banner { flex: 0 0 100%; width: 100%; margin: 0; scroll-snap-align: start; }
+  #view-home .home-promo-dots { height: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
+  #view-home .home-promo-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,255,255,.2); transition: width .18s ease, background .18s ease; }
+  #view-home .home-promo-dots button.active { width: 18px; background: var(--green); }
   #view-home .home-points-banner { position: relative; width: calc(100% - (var(--pad-screen) * 2)); min-height: 154px; margin: 8px var(--pad-screen) 8px; padding: 16px 54px 14px 116px; border: 1px solid rgba(128,255,159,.18); border-radius: 18px; display: grid; align-items: center; overflow: hidden; text-align: left; color: #fff; background: radial-gradient(circle at 14% 48%, rgba(93,255,126,.22), transparent 28%), radial-gradient(circle at 84% 70%, rgba(143,255,128,.18), transparent 24%), linear-gradient(112deg, #0b100c, #101a12 58%, #0a0d0b); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 46px rgba(0,0,0,.26); cursor: pointer; }
   #view-home .home-points-banner::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 18% 22%, rgba(167,255,169,.9) 0 1px, transparent 2px), radial-gradient(circle at 76% 78%, rgba(167,255,169,.85) 0 1px, transparent 2px), linear-gradient(90deg, rgba(74,222,128,.08), transparent 36%, rgba(74,222,128,.07)); pointer-events: none; }
   #view-home .home-points-orbit { position: absolute; left: 18px; top: 50%; width: 82px; height: 82px; transform: translateY(-50%); border-radius: 50%; display: grid; place-items: center; background: transparent; box-shadow: none; overflow: visible; }
@@ -351,6 +358,42 @@
   #view-home .home-points-spark.s3 { right: 70px; top: 32px; opacity: .62; }
   #view-home .home-points-spark.s4 { right: 58px; top: 8px; width: 2px; height: 2px; opacity: .7; }
   #view-home .home-points-chev { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-size: 34px; line-height: 1; z-index: 1; }
+  #view-home .home-ico-banner { border-color: rgba(165,255,109,.28); background: radial-gradient(circle at 18% 50%, rgba(178,255,85,.24), transparent 30%), radial-gradient(circle at 86% 24%, rgba(72,222,128,.22), transparent 28%), linear-gradient(112deg, #0a0d09, #162012 55%, #09110c); }
+  #view-home .home-ico-banner::before { background: linear-gradient(110deg, rgba(177,255,66,.12), transparent 44%, rgba(74,222,128,.1)), radial-gradient(circle at 72% 16%, rgba(255,255,255,.55) 0 1px, transparent 2px); }
+  #view-home .home-ico-orb { position: absolute; left: 20px; top: 50%; width: 80px; height: 80px; transform: translateY(-50%); border-radius: 28px; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, rgba(206,255,92,.9), rgba(74,222,128,.35) 38%, rgba(8,14,9,.96) 70%); box-shadow: inset 0 0 0 1px rgba(185,255,112,.36), 0 0 34px rgba(95,255,126,.34); }
+  #view-home .home-ico-orb i { position: relative; z-index: 2; color: #031007; font-style: normal; font-size: 36px; font-weight: 950; }
+  #view-home .home-ico-orb b { position: absolute; inset: 11px; border: 1px solid rgba(255,255,255,.4); border-radius: 23px; transform: rotate(18deg); }
+  #view-home .home-ico-rays { position: absolute; right: 24px; top: 24px; width: 82px; height: 82px; border-radius: 50%; pointer-events: none; opacity: .82; background: radial-gradient(circle, rgba(153,255,99,.36), transparent 62%); filter: drop-shadow(0 0 20px rgba(112,255,124,.42)); }
+  #view-home .home-ico-rays i { position: absolute; inset: 14px; border: 1px solid rgba(142,255,118,.32); border-radius: 50%; }
+  #view-home .home-ico-rays i:nth-child(2) { inset: 25px; border-color: rgba(255,255,255,.2); }
+  #view-home .home-ico-rays i:nth-child(3) { left: 38px; top: -5px; width: 8px; height: 8px; border: 0; background: #caff5a; box-shadow: 0 0 16px rgba(202,255,90,.95); }
+  .lumina-ico-sheet { align-items: flex-end; padding: 16px 12px 0; }
+  .lumina-ico-page { position: relative; width: min(430px, 100%); max-height: 88vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(136,255,143,.2); border-radius: 30px 30px 0 0; background: radial-gradient(circle at 80% 0%, rgba(117,255,120,.2), transparent 34%), linear-gradient(180deg, #101510, #050605); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
+  .lumina-ico-close { position: absolute; z-index: 4; right: 18px; top: 16px; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.06); color: #fff; font-size: 24px; line-height: 1; }
+  .lumina-ico-hero { position: relative; min-height: 210px; padding: 34px 26px 22px; display: grid; align-content: end; gap: 18px; overflow: hidden; }
+  .lumina-ico-hero::before { content: ""; position: absolute; right: -74px; top: -56px; width: 210px; height: 210px; border-radius: 50%; border: 1px solid rgba(151,255,122,.24); box-shadow: inset 0 0 60px rgba(91,255,124,.16); }
+  .lumina-ico-token { position: relative; width: 92px; height: 92px; border-radius: 32px; display: grid; place-items: center; background: radial-gradient(circle at 36% 28%, #d6ff64, #52e682 38%, #071009 72%); box-shadow: 0 0 50px rgba(105,255,122,.32), inset 0 0 0 1px rgba(255,255,255,.16); }
+  .lumina-ico-token span { color: #031007; font-size: 44px; font-weight: 950; }
+  .lumina-ico-token i { position: absolute; inset: 12px; border: 1px solid rgba(255,255,255,.42); border-radius: 26px; transform: rotate(18deg); }
+  .lumina-ico-hero em { display: block; margin-bottom: 8px; color: #9dffa8; font-size: 12px; font-style: normal; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+  .lumina-ico-hero h2 { margin: 0; font-size: 38px; line-height: 1; font-weight: 950; letter-spacing: 0; }
+  .lumina-ico-hero p { max-width: 320px; margin: 12px 0 0; color: rgba(255,255,255,.72); font-size: 15px; line-height: 1.45; font-weight: 700; }
+  .lumina-ico-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 18px 14px; }
+  .lumina-ico-stats div, .lumina-ico-panel { border: 1px solid rgba(255,255,255,.08); border-radius: 20px; background: rgba(255,255,255,.045); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+  .lumina-ico-stats div { padding: 15px; }
+  .lumina-ico-stats span, .lumina-ico-panel label, .lumina-ico-preview span, .lumina-ico-address span { display: block; color: rgba(255,255,255,.52); font-size: 12px; font-weight: 850; }
+  .lumina-ico-stats b { display: block; margin-top: 8px; font-size: 18px; line-height: 1.1; font-weight: 950; }
+  .lumina-ico-stats small { display: block; margin-top: 4px; color: #7cf28a; font-size: 11px; font-weight: 900; }
+  .lumina-ico-panel { margin: 0 18px 18px; padding: 18px; }
+  .lumina-ico-input { height: 62px; margin-top: 10px; padding: 0 16px; border: 1px solid rgba(144,255,151,.16); border-radius: 18px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.24); }
+  .lumina-ico-input input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: 28px; line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; }
+  .lumina-ico-input span { color: #91f79c; font-size: 15px; font-weight: 950; }
+  .lumina-ico-preview, .lumina-ico-address { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .lumina-ico-preview b { color: #fff; font-size: 17px; font-weight: 950; text-align: right; }
+  .lumina-ico-address button { min-width: 0; border: 0; border-radius: 12px; padding: 8px 10px; background: rgba(124,255,138,.12); color: #9cffaa; font-size: 12px; font-weight: 900; }
+  .lumina-ico-pay { width: 100%; min-height: 54px; margin-top: 18px; border: 0; border-radius: 18px; background: linear-gradient(135deg, #78f08a, #caff5a); color: #041006; font-size: 15px; font-weight: 950; box-shadow: 0 16px 32px rgba(104,255,128,.2); }
+  .lumina-ico-pay:disabled { opacity: .48; box-shadow: none; }
+  .lumina-ico-note { margin: 14px 2px 0; color: rgba(255,255,255,.48); font-size: 12px; line-height: 1.5; }
   @keyframes homeRingSpin { to { transform: rotate(360deg); } }
   @keyframes homeDotOrbit { from { transform: rotate(0deg) translateX(40px) rotate(0deg); } to { transform: rotate(360deg) translateX(40px) rotate(-360deg); } }
   @media (max-width: 390px) {
@@ -359,6 +402,9 @@
     #view-home .home-points-orbit img { width: 52px; height: 52px; }
     #view-home .home-points-copy small { max-width: 190px; }
     #view-home .home-points-gifts { right: 26px; top: 20px; transform: scale(.66); transform-origin: top right; opacity: .84; }
+    #view-home .home-ico-orb { left: 12px; width: 72px; height: 72px; border-radius: 24px; }
+    #view-home .home-ico-orb i { font-size: 31px; }
+    #view-home .home-ico-rays { right: 18px; transform: scale(.76); transform-origin: top right; }
   }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }

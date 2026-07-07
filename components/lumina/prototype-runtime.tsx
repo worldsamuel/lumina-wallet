@@ -24,6 +24,13 @@ import { executeSwap, friendlySwapError, type ExecuteSwapParams } from "@/lib/sw
 import { sendToken, friendlySendError, type SendParams, type SendResult } from "@/lib/transfer/sendToken";
 import { TOKENS } from "@/lib/tokens";
 
+const LUMINA_ICO_TREASURY_ADDRESS =
+  process.env.NEXT_PUBLIC_LUMINA_ICO_TREASURY_ADDRESS ||
+  process.env.NEXT_PUBLIC_SWAP_FEE_RECIPIENT ||
+  "";
+const WLD_TOKEN_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003";
+const LUMINA_ICO_RATE = 1000;
+
 type PrototypeRuntimeProps = {
   initialView: string;
 };
@@ -3351,6 +3358,11 @@ function enhancePrototypeHome() {
       function homeSystemConfig(){
         try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
       }
+      var luminaIcoDefaults = {
+        treasuryAddress: ${JSON.stringify(LUMINA_ICO_TREASURY_ADDRESS)},
+        wldTokenAddress: ${JSON.stringify(WLD_TOKEN_ADDRESS)},
+        rate: ${LUMINA_ICO_RATE}
+      };
       function homePointsBannerConfig(){
         var cfg = homeSystemConfig();
         var banner = cfg && cfg.pointsHomeBanner ? cfg.pointsHomeBanner : {};
@@ -3362,27 +3374,183 @@ function enhancePrototypeHome() {
           box: homeBannerText(banner.boxLabelI18n, "Mystery Box")
         };
       }
+      function luminaIcoConfig(){
+        var cfg = homeSystemConfig();
+        var ico = cfg && cfg.ico ? cfg.ico : {};
+        return {
+          enabled: ico.enabled !== false,
+          treasuryAddress: String(ico.treasuryAddress || luminaIcoDefaults.treasuryAddress || "").trim(),
+          rate: Math.max(1, Number(ico.rate || luminaIcoDefaults.rate || 1000)),
+          minWld: Math.max(0.001, Number(ico.minWld || 0.1)),
+          hardCap: Math.max(0, Number(ico.hardCap || 1000000))
+        };
+      }
+      function luminaIcoAllocation(){
+        try { return JSON.parse(localStorage.getItem("lumina_ico_allocation_v1:" + String(window.__luminaUserAddress || "guest").toLowerCase()) || '{"wld":0,"lumina":0,"orders":[]}'); } catch(e) { return { wld:0, lumina:0, orders:[] }; }
+      }
+      function saveLuminaIcoAllocation(row){
+        var key = "lumina_ico_allocation_v1:" + String(window.__luminaUserAddress || "guest").toLowerCase();
+        var current = luminaIcoAllocation();
+        current.wld = Number(current.wld || 0) + Number(row.wld || 0);
+        current.lumina = Number(current.lumina || 0) + Number(row.lumina || 0);
+        current.orders = Array.isArray(current.orders) ? current.orders : [];
+        current.orders.unshift(row);
+        current.orders = current.orders.slice(0, 20);
+        try { localStorage.setItem(key, JSON.stringify(current)); } catch(e) {}
+        return current;
+      }
+      function renderHomePromoDots(active){
+        var dots = document.getElementById("homePromoDots");
+        if (!dots) return;
+        dots.querySelectorAll("button").forEach(function(btn, index){ btn.classList.toggle("active", index === active); });
+      }
+      function attachHomePromoSlider(slider){
+        var track = slider && slider.querySelector(".home-promo-track");
+        if (!track || track.__luminaSliderWired) return;
+        track.__luminaSliderWired = true;
+        track.addEventListener("scroll", function(){
+          var width = Math.max(1, track.clientWidth);
+          renderHomePromoDots(Math.round(track.scrollLeft / width));
+        }, { passive: true });
+        var dots = slider.querySelectorAll(".home-promo-dots button");
+        dots.forEach(function(btn, index){
+          btn.onclick = function(event){
+            event.preventDefault();
+            event.stopPropagation();
+            track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
+          };
+        });
+      }
       function ensureHomePointsBanner(){
         var home = document.getElementById("view-home");
         if (!home) return;
         var cfg = homePointsBannerConfig();
-        var existing = document.getElementById("homePointsBanner");
-        if (!cfg.enabled) { if (existing) existing.remove(); return; }
-        if (!existing) {
+        var slider = document.getElementById("homePromoSlider");
+        if (!cfg.enabled) { if (slider) slider.remove(); return; }
+        if (!slider) {
           var section = home.querySelector(".section-head");
           if (!section) return;
-          existing = document.createElement("button");
-          existing.type = "button";
-          existing.id = "homePointsBanner";
-          existing.className = "home-points-banner";
-          existing.onclick = function(){ if (typeof window.openPointsCenter === "function") window.openPointsCenter(); };
-          section.insertAdjacentElement("beforebegin", existing);
+          var old = document.getElementById("homePointsBanner");
+          if (old) old.remove();
+          slider = document.createElement("div");
+          slider.id = "homePromoSlider";
+          slider.className = "home-promo-slider";
+          slider.innerHTML =
+            '<div class="home-promo-track">' +
+              '<button type="button" id="homePointsBanner" class="home-points-banner"></button>' +
+              '<button type="button" id="homeIcoBanner" class="home-points-banner home-ico-banner"></button>' +
+            '</div>' +
+            '<div class="home-promo-dots" id="homePromoDots"><button type="button" class="active"></button><button type="button"></button></div>';
+          section.insertAdjacentElement("beforebegin", slider);
+          attachHomePromoSlider(slider);
         }
+        var existing = document.getElementById("homePointsBanner");
+        var icoBanner = document.getElementById("homeIcoBanner");
+        if (existing) existing.onclick = function(){ if (typeof window.openPointsCenter === "function") window.openPointsCenter(); };
         existing.innerHTML =
           '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
           '<span class="home-points-copy"><b>' + homeBannerEscape(cfg.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(cfg.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(cfg.tasks) + '</i><i class="gift">' + homeBannerEscape(cfg.box) + '</i></span></span>' +
           '<span class="home-points-gifts" aria-hidden="true"><span class="home-points-cube"><b>?</b><i>?</i><em>?</em></span><span class="home-points-spark s1"></span><span class="home-points-spark s2"></span><span class="home-points-spark s3"></span><span class="home-points-spark s4"></span></span><span class="home-points-chev">›</span>';
+        if (icoBanner) {
+          var ico = luminaIcoConfig();
+          icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
+          icoBanner.innerHTML =
+            '<span class="home-ico-orb"><i>L</i><b></b></span>' +
+            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>Send WLD to the treasury address and receive LUMINA token allocation.</small><span class="home-points-actions"><i>WLD Pay</i><i class="gift">Get LUMINA</i></span></span>' +
+            '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
+        }
       }
+      window.openLuminaIco = async function(){
+        var old = document.getElementById("luminaIcoSheet");
+        if (old) old.remove();
+        var ico = luminaIcoConfig();
+        var allocation = luminaIcoAllocation();
+        var treasury = ico.treasuryAddress;
+        var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : "Not configured";
+        var sheet = document.createElement("div");
+        sheet.id = "luminaIcoSheet";
+        sheet.className = "modal-mask open lumina-ico-sheet";
+        sheet.innerHTML =
+          '<div class="lumina-ico-page">' +
+            '<button type="button" class="lumina-ico-close" id="icoCloseBtn">×</button>' +
+            '<section class="lumina-ico-hero">' +
+              '<div class="lumina-ico-token"><span>L</span><i></i></div>' +
+              '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>Send WLD to the treasury address and receive your LUMINA token allocation.</p></div>' +
+            '</section>' +
+            '<section class="lumina-ico-stats">' +
+              '<div><span>Rate</span><b>1 WLD = ' + Number(ico.rate).toLocaleString() + '</b><small>LUMINA</small></div>' +
+              '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
+            '</section>' +
+            '<section class="lumina-ico-panel">' +
+              '<label>Pay with WLD</label>' +
+              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + ico.minWld + '" /><span>WLD</span></div>' +
+              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(ico.minWld * ico.rate).toLocaleString() + ' LUMINA</b></div>' +
+              '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
+              '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay WLD and reserve LUMINA" : "Configure treasury address first") + '</button>' +
+              '<p class="lumina-ico-note">The allocation is recorded after World App confirms the WLD transfer. Final token distribution follows Lumina ICO rules.</p>' +
+            '</section>' +
+          '</div>';
+        document.body.appendChild(sheet);
+        var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
+        sheet.onclick = function(event){ if (event.target === sheet) close(); };
+        document.getElementById("icoCloseBtn").onclick = close;
+        var input = document.getElementById("icoWldAmount");
+        var receive = document.getElementById("icoReceiveAmount");
+        var pay = document.getElementById("icoPayBtn");
+        var copy = document.getElementById("icoCopyTreasury");
+        function amount(){
+          var value = Number(String(input.value || "").replace(/,/g, ""));
+          return Number.isFinite(value) ? Math.max(0, value) : 0;
+        }
+        function refresh(){
+          var wld = amount();
+          receive.textContent = Number(wld * ico.rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
+          pay.disabled = !treasury || wld < ico.minWld;
+        }
+        input.oninput = refresh;
+        if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast("Treasury address copied", "success"); }); };
+        pay.onclick = async function(){
+          var wld = amount();
+          if (!treasury) { toast("ICO treasury address is not configured."); return; }
+          if (!window.__luminaUserAddress) { toast("Please connect wallet first."); return; }
+          if (wld < ico.minWld) { toast("Minimum " + ico.minWld + " WLD"); return; }
+          if (!window.__luminaSendToken) { toast("World App payment is unavailable."); return; }
+          pay.disabled = true;
+          pay.textContent = "Waiting for World App...";
+          try {
+            var result = await window.__luminaSendToken({
+              tokenSymbol: "WLD",
+              tokenAddress: luminaIcoDefaults.wldTokenAddress,
+              tokenDecimals: 18,
+              recipient: treasury,
+              amountHuman: String(wld),
+              userAddress: window.__luminaUserAddress || ""
+            });
+            if (result.status === "success") {
+              var row = saveLuminaIcoAllocation({ wld: wld, lumina: wld * ico.rate, hash: result.txHash || "", createdAt: new Date().toISOString() });
+              var value = document.getElementById("icoAllocationValue");
+              if (value) value.textContent = Number(row.lumina || 0).toLocaleString();
+              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(wld * ico.rate).toLocaleString() + " LUMINA", amount:"-" + wld + " WLD", status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
+              if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+              toast("LUMINA allocation reserved", "success");
+              pay.textContent = "Reserved";
+            } else if (result.status === "user_rejected") {
+              toast("Payment cancelled");
+              pay.textContent = "Pay WLD and reserve LUMINA";
+            } else {
+              var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Payment failed");
+              toast("Payment failed: " + msg);
+              pay.textContent = "Pay WLD and reserve LUMINA";
+            }
+          } catch(e) {
+            toast("Payment failed: " + ((e && e.message) || "unknown error"));
+            pay.textContent = "Pay WLD and reserve LUMINA";
+          } finally {
+            refresh();
+          }
+        };
+        refresh();
+      };
       function welcomeBoxKey(){
         return "lumina_welcome_box_seen_" + String(window.__luminaUserAddress || "guest").toLowerCase();
       }
