@@ -3382,10 +3382,10 @@ function enhancePrototypeHome() {
       };
       function defaultIcoPaymentTokens(){
         return [
-          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:100 },
-          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300 },
-          { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.00001, maxAmount:0.01 },
-          { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5 }
+          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:100, luminaRate:1000 },
+          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300, luminaRate:5000 },
+          { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:100000000 },
+          { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:1000000 }
         ];
       }
       function normalizeIcoPaymentTokens(rows){
@@ -3402,7 +3402,8 @@ function enhancePrototypeHome() {
             address: row.address === null ? null : String(row.address || fallbackRow.address || "").trim(),
             decimals: Math.max(0, Number(row.decimals != null ? row.decimals : fallbackRow.decimals || 18)),
             minAmount: Math.max(0.00000001, Number(row.minAmount != null ? row.minAmount : fallbackRow.minAmount || 0.001)),
-            maxAmount: Math.max(0.00000001, Number(row.maxAmount != null ? row.maxAmount : fallbackRow.maxAmount || 1))
+            maxAmount: Math.max(0.00000001, Number(row.maxAmount != null ? row.maxAmount : fallbackRow.maxAmount || 1)),
+            luminaRate: Math.max(1, Number(row.luminaRate != null ? row.luminaRate : fallbackRow.luminaRate || luminaIcoDefaults.rate || 1000))
           };
         }).filter(Boolean);
         return out.length ? out : fallback;
@@ -3552,14 +3553,14 @@ function enhancePrototypeHome() {
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
             '<section class="lumina-ico-info"><b>September 7</b><span>Airdrop + Exchange Listing</span><small id="icoMaxHint">Max allocation ' + Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }) + ' ' + homeBannerEscape(selectedToken.symbol) + ' per wallet</small></section>' +
             '<section class="lumina-ico-stats">' +
-              '<div><span>Rate</span><b>1 WLD = ' + Number(ico.rate).toLocaleString() + '</b><small>LUMINA</small></div>' +
+              '<div><span>Rate</span><b id="icoRateValue">1 ' + homeBannerEscape(selectedToken.symbol) + ' = ' + Number(selectedToken.luminaRate || ico.rate).toLocaleString() + ' LUMINA</b></div>' +
               '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
             '</section>' +
             '<section class="lumina-ico-panel">' +
               '<label>Pay with</label>' +
               '<select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select>' +
               '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + selectedToken.minAmount + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
-              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(selectedToken.minAmount * ico.rate).toLocaleString() + ' LUMINA</b></div>' +
+              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(selectedToken.minAmount * (selectedToken.luminaRate || ico.rate)).toLocaleString() + ' LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay " + homeBannerEscape(selectedToken.symbol) + " and reserve LUMINA" : "Configure treasury address first") + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
@@ -3587,6 +3588,16 @@ function enhancePrototypeHome() {
           var symbol = tokenSelect ? String(tokenSelect.value || "WLD").toUpperCase() : "WLD";
           return ico.paymentTokens.find(function(token){ return token.symbol === symbol; }) || selectedToken;
         }
+        function tokenRate(token){
+          return Math.max(1, Number((token && token.luminaRate) || ico.rate || 1000));
+        }
+        function receiveLumina(value, token){
+          return value * tokenRate(token);
+        }
+        function rateLabel(token){
+          token = token || currentToken();
+          return "1 " + token.symbol + " = " + Number(tokenRate(token)).toLocaleString() + " LUMINA";
+        }
         function refresh(){
           var token = currentToken();
           var value = amount();
@@ -3594,7 +3605,9 @@ function enhancePrototypeHome() {
           var remaining = Math.max(0, Number(token.maxAmount || 0) - used);
           if (tokenSuffix) tokenSuffix.textContent = token.symbol;
           if (maxHint) maxHint.textContent = "Max allocation " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet";
-          receive.textContent = Number(value * ico.rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
+          var rateBox = document.getElementById("icoRateValue");
+          if (rateBox) rateBox.textContent = rateLabel(token);
+          receive.textContent = Number(receiveLumina(value, token)).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
           pay.disabled = !treasury || value < token.minAmount || value > remaining;
           if (value > remaining) pay.textContent = "Max " + remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " remaining";
           else if (value < token.minAmount) pay.textContent = "Minimum " + token.minAmount + " " + token.symbol;
@@ -3628,10 +3641,10 @@ function enhancePrototypeHome() {
               userAddress: window.__luminaUserAddress || ""
             });
             if (result.status === "success") {
-              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: value * ico.rate, hash: result.txHash || "", createdAt: new Date().toISOString() });
+              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: receiveLumina(value, token), hash: result.txHash || "", createdAt: new Date().toISOString() });
               var allocationValue = document.getElementById("icoAllocationValue");
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
-              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(amount() * ico.rate).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
+              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(receiveLumina(amount(), token)).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
               toast("LUMINA allocation reserved", "success");
               pay.textContent = "Reserved";

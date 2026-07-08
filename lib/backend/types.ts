@@ -74,6 +74,7 @@ export type BackendSystemConfig = {
       decimals?: number;
       minAmount?: number;
       maxAmount?: number;
+      luminaRate?: number;
     }>;
     launchAt?: string | null;
     headlineI18n?: Record<string, string>;
