@@ -3561,7 +3561,7 @@ function enhancePrototypeHome() {
             '<section class="lumina-ico-panel">' +
               '<label>Pay with</label>' +
               '<div class="lumina-ico-select-wrap"><select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select><span>⌄</span></div>' +
-              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
+              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><button type="button" id="icoMaxBtn">MAX</button><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
               '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay " + homeBannerEscape(selectedToken.symbol) + " and reserve LUMINA" : "Configure treasury address first") + '</button>' +
@@ -3575,6 +3575,7 @@ function enhancePrototypeHome() {
         var input = document.getElementById("icoWldAmount");
         var tokenSelect = document.getElementById("icoPayToken");
         var tokenSuffix = document.getElementById("icoTokenSuffix");
+        var maxBtn = document.getElementById("icoMaxBtn");
         var maxHint = document.getElementById("icoMaxHint");
         var receive = document.getElementById("icoReceiveAmount");
         var pay = document.getElementById("icoPayBtn");
@@ -3603,13 +3604,33 @@ function enhancePrototypeHome() {
         function formatIcoRange(token){
           return Number(token.minAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + "~" + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol;
         }
+        function remainingForToken(token){
+          var used = Number((allocation.byToken || {})[token.symbol] || 0);
+          return Math.max(0, Number(token.maxAmount || 0) - used);
+        }
+        function balanceForToken(token){
+          var keys = [token.paySymbol, token.symbol].filter(Boolean).map(function(value){ return String(value).toUpperCase(); });
+          for (var i = 0; i < keys.length; i++) {
+            var raw = balances && balances[keys[i]];
+            if (raw === undefined || raw === null) continue;
+            var numeric = Number(String(raw).replace(/,/g, "").replace(/^</, "").replace(/[A-Z$ ]/g, "").trim());
+            if (Number.isFinite(numeric)) return Math.max(0, numeric);
+          }
+          return 0;
+        }
+        function maxPayAmount(token){
+          return Math.min(balanceForToken(token), remainingForToken(token));
+        }
+        function formatAmountInput(value){
+          return Number(value || 0).toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: 8 });
+        }
         function refresh(){
           var token = currentToken();
           var value = amount();
-          var used = Number((allocation.byToken || {})[token.symbol] || 0);
-          var remaining = Math.max(0, Number(token.maxAmount || 0) - used);
+          var remaining = remainingForToken(token);
           if (tokenSuffix) tokenSuffix.textContent = token.symbol;
           if (input) input.placeholder = formatIcoRange(token);
+          if (maxBtn) maxBtn.disabled = maxPayAmount(token) <= 0;
           if (maxHint) maxHint.textContent = "Max allocation " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet";
           var rateBox = document.getElementById("icoRateValue");
           if (rateBox) rateBox.textContent = rateLabel(token);
@@ -3620,6 +3641,10 @@ function enhancePrototypeHome() {
           else pay.textContent = treasury ? "Pay " + token.symbol + " and reserve LUMINA" : "Configure treasury address first";
         }
         input.oninput = refresh;
+        if (maxBtn) maxBtn.onclick = function(){
+          input.value = formatAmountInput(maxPayAmount(currentToken()));
+          refresh();
+        };
         if (tokenSelect) tokenSelect.onchange = function(){
           input.value = "";
           refresh();
