@@ -67,6 +67,7 @@ declare global {
     __luminaRefreshPoints?: () => void;
     __luminaCompleteTask?: (id: string, silent?: boolean) => void;
     __luminaIcoCountdownTimer?: ReturnType<typeof setInterval>;
+    __luminaEnsureHomePointsBanner?: () => void;
     __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
@@ -3366,9 +3367,49 @@ function enhancePrototypeHome() {
         return String(text == null ? "" : text).replace(/[&<>"']/g, function(ch){ return ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" })[ch]; });
       }
       function homeBannerText(map, fallback){
-        var lang = window.currentLang || "en";
+        var lang = window.currentLang || localStorage.getItem("ww_lang_pref_v2") || "en";
         map = map || {};
         return map[lang] || map.en || map["zh-CN"] || fallback || "";
+      }
+      var icoCopyMap = {
+        headline: { en:"Owning LUMINA may be your smartest choice.", "zh-CN":"拥有 LUMINA，将会是你最明智的选择。", "zh-TW":"擁有 LUMINA，將會是你最明智的選擇。", fr:"Posséder LUMINA pourrait être votre meilleur choix.", de:"LUMINA zu besitzen könnte Ihre klügste Entscheidung sein.", es:"Tener LUMINA puede ser tu decisión más inteligente.", ja:"LUMINA を持つことは、あなたの賢い選択になるかもしれません。" },
+        subtitle: { en:"Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.", "zh-CN":"9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。", "zh-TW":"9 月 7 日進行代幣空投並上線交易所。每個錢包最多可分配 1000 WLD 額度。", fr:"L'airdrop et la cotation en bourse sont prévus le 7 septembre. Chaque wallet peut réserver jusqu'à 1000 WLD.", de:"Airdrop und Börsenlisting sind für den 7. September geplant. Jede Wallet kann bis zu 1000 WLD reservieren.", es:"El airdrop y la cotización en exchange están programados para el 7 de septiembre. Cada billetera puede reservar hasta 1000 WLD.", ja:"エアドロップと取引所上場は9月7日に予定されています。各ウォレットは最大1000 WLDまで予約できます。" },
+        publicAllocation: { en:"Public Allocation", "zh-CN":"公开额度", "zh-TW":"公開額度", fr:"Allocation publique", de:"Öffentliche Zuteilung", es:"Asignación pública", ja:"公開割当" },
+        september7: { en:"September 7", "zh-CN":"9 月 7 日", "zh-TW":"9 月 7 日", fr:"7 septembre", de:"7. September", es:"7 de septiembre", ja:"9月7日" },
+        airdropListing: { en:"Airdrop + Exchange Listing", "zh-CN":"空投 + 上线交易所", "zh-TW":"空投 + 上線交易所", fr:"Airdrop + cotation en bourse", de:"Airdrop + Börsenlisting", es:"Airdrop + listado en exchange", ja:"エアドロップ + 取引所上場" },
+        maxAllocation: { en:"Max allocation {amount} {symbol} per wallet", "zh-CN":"每个钱包最多可分配 {amount} {symbol}", "zh-TW":"每個錢包最多可分配 {amount} {symbol}", fr:"Allocation max. {amount} {symbol} par wallet", de:"Max. Zuteilung {amount} {symbol} pro Wallet", es:"Asignación máxima {amount} {symbol} por billetera", ja:"ウォレットごとの最大割当 {amount} {symbol}" },
+        rate: { en:"Rate", "zh-CN":"兑换比例", "zh-TW":"兌換比例", fr:"Taux", de:"Kurs", es:"Tasa", ja:"レート" },
+        yourAllocation: { en:"Your allocation", "zh-CN":"你的额度", "zh-TW":"你的額度", fr:"Votre allocation", de:"Ihre Zuteilung", es:"Tu asignación", ja:"あなたの割当" },
+        payWith: { en:"Pay with", "zh-CN":"支付代币", "zh-TW":"支付代幣", fr:"Payer avec", de:"Bezahlen mit", es:"Pagar con", ja:"支払い方法" },
+        youReceive: { en:"You receive", "zh-CN":"你将获得", "zh-TW":"你將獲得", fr:"Vous recevez", de:"Sie erhalten", es:"Recibes", ja:"受け取る数量" },
+        treasury: { en:"Treasury", "zh-CN":"金库", "zh-TW":"金庫", fr:"Trésorerie", de:"Treasury", es:"Tesorería", ja:"トレジャリー" },
+        payReserve: { en:"Pay {symbol} and reserve LUMINA", "zh-CN":"支付 {symbol} 并预留 LUMINA", "zh-TW":"支付 {symbol} 並預留 LUMINA", fr:"Payer en {symbol} et réserver LUMINA", de:"Mit {symbol} zahlen und LUMINA reservieren", es:"Pagar {symbol} y reservar LUMINA", ja:"{symbol} で支払い LUMINA を予約" },
+        configureTreasury: { en:"Configure treasury address first", "zh-CN":"请先配置金库地址", "zh-TW":"請先配置金庫地址", fr:"Configurez d'abord l'adresse de trésorerie", de:"Zuerst Treasury-Adresse einrichten", es:"Configura primero la dirección de tesorería", ja:"先にトレジャリーアドレスを設定してください" },
+        minimum: { en:"Minimum {amount} {symbol}", "zh-CN":"最低 {amount} {symbol}", "zh-TW":"最低 {amount} {symbol}", fr:"Minimum {amount} {symbol}", de:"Minimum {amount} {symbol}", es:"Mínimo {amount} {symbol}", ja:"最小 {amount} {symbol}" },
+        maxRemaining: { en:"Max {amount} {symbol} remaining", "zh-CN":"剩余额度最多 {amount} {symbol}", "zh-TW":"剩餘額度最多 {amount} {symbol}", fr:"Reste max. {amount} {symbol}", de:"Max. verbleibend {amount} {symbol}", es:"Máximo restante {amount} {symbol}", ja:"残り上限 {amount} {symbol}" },
+        copiedTreasury: { en:"Treasury address copied", "zh-CN":"金库地址已复制", "zh-TW":"金庫地址已複製", fr:"Adresse de trésorerie copiée", de:"Treasury-Adresse kopiert", es:"Dirección de tesorería copiada", ja:"トレジャリーアドレスをコピーしました" },
+        noTreasury: { en:"ICO treasury address is not configured.", "zh-CN":"ICO 金库地址未配置。", "zh-TW":"ICO 金庫地址未配置。", fr:"L'adresse de trésorerie ICO n'est pas configurée.", de:"ICO-Treasury-Adresse ist nicht konfiguriert.", es:"La dirección de tesorería ICO no está configurada.", ja:"ICO トレジャリーアドレスが設定されていません。" },
+        connectWallet: { en:"Please connect wallet first.", "zh-CN":"请先连接钱包。", "zh-TW":"請先連接錢包。", fr:"Connectez d'abord votre wallet.", de:"Bitte zuerst Wallet verbinden.", es:"Conecta primero tu billetera.", ja:"先にウォレットを接続してください。" },
+        maxAllocationToast: { en:"Maximum allocation is {amount} {symbol} per wallet.", "zh-CN":"每个钱包最多可分配 {amount} {symbol}。", "zh-TW":"每個錢包最多可分配 {amount} {symbol}。", fr:"L'allocation maximale est de {amount} {symbol} par wallet.", de:"Die maximale Zuteilung beträgt {amount} {symbol} pro Wallet.", es:"La asignación máxima es {amount} {symbol} por billetera.", ja:"ウォレットごとの最大割当は {amount} {symbol} です。" },
+        paymentUnavailable: { en:"World App payment is unavailable.", "zh-CN":"World App 支付暂不可用。", "zh-TW":"World App 支付暫不可用。", fr:"Le paiement World App est indisponible.", de:"World App-Zahlung ist nicht verfügbar.", es:"El pago de World App no está disponible.", ja:"World App の支払いは利用できません。" },
+        waitingWorldApp: { en:"Waiting for World App...", "zh-CN":"等待 World App 确认...", "zh-TW":"等待 World App 確認...", fr:"En attente de World App...", de:"Warten auf World App...", es:"Esperando World App...", ja:"World App を待機中..." },
+        launchCountdown: { en:"Launch countdown", "zh-CN":"上线倒计时", "zh-TW":"上線倒數", fr:"Compte à rebours", de:"Countdown zum Start", es:"Cuenta atrás", ja:"ローンチまで" },
+        icoStatus: { en:"ICO Status", "zh-CN":"ICO 状态", "zh-TW":"ICO 狀態", fr:"Statut ICO", de:"ICO-Status", es:"Estado ICO", ja:"ICO ステータス" },
+        live: { en:"LIVE", "zh-CN":"进行中", "zh-TW":"進行中", fr:"EN DIRECT", de:"LIVE", es:"EN VIVO", ja:"公開中" },
+        wldPay: { en:"WLD Pay", "zh-CN":"WLD 支付", "zh-TW":"WLD 支付", fr:"Paiement WLD", de:"WLD-Zahlung", es:"Pago WLD", ja:"WLD 支払い" },
+        reserve: { en:"Reserve", "zh-CN":"预留", "zh-TW":"預留", fr:"Réserver", de:"Reservieren", es:"Reservar", ja:"予約" },
+        allocationReserved: { en:"LUMINA allocation reserved", "zh-CN":"LUMINA 额度已预留", "zh-TW":"LUMINA 額度已預留", fr:"Allocation LUMINA réservée", de:"LUMINA-Zuteilung reserviert", es:"Asignación LUMINA reservada", ja:"LUMINA 割当を予約しました" },
+        reserved: { en:"Reserved", "zh-CN":"已预留", "zh-TW":"已預留", fr:"Réservé", de:"Reserviert", es:"Reservado", ja:"予約済み" },
+        paymentCancelled: { en:"Payment cancelled", "zh-CN":"支付已取消", "zh-TW":"支付已取消", fr:"Paiement annulé", de:"Zahlung abgebrochen", es:"Pago cancelado", ja:"支払いがキャンセルされました" },
+        paymentFailed: { en:"Payment failed: {message}", "zh-CN":"支付失败：{message}", "zh-TW":"支付失敗：{message}", fr:"Paiement échoué : {message}", de:"Zahlung fehlgeschlagen: {message}", es:"Pago fallido: {message}", ja:"支払いに失敗しました：{message}" }
+      };
+      function icoCopy(key, vars){
+        var lang = window.currentLang || localStorage.getItem("ww_lang_pref_v2") || "en";
+        var row = icoCopyMap[key] || {};
+        var text = row[lang] || row.en || row["zh-CN"] || key;
+        vars = vars || {};
+        Object.keys(vars).forEach(function(name){ text = text.replace(new RegExp("\\\\{" + name + "\\\\}", "g"), vars[name]); });
+        return text;
       }
       function homeSystemConfig(){
         try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
@@ -3431,8 +3472,8 @@ function enhancePrototypeHome() {
           paymentTokens: normalizeIcoPaymentTokens(ico.paymentTokens),
           hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
           launchAt: ico.launchAt || "2026-09-07T00:00:00.000Z",
-          headline: homeBannerText(ico.headlineI18n, "Owning LUMINA may be your smartest choice."),
-          subtitle: homeBannerText(ico.subtitleI18n, "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 100 WLD.")
+          headline: homeBannerText(ico.headlineI18n, icoCopy("headline")),
+          subtitle: homeBannerText(ico.subtitleI18n, icoCopy("subtitle"))
         };
       }
       function luminaIcoAllocation(){
@@ -3504,9 +3545,10 @@ function enhancePrototypeHome() {
           icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
           icoBanner.innerHTML =
             '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
-            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>WLD Pay</i><i class="gift">Reserve</i></span></span>' +
+            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
         }
+        window.__luminaEnsureHomePointsBanner = ensureHomePointsBanner;
       }
       function icoCountdownParts(launchAt){
         var target = launchAt ? new Date(launchAt).getTime() : 0;
@@ -3524,10 +3566,10 @@ function enhancePrototypeHome() {
         if (!el) return;
         var c = icoCountdownParts(ico.launchAt);
         if (!c.active) {
-          el.innerHTML = '<span>ICO Status</span><b>LIVE</b>';
+          el.innerHTML = '<span>' + homeBannerEscape(icoCopy("icoStatus")) + '</span><b>' + homeBannerEscape(icoCopy("live")) + '</b>';
           return;
         }
-        el.innerHTML = '<span>Launch countdown</span><b>' + c.days + 'D ' + c.hours + ':' + c.mins + ':' + c.secs + '</b>';
+        el.innerHTML = '<span>' + homeBannerEscape(icoCopy("launchCountdown")) + '</span><b>' + c.days + 'D ' + c.hours + ':' + c.mins + ':' + c.secs + '</b>';
       }
       window.openLuminaIco = async function(){
         var old = document.getElementById("luminaIcoSheet");
@@ -3536,7 +3578,7 @@ function enhancePrototypeHome() {
         var allocation = luminaIcoAllocation();
         var treasury = ico.treasuryAddress;
         var selectedToken = ico.paymentTokens[0] || defaultIcoPaymentTokens()[0];
-        var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : "Not configured";
+        var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : icoCopy("configureTreasury");
         function tokenOptions(){
           return ico.paymentTokens.map(function(token){
             return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + '</option>';
@@ -3550,21 +3592,21 @@ function enhancePrototypeHome() {
             '<button type="button" class="lumina-ico-close" id="icoCloseBtn">×</button>' +
             '<section class="lumina-ico-hero">' +
               '<div class="lumina-ico-token"><img src="/points/lumina-points-icon.png" alt="" /></div>' +
-              '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
+              '<div><em>' + homeBannerEscape(icoCopy("publicAllocation")) + '</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
             '</section>' +
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
-            '<section class="lumina-ico-info"><b>September 7</b><span>Airdrop + Exchange Listing</span><small id="icoMaxHint">Max allocation ' + Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }) + ' ' + homeBannerEscape(selectedToken.symbol) + ' per wallet</small></section>' +
+            '<section class="lumina-ico-info"><b>' + homeBannerEscape(icoCopy("september7")) + '</b><span>' + homeBannerEscape(icoCopy("airdropListing")) + '</span><small id="icoMaxHint">' + homeBannerEscape(icoCopy("maxAllocation", { amount: Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: selectedToken.symbol })) + '</small></section>' +
             '<section class="lumina-ico-stats">' +
-              '<div><span>Rate</span><b id="icoRateValue">1 ' + homeBannerEscape(selectedToken.symbol) + ' = ' + Number(selectedToken.luminaRate || ico.rate).toLocaleString() + ' LUMINA</b></div>' +
-              '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
+              '<div><span>' + homeBannerEscape(icoCopy("rate")) + '</span><b id="icoRateValue">1 ' + homeBannerEscape(selectedToken.symbol) + ' = ' + Number(selectedToken.luminaRate || ico.rate).toLocaleString() + ' LUMINA</b></div>' +
+              '<div><span>' + homeBannerEscape(icoCopy("yourAllocation")) + '</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
             '</section>' +
             '<section class="lumina-ico-panel">' +
-              '<label>Pay with</label>' +
+              '<label>' + homeBannerEscape(icoCopy("payWith")) + '</label>' +
               '<div class="lumina-ico-select-wrap"><select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select><span>⌄</span></div>' +
               '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><button type="button" id="icoMaxBtn">MAX</button><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
-              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
-              '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
-              '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay " + homeBannerEscape(selectedToken.symbol) + " and reserve LUMINA" : "Configure treasury address first") + '</button>' +
+              '<div class="lumina-ico-preview"><span>' + homeBannerEscape(icoCopy("youReceive")) + '</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
+              '<div class="lumina-ico-address"><span>' + homeBannerEscape(icoCopy("treasury")) + '</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
+              '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + homeBannerEscape(treasury ? icoCopy("payReserve", { symbol: selectedToken.symbol }) : icoCopy("configureTreasury")) + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
             '</section>' +
           '</div>';
@@ -3631,14 +3673,14 @@ function enhancePrototypeHome() {
           if (tokenSuffix) tokenSuffix.textContent = token.symbol;
           if (input) input.placeholder = formatIcoRange(token);
           if (maxBtn) maxBtn.disabled = maxPayAmount(token) <= 0;
-          if (maxHint) maxHint.textContent = "Max allocation " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet";
+          if (maxHint) maxHint.textContent = icoCopy("maxAllocation", { amount: Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: token.symbol });
           var rateBox = document.getElementById("icoRateValue");
           if (rateBox) rateBox.textContent = rateLabel(token);
           receive.textContent = Number(receiveLumina(value, token)).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
           pay.disabled = !treasury || value < token.minAmount || value > remaining;
-          if (value > remaining) pay.textContent = "Max " + remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " remaining";
-          else if (value < token.minAmount) pay.textContent = "Minimum " + token.minAmount + " " + token.symbol;
-          else pay.textContent = treasury ? "Pay " + token.symbol + " and reserve LUMINA" : "Configure treasury address first";
+          if (value > remaining) pay.textContent = icoCopy("maxRemaining", { amount: remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: token.symbol });
+          else if (value < token.minAmount) pay.textContent = icoCopy("minimum", { amount: token.minAmount, symbol: token.symbol });
+          else pay.textContent = treasury ? icoCopy("payReserve", { symbol: token.symbol }) : icoCopy("configureTreasury");
         }
         input.oninput = refresh;
         if (maxBtn) maxBtn.onclick = function(){
@@ -3649,18 +3691,18 @@ function enhancePrototypeHome() {
           input.value = "";
           refresh();
         };
-        if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast("Treasury address copied", "success"); }); };
+        if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast(icoCopy("copiedTreasury"), "success"); }); };
         pay.onclick = async function(){
           var token = currentToken();
           var value = amount();
-          if (!treasury) { toast("ICO treasury address is not configured."); return; }
-          if (!window.__luminaUserAddress) { toast("Please connect wallet first."); return; }
-          if (value < token.minAmount) { toast("Minimum " + token.minAmount + " " + token.symbol); return; }
+          if (!treasury) { toast(icoCopy("noTreasury")); return; }
+          if (!window.__luminaUserAddress) { toast(icoCopy("connectWallet")); return; }
+          if (value < token.minAmount) { toast(icoCopy("minimum", { amount: token.minAmount, symbol: token.symbol })); return; }
           var remaining = Math.max(0, Number(token.maxAmount || 0) - Number((allocation.byToken || {})[token.symbol] || 0));
-          if (value > remaining) { toast("Maximum allocation is " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet."); return; }
-          if (!window.__luminaSendToken) { toast("World App payment is unavailable."); return; }
+          if (value > remaining) { toast(icoCopy("maxAllocationToast", { amount: Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: token.symbol })); return; }
+          if (!window.__luminaSendToken) { toast(icoCopy("paymentUnavailable")); return; }
           pay.disabled = true;
-          pay.textContent = "Waiting for World App...";
+          pay.textContent = icoCopy("waitingWorldApp");
           try {
             var result = await window.__luminaSendToken({
               tokenSymbol: token.paySymbol || token.symbol,
@@ -3676,19 +3718,19 @@ function enhancePrototypeHome() {
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(receiveLumina(amount(), token)).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
-              toast("LUMINA allocation reserved", "success");
-              pay.textContent = "Reserved";
+              toast(icoCopy("allocationReserved"), "success");
+              pay.textContent = icoCopy("reserved");
             } else if (result.status === "user_rejected") {
-              toast("Payment cancelled");
-              pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
+              toast(icoCopy("paymentCancelled"));
+              pay.textContent = icoCopy("payReserve", { symbol: token.symbol });
             } else {
               var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Payment failed");
-              toast("Payment failed: " + msg);
-              pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
+              toast(icoCopy("paymentFailed", { message: msg }));
+              pay.textContent = icoCopy("payReserve", { symbol: token.symbol });
             }
           } catch(e) {
-            toast("Payment failed: " + ((e && e.message) || "unknown error"));
-            pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
+            toast(icoCopy("paymentFailed", { message: ((e && e.message) || "unknown error") }));
+            pay.textContent = icoCopy("payReserve", { symbol: token.symbol });
           } finally {
             refresh();
           }
@@ -7386,6 +7428,7 @@ function enhancePrototypeMe() {
           }
         if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
         if (typeof window.renderAssets === "function") window.renderAssets();
+          if (typeof window.__luminaEnsureHomePointsBanner === "function") window.__luminaEnsureHomePointsBanner();
           updateFeedbackCopy();
         };
       }
