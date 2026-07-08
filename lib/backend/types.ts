@@ -67,6 +67,14 @@ export type BackendSystemConfig = {
     rate?: number;
     minWld?: number;
     maxWld?: number;
+    paymentTokens?: Array<{
+      symbol?: string;
+      paySymbol?: string;
+      address?: string | null;
+      decimals?: number;
+      minAmount?: number;
+      maxAmount?: number;
+    }>;
     launchAt?: string | null;
     headlineI18n?: Record<string, string>;
     subtitleI18n?: Record<string, string>;

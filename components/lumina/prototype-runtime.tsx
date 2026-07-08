@@ -28,6 +28,8 @@ const LUMINA_ICO_TREASURY_ADDRESS =
   process.env.NEXT_PUBLIC_LUMINA_ICO_TREASURY_ADDRESS ||
   "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
 const WLD_TOKEN_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003";
+const USDC_TOKEN_ADDRESS = "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1";
+const WBTC_TOKEN_ADDRESS = "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3";
 const LUMINA_ICO_RATE = 1000;
 
 type PrototypeRuntimeProps = {
@@ -3374,8 +3376,37 @@ function enhancePrototypeHome() {
       var luminaIcoDefaults = {
         treasuryAddress: ${JSON.stringify(LUMINA_ICO_TREASURY_ADDRESS)},
         wldTokenAddress: ${JSON.stringify(WLD_TOKEN_ADDRESS)},
+        usdcTokenAddress: ${JSON.stringify(USDC_TOKEN_ADDRESS)},
+        wbtcTokenAddress: ${JSON.stringify(WBTC_TOKEN_ADDRESS)},
         rate: ${LUMINA_ICO_RATE}
       };
+      function defaultIcoPaymentTokens(){
+        return [
+          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:100 },
+          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300 },
+          { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.00001, maxAmount:0.01 },
+          { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5 }
+        ];
+      }
+      function normalizeIcoPaymentTokens(rows){
+        var fallback = defaultIcoPaymentTokens();
+        var source = Array.isArray(rows) && rows.length ? rows : fallback;
+        var out = source.map(function(row){
+          row = row || {};
+          var symbol = String(row.symbol || "").toUpperCase();
+          if (!symbol) return null;
+          var fallbackRow = fallback.find(function(item){ return item.symbol === symbol; }) || {};
+          return {
+            symbol: symbol,
+            paySymbol: String(row.paySymbol || fallbackRow.paySymbol || symbol).toUpperCase(),
+            address: row.address === null ? null : String(row.address || fallbackRow.address || "").trim(),
+            decimals: Math.max(0, Number(row.decimals != null ? row.decimals : fallbackRow.decimals || 18)),
+            minAmount: Math.max(0.00000001, Number(row.minAmount != null ? row.minAmount : fallbackRow.minAmount || 0.001)),
+            maxAmount: Math.max(0.00000001, Number(row.maxAmount != null ? row.maxAmount : fallbackRow.maxAmount || 1))
+          };
+        }).filter(Boolean);
+        return out.length ? out : fallback;
+      }
       function homePointsBannerConfig(){
         var cfg = homeSystemConfig();
         var banner = cfg && cfg.pointsHomeBanner ? cfg.pointsHomeBanner : {};
@@ -3396,6 +3427,7 @@ function enhancePrototypeHome() {
           rate: Math.max(1, Number(ico.rate || luminaIcoDefaults.rate || 1000)),
           minWld: Math.max(0.001, Number(ico.minWld || 0.1)),
           maxWld: Math.max(0.001, Number(ico.maxWld || 100)),
+          paymentTokens: normalizeIcoPaymentTokens(ico.paymentTokens),
           hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
           launchAt: ico.launchAt || "2026-09-07T00:00:00.000Z",
           headline: homeBannerText(ico.headlineI18n, "Owning LUMINA may be your smartest choice."),
@@ -3403,13 +3435,21 @@ function enhancePrototypeHome() {
         };
       }
       function luminaIcoAllocation(){
-        try { return JSON.parse(localStorage.getItem("lumina_ico_allocation_v1:" + String(window.__luminaUserAddress || "guest").toLowerCase()) || '{"wld":0,"lumina":0,"orders":[]}'); } catch(e) { return { wld:0, lumina:0, orders:[] }; }
+        try {
+          var saved = JSON.parse(localStorage.getItem("lumina_ico_allocation_v1:" + String(window.__luminaUserAddress || "guest").toLowerCase()) || '{"wld":0,"lumina":0,"orders":[]}');
+          saved.byToken = saved.byToken || {};
+          if (saved.wld && !saved.byToken.WLD) saved.byToken.WLD = saved.wld;
+          return saved;
+        } catch(e) { return { wld:0, lumina:0, orders:[], byToken:{} }; }
       }
       function saveLuminaIcoAllocation(row){
         var key = "lumina_ico_allocation_v1:" + String(window.__luminaUserAddress || "guest").toLowerCase();
         var current = luminaIcoAllocation();
         current.wld = Number(current.wld || 0) + Number(row.wld || 0);
         current.lumina = Number(current.lumina || 0) + Number(row.lumina || 0);
+        current.byToken = current.byToken || {};
+        var tokenKey = String(row.tokenSymbol || "WLD").toUpperCase();
+        current.byToken[tokenKey] = Number(current.byToken[tokenKey] || 0) + Number(row.tokenAmount || row.wld || 0);
         current.orders = Array.isArray(current.orders) ? current.orders : [];
         current.orders.unshift(row);
         current.orders = current.orders.slice(0, 20);
@@ -3494,7 +3534,11 @@ function enhancePrototypeHome() {
         var ico = luminaIcoConfig();
         var allocation = luminaIcoAllocation();
         var treasury = ico.treasuryAddress;
+        var selectedToken = ico.paymentTokens[0] || defaultIcoPaymentTokens()[0];
         var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : "Not configured";
+        function tokenOptions(){
+          return ico.paymentTokens.map(function(token){ return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + ' · Max ' + Number(token.maxAmount).toLocaleString(undefined, { maximumFractionDigits: 8 }) + '</option>'; }).join("");
+        }
         var sheet = document.createElement("div");
         sheet.id = "luminaIcoSheet";
         sheet.className = "modal-mask open lumina-ico-sheet";
@@ -3506,17 +3550,18 @@ function enhancePrototypeHome() {
               '<div><em>Public Allocation</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
             '</section>' +
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
-            '<section class="lumina-ico-info"><b>September 7</b><span>Airdrop + Exchange Listing</span><small>Max allocation ' + Number(ico.maxWld || 100).toLocaleString() + ' WLD per wallet</small></section>' +
+            '<section class="lumina-ico-info"><b>September 7</b><span>Airdrop + Exchange Listing</span><small id="icoMaxHint">Max allocation ' + Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }) + ' ' + homeBannerEscape(selectedToken.symbol) + ' per wallet</small></section>' +
             '<section class="lumina-ico-stats">' +
               '<div><span>Rate</span><b>1 WLD = ' + Number(ico.rate).toLocaleString() + '</b><small>LUMINA</small></div>' +
               '<div><span>Your allocation</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
             '</section>' +
             '<section class="lumina-ico-panel">' +
-              '<label>Pay with WLD</label>' +
-              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + ico.minWld + '" /><span>WLD</span></div>' +
-              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(ico.minWld * ico.rate).toLocaleString() + ' LUMINA</b></div>' +
+              '<label>Pay with</label>' +
+              '<select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select>' +
+              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + selectedToken.minAmount + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
+              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(selectedToken.minAmount * ico.rate).toLocaleString() + ' LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
-              '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay WLD and reserve LUMINA" : "Configure treasury address first") + '</button>' +
+              '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay " + homeBannerEscape(selectedToken.symbol) + " and reserve LUMINA" : "Configure treasury address first") + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
             '</section>' +
           '</div>';
@@ -3525,6 +3570,9 @@ function enhancePrototypeHome() {
         sheet.onclick = function(event){ if (event.target === sheet) close(); };
         document.getElementById("icoCloseBtn").onclick = close;
         var input = document.getElementById("icoWldAmount");
+        var tokenSelect = document.getElementById("icoPayToken");
+        var tokenSuffix = document.getElementById("icoTokenSuffix");
+        var maxHint = document.getElementById("icoMaxHint");
         var receive = document.getElementById("icoReceiveAmount");
         var pay = document.getElementById("icoPayBtn");
         var copy = document.getElementById("icoCopyTreasury");
@@ -3535,54 +3583,69 @@ function enhancePrototypeHome() {
           var value = Number(String(input.value || "").replace(/,/g, ""));
           return Number.isFinite(value) ? Math.max(0, value) : 0;
         }
+        function currentToken(){
+          var symbol = tokenSelect ? String(tokenSelect.value || "WLD").toUpperCase() : "WLD";
+          return ico.paymentTokens.find(function(token){ return token.symbol === symbol; }) || selectedToken;
+        }
         function refresh(){
-          var wld = amount();
-          var remaining = Math.max(0, Number(ico.maxWld || 100) - Number(allocation.wld || 0));
-          receive.textContent = Number(wld * ico.rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
-          pay.disabled = !treasury || wld < ico.minWld || wld > remaining;
-          if (wld > remaining) pay.textContent = "Max " + remaining.toLocaleString(undefined, { maximumFractionDigits: 3 }) + " WLD remaining";
-          else pay.textContent = treasury ? "Pay WLD and reserve LUMINA" : "Configure treasury address first";
+          var token = currentToken();
+          var value = amount();
+          var used = Number((allocation.byToken || {})[token.symbol] || 0);
+          var remaining = Math.max(0, Number(token.maxAmount || 0) - used);
+          if (tokenSuffix) tokenSuffix.textContent = token.symbol;
+          if (maxHint) maxHint.textContent = "Max allocation " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet";
+          receive.textContent = Number(value * ico.rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
+          pay.disabled = !treasury || value < token.minAmount || value > remaining;
+          if (value > remaining) pay.textContent = "Max " + remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " remaining";
+          else if (value < token.minAmount) pay.textContent = "Minimum " + token.minAmount + " " + token.symbol;
+          else pay.textContent = treasury ? "Pay " + token.symbol + " and reserve LUMINA" : "Configure treasury address first";
         }
         input.oninput = refresh;
+        if (tokenSelect) tokenSelect.onchange = function(){
+          var token = currentToken();
+          input.value = token.minAmount;
+          refresh();
+        };
         if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast("Treasury address copied", "success"); }); };
         pay.onclick = async function(){
-          var wld = amount();
+          var token = currentToken();
+          var value = amount();
           if (!treasury) { toast("ICO treasury address is not configured."); return; }
           if (!window.__luminaUserAddress) { toast("Please connect wallet first."); return; }
-          if (wld < ico.minWld) { toast("Minimum " + ico.minWld + " WLD"); return; }
-          var remaining = Math.max(0, Number(ico.maxWld || 100) - Number(allocation.wld || 0));
-          if (wld > remaining) { toast("Maximum allocation is " + Number(ico.maxWld || 100).toLocaleString() + " WLD per wallet."); return; }
+          if (value < token.minAmount) { toast("Minimum " + token.minAmount + " " + token.symbol); return; }
+          var remaining = Math.max(0, Number(token.maxAmount || 0) - Number((allocation.byToken || {})[token.symbol] || 0));
+          if (value > remaining) { toast("Maximum allocation is " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet."); return; }
           if (!window.__luminaSendToken) { toast("World App payment is unavailable."); return; }
           pay.disabled = true;
           pay.textContent = "Waiting for World App...";
           try {
             var result = await window.__luminaSendToken({
-              tokenSymbol: "WLD",
-              tokenAddress: luminaIcoDefaults.wldTokenAddress,
-              tokenDecimals: 18,
+              tokenSymbol: token.paySymbol || token.symbol,
+              tokenAddress: token.address || null,
+              tokenDecimals: token.decimals || 18,
               recipient: treasury,
-              amountHuman: String(wld),
+              amountHuman: String(value),
               userAddress: window.__luminaUserAddress || ""
             });
             if (result.status === "success") {
-              var row = saveLuminaIcoAllocation({ wld: wld, lumina: wld * ico.rate, hash: result.txHash || "", createdAt: new Date().toISOString() });
-              var value = document.getElementById("icoAllocationValue");
-              if (value) value.textContent = Number(row.lumina || 0).toLocaleString();
-              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(wld * ico.rate).toLocaleString() + " LUMINA", amount:"-" + wld + " WLD", status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
+              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: value * ico.rate, hash: result.txHash || "", createdAt: new Date().toISOString() });
+              var allocationValue = document.getElementById("icoAllocationValue");
+              if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
+              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(amount() * ico.rate).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
               toast("LUMINA allocation reserved", "success");
               pay.textContent = "Reserved";
             } else if (result.status === "user_rejected") {
               toast("Payment cancelled");
-              pay.textContent = "Pay WLD and reserve LUMINA";
+              pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
             } else {
               var msg = window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Payment failed");
               toast("Payment failed: " + msg);
-              pay.textContent = "Pay WLD and reserve LUMINA";
+              pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
             }
           } catch(e) {
             toast("Payment failed: " + ((e && e.message) || "unknown error"));
-            pay.textContent = "Pay WLD and reserve LUMINA";
+            pay.textContent = "Pay " + token.symbol + " and reserve LUMINA";
           } finally {
             refresh();
           }

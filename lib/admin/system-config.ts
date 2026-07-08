@@ -26,6 +26,14 @@ export type SystemConfig = {
     rate: number;
     minWld: number;
     maxWld: number;
+    paymentTokens: Array<{
+      symbol: string;
+      paySymbol?: string;
+      address: string | null;
+      decimals: number;
+      minAmount: number;
+      maxAmount: number;
+    }>;
     launchAt: string | null;
     headlineI18n: Record<string, string>;
     subtitleI18n: Record<string, string>;
@@ -123,6 +131,12 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     rate: 1000,
     minWld: 0.1,
     maxWld: 100,
+    paymentTokens: [
+      { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18, minAmount: 0.1, maxAmount: 100 },
+      { symbol: "USDC", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals: 6, minAmount: 1, maxAmount: 300 },
+      { symbol: "BTC", paySymbol: "WBTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals: 8, minAmount: 0.00001, maxAmount: 0.01 },
+      { symbol: "ETH", address: null, decimals: 18, minAmount: 0.001, maxAmount: 0.5 },
+    ],
     launchAt: "2026-09-07T00:00:00.000Z",
     headlineI18n: {
       en: "Owning LUMINA may be your smartest choice.",
@@ -321,10 +335,33 @@ function normalizeIco(value: unknown): SystemConfig["ico"] {
     rate: Math.max(1, Number(source.rate ?? fallback.rate)),
     minWld: Math.max(0.001, Number(source.minWld ?? fallback.minWld)),
     maxWld: Math.max(0.001, Number(source.maxWld ?? fallback.maxWld)),
+    paymentTokens: cleanIcoPaymentTokens(source.paymentTokens, fallback.paymentTokens),
     launchAt: cleanIsoDate(source.launchAt) || fallback.launchAt,
     headlineI18n: cleanI18n(source.headlineI18n, fallback.headlineI18n.en),
     subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),
   };
+}
+
+function cleanIcoPaymentTokens(value: unknown, fallback: SystemConfig["ico"]["paymentTokens"]) {
+  const rows = Array.isArray(value) ? value : fallback;
+  const cleaned = rows
+    .map((row) => {
+      if (typeof row !== "object" || row === null) return null;
+      const source = row as Record<string, unknown>;
+      const symbol = String(source.symbol || "").trim().toUpperCase();
+      if (!symbol) return null;
+      const addressRaw = source.address == null ? null : String(source.address || "").trim();
+      return {
+        symbol,
+        paySymbol: source.paySymbol ? String(source.paySymbol).trim().toUpperCase() : undefined,
+        address: addressRaw && /^0x[a-fA-F0-9]{40}$/.test(addressRaw) ? addressRaw : null,
+        decimals: Math.max(0, Math.min(36, Math.floor(Number(source.decimals ?? 18)))),
+        minAmount: Math.max(0.00000001, Number(source.minAmount ?? 0.001)),
+        maxAmount: Math.max(0.00000001, Number(source.maxAmount ?? 1)),
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  return cleaned.length ? cleaned : fallback;
 }
 
 function normalizeWelcomeBox(value: unknown): SystemConfig["welcomeBox"] {
