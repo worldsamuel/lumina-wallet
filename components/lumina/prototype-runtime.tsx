@@ -3382,7 +3382,7 @@ function enhancePrototypeHome() {
       };
       function defaultIcoPaymentTokens(){
         return [
-          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:100, luminaRate:1000 },
+          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:1000, luminaRate:1000 },
           { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300, luminaRate:5000 },
           { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:100000000 },
           { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:1000000 }
@@ -3427,7 +3427,7 @@ function enhancePrototypeHome() {
           treasuryAddress: String(ico.treasuryAddress || luminaIcoDefaults.treasuryAddress || "").trim(),
           rate: Math.max(1, Number(ico.rate || luminaIcoDefaults.rate || 1000)),
           minWld: Math.max(0.001, Number(ico.minWld || 0.1)),
-          maxWld: Math.max(0.001, Number(ico.maxWld || 100)),
+          maxWld: Math.max(0.001, Number(ico.maxWld || 1000)),
           paymentTokens: normalizeIcoPaymentTokens(ico.paymentTokens),
           hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
           launchAt: ico.launchAt || "2026-09-07T00:00:00.000Z",
@@ -3561,8 +3561,8 @@ function enhancePrototypeHome() {
             '<section class="lumina-ico-panel">' +
               '<label>Pay with</label>' +
               '<div class="lumina-ico-select-wrap"><select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select><span>⌄</span></div>' +
-              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + selectedToken.minAmount + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
-              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(selectedToken.minAmount * (selectedToken.luminaRate || ico.rate)).toLocaleString() + ' LUMINA</b></div>' +
+              '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
+              '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + (treasury ? "Pay " + homeBannerEscape(selectedToken.symbol) + " and reserve LUMINA" : "Configure treasury address first") + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
@@ -3600,12 +3600,16 @@ function enhancePrototypeHome() {
           token = token || currentToken();
           return "1 " + token.symbol + " = " + Number(tokenRate(token)).toLocaleString() + " LUMINA";
         }
+        function formatIcoRange(token){
+          return Number(token.minAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + "~" + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol;
+        }
         function refresh(){
           var token = currentToken();
           var value = amount();
           var used = Number((allocation.byToken || {})[token.symbol] || 0);
           var remaining = Math.max(0, Number(token.maxAmount || 0) - used);
           if (tokenSuffix) tokenSuffix.textContent = token.symbol;
+          if (input) input.placeholder = formatIcoRange(token);
           if (maxHint) maxHint.textContent = "Max allocation " + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " per wallet";
           var rateBox = document.getElementById("icoRateValue");
           if (rateBox) rateBox.textContent = rateLabel(token);
@@ -3617,8 +3621,7 @@ function enhancePrototypeHome() {
         }
         input.oninput = refresh;
         if (tokenSelect) tokenSelect.onchange = function(){
-          var token = currentToken();
-          input.value = token.minAmount;
+          input.value = "";
           refresh();
         };
         if (copy) copy.onclick = function(){ if (treasury && navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast("Treasury address copied", "success"); }); };

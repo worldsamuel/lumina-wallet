@@ -131,9 +131,9 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     treasuryAddress: process.env.NEXT_PUBLIC_LUMINA_ICO_TREASURY_ADDRESS || "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
     rate: 1000,
     minWld: 0.1,
-    maxWld: 100,
+    maxWld: 1000,
     paymentTokens: [
-      { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18, minAmount: 0.1, maxAmount: 100, luminaRate: 1000 },
+      { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18, minAmount: 0.1, maxAmount: 1000, luminaRate: 1000 },
       { symbol: "USDC", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals: 6, minAmount: 1, maxAmount: 300, luminaRate: 5000 },
       { symbol: "BTC", paySymbol: "WBTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals: 8, minAmount: 0.0001, maxAmount: 0.01, luminaRate: 100000000 },
       { symbol: "ETH", address: null, decimals: 18, minAmount: 0.001, maxAmount: 0.5, luminaRate: 1000000 },
@@ -144,8 +144,8 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       "zh-CN": "拥有 LUMINA，将会是你最明智的选择。",
     },
     subtitleI18n: {
-      en: "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 100 WLD.",
-      "zh-CN": "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 100 WLD 额度。",
+      en: "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.",
+      "zh-CN": "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。",
     },
   },
   pointsRules: {

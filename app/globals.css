@@ -396,6 +396,7 @@
   .lumina-ico-select { width: 100%; height: 46px; padding: 0 44px 0 14px; border: 1px solid rgba(144,255,151,.22); border-radius: 16px; outline: 0; background: rgba(0,0,0,.34); color: #fff; font-size: 15px; font-weight: 900; appearance: none; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
   .lumina-ico-input { height: 54px; margin-top: 8px; padding: 0 14px; border: 1px solid rgba(144,255,151,.16); border-radius: 16px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,.24); }
   .lumina-ico-input input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-size: 24px; line-height: 1; font-weight: 950; font-variant-numeric: tabular-nums; }
+  .lumina-ico-input input::placeholder { color: rgba(255,255,255,.42); font-size: 20px; font-weight: 850; }
   .lumina-ico-input span { color: #91f79c; font-size: 15px; font-weight: 950; }
   .lumina-ico-preview, .lumina-ico-address { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .lumina-ico-preview b { color: #fff; font-size: 17px; font-weight: 950; text-align: right; }
