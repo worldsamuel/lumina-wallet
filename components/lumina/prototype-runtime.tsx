@@ -3538,7 +3538,10 @@ function enhancePrototypeHome() {
         var selectedToken = ico.paymentTokens[0] || defaultIcoPaymentTokens()[0];
         var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : "Not configured";
         function tokenOptions(){
-          return ico.paymentTokens.map(function(token){ return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + ' · Max ' + Number(token.maxAmount).toLocaleString(undefined, { maximumFractionDigits: 8 }) + '</option>'; }).join("");
+          return ico.paymentTokens.map(function(token){
+            var rate = Math.max(1, Number(token.luminaRate || ico.rate || 1000));
+            return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + ' · 1 = ' + Number(rate).toLocaleString() + ' LUMINA · Max ' + Number(token.maxAmount).toLocaleString(undefined, { maximumFractionDigits: 8 }) + '</option>';
+          }).join("");
         }
         var sheet = document.createElement("div");
         sheet.id = "luminaIcoSheet";
@@ -3558,7 +3561,7 @@ function enhancePrototypeHome() {
             '</section>' +
             '<section class="lumina-ico-panel">' +
               '<label>Pay with</label>' +
-              '<select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select>' +
+              '<div class="lumina-ico-select-wrap"><select class="lumina-ico-select" id="icoPayToken">' + tokenOptions() + '</select><span>⌄</span></div>' +
               '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="' + selectedToken.minAmount + '" /><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
               '<div class="lumina-ico-preview"><span>You receive</span><b id="icoReceiveAmount">' + Number(selectedToken.minAmount * (selectedToken.luminaRate || ico.rate)).toLocaleString() + ' LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>Treasury</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
