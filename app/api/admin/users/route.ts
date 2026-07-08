@@ -9,8 +9,8 @@ const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address;
 const WLD_DECIMALS = 18;
 const DEFAULT_LIMIT = 300;
 const MAX_LIMIT = 800;
-const BALANCE_LOOKUP_LIMIT = 80;
-const BALANCE_TIMEOUT_MS = 1_800;
+const BALANCE_LOOKUP_LIMIT = 12;
+const BALANCE_TIMEOUT_MS = 800;
 const erc20BalanceAbi = [
   {
     type: "function",
@@ -93,7 +93,7 @@ export async function GET(req: Request) {
     adjustmentsByAddress.set(address, bucket);
   }
   const balanceLookupCount = q ? Math.min(visible.length, BALANCE_LOOKUP_LIMIT * 2) : Math.min(visible.length, BALANCE_LOOKUP_LIMIT);
-  const balanceRows = await mapWithConcurrency(visible.slice(0, balanceLookupCount), 4, async (user) =>
+  const balanceRows = await mapWithConcurrency(visible.slice(0, balanceLookupCount), 8, async (user) =>
     withTimeout(getWldBalance(user.address), BALANCE_TIMEOUT_MS, null),
   );
   const wldBalances = new Map<string, string | null>();
