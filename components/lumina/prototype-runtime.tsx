@@ -3539,8 +3539,7 @@ function enhancePrototypeHome() {
         var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : "Not configured";
         function tokenOptions(){
           return ico.paymentTokens.map(function(token){
-            var rate = Math.max(1, Number(token.luminaRate || ico.rate || 1000));
-            return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + ' · 1 = ' + Number(rate).toLocaleString() + ' LUMINA · Max ' + Number(token.maxAmount).toLocaleString(undefined, { maximumFractionDigits: 8 }) + '</option>';
+            return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + '</option>';
           }).join("");
         }
         var sheet = document.createElement("div");
