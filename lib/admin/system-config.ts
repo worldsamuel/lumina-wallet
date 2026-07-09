@@ -34,6 +34,8 @@ export type SystemConfig = {
       minAmount: number;
       maxAmount: number;
       luminaRate: number;
+      quoteAmount: number;
+      boostMultiplier: number;
     }>;
     launchAt: string | null;
     headlineI18n: Record<string, string>;
@@ -133,10 +135,10 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     minWld: 0.1,
     maxWld: 1000,
     paymentTokens: [
-      { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18, minAmount: 0.1, maxAmount: 1000, luminaRate: 1000 },
-      { symbol: "USDC", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals: 6, minAmount: 1, maxAmount: 300, luminaRate: 5000 },
-      { symbol: "BTC", paySymbol: "WBTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals: 8, minAmount: 0.0001, maxAmount: 0.01, luminaRate: 100000000 },
-      { symbol: "ETH", address: null, decimals: 18, minAmount: 0.001, maxAmount: 0.5, luminaRate: 1000000 },
+      { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals: 18, minAmount: 0.1, maxAmount: 1000, luminaRate: 1000, quoteAmount: 1, boostMultiplier: 1 },
+      { symbol: "USDC", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals: 6, minAmount: 1, maxAmount: 300, luminaRate: 5000, quoteAmount: 1, boostMultiplier: 2 },
+      { symbol: "BTC", paySymbol: "WBTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals: 8, minAmount: 0.0001, maxAmount: 0.01, luminaRate: 650000000, quoteAmount: 0.001, boostMultiplier: 4 },
+      { symbol: "ETH", address: null, decimals: 18, minAmount: 0.001, maxAmount: 0.5, luminaRate: 13500000, quoteAmount: 0.001, boostMultiplier: 3 },
     ],
     launchAt: "2026-09-07T00:00:00.000Z",
     headlineI18n: {
@@ -360,6 +362,8 @@ function cleanIcoPaymentTokens(value: unknown, fallback: SystemConfig["ico"]["pa
         minAmount: Math.max(0.00000001, Number(source.minAmount ?? 0.001)),
         maxAmount: Math.max(0.00000001, Number(source.maxAmount ?? 1)),
         luminaRate: Math.max(1, Number(source.luminaRate ?? source.rate ?? 1000)),
+        quoteAmount: Math.max(0.00000001, Number(source.quoteAmount ?? 1)),
+        boostMultiplier: Math.max(1, Number(source.boostMultiplier ?? 1)),
       };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row));

@@ -75,6 +75,8 @@ export type BackendSystemConfig = {
       minAmount?: number;
       maxAmount?: number;
       luminaRate?: number;
+      quoteAmount?: number;
+      boostMultiplier?: number;
     }>;
     launchAt?: string | null;
     headlineI18n?: Record<string, string>;

@@ -3401,7 +3401,8 @@ function enhancePrototypeHome() {
         allocationReserved: { en:"LUMINA allocation reserved", "zh-CN":"LUMINA 额度已预留", "zh-TW":"LUMINA 額度已預留", fr:"Allocation LUMINA réservée", de:"LUMINA-Zuteilung reserviert", es:"Asignación LUMINA reservada", ja:"LUMINA 割当を予約しました" },
         reserved: { en:"Reserved", "zh-CN":"已预留", "zh-TW":"已預留", fr:"Réservé", de:"Reserviert", es:"Reservado", ja:"予約済み" },
         paymentCancelled: { en:"Payment cancelled", "zh-CN":"支付已取消", "zh-TW":"支付已取消", fr:"Paiement annulé", de:"Zahlung abgebrochen", es:"Pago cancelado", ja:"支払いがキャンセルされました" },
-        paymentFailed: { en:"Payment failed: {message}", "zh-CN":"支付失败：{message}", "zh-TW":"支付失敗：{message}", fr:"Paiement échoué : {message}", de:"Zahlung fehlgeschlagen: {message}", es:"Pago fallido: {message}", ja:"支払いに失敗しました：{message}" }
+        paymentFailed: { en:"Payment failed: {message}", "zh-CN":"支付失败：{message}", "zh-TW":"支付失敗：{message}", fr:"Paiement échoué : {message}", de:"Zahlung fehlgeschlagen: {message}", es:"Pago fallido: {message}", ja:"支払いに失敗しました：{message}" },
+        boost: { en:"{multiplier}x bonus", "zh-CN":"{multiplier}倍加成", "zh-TW":"{multiplier}倍加成", fr:"Bonus x{multiplier}", de:"{multiplier}x Bonus", es:"Bono x{multiplier}", ja:"{multiplier}倍ボーナス" }
       };
       function icoCopy(key, vars){
         var lang = window.currentLang || localStorage.getItem("ww_lang_pref_v2") || "en";
@@ -3423,10 +3424,10 @@ function enhancePrototypeHome() {
       };
       function defaultIcoPaymentTokens(){
         return [
-          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:1000, luminaRate:1000 },
-          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300, luminaRate:5000 },
-          { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:100000000 },
-          { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:1000000 }
+          { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:1000, luminaRate:1000, quoteAmount:1, boostMultiplier:1 },
+          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300, luminaRate:5000, quoteAmount:1, boostMultiplier:2 },
+          { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:650000000, quoteAmount:0.001, boostMultiplier:4 },
+          { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:13500000, quoteAmount:0.001, boostMultiplier:3 }
         ];
       }
       function normalizeIcoPaymentTokens(rows){
@@ -3444,7 +3445,9 @@ function enhancePrototypeHome() {
             decimals: Math.max(0, Number(row.decimals != null ? row.decimals : fallbackRow.decimals || 18)),
             minAmount: Math.max(0.00000001, Number(row.minAmount != null ? row.minAmount : fallbackRow.minAmount || 0.001)),
             maxAmount: Math.max(0.00000001, Number(row.maxAmount != null ? row.maxAmount : fallbackRow.maxAmount || 1)),
-            luminaRate: Math.max(1, Number(row.luminaRate != null ? row.luminaRate : fallbackRow.luminaRate || luminaIcoDefaults.rate || 1000))
+            luminaRate: Math.max(1, Number(row.luminaRate != null ? row.luminaRate : fallbackRow.luminaRate || luminaIcoDefaults.rate || 1000)),
+            quoteAmount: Math.max(0.00000001, Number(row.quoteAmount != null ? row.quoteAmount : fallbackRow.quoteAmount || 1)),
+            boostMultiplier: Math.max(1, Number(row.boostMultiplier != null ? row.boostMultiplier : fallbackRow.boostMultiplier || 1))
           };
         }).filter(Boolean);
         return out.length ? out : fallback;
@@ -3579,9 +3582,17 @@ function enhancePrototypeHome() {
         var treasury = ico.treasuryAddress;
         var selectedToken = ico.paymentTokens[0] || defaultIcoPaymentTokens()[0];
         var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : icoCopy("configureTreasury");
+        function tokenRateLabel(token){
+          var quoteAmount = Math.max(0.00000001, Number((token && token.quoteAmount) || 1));
+          var rate = Math.max(1, Number((token && token.luminaRate) || ico.rate || 1000));
+          return Number(quoteAmount).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol + " = " + Number(quoteAmount * rate).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
+        }
+        function tokenBoostLabel(token){
+          return icoCopy("boost", { multiplier: Number(token.boostMultiplier || 1).toLocaleString(undefined, { maximumFractionDigits: 2 }) });
+        }
         function tokenOptions(){
           return ico.paymentTokens.map(function(token){
-            return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol) + '</option>';
+            return '<option value="' + homeBannerEscape(token.symbol) + '">' + homeBannerEscape(token.symbol + " · " + tokenBoostLabel(token)) + '</option>';
           }).join("");
         }
         var sheet = document.createElement("div");
@@ -3597,7 +3608,7 @@ function enhancePrototypeHome() {
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
             '<section class="lumina-ico-info"><b>' + homeBannerEscape(icoCopy("september7")) + '</b><span>' + homeBannerEscape(icoCopy("airdropListing")) + '</span><small id="icoMaxHint">' + homeBannerEscape(icoCopy("maxAllocation", { amount: Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: selectedToken.symbol })) + '</small></section>' +
             '<section class="lumina-ico-stats">' +
-              '<div><span>' + homeBannerEscape(icoCopy("rate")) + '</span><b id="icoRateValue">1 ' + homeBannerEscape(selectedToken.symbol) + ' = ' + Number(selectedToken.luminaRate || ico.rate).toLocaleString() + ' LUMINA</b></div>' +
+              '<div><span>' + homeBannerEscape(icoCopy("rate")) + '</span><b id="icoRateValue">' + homeBannerEscape(tokenRateLabel(selectedToken)) + '</b></div>' +
               '<div><span>' + homeBannerEscape(icoCopy("yourAllocation")) + '</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
             '</section>' +
             '<section class="lumina-ico-panel">' +
@@ -3641,7 +3652,7 @@ function enhancePrototypeHome() {
         }
         function rateLabel(token){
           token = token || currentToken();
-          return "1 " + token.symbol + " = " + Number(tokenRate(token)).toLocaleString() + " LUMINA";
+          return tokenRateLabel(token);
         }
         function formatIcoRange(token){
           return Number(token.minAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + "~" + Number(token.maxAmount || 0).toLocaleString(undefined, { maximumFractionDigits: 8 }) + " " + token.symbol;
