@@ -3530,7 +3530,7 @@ function enhancePrototypeHome() {
         var ico = luminaIcoConfig();
         var points = homePointsBannerConfig();
         var showIco = ico.enabled !== false;
-        var showPoints = points.enabled !== false;
+        var showPoints = showIco || points.enabled !== false;
         if (!showIco && !showPoints) { if (slider) slider.remove(); return; }
         if (!slider) {
           var section = home.querySelector(".section-head");
