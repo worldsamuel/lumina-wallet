@@ -3420,7 +3420,9 @@ function enhancePrototypeHome() {
         wldTokenAddress: ${JSON.stringify(WLD_TOKEN_ADDRESS)},
         usdcTokenAddress: ${JSON.stringify(USDC_TOKEN_ADDRESS)},
         wbtcTokenAddress: ${JSON.stringify(WBTC_TOKEN_ADDRESS)},
-        rate: ${LUMINA_ICO_RATE}
+        rate: ${LUMINA_ICO_RATE},
+        targetLumina: 450000000,
+        baseProgressLumina: 295980
       };
       function defaultIcoPaymentTokens(){
         return [
@@ -3501,6 +3503,29 @@ function enhancePrototypeHome() {
         try { localStorage.setItem(key, JSON.stringify(current)); } catch(e) {}
         return current;
       }
+      function localIcoProgressPercent(){
+        var allocation = luminaIcoAllocation();
+        var total = Number(luminaIcoDefaults.baseProgressLumina || 0) + Number(allocation.lumina || 0);
+        return Math.max(0, Math.min(100, (total / Math.max(1, Number(luminaIcoDefaults.targetLumina || 450000000))) * 100));
+      }
+      function formatIcoProgressPercent(value){
+        var pct = Math.max(0, Math.min(100, Number(value || 0)));
+        return pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct < 1 ? 2 : 1) + "%";
+      }
+      function renderIcoProgress(value){
+        var pct = Math.max(0, Math.min(100, Number(value == null ? localIcoProgressPercent() : value)));
+        var fills = document.querySelectorAll("[data-ico-progress-fill]");
+        var labels = document.querySelectorAll("[data-ico-progress-label]");
+        fills.forEach(function(el){ el.style.width = Math.max(0.4, pct).toFixed(4) + "%"; });
+        labels.forEach(function(el){ el.textContent = formatIcoProgressPercent(pct); });
+      }
+      function refreshIcoProgress(){
+        renderIcoProgress();
+        fetch("/api/ico/participation?t=" + Date.now(), { cache:"no-store", headers:{ "cache-control":"no-store" } })
+          .then(function(res){ return res.ok ? res.json() : null; })
+          .then(function(data){ if (data && Number.isFinite(Number(data.percent))) renderIcoProgress(Number(data.percent)); })
+          .catch(function(){});
+      }
       function renderHomePromoDots(active){
         var dots = document.getElementById("homePromoDots");
         if (!dots) return;
@@ -3554,7 +3579,9 @@ function enhancePrototypeHome() {
           icoBanner.innerHTML =
             '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
             '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
+            '<span class="home-ico-progress" aria-label="ICO progress"><i data-ico-progress-fill style="width:0.4%"></i><b data-ico-progress-label>0%</b></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
+          refreshIcoProgress();
         }
         var pointsBanner = document.getElementById("homePointsBanner");
         if (pointsBanner) {
@@ -3648,6 +3675,7 @@ function enhancePrototypeHome() {
         var pay = document.getElementById("icoPayBtn");
         var copy = document.getElementById("icoCopyTreasury");
         renderIcoCountdown(ico);
+        refreshIcoProgress();
         clearInterval(window.__luminaIcoCountdownTimer);
         window.__luminaIcoCountdownTimer = setInterval(function(){ renderIcoCountdown(ico); }, 1000);
         function amount(){
@@ -3756,6 +3784,7 @@ function enhancePrototypeHome() {
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(luminaAmount).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+              refreshIcoProgress();
               toast(icoCopy("allocationReserved"), "success");
               pay.textContent = icoCopy("reserved");
             } else if (result.status === "user_rejected") {

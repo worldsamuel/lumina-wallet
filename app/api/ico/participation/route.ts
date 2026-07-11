@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { recordIcoParticipation } from "@/lib/admin/ico-participation";
+import { getIcoProgress, recordIcoParticipation } from "@/lib/admin/ico-participation";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +11,13 @@ const NO_STORE_HEADERS = {
 
 export function OPTIONS() {
   return optionsResponse();
+}
+
+export async function GET(req: NextRequest) {
+  if (!rateLimit(req, "public:ico-progress", 120).ok) {
+    return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
+  }
+  return jsonResponse(await getIcoProgress(), { headers: NO_STORE_HEADERS });
 }
 
 export async function POST(req: NextRequest) {

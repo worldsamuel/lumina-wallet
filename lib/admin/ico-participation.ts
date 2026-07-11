@@ -2,6 +2,8 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 
 const ICO_PARTICIPANTS_KEY = "ico_participants";
+const ICO_TARGET_LUMINA = 450_000_000;
+const ICO_BASE_PROGRESS_LUMINA = (288 * 1000) + (1.33 * 6000);
 
 export type IcoParticipationRecord = {
   id: string;
@@ -91,4 +93,15 @@ export async function assertIcoMysteryBoxEligibility(address: string) {
   if (!(await hasIcoParticipation(address))) {
     throw new Error("Join the LUMINA ICO first to unlock this mystery box.");
   }
+}
+
+export async function getIcoProgress() {
+  const rows = await readRecords();
+  const recordedLumina = rows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
+  const raisedLumina = Math.max(0, ICO_BASE_PROGRESS_LUMINA + recordedLumina);
+  const percent = Math.max(0, Math.min(100, (raisedLumina / ICO_TARGET_LUMINA) * 100));
+  return {
+    targetLumina: ICO_TARGET_LUMINA,
+    percent,
+  };
 }
