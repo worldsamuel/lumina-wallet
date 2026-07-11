@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { assertAlphaBlindBoxEligibility, spendAlphaBlindBoxPoints } from "@/lib/admin/alpha-points";
+import { assertIcoMysteryBoxEligibility } from "@/lib/admin/ico-participation";
 import { getPointsOrders, getPublicPointsProducts, openBlindBoxOrder, purchasePointsProduct } from "@/lib/admin/points-products";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +37,12 @@ export async function POST(req: NextRequest) {
   try {
     const product = (await getPublicPointsProducts()).find((item) => item.id === productId);
     const alphaProduct = product?.type === "blind_box" && product.alphaRequired === true;
+    const icoProduct = product?.type === "blind_box" && product.icoRequired === true;
     if (alphaProduct && (body.action !== "open" || body.allowPurchase === true)) {
       await assertAlphaBlindBoxEligibility(address);
+    }
+    if (icoProduct && (body.action !== "open" || body.allowPurchase === true)) {
+      await assertIcoMysteryBoxEligibility(address);
     }
     if (body.action === "open") {
       const result = await openBlindBoxOrder({
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
         availablePoints: Number(body.availablePoints || 0),
         clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
         allowPurchase: body.allowPurchase === true,
-        skipPointDebit: alphaProduct,
+        skipPointDebit: alphaProduct || icoProduct,
       });
       if (alphaProduct && body.allowPurchase === true) {
         await spendAlphaBlindBoxPoints({
@@ -72,7 +77,7 @@ export async function POST(req: NextRequest) {
             productId,
             availablePoints: Number(body.availablePoints || 0),
             clientOrderId: typeof body.clientOrderId === "string" ? body.clientOrderId : null,
-            skipPointDebit: alphaProduct,
+            skipPointDebit: alphaProduct || icoProduct,
           });
           if (alphaProduct) {
             await spendAlphaBlindBoxPoints({

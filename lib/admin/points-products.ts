@@ -21,6 +21,8 @@ export type PointsProductConfig = {
   points: number;
   originalPoints?: number | null;
   alphaRequired?: boolean;
+  icoRequired?: boolean;
+  hideRewardAmounts?: boolean;
   imageUrl?: string | null;
   detailImageUrl?: string | null;
   iconUrl?: string | null;
@@ -38,6 +40,10 @@ export type PointsProductConfig = {
     name: string;
     nameI18n?: Record<string, string>;
     value?: string | null;
+    symbol?: string | null;
+    minAmount?: number | null;
+    maxAmount?: number | null;
+    rareMaxOdds?: number | null;
     odds: number;
     stock?: number | null;
   }>;
@@ -125,6 +131,34 @@ function defaultProducts(): PointsProductConfig[] {
       ],
     },
     {
+      id: "ico-token-mystery-box",
+      type: "blind_box",
+      title: "ICO Token Mystery Box",
+      titleI18n: { en: "ICO Token Mystery Box", "zh-CN": "ICO 代币盲盒", "zh-TW": "ICO 代幣盲盒", ja: "ICOトークンミステリーボックス", fr: "Boîte mystère ICO" },
+      category: "alpha",
+      points: 0,
+      originalPoints: null,
+      icoRequired: true,
+      hideRewardAmounts: true,
+      iconUrl: "/points/lumina-points-icon.png",
+      imageText: null,
+      badge: "ICO",
+      countries: ["global"],
+      stock: 5000,
+      purchaseLimit: 1,
+      enabled: true,
+      sortOrder: 7,
+      description: "Users who reserved LUMINA in the ICO can open once.",
+      descriptionI18n: { en: "Users who reserved LUMINA in the ICO can open once.", "zh-CN": "只要参与过 ICO 认购，就可以开启一次。", "zh-TW": "只要參與過 ICO 認購，就可以開啟一次。", ja: "ICOに参加したユーザーは1回開けられます。", fr: "Les utilisateurs ayant participé à l'ICO peuvent l'ouvrir une fois." },
+      rewards: [
+        { id: "usdc", name: "USDC", value: null, symbol: "USDC", minAmount: 0.001, maxAmount: 1, rareMaxOdds: 0.01, odds: 2200, stock: null },
+        { id: "wld", name: "WLD", value: null, symbol: "WLD", minAmount: 0.01, maxAmount: 1, rareMaxOdds: 0.01, odds: 2200, stock: null },
+        { id: "doge", name: "DOGE", value: null, symbol: "DOGE", minAmount: 1, maxAmount: 100, odds: 1900, stock: null },
+        { id: "sui", name: "SUI", value: null, symbol: "SUI", minAmount: 0.01, maxAmount: 2, odds: 1900, stock: null },
+        { id: "xrp", name: "XRP", value: null, symbol: "XRP", minAmount: 0.1, maxAmount: 10, odds: 1800, stock: null },
+      ],
+    },
+    {
       id: "umy-silver",
       type: "product",
       title: "Upgrade to Umy Silver membership",
@@ -201,6 +235,10 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
           name: String(reward.name || "").trim(),
           nameI18n: cleanI18n(reward.nameI18n, String(reward.name || "Reward").trim()),
           value: typeof reward.value === "string" && reward.value.trim() ? reward.value.trim() : null,
+          symbol: typeof reward.symbol === "string" && reward.symbol.trim() ? reward.symbol.trim().toUpperCase().slice(0, 16) : null,
+          minAmount: reward.minAmount == null ? null : Math.max(0, Number(reward.minAmount)),
+          maxAmount: reward.maxAmount == null ? null : Math.max(0, Number(reward.maxAmount)),
+          rareMaxOdds: reward.rareMaxOdds == null ? null : Math.max(0, Math.min(1, Number(reward.rareMaxOdds))),
           odds: Math.max(0, Number(reward.odds || 0)),
           stock: reward.stock == null ? null : Math.max(0, Math.floor(Number(reward.stock))),
         }))
@@ -214,6 +252,8 @@ function normalizeProduct(input: Partial<PointsProductConfig>, index: number): P
     points: Math.max(0, Math.floor(Number(input.points ?? 0))),
     originalPoints: input.originalPoints == null || input.originalPoints === 0 ? null : Math.max(0, Math.floor(Number(input.originalPoints))),
     alphaRequired: input.alphaRequired === true,
+    icoRequired: input.icoRequired === true,
+    hideRewardAmounts: input.hideRewardAmounts === true,
     imageUrl: typeof input.imageUrl === "string" && input.imageUrl.trim() ? input.imageUrl.trim() : null,
     detailImageUrl: typeof input.detailImageUrl === "string" && input.detailImageUrl.trim() ? input.detailImageUrl.trim() : null,
     iconUrl: typeof input.iconUrl === "string" && input.iconUrl.trim() ? input.iconUrl.trim() : null,
@@ -241,6 +281,10 @@ function parseProducts(value: unknown): PointsProductConfig[] {
   if (!rows.some((item) => item.alphaRequired === true)) {
     const alphaDefault = defaultProducts().find((item) => item.alphaRequired === true);
     if (alphaDefault) rows.push(alphaDefault);
+  }
+  if (!rows.some((item) => item.icoRequired === true)) {
+    const icoDefault = defaultProducts().find((item) => item.icoRequired === true);
+    if (icoDefault) rows.push(icoDefault);
   }
   return rows.sort((a, b) => a.sortOrder - b.sortOrder);
 }
@@ -298,6 +342,7 @@ function toPublicProduct(product: PointsProductConfig, issuedCount = 0): PointsP
 }
 
 function effectiveProductCost(product: PointsProductConfig) {
+  if (product.icoRequired === true) return 0;
   return product.alphaRequired === true ? ALPHA_BOX_COST : Math.max(0, Math.floor(Number(product.points || 0)));
 }
 
@@ -548,6 +593,21 @@ function pickBlindReward(product: PointsProductConfig) {
       won = reward;
       break;
     }
+  }
+  const symbol = String(won.symbol || won.name || "").trim().toUpperCase();
+  const min = Number(won.minAmount);
+  const max = Number(won.maxAmount);
+  if (Number.isFinite(min) && Number.isFinite(max) && max > min && symbol) {
+    const rareMaxOdds = Math.max(0, Math.min(1, Number(won.rareMaxOdds || 0)));
+    const amount = Math.random() < rareMaxOdds ? max : min + (max - min) * Math.pow(Math.random(), 2.6);
+    const formatted = Number(amount.toFixed(8)).toLocaleString("en-US", { maximumFractionDigits: 8 });
+    if (product.hideRewardAmounts === true) {
+      return { name: symbol, value: `${formatted} ${symbol}` };
+    }
+    return { name: `${formatted} ${symbol}`, value: `${formatted} ${symbol}` };
+  }
+  if (product.hideRewardAmounts === true) {
+    return { name: symbol || won.name || "Lumina reward", value: won.value ?? null };
   }
   return { name: won.name || "Lumina reward", value: won.value ?? null };
 }

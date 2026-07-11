@@ -3425,7 +3425,7 @@ function enhancePrototypeHome() {
       function defaultIcoPaymentTokens(){
         return [
           { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:1000, luminaRate:1000, quoteAmount:1, boostMultiplier:1 },
-          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:1, maxAmount:300, luminaRate:5000, quoteAmount:1, boostMultiplier:2 },
+          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:0.1, maxAmount:300, luminaRate:5000, quoteAmount:1, boostMultiplier:2 },
           { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:650000000, quoteAmount:0.001, boostMultiplier:4 },
           { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:13500000, quoteAmount:0.001, boostMultiplier:3 }
         ];
@@ -3528,7 +3528,10 @@ function enhancePrototypeHome() {
         if (!home) return;
         var slider = document.getElementById("homePromoSlider");
         var ico = luminaIcoConfig();
-        if (!ico.enabled) { if (slider) slider.remove(); return; }
+        var points = homePointsBannerConfig();
+        var showIco = ico.enabled !== false;
+        var showPoints = points.enabled !== false;
+        if (!showIco && !showPoints) { if (slider) slider.remove(); return; }
         if (!slider) {
           var section = home.querySelector(".section-head");
           if (!section) return;
@@ -3537,12 +3540,14 @@ function enhancePrototypeHome() {
           slider = document.createElement("div");
           slider.id = "homePromoSlider";
           slider.className = "home-promo-slider";
-          slider.innerHTML =
-            '<div class="home-promo-track">' +
-              '<button type="button" id="homeIcoBanner" class="home-points-banner home-ico-banner"></button>' +
-            '</div>';
           section.insertAdjacentElement("beforebegin", slider);
         }
+        slider.innerHTML =
+          '<div class="home-promo-track">' +
+            (showIco ? '<button type="button" id="homeIcoBanner" class="home-points-banner home-ico-banner"></button>' : '') +
+            (showPoints ? '<button type="button" id="homePointsBanner" class="home-points-banner"></button>' : '') +
+          '</div>' +
+          ((showIco && showPoints) ? '<div id="homePromoDots" class="home-promo-dots"><button type="button" class="active" aria-label="ICO"></button><button type="button" aria-label="Lumina Points"></button></div>' : '');
         var icoBanner = document.getElementById("homeIcoBanner");
         if (icoBanner) {
           icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
@@ -3551,6 +3556,15 @@ function enhancePrototypeHome() {
             '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
         }
+        var pointsBanner = document.getElementById("homePointsBanner");
+        if (pointsBanner) {
+          pointsBanner.onclick = function(){ if (window.openPointsCenter) window.openPointsCenter(); };
+          pointsBanner.innerHTML =
+            '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
+            '<span class="home-points-copy"><b>' + homeBannerEscape(points.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(points.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(points.tasksLabel) + '</i><i class="gift">' + homeBannerEscape(points.boxLabel) + '</i></span></span>' +
+            '<span class="home-points-chev">›</span>';
+        }
+        attachHomePromoSlider(slider);
         window.__luminaEnsureHomePointsBanner = ensureHomePointsBanner;
       }
       function icoCountdownParts(launchAt){
@@ -3724,10 +3738,23 @@ function enhancePrototypeHome() {
               userAddress: window.__luminaUserAddress || ""
             });
             if (result.status === "success") {
-              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: receiveLumina(value, token), hash: result.txHash || "", createdAt: new Date().toISOString() });
+              var luminaAmount = receiveLumina(value, token);
+              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: luminaAmount, hash: result.txHash || "", createdAt: new Date().toISOString() });
+              fetch("/api/ico/participation", {
+                method: "POST",
+                cache: "no-store",
+                headers: { "content-type": "application/json", "cache-control": "no-store" },
+                body: JSON.stringify({
+                  address: window.__luminaUserAddress || "",
+                  tokenSymbol: token.symbol,
+                  tokenAmount: value,
+                  luminaAmount: luminaAmount,
+                  txHash: result.txHash || ""
+                })
+              }).catch(function(){});
               var allocationValue = document.getElementById("icoAllocationValue");
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
-              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(receiveLumina(amount(), token)).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
+              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(luminaAmount).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
               toast(icoCopy("allocationReserved"), "success");
               pay.textContent = icoCopy("reserved");
@@ -6425,6 +6452,9 @@ function enhancePrototypeMe() {
       function productAlphaRequired(product){
         return !!(product && product.type === "blind_box" && product.alphaRequired === true);
       }
+      function productIcoRequired(product){
+        return !!(product && product.type === "blind_box" && product.icoRequired === true);
+      }
       function alphaNeedText(){
         var alpha = alphaProfile();
         if (Number(alpha.balanceScore || 0) <= 0 && Number(alpha.swapScore || 0) <= 0) return "Need Balance + Swap score";
@@ -6724,6 +6754,35 @@ function enhancePrototypeMe() {
               { id:"1", name:"0.01 WLD", value:"0.01 WLD", odds:9000, stock:null },
               { id:"2", name:"0.1 WLD", value:"0.1 WLD", odds:900, stock:null },
               { id:"3", name:"1 WLD", value:"1 WLD", odds:100, stock:null }
+            ]
+          },{
+            id:"ico-token-mystery-box",
+            type:"blind_box",
+            title:"ICO Token Mystery Box",
+            titleI18n:{ en:"ICO Token Mystery Box", "zh-CN":"ICO 代币盲盒", "zh-TW":"ICO 代幣盲盒", ja:"ICOトークンミステリーボックス", fr:"Boîte mystère ICO" },
+            category:"alpha",
+            points:0,
+            originalPoints:null,
+            icoRequired:true,
+            hideRewardAmounts:true,
+            imageUrl:null,
+            detailImageUrl:null,
+            iconUrl:"/points/lumina-points-icon.png",
+            imageText:null,
+            badge:"ICO",
+            countries:["global"],
+            stock:5000,
+            purchaseLimit:1,
+            enabled:true,
+            sortOrder:7,
+            description:"Users who reserved LUMINA in the ICO can open once.",
+            descriptionI18n:{ en:"Users who reserved LUMINA in the ICO can open once.", "zh-CN":"只要参与过 ICO 认购，就可以开启一次。", "zh-TW":"只要參與過 ICO 認購，就可以開啟一次。", ja:"ICOに参加したユーザーは1回開けられます。", fr:"Les utilisateurs ayant participé à l'ICO peuvent l'ouvrir une fois." },
+            rewards:[
+              { id:"usdc", name:"USDC", value:null, odds:2200, stock:null },
+              { id:"wld", name:"WLD", value:null, odds:2200, stock:null },
+              { id:"doge", name:"DOGE", value:null, odds:1900, stock:null },
+              { id:"sui", name:"SUI", value:null, odds:1900, stock:null },
+              { id:"xrp", name:"XRP", value:null, odds:1800, stock:null }
             ]
           }];
         }
@@ -7057,7 +7116,10 @@ function enhancePrototypeMe() {
         function cleanRewardText(text){
           return String(text || "").replace(/^\\s*\\d+\\s+(?=(\\d|US|WLD|ETH|USDC|ORB|SUSHI|Point|\\$))/i, "").trim();
         }
-        function blindRewardLabel(reward){
+        function blindRewardLabel(reward, product){
+          if (product && product.hideRewardAmounts) {
+            return cleanRewardText(i18nText(reward && reward.nameI18n, reward && reward.name || "")) || "Lumina reward";
+          }
           var value = cleanRewardText(reward && reward.value);
           var name = cleanRewardText(i18nText(reward && reward.nameI18n, reward && reward.name || ""));
           return value || name || "Lumina reward";
@@ -7072,6 +7134,7 @@ function enhancePrototypeMe() {
           var pendingBuy = pendingBuyEntry && pendingBuyEntry.promise ? pendingBuyEntry.promise : pendingBuyEntry;
           var clientOrderId = pendingBuyEntry && pendingBuyEntry.clientOrderId ? pendingBuyEntry.clientOrderId : null;
           var fallbackAvailablePoints = pendingBuyEntry && pendingBuyEntry.availablePoints ? Number(pendingBuyEntry.availablePoints || 0) : Number(window.__luminaPoints || 0) + Number(product.points || 0);
+          var isIcoBox = productIcoRequired(product);
           if (pendingBuy) {
             pointsActionBusy(busyKey, true);
             renderProductDetail(product.id, null, "buying");
@@ -7105,7 +7168,7 @@ function enhancePrototypeMe() {
             await reloadPointsOrders().catch(function(){ return []; });
             count = purchasedCount(product.id);
           }
-          if (count <= 0) { toast(copy.buyFirst || "Please buy this mystery box first"); renderProductDetail(product.id, "buyfirst"); return; }
+          if (count <= 0 && !isIcoBox) { toast(copy.buyFirst || "Please buy this mystery box first"); renderProductDetail(product.id, "buyfirst"); return; }
           pointsActionBusy(busyKey, true);
           renderProductDetail(product.id, null, "opening");
           var rewards = Array.isArray(product.rewards) && product.rewards.length ? product.rewards : [{ name:"Lumina reward", value:"", odds:1 }];
@@ -7125,7 +7188,7 @@ function enhancePrototypeMe() {
                 method: "POST",
                 cache: "no-store",
                 headers: { "content-type": "application/json", "cache-control": "no-store" },
-                body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id, clientOrderId:clientOrderId, availablePoints:fallbackAvailablePoints, allowPurchase:false }),
+                body: JSON.stringify({ action:"open", address:window.__luminaUserAddress, productId:product.id, clientOrderId:clientOrderId, availablePoints:fallbackAvailablePoints, allowPurchase:isIcoBox && count <= 0 }),
               });
               var data = await res.json().catch(function(){ return null; });
               if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || "Open failed");
@@ -7165,11 +7228,11 @@ function enhancePrototypeMe() {
           }
           var result = box.querySelector(".blind-result");
           if (result) {
-            var rewardLabel = blindRewardLabel(won);
+            var rewardLabel = blindRewardLabel(won, product);
             result.classList.remove("pending");
             result.innerHTML = '<small>' + escapeAttr(copy.youGot || "You got") + '</small><strong>' + escapeAttr(rewardLabel) + '</strong><button type="button" onclick="document.getElementById(\\'blindBoxModal\\').remove()">' + escapeAttr(copy.done || "Done") + '</button>';
           }
-          addPointsCoupon({ title: blindRewardLabel(won), value: "", source: productTitle(product) });
+          addPointsCoupon({ title: blindRewardLabel(won, product), value: "", source: productTitle(product) });
           pointsActionBusy(busyKey, false);
           renderProductDetail(product.id);
         };
@@ -7186,7 +7249,7 @@ function enhancePrototypeMe() {
           if (!rewards.length) return '<li>' + escapeAttr(copy.rewardFallback || "Rewards are issued to your Lumina account after redemption.") + '</li>';
           return rewards.map(function(item){
             var title = i18nText(item.nameI18n, item.name || "Reward");
-            return '<li>' + escapeAttr(title) + (item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
+            return '<li>' + escapeAttr(title) + (!product.hideRewardAmounts && item.value ? ' <b>' + escapeAttr(item.value) + '</b>' : '') + '</li>';
           }).join("");
         }
         async function buyProduct(productId){
@@ -7198,8 +7261,9 @@ function enhancePrototypeMe() {
           if (product.enabled === false) { toast(copy.unavailable || "This product is unavailable"); return; }
           var cost = Math.max(0, Number(product.points || 0));
           var isAlphaBox = productAlphaRequired(product);
+          var isIcoBox = productIcoRequired(product);
           if (isAlphaBox && !alphaEligible()) { toast(alphaNeedText()); renderProductDetail(productId, "alpha"); return; }
-          if (!isAlphaBox && Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
+          if (!isAlphaBox && !isIcoBox && Number(window.__luminaPoints || 0) < cost) { toast(copy.insufficientPoints || "Not enough Lumina Points"); renderProductDetail(productId, "insufficient"); return; }
           var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
           if (limit > 0 && totalPurchasedCount(product.id) >= limit) { toast(copy.limitReached || "Purchase limit reached"); renderProductDetail(productId, "limit"); return; }
           if (Math.floor(Number(product.stock || 0)) <= 0) { toast(copy.soldOut || "Sold out"); renderProductDetail(productId, "soldout"); return; }
@@ -7234,7 +7298,7 @@ function enhancePrototypeMe() {
             } else if (previousStock > 0) {
               product.stock = previousStock - 1;
             }
-            if (!isAlphaBox) {
+            if (!isAlphaBox && !isIcoBox) {
               updatePointsBalance(previousPoints - cost);
               addPointsLedger({ type:"spend", points:cost, title:productTitle(product), productId:product.id });
             } else {
@@ -7266,14 +7330,15 @@ function enhancePrototypeMe() {
           var original = Number(product.originalPoints || 0) > Number(product.points || 0) ? '<del>' + Number(product.originalPoints || 0).toLocaleString() + '</del>' : "";
           var isBlind = product.type === "blind_box";
           var isAlphaBox = productAlphaRequired(product);
+          var isIcoBox = productIcoRequired(product);
           var owned = purchasedCount(product.id);
           var totalOwned = totalPurchasedCount(product.id);
           var stock = Math.max(0, Math.floor(Number(product.stock || 0)));
           var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
           var isBuying = owned <= 0 && (pendingAction === "buying" || pointsActionBusy("buy:" + product.id));
           var isOpening = pendingAction === "opening" || pointsActionBusy("open:" + product.id);
-          var action = isBlind && owned > 0 ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
-          var actionText = isBlind && owned > 0 ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
+          var action = (isBlind && (owned > 0 || isIcoBox)) ? "window.__luminaOpenBlindBox('" + escapeAttr(product.id) + "')" : "window.__luminaBuyPointsProduct('" + escapeAttr(product.id) + "')";
+          var actionText = (isBlind && (owned > 0 || isIcoBox)) ? (copy.openNow || "OPEN NOW") : (isBlind ? (copy.buyBox || "BUY BOX") : (copy.redeemNow || "REDEEM NOW"));
           if (isBuying) actionText = copy.processing || "Processing...";
           if (isOpening) actionText = copy.opening || "Opening...";
           var limitReached = isBlind && limit > 0 && totalOwned >= limit && owned <= 0;
@@ -7283,7 +7348,7 @@ function enhancePrototypeMe() {
           if (limitReached) actionText = copy.limitReached || "LIMIT REACHED";
           if (soldOutForAction) actionText = copy.soldOut || "SOLD OUT";
           if (alphaBlocked) actionText = alphaNeedText();
-          var subtitle = isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points.");
+          var subtitle = isIcoBox ? "Join the LUMINA ICO to unlock one opening." : (isBlind ? (copy.buyFirstOpen || "Buy first, then open the mystery box.") : (copy.redeemWithPoints || "Redeem this reward with Lumina Points."));
           var description = productDescription(product, isBlind ? copy.blindBoxDescription : copy.productDescription);
           var error = errorText ? '<div class="points-detail-error">' + escapeAttr(copy.insufficientPoints || "Not enough Lumina Points") + '</div>' : "";
           if (errorText === "limit") error = '<div class="points-detail-error">' + escapeAttr(copy.limitReached || "Purchase limit reached") + '</div>';
@@ -7300,7 +7365,7 @@ function enhancePrototypeMe() {
             alphaInfo +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.productDetails || "Product Details") + '</h3><p>' + escapeAttr(description) + '</p></section>' +
             '<section class="points-detail-section"><h3>' + escapeAttr(copy.rewards || "Rewards") + '</h3><ul>' + rewardDetails(product) + '</ul></section>' +
-            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + Number(product.points || 0).toLocaleString() + '</strong>' + original + '</div><small>' + escapeAttr(isAlphaBox ? "Alpha available" : (copy.available || "Available")) + ': <b id="pointsShopBalance">' + Number(isAlphaBox ? alphaScore() : (window.__luminaPoints || 0)).toLocaleString() + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
+            '<div class="points-detail-footer"><div class="points-detail-price"><div>' + luminaMark("sm") + '<strong>' + (isIcoBox ? "ICO" : Number(product.points || 0).toLocaleString()) + '</strong>' + original + '</div><small>' + escapeAttr(isIcoBox ? "ICO participant" : (isAlphaBox ? "Alpha available" : (copy.available || "Available"))) + ': <b id="pointsShopBalance">' + (isIcoBox ? "1 chance" : Number(isAlphaBox ? alphaScore() : (window.__luminaPoints || 0)).toLocaleString()) + '</b>' + (owned > 0 ? ' · ' + escapeAttr(copy.owned || "Owned") + ': ' + owned : '') + '</small>' + boxInfo + error + '</div><button type="button" ' + (disabled ? "disabled" : "") + ' onclick="' + (disabled ? "return false" : action) + '">' + escapeAttr(actionText) + '</button></div>';
         }
         window.__luminaBuyPointsProduct = buyProduct;
         window.__luminaOpenPointsProduct = renderProductDetail;
@@ -7328,13 +7393,16 @@ function enhancePrototypeMe() {
         window.__luminaOpenCoupons = function(){
           var copy = meCopy();
           var alphaRows = [];
+          var icoRows = [];
           var normalRows = [];
           (window.__luminaPointsOrders || []).filter(function(order){ return order && order.type === "blind_box"; }).forEach(function(order){
             var reward = order.reward || {};
+            var isIcoOrder = String(order.productId || "") === "ico-token-mystery-box";
             var title = order.status === "opened" ? (reward.name || "Opened mystery box") : "Unopened mystery box";
-            var detail = order.status === "opened" ? (reward.value || order.productTitle || "Reward revealed") : (order.productTitle || "Ready to open");
+            var detail = order.status === "opened" ? (isIcoOrder ? (order.productTitle || "Reward revealed") : (reward.value || order.productTitle || "Reward revealed")) : (order.productTitle || "Ready to open");
             var html = '<div class="coupon-row"><span>' + luminaMark("sm") + '</span><div><b>' + escapeAttr(title) + '</b><small>' + escapeAttr(detail) + '</small></div><em>' + escapeAttr(order.status === "opened" ? "Opened" : "Ready") + '</em></div>';
             if (String(order.productId || "") === "alpha-token-mystery-box") alphaRows.push(html);
+            else if (isIcoOrder) icoRows.push(html);
             else normalRows.push(html);
           });
           pointsCoupons().forEach(function(row){
@@ -7342,6 +7410,7 @@ function enhancePrototypeMe() {
           });
           var rows =
             '<section class="coupon-section"><h4>Lumina Points Box</h4>' + (normalRows.join("") || '<p class="points-empty">' + escapeAttr(copy.noBoxRecords || "No box records yet. Buy or open a mystery box to see it here.") + '</p>') + '</section>' +
+            '<section class="coupon-section"><h4>ICO Token Box</h4>' + (icoRows.join("") || '<p class="points-empty">No ICO box records yet.</p>') + '</section>' +
             '<section class="coupon-section"><h4>Alpha Token Box</h4>' + (alphaRows.join("") || '<p class="points-empty">No Alpha box records yet.</p>') + '</section>';
           var old = document.getElementById("pointsCouponsSheet"); if (old) old.remove();
           var sheet = document.createElement("div");
@@ -7365,8 +7434,9 @@ function enhancePrototypeMe() {
             var limit = Math.max(0, Math.floor(Number(product.purchaseLimit || 0)));
             var owned = totalPurchasedCount(product.id);
             var isAlphaBox = productAlphaRequired(product);
-            var meta = product.type === "blind_box" ? '<small class="points-product-meta">' + escapeAttr(isAlphaBox ? "Alpha Box" : (c.box || "Box")) + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(c.limit || "Limit") + ': ' + owned + '/' + limit : '') + '</small>' : "";
-            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div><div class="points-product-cost">' + luminaMark("sm") + '<b>' + (isAlphaBox ? "Alpha " : "Lumina ") + Number(product.points || 0).toLocaleString() + '</b>' + original + '</div>' + meta + '</div></div></button>';
+            var isIcoBox = productIcoRequired(product);
+            var meta = product.type === "blind_box" ? '<small class="points-product-meta">' + escapeAttr(isIcoBox ? "ICO Box" : (isAlphaBox ? "Alpha Box" : (c.box || "Box"))) + ': <b>' + stock.toLocaleString() + '</b>' + (limit > 0 ? ' · ' + escapeAttr(c.limit || "Limit") + ': ' + owned + '/' + limit : '') + '</small>' : "";
+            return '<button type="button" class="points-product ' + (product.type === "blind_box" ? "blind" : "") + '" onclick="' + action + '"><div class="points-product-art">' + productArt(product) + badge + '</div><div class="points-product-body"><strong>' + escapeAttr(productTitle(product)) + '</strong><div><div class="points-product-cost">' + luminaMark("sm") + '<b>' + (isIcoBox ? "ICO " : (isAlphaBox ? "Alpha " : "Lumina ")) + (isIcoBox ? "Chance" : Number(product.points || 0).toLocaleString()) + '</b>' + original + '</div>' + meta + '</div></div></button>';
           }).join("") : '<div class="points-empty">' + c.noPoints + '</div>';
         }
         var categories = ["all", "shop", "alpha", "travel", "fitness", "dining", "cash"];
