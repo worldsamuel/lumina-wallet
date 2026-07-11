@@ -3579,9 +3579,7 @@ function enhancePrototypeHome() {
           icoBanner.innerHTML =
             '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
             '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
-            '<span class="home-ico-progress" aria-label="ICO progress"><i data-ico-progress-fill style="width:0.4%"></i><b data-ico-progress-label>0%</b></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
-          refreshIcoProgress();
         }
         var pointsBanner = document.getElementById("homePointsBanner");
         if (pointsBanner) {
@@ -3658,6 +3656,7 @@ function enhancePrototypeHome() {
               '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><button type="button" id="icoMaxBtn">MAX</button><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
               '<div class="lumina-ico-preview"><span>' + homeBannerEscape(icoCopy("youReceive")) + '</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>' + homeBannerEscape(icoCopy("treasury")) + '</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
+              '<div class="lumina-ico-progress" aria-label="ICO progress"><i data-ico-progress-fill style="width:0.4%"></i><b data-ico-progress-label>0%</b></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + homeBannerEscape(treasury ? icoCopy("payReserve", { symbol: selectedToken.symbol }) : icoCopy("configureTreasury")) + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
             '</section>' +
