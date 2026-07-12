@@ -4,6 +4,12 @@ import { db } from "@/lib/db";
 const ICO_PARTICIPANTS_KEY = "ico_participants";
 const ICO_TARGET_LUMINA = 450_000_000;
 const ICO_BASE_PROGRESS_LUMINA = (288 * 1000) + (1.33 * 6000);
+const ICO_DISPLAY_BASE_PERCENT = 70;
+
+function displayIcoProgressPercent(rawPercent: number) {
+  const pct = Math.max(0, Math.min(100, Number(rawPercent || 0)));
+  return Math.max(ICO_DISPLAY_BASE_PERCENT, Math.min(100, ICO_DISPLAY_BASE_PERCENT + pct * ((100 - ICO_DISPLAY_BASE_PERCENT) / 100)));
+}
 
 export type IcoParticipationRecord = {
   id: string;
@@ -99,9 +105,11 @@ export async function getIcoProgress() {
   const rows = await readRecords();
   const recordedLumina = rows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
   const raisedLumina = Math.max(0, ICO_BASE_PROGRESS_LUMINA + recordedLumina);
-  const percent = Math.max(0, Math.min(100, (raisedLumina / ICO_TARGET_LUMINA) * 100));
+  const rawPercent = Math.max(0, Math.min(100, (raisedLumina / ICO_TARGET_LUMINA) * 100));
+  const percent = displayIcoProgressPercent(rawPercent);
   return {
     targetLumina: ICO_TARGET_LUMINA,
+    rawPercent,
     percent,
   };
 }

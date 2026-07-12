@@ -3422,7 +3422,8 @@ function enhancePrototypeHome() {
         wbtcTokenAddress: ${JSON.stringify(WBTC_TOKEN_ADDRESS)},
         rate: ${LUMINA_ICO_RATE},
         targetLumina: 450000000,
-        baseProgressLumina: 295980
+        baseProgressLumina: 295980,
+        displayBaseProgressPercent: 70
       };
       function defaultIcoPaymentTokens(){
         return [
@@ -3506,7 +3507,9 @@ function enhancePrototypeHome() {
       function localIcoProgressPercent(){
         var allocation = luminaIcoAllocation();
         var total = Number(luminaIcoDefaults.baseProgressLumina || 0) + Number(allocation.lumina || 0);
-        return Math.max(0, Math.min(100, (total / Math.max(1, Number(luminaIcoDefaults.targetLumina || 450000000))) * 100));
+        var raw = Math.max(0, Math.min(100, (total / Math.max(1, Number(luminaIcoDefaults.targetLumina || 450000000))) * 100));
+        var base = Math.max(0, Math.min(100, Number(luminaIcoDefaults.displayBaseProgressPercent || 70)));
+        return Math.max(base, Math.min(100, base + raw * ((100 - base) / 100)));
       }
       function formatIcoProgressPercent(value){
         var pct = Math.max(0, Math.min(100, Number(value || 0)));
@@ -3656,7 +3659,7 @@ function enhancePrototypeHome() {
               '<div class="lumina-ico-input"><input id="icoWldAmount" inputmode="decimal" value="" placeholder="' + homeBannerEscape(formatIcoRange(selectedToken)) + '" /><button type="button" id="icoMaxBtn">MAX</button><span id="icoTokenSuffix">' + homeBannerEscape(selectedToken.symbol) + '</span></div>' +
               '<div class="lumina-ico-preview"><span>' + homeBannerEscape(icoCopy("youReceive")) + '</span><b id="icoReceiveAmount">0 LUMINA</b></div>' +
               '<div class="lumina-ico-address"><span>' + homeBannerEscape(icoCopy("treasury")) + '</span><button type="button" id="icoCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
-              '<div class="lumina-ico-progress" aria-label="ICO progress"><i data-ico-progress-fill style="width:0.4%"></i><b data-ico-progress-label>0%</b></div>' +
+              '<div class="lumina-ico-progress" aria-label="ICO progress"><i data-ico-progress-fill style="width:70%"></i><b data-ico-progress-label>70%</b></div>' +
               '<button type="button" class="lumina-ico-pay" id="icoPayBtn">' + homeBannerEscape(treasury ? icoCopy("payReserve", { symbol: selectedToken.symbol }) : icoCopy("configureTreasury")) + '</button>' +
               '<p class="lumina-ico-note">' + homeBannerEscape(ico.subtitle) + '</p>' +
             '</section>' +
