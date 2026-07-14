@@ -1,11 +1,15 @@
 import type { Prisma } from "@prisma/client";
+import { formatUnits, parseAbiItem, type Address } from "viem";
 import { db } from "@/lib/db";
+import { publicClient } from "@/lib/chain";
 
 const ICO_PARTICIPANTS_KEY = "ico_participants";
 const ICO_TARGET_LUMINA = 450_000_000;
 const ICO_BASE_PROGRESS_LUMINA = (288 * 1000) + (1.33 * 6000);
 const ICO_DISPLAY_BASE_PERCENT = 70;
 const ICO_TREASURY_ADDRESS = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
+const ICO_CHAIN_LOOKBACK_BLOCKS = 1_000_000n;
+const ICO_CHAIN_LOG_CHUNK_BLOCKS = 50_000n;
 const ICO_TOKEN_RATES: Record<string, number> = {
   WLD: 1000,
   USDC: 5000,
@@ -14,6 +18,16 @@ const ICO_TOKEN_RATES: Record<string, number> = {
   BTC: 650_000_000,
   WBTC: 650_000_000,
 };
+const ICO_CHAIN_TOKENS = [
+  { symbol: "WLD", address: "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address, decimals: 18 },
+  { symbol: "USDC", address: "0x79A02482A880bCE3F13e09Da970dC34db4CD24d1" as Address, decimals: 6 },
+  { symbol: "ETH", address: "0x4200000000000000000000000000000000000006" as Address, decimals: 18 },
+  { symbol: "BTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3" as Address, decimals: 8 },
+];
+const transferEvent = parseAbiItem("event Transfer(address indexed from, address indexed to, uint256 value)");
+
+let lastChainSyncAt = 0;
+let chainSyncPromise: Promise<IcoParticipationRecord[]> | null = null;
 
 function displayIcoProgressPercent(rawPercent: number) {
   const pct = Math.max(0, Math.min(100, Number(rawPercent || 0)));
@@ -123,6 +137,67 @@ async function syncIcoRecordsFromActivityLog() {
   return writeRecords([...imported, ...rows]);
 }
 
+function knownTxHashes(rows: IcoParticipationRecord[]) {
+  return new Set(rows.map((row) => String(row.txHash || "").toLowerCase().split(":")[0]).filter(Boolean));
+}
+
+async function syncIcoRecordsFromChain() {
+  const startedAt = Date.now();
+  if (chainSyncPromise) return chainSyncPromise;
+  if (startedAt - lastChainSyncAt < 120_000) return syncIcoRecordsFromActivityLog();
+  chainSyncPromise = (async () => {
+    let rows = await syncIcoRecordsFromActivityLog();
+    const known = knownTxHashes(rows);
+    const latest = await publicClient.getBlockNumber();
+    const minBlock = latest > ICO_CHAIN_LOOKBACK_BLOCKS ? latest - ICO_CHAIN_LOOKBACK_BLOCKS : 0n;
+    const imported: IcoParticipationRecord[] = [];
+
+    for (const token of ICO_CHAIN_TOKENS) {
+      for (let fromBlock = minBlock; fromBlock <= latest; ) {
+        const toBlock = fromBlock + ICO_CHAIN_LOG_CHUNK_BLOCKS > latest ? latest : fromBlock + ICO_CHAIN_LOG_CHUNK_BLOCKS;
+        const logs = await publicClient
+          .getLogs({
+            address: token.address,
+            event: transferEvent,
+            args: { to: ICO_TREASURY_ADDRESS as Address },
+            fromBlock,
+            toBlock,
+          })
+          .catch(() => []);
+        for (const log of logs) {
+          const hash = String(log.transactionHash || "").toLowerCase();
+          if (!hash || known.has(hash)) continue;
+          const args = log.args as { from?: string; value?: bigint };
+          const from = String(args.from || "").toLowerCase();
+          const value = args.value ?? 0n;
+          if (!/^0x[a-f0-9]{40}$/.test(from) || value <= 0n) continue;
+          const tokenAmount = Number(formatUnits(value, token.decimals));
+          if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) continue;
+          imported.push({
+            id: `ico-chain-${Number(log.blockNumber || 0n)}-${Number(log.logIndex || 0)}`,
+            address: from,
+            tokenSymbol: token.symbol,
+            tokenAmount,
+            luminaAmount: tokenAmount * ICO_TOKEN_RATES[token.symbol],
+            txHash: hash,
+            createdAt: new Date().toISOString(),
+          });
+          known.add(hash);
+        }
+        if (toBlock === latest) break;
+        fromBlock = toBlock + 1n;
+      }
+    }
+
+    if (imported.length) rows = await writeRecords([...imported, ...rows]);
+    lastChainSyncAt = Date.now();
+    return rows;
+  })().finally(() => {
+    chainSyncPromise = null;
+  });
+  return chainSyncPromise;
+}
+
 export async function recordIcoParticipation(input: {
   address: string;
   tokenSymbol: string;
@@ -156,7 +231,7 @@ export async function recordIcoParticipation(input: {
 
 export async function hasIcoParticipation(address: string) {
   const normalized = normalizeAddress(address);
-  const rows = await syncIcoRecordsFromActivityLog();
+  const rows = await syncIcoRecordsFromChain();
   return rows.some((row) => row.address === normalized && row.tokenAmount > 0);
 }
 
@@ -167,7 +242,7 @@ export async function assertIcoMysteryBoxEligibility(address: string) {
 }
 
 export async function getIcoProgress() {
-  const rows = await syncIcoRecordsFromActivityLog();
+  const rows = await syncIcoRecordsFromChain();
   const recordedLumina = rows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
   const raisedLumina = Math.max(0, ICO_BASE_PROGRESS_LUMINA + recordedLumina);
   const rawPercent = Math.max(0, Math.min(100, (raisedLumina / ICO_TARGET_LUMINA) * 100));
@@ -180,7 +255,7 @@ export async function getIcoProgress() {
 }
 
 export async function getIcoAdminOverview() {
-  const rows = await syncIcoRecordsFromActivityLog();
+  const rows = await syncIcoRecordsFromChain();
   const byAddress = new Map<string, { address: string; luminaAmount: number; tokenAmount: number; orders: number; lastAt: string | null }>();
   rows.forEach((row) => {
     const address = String(row.address || "").toLowerCase();
