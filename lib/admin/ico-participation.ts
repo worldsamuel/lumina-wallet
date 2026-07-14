@@ -113,3 +113,32 @@ export async function getIcoProgress() {
     percent,
   };
 }
+
+export async function getIcoAdminOverview() {
+  const rows = await readRecords();
+  const byAddress = new Map<string, { address: string; luminaAmount: number; tokenAmount: number; orders: number; lastAt: string | null }>();
+  rows.forEach((row) => {
+    const address = String(row.address || "").toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(address)) return;
+    const current = byAddress.get(address) || { address, luminaAmount: 0, tokenAmount: 0, orders: 0, lastAt: null };
+    current.luminaAmount += Math.max(0, Number(row.luminaAmount || 0));
+    current.tokenAmount += Math.max(0, Number(row.tokenAmount || 0));
+    current.orders += 1;
+    if (!current.lastAt || new Date(row.createdAt).getTime() > new Date(current.lastAt).getTime()) current.lastAt = row.createdAt;
+    byAddress.set(address, current);
+  });
+  const leaderboard = Array.from(byAddress.values())
+    .sort((a, b) => b.luminaAmount - a.luminaAmount || new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime())
+    .slice(0, 500);
+  const progress = await getIcoProgress();
+  return {
+    stats: {
+      participants: leaderboard.length,
+      orders: rows.length,
+      luminaAmount: rows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0),
+      percent: progress.percent,
+      rawPercent: progress.rawPercent,
+    },
+    leaderboard,
+  };
+}
