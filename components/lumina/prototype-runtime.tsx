@@ -3513,7 +3513,7 @@ function enhancePrototypeHome() {
       }
       function formatIcoProgressPercent(value){
         var pct = Math.max(0, Math.min(100, Number(value || 0)));
-        return pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct < 1 ? 2 : 1) + "%";
+        return pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct >= 70 && pct < 100 ? 2 : (pct < 1 ? 2 : 1)) + "%";
       }
       function renderIcoProgress(value){
         var pct = Math.max(0, Math.min(100, Number(value == null ? localIcoProgressPercent() : value)));
@@ -3770,7 +3770,7 @@ function enhancePrototypeHome() {
             if (result.status === "success") {
               var luminaAmount = receiveLumina(value, token);
               var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: luminaAmount, hash: result.txHash || "", createdAt: new Date().toISOString() });
-              fetch("/api/ico/participation", {
+              await fetch("/api/ico/participation", {
                 method: "POST",
                 cache: "no-store",
                 headers: { "content-type": "application/json", "cache-control": "no-store" },
@@ -3781,7 +3781,7 @@ function enhancePrototypeHome() {
                   luminaAmount: luminaAmount,
                   txHash: result.txHash || ""
                 })
-              }).catch(function(){});
+              }).catch(function(){ return null; });
               var allocationValue = document.getElementById("icoAllocationValue");
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(luminaAmount).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
