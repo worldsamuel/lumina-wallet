@@ -1025,261 +1025,29 @@
         <div class="page-head">
           <div>
             <div class="title">数据看板</div>
-            <div class="sub">实时业务数据 · 最后更新 2 秒前</div>
+            <div class="sub">数据库实时数据 · 正在加载...</div>
           </div>
           <div class="actions">
-            <button class="btn sm">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>
-              过去 7 天
-            </button>
-            <button class="btn sm">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-              导出
-            </button>
-            <button class="btn primary sm">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-              刷新
-            </button>
+            <button class="btn sm" onclick="LuminaAdmin.loadAll()">刷新</button>
           </div>
         </div>
-        
-        <!-- KPI -->
         <div class="kpis">
-          <div class="kpi">
-            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="9" r="4"/><path d="M22 22l-2-2m-2-4a4 4 0 11-8 0 4 4 0 018 0z"/></svg></span>总用户数</div>
-            <div class="v">12,847</div>
-            <div class="d up">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-              12.5% <span>· vs 上周</span>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>总锁定价值 (TVL)</div>
-            <div class="v">$1.24<span class="suf">M</span></div>
-            <div class="d up">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-              3.8% <span>· vs 上周</span>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 1l4 4-4 4M3 11V9a4 4 0 014-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 01-4 4H3"/></svg></span>24h 交易笔数</div>
-            <div class="v">3,421</div>
-            <div class="d down">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-              4.2% <span>· vs 昨日</span>
-            </div>
-          </div>
-          <div class="kpi">
-            <div class="k"><span class="ic"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></span>24h 平台收益</div>
-            <div class="v">$842<span class="suf">.30</span></div>
-            <div class="d up">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
-              18.2% <span>· vs 昨日</span>
-            </div>
-          </div>
+          <div class="kpi"><div class="k">总用户数</div><div class="v">0</div><div class="d">真实用户表</div></div>
+          <div class="kpi"><div class="k">转账总量</div><div class="v">0</div><div class="d">链上活动</div></div>
+          <div class="kpi"><div class="k">交易笔数</div><div class="v">0</div><div class="d">最近用户链上记录</div></div>
+          <div class="kpi"><div class="k">平台收益</div><div class="v">0<span class="suf"> ETH</span></div><div class="d">Gas 统计</div></div>
         </div>
-        
-        <!-- ROW 1: CHART + PIE -->
-        <div class="grid-2">
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3>TVL 趋势</h3>
-                <div class="sub">过去 30 天总锁定价值变化</div>
-              </div>
-              <div class="filter-tabs">
-                <button class="ftab">7D</button>
-                <button class="ftab active">30D</button>
-                <button class="ftab">90D</button>
-              </div>
-            </div>
-            <div class="chart">
-              <svg viewBox="0 0 600 220" preserveAspectRatio="none">
-                <defs>
-                  <linearGradient id="gradTvl" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#16a34a" stop-opacity="0.18"/>
-                    <stop offset="100%" stop-color="#16a34a" stop-opacity="0"/>
-                  </linearGradient>
-                </defs>
-                <!-- grid -->
-                <line x1="0" y1="40" x2="600" y2="40" stroke="#f0f0f1" stroke-width="1"/>
-                <line x1="0" y1="90" x2="600" y2="90" stroke="#f0f0f1" stroke-width="1"/>
-                <line x1="0" y1="140" x2="600" y2="140" stroke="#f0f0f1" stroke-width="1"/>
-                <line x1="0" y1="190" x2="600" y2="190" stroke="#f0f0f1" stroke-width="1"/>
-                <!-- fill area -->
-                <path d="M0,170 L50,160 L100,150 L150,140 L200,130 L250,120 L300,100 L350,85 L400,70 L450,55 L500,45 L550,35 L600,30 L600,220 L0,220 Z" fill="url(#gradTvl)"/>
-                <!-- line -->
-                <path d="M0,170 L50,160 L100,150 L150,140 L200,130 L250,120 L300,100 L350,85 L400,70 L450,55 L500,45 L550,35 L600,30" stroke="#16a34a" stroke-width="2" fill="none"/>
-                <!-- dot -->
-                <circle cx="600" cy="30" r="4" fill="#16a34a" stroke="#fff" stroke-width="2"/>
-                <!-- y axis labels -->
-                <text x="8" y="44" fill="#a1a1aa" font-size="10">$1.5M</text>
-                <text x="8" y="94" fill="#a1a1aa" font-size="10">$1.0M</text>
-                <text x="8" y="144" fill="#a1a1aa" font-size="10">$500K</text>
-                <text x="8" y="194" fill="#a1a1aa" font-size="10">$0</text>
-              </svg>
-            </div>
-          </div>
-          
-          <div class="card">
-            <div class="card-head">
-              <div>
-                <h3>资金分布</h3>
-                <div class="sub">各 vault TVL 占比</div>
-              </div>
-            </div>
-            <div style="display: flex; justify-content: center; padding: 8px 0 12px;">
-              <svg width="140" height="140" viewBox="0 0 100 100">
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#f0f0f1" stroke-width="14"/>
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#2775ca" stroke-width="14"
-                        stroke-dasharray="113 251" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#16a34a" stroke-width="14"
-                        stroke-dasharray="75 251" stroke-dashoffset="-113" transform="rotate(-90 50 50)"/>
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" stroke-width="14"
-                        stroke-dasharray="40 251" stroke-dashoffset="-188" transform="rotate(-90 50 50)"/>
-                <circle cx="50" cy="50" r="40" fill="none" stroke="#a855f7" stroke-width="14"
-                        stroke-dasharray="23 251" stroke-dashoffset="-228" transform="rotate(-90 50 50)"/>
-              </svg>
-            </div>
-            <div class="legend">
-              <div class="row">
-                <div class="dot" style="background:#2775ca"></div>
-                <span class="nm">Re7 USDC</span>
-                <span class="pct">45%</span>
-                <span class="val">$558.0K</span>
-              </div>
-              <div class="row">
-                <div class="dot" style="background:#16a34a"></div>
-                <span class="nm">Re7 WLD</span>
-                <span class="pct">30%</span>
-                <span class="val">$372.0K</span>
-              </div>
-              <div class="row">
-                <div class="dot" style="background:#f59e0b"></div>
-                <span class="nm">Re7 WETH</span>
-                <span class="pct">16%</span>
-                <span class="val">$198.4K</span>
-              </div>
-              <div class="row">
-                <div class="dot" style="background:#a855f7"></div>
-                <span class="nm">Re7 WBTC</span>
-                <span class="pct">9%</span>
-                <span class="val">$111.6K</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <!-- ROW 2: ACTIVITY + ALERTS -->
         <div class="grid-2">
           <div class="card" style="padding:0;">
             <div class="card-head" style="padding:18px 20px 14px;">
-              <div>
-                <h3>最近交易</h3>
-                <div class="sub">实时链上交易流</div>
-              </div>
+              <div><h3>最近交易</h3><div class="sub">真实链上交易时间</div></div>
               <span class="link">查看全部 →</span>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>类型</th>
-                  <th>金额</th>
-                  <th>用户</th>
-                  <th style="text-align:right;">状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="text-3">2 分钟前</td>
-                  <td><span class="pill blue"><span class="d"></span>存款</span></td>
-                  <td><strong>0.5 USDC</strong> <span class="text-3">→ Re7 USDC</span></td>
-                  <td class="mono">0x0f3b...b2b26</td>
-                  <td style="text-align:right;"><span class="pill green">成功</span></td>
-                </tr>
-                <tr>
-                  <td class="text-3">5 分钟前</td>
-                  <td><span class="pill gray"><span class="d"></span>转账</span></td>
-                  <td><strong>1.0 WLD</strong> <span class="text-3">→ ...4Ab9f</span></td>
-                  <td class="mono">0x4df8...26511e</td>
-                  <td style="text-align:right;"><span class="pill green">成功</span></td>
-                </tr>
-                <tr>
-                  <td class="text-3">12 分钟前</td>
-                  <td><span class="pill amber"><span class="d"></span>提现</span></td>
-                  <td><strong>0.1 WLD</strong> <span class="text-3">← Re7 WLD</span></td>
-                  <td class="mono">0x0f3b...b2b26</td>
-                  <td style="text-align:right;"><span class="pill green">成功</span></td>
-                </tr>
-                <tr>
-                  <td class="text-3">18 分钟前</td>
-                  <td><span class="pill blue"><span class="d"></span>存款</span></td>
-                  <td><strong>2.5 WLD</strong> <span class="text-3">→ Re7 WLD</span></td>
-                  <td class="mono">0x9a1c...8e2f4</td>
-                  <td style="text-align:right;"><span class="pill green">成功</span></td>
-                </tr>
-                <tr>
-                  <td class="text-3">25 分钟前</td>
-                  <td><span class="pill gray"><span class="d"></span>转账</span></td>
-                  <td><strong>0.01 STO</strong> <span class="text-3">→ ...26511e</span></td>
-                  <td class="mono">0x0f3b...b2b26</td>
-                  <td style="text-align:right;"><span class="pill red">失败</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <table><thead><tr><th>时间</th><th>类型</th><th>金额</th><th>用户</th><th style="text-align:right;">状态</th></tr></thead><tbody><tr><td colspan="5" class="bridge-loader">正在加载交易...</td></tr></tbody></table>
           </div>
-          
           <div class="card">
-            <div class="card-head">
-              <div>
-                <h3>风控告警</h3>
-                <div class="sub">需要人工处理</div>
-              </div>
-              <span class="link">3 待处理</span>
-            </div>
-            <div>
-              <div class="alert-row">
-                <div class="alert-ic red">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                </div>
-                <div class="body">
-                  <div class="t">大额转账触发</div>
-                  <div class="s">用户 0x9a1c... 单笔转账 5,000 USDC</div>
-                </div>
-                <div class="time">3 分钟前</div>
-              </div>
-              <div class="alert-row">
-                <div class="alert-ic amber">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                </div>
-                <div class="body">
-                  <div class="t">新代币申请审核</div>
-                  <div class="s">3 个代币等待白名单审核</div>
-                </div>
-                <div class="time">1 小时前</div>
-              </div>
-              <div class="alert-row">
-                <div class="alert-ic amber">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                </div>
-                <div class="body">
-                  <div class="t">异常登录</div>
-                  <div class="s">用户在 24h 内从 3 个国家登录</div>
-                </div>
-                <div class="time">2 小时前</div>
-              </div>
-              <div class="alert-row">
-                <div class="alert-ic green">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
-                </div>
-                <div class="body">
-                  <div class="t">系统健康检查</div>
-                  <div class="s">所有 RPC 节点正常</div>
-                </div>
-                <div class="time">5 小时前</div>
-              </div>
-            </div>
+            <div class="card-head"><div><h3>风控告警</h3><div class="sub">来自待审核代币</div></div><span class="link">0 待处理</span></div>
+            <div><div class="alert-row"><div class="alert-ic green"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="body"><div class="t">暂无待处理风控</div><div class="s">代币审核队列为空</div></div><div class="time">实时</div></div></div>
           </div>
         </div>
       </section>
@@ -2022,6 +1790,7 @@
   function logout(){api("/api/admin/logout",{method:"POST"}).finally(function(){location.reload()})}
   function replacePage(page,markup){var el=$("#page-"+page); if(el) el.innerHTML=markup}
   function renderShells(){
+    replacePage("dashboard",'<div class="page-head"><div><div class="title">数据看板</div><div class="sub">数据库实时数据 · 正在加载...</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadAll()">刷新</button></div></div><div class="kpis"><div class="kpi"><div class="k">总用户数</div><div class="v">0</div><div class="d">真实用户表</div></div><div class="kpi"><div class="k">转账总量</div><div class="v">0</div><div class="d">链上活动</div></div><div class="kpi"><div class="k">交易笔数</div><div class="v">0</div><div class="d">最近用户链上记录</div></div><div class="kpi"><div class="k">平台收益</div><div class="v">0<span class="suf"> ETH</span></div><div class="d">Gas 统计</div></div></div><div class="grid-2"><div class="card" style="padding:0;"><div class="card-head" style="padding:18px 20px 14px;"><div><h3>最近交易</h3><div class="sub">真实链上交易时间</div></div><span class="link">查看全部 →</span></div><table><thead><tr><th>时间</th><th>类型</th><th>金额</th><th>用户</th><th style="text-align:right;">状态</th></tr></thead><tbody><tr><td colspan="5" class="bridge-loader">正在加载交易...</td></tr></tbody></table></div><div class="card"><div class="card-head"><div><h3>风控告警</h3><div class="sub">来自待审核代币</div></div><span class="link">0 待处理</span></div><div><div class="alert-row"><div class="alert-ic green"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg></div><div class="body"><div class="t">暂无待处理风控</div><div class="s">代币审核队列为空</div></div><div class="time">实时</div></div></div></div></div>');
     replacePage("earn",'<div class="page-head"><div><div class="title">理财产品</div><div class="sub">与数据库 earn_products 配置互通,用户端 Earn 页实时读取</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.openEarn()">+ 新建产品</button></div></div><div class="table-wrap"><table><thead><tr><th>产品</th><th>Vault</th><th>资产</th><th>APY</th><th>风险</th><th>TVL</th><th>状态</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeEarnRows"><tr><td colspan="8" class="bridge-loader">Loading...</td></tr></tbody></table></div>');
     replacePage("tokens",'<div class="page-head"><div><div class="title">代币白名单</div><div class="sub">数据库 Token 表,用户端 Swap / Token List 通过 /api/tokens 同步</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.openBatchTokens()">批量导入</button><button class="btn primary sm" onclick="LuminaAdmin.openToken()">+ 添加代币</button></div></div><div class="kpis" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px"><div class="kpi"><div class="k">核心代币</div><div class="v" id="tokenKpiCore">0</div></div><div class="kpi"><div class="k">已审核</div><div class="v" id="tokenKpiVerified">0</div></div><div class="kpi"><div class="k">待审核</div><div class="v" id="tokenKpiPending" style="color:var(--warn)">0</div></div><div class="kpi"><div class="k">已禁用</div><div class="v" id="tokenKpiDisabled">0</div></div></div><div class="toolbar"><input class="input" id="bridgeTokenSearch" oninput="LuminaAdmin.renderTokens()" placeholder="搜索 symbol / 名称 / 地址" style="width:260px"><div class="spacer"></div><button class="btn sm" onclick="LuminaAdmin.loadTokens()">刷新</button></div><div class="table-wrap"><table><thead><tr><th>代币</th><th>合约地址</th><th>Decimals</th><th>等级</th><th>状态</th><th>可转账</th><th>可 Swap</th><th>Top 排行</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeTokenRows"></tbody></table></div>');
     replacePage("points",'<div class="page-head"><div><div class="title">积分中心</div><div class="sub">按类型配置积分。Swap / Earn 支持每美元积分和每日美元上限。</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.savePointsRules()">保存积分规则</button></div></div><div class="grid-2"><div class="card"><div class="card-head"><div><h3>基础规则</h3><div class="sub">不同业务类型独立计算</div></div><button id="pointsEnabled" class="toggle on" onclick="this.classList.toggle(\'on\')"></button></div><div class="bridge-form-grid"><div><label>每日签到积分</label><input class="input" id="pointsCheckin" type="number" min="0"></div><div><label>Swap 固定积分</label><input class="input" id="pointsSwapFixed" type="number" min="0"></div><div><label>Swap 每美元积分</label><input class="input" id="pointsSwapPerUsd" type="number" min="0" step="0.01"></div><div><label>Swap 每日美元上限</label><input class="input" id="pointsSwapUsdCap" type="number" min="0" step="1"></div><div><label>Earn 固定积分</label><input class="input" id="pointsEarnFixed" type="number" min="0"></div><div><label>Earn 每美元积分</label><input class="input" id="pointsEarnPerUsd" type="number" min="0" step="0.01"></div><div><label>Earn 每日美元上限</label><input class="input" id="pointsEarnUsdCap" type="number" min="0" step="1"></div></div></div><div class="card"><div class="card-head"><div><h3>翻倍活动</h3><div class="sub">会叠加到签到 / Swap / Earn / 任务奖励</div></div></div><label style="display:flex;align-items:center;justify-content:space-between">周三积分翻倍 <button id="pointsWednesday" class="toggle" onclick="this.classList.toggle(\'on\')"></button></label><label style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">幸运日倍率 <button id="pointsLuckyEnabled" class="toggle" onclick="this.classList.toggle(\'on\')"></button></label><div class="bridge-form-grid" style="margin-top:12px"><div><label>幸运日倍数</label><input class="input" id="pointsLuckyMultiplier" type="number" min="1" step="0.1"></div><div><label>幸运日日期</label><textarea class="input" id="pointsLuckyDates" placeholder="2026-06-08&#10;2026-07-01" style="min-height:86px"></textarea></div></div></div></div><div class="card"><div class="card-head"><div><h3>自定义规则</h3><div class="sub">用于任务中心或运营手动发放</div></div><button class="btn sm" onclick="LuminaAdmin.addCustomPointRule()">加入新规则</button></div><div class="table-wrap"><table><thead><tr><th>规则 ID</th><th>规则名称</th><th>积分</th><th>状态</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeCustomPointRules"></tbody></table></div></div>');
