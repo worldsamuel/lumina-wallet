@@ -3402,6 +3402,7 @@ function enhancePrototypeHome() {
         reserved: { en:"Reserved", "zh-CN":"已预留", "zh-TW":"已預留", fr:"Réservé", de:"Reserviert", es:"Reservado", ja:"予約済み" },
         paymentCancelled: { en:"Payment cancelled", "zh-CN":"支付已取消", "zh-TW":"支付已取消", fr:"Paiement annulé", de:"Zahlung abgebrochen", es:"Pago cancelado", ja:"支払いがキャンセルされました" },
         paymentFailed: { en:"Payment failed: {message}", "zh-CN":"支付失败：{message}", "zh-TW":"支付失敗：{message}", fr:"Paiement échoué : {message}", de:"Zahlung fehlgeschlagen: {message}", es:"Pago fallido: {message}", ja:"支払いに失敗しました：{message}" },
+        recordSyncFailed: { en:"Payment succeeded, but ICO record sync failed. Please refresh and try again.", "zh-CN":"支付已成功，但 ICO 记录同步失败。请刷新后重试。", "zh-TW":"支付已成功，但 ICO 記錄同步失敗。請刷新後重試。", fr:"Paiement réussi, mais la synchronisation ICO a échoué. Actualisez puis réessayez.", de:"Zahlung erfolgreich, aber ICO-Datensatz konnte nicht synchronisiert werden. Bitte aktualisieren und erneut versuchen.", es:"El pago se realizó, pero falló la sincronización del registro ICO. Actualiza e inténtalo de nuevo.", ja:"支払いは成功しましたが、ICO 記録の同期に失敗しました。更新して再試行してください。" },
         boost: { en:"{multiplier}x bonus", "zh-CN":"{multiplier}倍加成", "zh-TW":"{multiplier}倍加成", fr:"Bonus x{multiplier}", de:"{multiplier}x Bonus", es:"Bono x{multiplier}", ja:"{multiplier}倍ボーナス" }
       };
       function icoCopy(key, vars){
@@ -3589,7 +3590,7 @@ function enhancePrototypeHome() {
           pointsBanner.onclick = function(){ if (window.openPointsCenter) window.openPointsCenter(); };
           pointsBanner.innerHTML =
             '<span class="home-points-orbit"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
-            '<span class="home-points-copy"><b>' + homeBannerEscape(points.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(points.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(points.tasksLabel) + '</i><i class="gift">' + homeBannerEscape(points.boxLabel) + '</i></span></span>' +
+            '<span class="home-points-copy"><b>' + homeBannerEscape(points.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(points.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(points.tasks) + '</i><i class="gift">' + homeBannerEscape(points.box) + '</i></span></span>' +
             '<span class="home-points-chev">›</span>';
         }
         attachHomePromoSlider(slider);
@@ -3769,19 +3770,32 @@ function enhancePrototypeHome() {
             });
             if (result.status === "success") {
               var luminaAmount = receiveLumina(value, token);
+              var synced = false;
+              for (var attempt = 0; attempt < 2 && !synced; attempt++) {
+                try {
+                  var syncRes = await fetch("/api/ico/participation", {
+                    method: "POST",
+                    cache: "no-store",
+                    headers: { "content-type": "application/json", "cache-control": "no-store" },
+                    body: JSON.stringify({
+                      address: window.__luminaUserAddress || "",
+                      tokenSymbol: token.symbol,
+                      tokenAmount: value,
+                      luminaAmount: luminaAmount,
+                      txHash: result.txHash || ""
+                    })
+                  });
+                  synced = Boolean(syncRes && syncRes.ok);
+                } catch(e) {
+                  synced = false;
+                }
+              }
+              if (!synced) {
+                toast(icoCopy("recordSyncFailed"));
+                pay.textContent = icoCopy("payReserve", { symbol: token.symbol });
+                return;
+              }
               var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: luminaAmount, hash: result.txHash || "", createdAt: new Date().toISOString() });
-              await fetch("/api/ico/participation", {
-                method: "POST",
-                cache: "no-store",
-                headers: { "content-type": "application/json", "cache-control": "no-store" },
-                body: JSON.stringify({
-                  address: window.__luminaUserAddress || "",
-                  tokenSymbol: token.symbol,
-                  tokenAmount: value,
-                  luminaAmount: luminaAmount,
-                  txHash: result.txHash || ""
-                })
-              }).catch(function(){ return null; });
               var allocationValue = document.getElementById("icoAllocationValue");
               if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(luminaAmount).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });

@@ -5,6 +5,15 @@ const ICO_PARTICIPANTS_KEY = "ico_participants";
 const ICO_TARGET_LUMINA = 450_000_000;
 const ICO_BASE_PROGRESS_LUMINA = (288 * 1000) + (1.33 * 6000);
 const ICO_DISPLAY_BASE_PERCENT = 70;
+const ICO_TREASURY_ADDRESS = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
+const ICO_TOKEN_RATES: Record<string, number> = {
+  WLD: 1000,
+  USDC: 5000,
+  ETH: 13_500_000,
+  WETH: 13_500_000,
+  BTC: 650_000_000,
+  WBTC: 650_000_000,
+};
 
 function displayIcoProgressPercent(rawPercent: number) {
   const pct = Math.max(0, Math.min(100, Number(rawPercent || 0)));
@@ -58,6 +67,62 @@ async function writeRecords(records: IcoParticipationRecord[]) {
   return trimmed;
 }
 
+function parseActivityAmount(value: unknown) {
+  const match = String(value || "").match(/([0-9]+(?:\.[0-9]+)?)\s*([A-Za-z]+)/);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  const symbol = String(match[2] || "").toUpperCase();
+  if (!Number.isFinite(amount) || amount <= 0 || !ICO_TOKEN_RATES[symbol]) return null;
+  return { amount, symbol };
+}
+
+type IcoActivityRow = {
+  address: string | null;
+  amount: string | null;
+  hash: string;
+  metadata: { tokenSymbol?: string; recipient?: string } | null;
+  createdAt: Date;
+};
+
+async function syncIcoRecordsFromActivityLog() {
+  const rows = await readRecords();
+  const known = new Set(rows.map((row) => String(row.txHash || "").toLowerCase()).filter(Boolean));
+  const activities = await db
+    .$queryRaw<IcoActivityRow[]>`
+      SELECT "address", "amount", "hash", "metadata", "createdAt"
+      FROM "ActivityLog"
+      WHERE LOWER(COALESCE("metadata"->>'recipient', '')) = ${ICO_TREASURY_ADDRESS}
+      ORDER BY "createdAt" DESC
+    `
+    .catch(() => [] as IcoActivityRow[]);
+
+  const imported: IcoParticipationRecord[] = [];
+  for (const activity of activities) {
+    const hash = String(activity.hash || "").trim();
+    if (!hash || known.has(hash.toLowerCase())) continue;
+    const address = String(activity.address || "").toLowerCase();
+    if (!/^0x[a-f0-9]{40}$/.test(address)) continue;
+    const parsed = parseActivityAmount(activity.amount);
+    if (!parsed) continue;
+    const metadataSymbol = String(activity.metadata?.tokenSymbol || "").toUpperCase();
+    const tokenSymbol = ICO_TOKEN_RATES[metadataSymbol] ? metadataSymbol : parsed.symbol;
+    const tokenAmount = parsed.amount;
+    imported.push({
+      id: `ico-activity-${Date.now()}-${imported.length}`,
+      address,
+      tokenSymbol,
+      tokenAmount,
+      luminaAmount: tokenAmount * ICO_TOKEN_RATES[tokenSymbol],
+      txHash: hash,
+      createdAt: activity.createdAt instanceof Date ? activity.createdAt.toISOString() : String(activity.createdAt || new Date().toISOString()),
+    });
+    known.add(hash.toLowerCase());
+  }
+
+  if (!imported.length) return rows;
+  return writeRecords([...imported, ...rows]);
+}
+
 export async function recordIcoParticipation(input: {
   address: string;
   tokenSymbol: string;
@@ -91,7 +156,7 @@ export async function recordIcoParticipation(input: {
 
 export async function hasIcoParticipation(address: string) {
   const normalized = normalizeAddress(address);
-  const rows = await readRecords();
+  const rows = await syncIcoRecordsFromActivityLog();
   return rows.some((row) => row.address === normalized && row.tokenAmount > 0);
 }
 
@@ -102,7 +167,7 @@ export async function assertIcoMysteryBoxEligibility(address: string) {
 }
 
 export async function getIcoProgress() {
-  const rows = await readRecords();
+  const rows = await syncIcoRecordsFromActivityLog();
   const recordedLumina = rows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
   const raisedLumina = Math.max(0, ICO_BASE_PROGRESS_LUMINA + recordedLumina);
   const rawPercent = Math.max(0, Math.min(100, (raisedLumina / ICO_TARGET_LUMINA) * 100));
@@ -115,7 +180,7 @@ export async function getIcoProgress() {
 }
 
 export async function getIcoAdminOverview() {
-  const rows = await readRecords();
+  const rows = await syncIcoRecordsFromActivityLog();
   const byAddress = new Map<string, { address: string; luminaAmount: number; tokenAmount: number; orders: number; lastAt: string | null }>();
   rows.forEach((row) => {
     const address = String(row.address || "").toLowerCase();
