@@ -283,7 +283,7 @@ function hasRealTransactionHash(row: IcoParticipationRecord) {
 }
 
 function isChainSourcedRecord(row: IcoParticipationRecord) {
-  return row.id.startsWith("ico-explorer-") || row.id.startsWith("ico-chain-") || hasRealTransactionHash(row);
+  return row.id.startsWith("ico-explorer-") || row.id.startsWith("ico-chain-");
 }
 
 function dedupeIcoRecords(rows: IcoParticipationRecord[]) {
