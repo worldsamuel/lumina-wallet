@@ -277,6 +277,35 @@ function knownTxHashes(rows: IcoParticipationRecord[]) {
   return new Set(rows.map((row) => String(row.txHash || "").toLowerCase().split(":")[0]).filter(Boolean));
 }
 
+function hasRealTransactionHash(row: IcoParticipationRecord) {
+  return /^0x[a-f0-9]{64}$/i.test(String(row.txHash || ""));
+}
+
+function isChainSourcedRecord(row: IcoParticipationRecord) {
+  return row.id.startsWith("ico-explorer-") || row.id.startsWith("ico-chain-") || hasRealTransactionHash(row);
+}
+
+function dedupeIcoRecords(rows: IcoParticipationRecord[]) {
+  const seenTx = new Set<string>();
+  const chainKeys = new Set<string>();
+  const unique: IcoParticipationRecord[] = [];
+
+  for (const row of rows) {
+    const txHash = hasRealTransactionHash(row) ? String(row.txHash).toLowerCase() : "";
+    if (txHash) {
+      if (seenTx.has(txHash)) continue;
+      seenTx.add(txHash);
+    }
+    if (isChainSourcedRecord(row)) chainKeys.add(`${row.address}:${row.tokenSymbol}`);
+    unique.push(row);
+  }
+
+  return unique.filter((row) => {
+    if (isChainSourcedRecord(row)) return true;
+    return !chainKeys.has(`${row.address}:${row.tokenSymbol}`);
+  });
+}
+
 async function syncIcoRecordsFromChain() {
   const startedAt = Date.now();
   if (chainSyncPromise) return chainSyncPromise;
@@ -372,7 +401,7 @@ export async function recordIcoParticipation(input: {
 
 export async function hasIcoParticipation(address: string) {
   const normalized = normalizeAddress(address);
-  const rows = await syncIcoRecordsFromChain();
+  const rows = dedupeIcoRecords(await syncIcoRecordsFromChain());
   return rows.some((row) => row.address === normalized && row.tokenAmount > 0);
 }
 
@@ -383,7 +412,7 @@ export async function assertIcoMysteryBoxEligibility(address: string) {
 }
 
 export async function getIcoProgress() {
-  const rows = await syncIcoRecordsFromChain();
+  const rows = dedupeIcoRecords(await syncIcoRecordsFromChain());
   const rates = await getIcoTokenRates();
   const normalizedRows = rows.map((row) => recalculateRecordLumina(row, rates));
   const recordedLumina = normalizedRows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
@@ -398,7 +427,7 @@ export async function getIcoProgress() {
 }
 
 export async function getIcoAdminOverview() {
-  const rows = await syncIcoRecordsFromChain();
+  const rows = dedupeIcoRecords(await syncIcoRecordsFromChain());
   const rates = await getIcoTokenRates();
   const normalizedRows = rows.map((row) => recalculateRecordLumina(row, rates));
   const byAddress = new Map<string, { address: string; luminaAmount: number; tokenAmount: number; orders: number; lastAt: string | null }>();
