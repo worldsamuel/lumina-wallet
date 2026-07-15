@@ -14,6 +14,7 @@ const ICO_CHAIN_LOG_CHUNK_BLOCKS = 100n;
 const ICO_EXPLORER_BASE_URL = process.env.WORLD_CHAIN_EXPLORER_API_URL || "https://worldchain-mainnet.explorer.alchemy.com/api/v2";
 const ICO_EXPLORER_SYNC_AFTER = process.env.LUMINA_ICO_SYNC_AFTER || "2026-07-07T00:00:00.000Z";
 const ICO_EXPLORER_MAX_PAGES = 80;
+const ICO_ENABLE_RPC_SYNC = process.env.LUMINA_ICO_ENABLE_RPC_SYNC === "1";
 const ICO_TOKEN_RATES: Record<string, number> = {
   WLD: 1000,
   USDC: 6000,
@@ -314,6 +315,10 @@ async function syncIcoRecordsFromChain() {
     const rates = await getIcoTokenRates();
     let rows = await syncIcoRecordsFromActivityLog();
     rows = await syncIcoRecordsFromExplorer(rows, rates).catch(() => rows);
+    if (!ICO_ENABLE_RPC_SYNC) {
+      lastChainSyncAt = Date.now();
+      return rows;
+    }
     const known = knownTxHashes(rows);
     const latest = await publicClient.getBlockNumber();
     const minBlock = latest > ICO_CHAIN_LOOKBACK_BLOCKS ? latest - ICO_CHAIN_LOOKBACK_BLOCKS : 0n;
