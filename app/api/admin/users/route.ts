@@ -8,7 +8,7 @@ import { formatUnits, isAddress, type Address } from "viem";
 const WLD_ADDRESS = "0x2cFc85d8E48F8EAB294be644d9E25C3030863003" as Address;
 const WLD_DECIMALS = 18;
 const DEFAULT_LIMIT = 300;
-const MAX_LIMIT = 800;
+const MAX_LIMIT = 5000;
 const BALANCE_LOOKUP_LIMIT = 12;
 const BALANCE_TIMEOUT_MS = 800;
 const erc20BalanceAbi = [
