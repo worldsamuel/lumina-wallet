@@ -18,7 +18,7 @@ const paymentTokens = [
     decimals: 6,
     minAmount: 0.1,
     maxAmount: 300,
-    luminaRate: 5000,
+    luminaRate: 6000,
     quoteAmount: 1,
     boostMultiplier: 2,
   },

@@ -9,11 +9,14 @@ const ICO_TARGET_LUMINA = 450_000_000;
 const ICO_BASE_PROGRESS_LUMINA = (288 * 1000) + (1.33 * 6000);
 const ICO_DISPLAY_BASE_PERCENT = 70;
 const ICO_TREASURY_ADDRESS = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
-const ICO_CHAIN_LOOKBACK_BLOCKS = 5_000_000n;
-const ICO_CHAIN_LOG_CHUNK_BLOCKS = 50_000n;
+const ICO_CHAIN_LOOKBACK_BLOCKS = 20_000n;
+const ICO_CHAIN_LOG_CHUNK_BLOCKS = 100n;
+const ICO_EXPLORER_BASE_URL = process.env.WORLD_CHAIN_EXPLORER_API_URL || "https://worldchain-mainnet.explorer.alchemy.com/api/v2";
+const ICO_EXPLORER_SYNC_AFTER = process.env.LUMINA_ICO_SYNC_AFTER || "2026-07-07T00:00:00.000Z";
+const ICO_EXPLORER_MAX_PAGES = 80;
 const ICO_TOKEN_RATES: Record<string, number> = {
   WLD: 1000,
-  USDC: 5000,
+  USDC: 6000,
   ETH: 13_500_000,
   WETH: 13_500_000,
   BTC: 650_000_000,
@@ -123,6 +126,22 @@ type IcoActivityRow = {
   createdAt: Date;
 };
 
+type ExplorerTokenTransfer = {
+  block_number?: number | string | null;
+  log_index?: number | string | null;
+  transaction_hash?: string | null;
+  timestamp?: string | null;
+  from?: { hash?: string | null } | null;
+  to?: { hash?: string | null } | null;
+  token?: { address_hash?: string | null; symbol?: string | null; decimals?: string | number | null } | null;
+  total?: { value?: string | null; decimals?: string | number | null } | null;
+};
+
+type ExplorerTransfersResponse = {
+  items?: ExplorerTokenTransfer[];
+  next_page_params?: Record<string, string | number | null> | null;
+};
+
 async function syncIcoRecordsFromActivityLog() {
   const rates = await getIcoTokenRates();
   const rows = await readRecords();
@@ -163,6 +182,97 @@ async function syncIcoRecordsFromActivityLog() {
   return writeRecords([...imported, ...rows]);
 }
 
+function tokenSymbolFromExplorerTransfer(item: ExplorerTokenTransfer, tokenByAddress: Map<string, { symbol: string; decimals: number }>) {
+  const tokenAddress = String(item.token?.address_hash || "").toLowerCase();
+  const byAddress = tokenByAddress.get(tokenAddress);
+  const rawSymbol = String(item.token?.symbol || byAddress?.symbol || "").toUpperCase();
+  if (rawSymbol === "WETH") return "ETH";
+  if (rawSymbol === "WBTC") return "BTC";
+  return rawSymbol || byAddress?.symbol || "";
+}
+
+function explorerTransferAmount(item: ExplorerTokenTransfer, fallbackDecimals: number) {
+  const rawValue = String(item.total?.value || "").trim();
+  if (!/^\d+$/.test(rawValue)) return 0;
+  const decimals = Math.max(0, Math.min(36, Number(item.total?.decimals ?? item.token?.decimals ?? fallbackDecimals)));
+  return Number(formatUnits(BigInt(rawValue), decimals));
+}
+
+function explorerNextUrl(baseUrl: string, nextPageParams: ExplorerTransfersResponse["next_page_params"]) {
+  if (!nextPageParams) return null;
+  const params = new URLSearchParams();
+  Object.entries(nextPageParams).forEach(([key, value]) => {
+    if (value !== null && value !== undefined) params.set(key, String(value));
+  });
+  const query = params.toString();
+  return query ? `${baseUrl}&${query}` : null;
+}
+
+async function fetchExplorerTransfersPage(url: string) {
+  const response = await fetch(url, {
+    headers: { accept: "application/json" },
+    signal: AbortSignal.timeout(8_000),
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(`Explorer ICO sync failed: HTTP ${response.status}`);
+  return response.json() as Promise<ExplorerTransfersResponse>;
+}
+
+async function syncIcoRecordsFromExplorer(rows: IcoParticipationRecord[], rates: Record<string, number>) {
+  const treasury = ICO_TREASURY_ADDRESS.toLowerCase();
+  const syncAfter = Date.parse(ICO_EXPLORER_SYNC_AFTER);
+  const tokenByAddress = new Map(
+    ICO_CHAIN_TOKENS.map((token) => [token.address.toLowerCase(), { symbol: token.symbol, decimals: token.decimals }]),
+  );
+  const known = knownTxHashes(rows);
+  const imported: IcoParticipationRecord[] = [];
+  const baseUrl = `${ICO_EXPLORER_BASE_URL.replace(/\/$/, "")}/addresses/${treasury}/token-transfers?type=ERC-20`;
+  let url: string | null = baseUrl;
+
+  for (let page = 0; page < ICO_EXPLORER_MAX_PAGES && url; page += 1) {
+    const data = await fetchExplorerTransfersPage(url);
+    const items = Array.isArray(data.items) ? data.items : [];
+    let reachedOlderRows = false;
+
+    for (const item of items) {
+      const createdAt = String(item.timestamp || new Date().toISOString());
+      const createdMs = Date.parse(createdAt);
+      if (Number.isFinite(syncAfter) && Number.isFinite(createdMs) && createdMs < syncAfter) {
+        reachedOlderRows = true;
+        continue;
+      }
+      const to = String(item.to?.hash || "").toLowerCase();
+      if (to !== treasury) continue;
+      const hash = String(item.transaction_hash || "").toLowerCase();
+      if (!hash || known.has(hash)) continue;
+      const from = String(item.from?.hash || "").toLowerCase();
+      if (!/^0x[a-f0-9]{40}$/.test(from)) continue;
+      const symbol = tokenSymbolFromExplorerTransfer(item, tokenByAddress);
+      const fallbackDecimals = tokenByAddress.get(String(item.token?.address_hash || "").toLowerCase())?.decimals ?? 18;
+      const rate = rates[symbol] || ICO_TOKEN_RATES[symbol] || 0;
+      if (!symbol || rate <= 0) continue;
+      const tokenAmount = explorerTransferAmount(item, fallbackDecimals);
+      if (!Number.isFinite(tokenAmount) || tokenAmount <= 0) continue;
+      imported.push({
+        id: `ico-explorer-${item.block_number || Date.now()}-${item.log_index || imported.length}`,
+        address: from,
+        tokenSymbol: symbol,
+        tokenAmount,
+        luminaAmount: tokenAmount * rate,
+        txHash: hash,
+        createdAt,
+      });
+      known.add(hash);
+    }
+
+    if (reachedOlderRows) break;
+    url = explorerNextUrl(baseUrl, data.next_page_params);
+  }
+
+  if (!imported.length) return rows;
+  return writeRecords([...imported, ...rows]);
+}
+
 function knownTxHashes(rows: IcoParticipationRecord[]) {
   return new Set(rows.map((row) => String(row.txHash || "").toLowerCase().split(":")[0]).filter(Boolean));
 }
@@ -174,6 +284,7 @@ async function syncIcoRecordsFromChain() {
   chainSyncPromise = (async () => {
     const rates = await getIcoTokenRates();
     let rows = await syncIcoRecordsFromActivityLog();
+    rows = await syncIcoRecordsFromExplorer(rows, rates).catch(() => rows);
     const known = knownTxHashes(rows);
     const latest = await publicClient.getBlockNumber();
     const minBlock = latest > ICO_CHAIN_LOOKBACK_BLOCKS ? latest - ICO_CHAIN_LOOKBACK_BLOCKS : 0n;
