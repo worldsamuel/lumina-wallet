@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:ico-progress", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
   }
-  return jsonResponse(await getIcoProgress(), { headers: NO_STORE_HEADERS });
+  return jsonResponse(await getIcoProgress({ sync: false }), { headers: NO_STORE_HEADERS });
 }
 
 export async function POST(req: NextRequest) {

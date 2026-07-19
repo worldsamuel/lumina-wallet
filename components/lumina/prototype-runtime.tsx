@@ -3429,7 +3429,7 @@ function enhancePrototypeHome() {
       function defaultIcoPaymentTokens(){
         return [
           { symbol:"WLD", address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.1, maxAmount:1000, luminaRate:1000, quoteAmount:1, boostMultiplier:1 },
-          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:0.1, maxAmount:300, luminaRate:5000, quoteAmount:1, boostMultiplier:2 },
+          { symbol:"USDC", address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:0.1, maxAmount:300, luminaRate:6000, quoteAmount:1, boostMultiplier:2 },
           { symbol:"BTC", paySymbol:"WBTC", address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.0001, maxAmount:0.01, luminaRate:650000000, quoteAmount:0.001, boostMultiplier:4 },
           { symbol:"ETH", address:null, decimals:18, minAmount:0.001, maxAmount:0.5, luminaRate:13500000, quoteAmount:0.001, boostMultiplier:3 }
         ];
@@ -3517,14 +3517,15 @@ function enhancePrototypeHome() {
         return pct < 0.01 && pct > 0 ? "<0.01%" : pct.toFixed(pct >= 70 && pct < 100 ? 2 : (pct < 1 ? 2 : 1)) + "%";
       }
       function renderIcoProgress(value){
-        var pct = Math.max(0, Math.min(100, Number(value == null ? localIcoProgressPercent() : value)));
+        var fallback = Number(window.__luminaIcoProgressPercent || 70);
+        var pct = Math.max(0, Math.min(100, Number(value == null ? fallback : value)));
+        window.__luminaIcoProgressPercent = pct;
         var fills = document.querySelectorAll("[data-ico-progress-fill]");
         var labels = document.querySelectorAll("[data-ico-progress-label]");
         fills.forEach(function(el){ el.style.width = Math.max(0.4, pct).toFixed(4) + "%"; });
         labels.forEach(function(el){ el.textContent = formatIcoProgressPercent(pct); });
       }
       function refreshIcoProgress(){
-        renderIcoProgress();
         fetch("/api/ico/participation?t=" + Date.now(), { cache:"no-store", headers:{ "cache-control":"no-store" } })
           .then(function(res){ return res.ok ? res.json() : null; })
           .then(function(data){ if (data && Number.isFinite(Number(data.percent))) renderIcoProgress(Number(data.percent)); })

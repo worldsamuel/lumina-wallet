@@ -416,8 +416,8 @@ export async function assertIcoMysteryBoxEligibility(address: string) {
   }
 }
 
-export async function getIcoProgress() {
-  const rows = dedupeIcoRecords(await syncIcoRecordsFromChain());
+export async function getIcoProgress(options: { sync?: boolean } = {}) {
+  const rows = dedupeIcoRecords(options.sync === false ? await readRecords() : await syncIcoRecordsFromChain());
   const rates = await getIcoTokenRates();
   const normalizedRows = rows.map((row) => recalculateRecordLumina(row, rates));
   const recordedLumina = normalizedRows.reduce((sum, row) => sum + Math.max(0, Number(row.luminaAmount || 0)), 0);
@@ -449,7 +449,7 @@ export async function getIcoAdminOverview() {
   const leaderboard = Array.from(byAddress.values())
     .sort((a, b) => b.luminaAmount - a.luminaAmount || new Date(b.lastAt || 0).getTime() - new Date(a.lastAt || 0).getTime())
     .slice(0, 500);
-  const progress = await getIcoProgress();
+  const progress = await getIcoProgress({ sync: false });
   return {
     stats: {
       participants: leaderboard.length,
