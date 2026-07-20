@@ -90,6 +90,8 @@ declare global {
     __luminaMaybeOpenWelcomeBox?: () => void;
     __luminaForceWelcomeBoxCheck?: (address?: string | null) => void;
     __luminaOpenReceive?: () => void;
+    __luminaMarkSecurityBackup?: () => Promise<void>;
+    __luminaRenderSecurityBackup?: () => void;
     __luminaNotificationPermissionGranted?: boolean;
     __luminaSyncNotificationPermission?: () => Promise<boolean>;
     __luminaRequestNotificationPermission?: (event?: Event) => Promise<boolean>;
@@ -316,6 +318,7 @@ export function PrototypeRuntime({ initialView }: PrototypeRuntimeProps) {
       enhancePrototypeSend();
       enhancePrototypeActivity();
       enhancePrototypeMe();
+      enhancePrototypeBackup();
       enhancePrototypeSystemConfig();
       enhancePrototypeAnalytics();
       if (initialView === "allassets") {
@@ -6193,6 +6196,8 @@ function enhancePrototypeMe() {
           currency: { en:"Display currency", fr:"Devise d'affichage", de:"Anzeigewährung", es:"Moneda", ja:"表示通貨", "zh-CN":"显示货币", "zh-TW":"顯示貨幣" },
           notifications: { en:"Notifications", fr:"Notifications", de:"Benachrichtigungen", es:"Notificaciones", ja:"通知", "zh-CN":"通知", "zh-TW":"通知" },
           legal: { en:"Legal", fr:"Legal", de:"Legal", es:"Legal", ja:"Legal", "zh-CN":"Legal", "zh-TW":"Legal" },
+          security: { en:"Security", fr:"Sécurité", de:"Sicherheit", es:"Seguridad", ja:"セキュリティ", "zh-CN":"安全", "zh-TW":"安全" },
+          securityBackup: { en:"Security Backup", fr:"Sauvegarde sécurisée", de:"Sicheres Backup", es:"Copia segura", ja:"セキュリティバックアップ", "zh-CN":"安全备份", "zh-TW":"安全備份" },
           privacy: { en:"Privacy Policy", fr:"Privacy Policy", de:"Privacy Policy", es:"Privacy Policy", ja:"Privacy Policy", "zh-CN":"Privacy Policy", "zh-TW":"Privacy Policy" },
           terms: { en:"Terms of Service", fr:"Terms of Service", de:"Terms of Service", es:"Terms of Service", ja:"Terms of Service", "zh-CN":"Terms of Service", "zh-TW":"Terms of Service" },
           version: { en:"Version", fr:"Version", de:"Version", es:"Versión", ja:"バージョン", "zh-CN":"版本", "zh-TW":"版本" },
@@ -6224,6 +6229,7 @@ function enhancePrototypeMe() {
         if (name === "language") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 010 20M12 2a15 15 0 000 20"/></svg>';
         if (name === "currency") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>';
         if (name === "bell") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>';
+        if (name === "backup") return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-5"/></svg>';
         return "";
       }
       function row(icon, label, value, action, extra) {
@@ -6668,6 +6674,9 @@ function enhancePrototypeMe() {
           '<div class="me-group-label">' + c.pointsCenter + '</div><div class="me-group">' +
             row("points", c.pointsCenter, '<span id="pointsCenterValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span>', "openPointsCenter()") +
             row("points", c.taskCenter, "", "openPointsCenter(\\'tasks\\')") +
+          '</div>' +
+          '<div class="me-group-label">' + c.security + '</div><div class="me-group">' +
+            row("backup", c.securityBackup, "", "go(\\'backup\\'); setTabByName(\\'Me\\'); if (window.__luminaRenderSecurityBackup) window.__luminaRenderSecurityBackup();") +
           '</div>' +
           '<div class="me-group-label">' + c.preferences + '</div><div class="me-group">' +
             row("media", c.mediaCenter, "", "openMediaCenter()") +
@@ -7593,6 +7602,114 @@ function enhancePrototypeMe() {
     })();
   `;
   runInPrototypeScope(source, "Failed to enhance Me page");
+}
+
+function enhancePrototypeBackup() {
+  const source = `
+    (function(){
+      function backupLang(){
+        var lang = window.currentLang || "en";
+        return lang === "zh-CN" || lang === "zh-TW" ? "zh" : "en";
+      }
+      function backupCopy(key){
+        var zh = backupLang() === "zh";
+        var copy = {
+          title: zh ? "安全备份" : "Security Backup",
+          intro: zh ? "请在 World App / 系统安全位置完成钱包备份。Lumina 不会读取、上传或保存你的助记词和私钥。" : "Complete your wallet backup in World App or a secure offline location. Lumina never reads, uploads, or stores your recovery phrase or private key.",
+          localOnly: zh ? "仅本地确认" : "Local confirmation only",
+          localOnlyBody: zh ? "后台安全中心只会显示该地址是否完成备份确认、确认时间和钱包地址，不会显示助记词或私钥。" : "The admin Security Center only shows backup status, confirmation time, and wallet address. It does not show recovery phrases or private keys.",
+          step1: zh ? "1. 打开 World App 的钱包备份/恢复设置。" : "1. Open wallet backup or recovery settings in World App.",
+          step2: zh ? "2. 将助记词或私钥离线保存到安全位置。" : "2. Store your recovery phrase or private key offline in a safe place.",
+          step3: zh ? "3. 完成后点击下面按钮，同步备份状态。" : "3. Tap the button below after backup to sync the status.",
+          confirm: zh ? "我已完成安全备份" : "I have completed backup",
+          confirmed: zh ? "已确认安全备份" : "Backup confirmed",
+          synced: zh ? "安全备份状态已同步" : "Backup status synced",
+          failed: zh ? "同步失败，请稍后重试" : "Sync failed. Please try again.",
+          noWallet: zh ? "请先连接钱包" : "Please connect wallet first"
+        };
+        return copy[key] || key;
+      }
+      function backupStatusKey(){
+        return "lumina_security_backup_confirmed_" + String(window.__luminaUserAddress || "guest").toLowerCase();
+      }
+      function hasConfirmedBackup(){
+        try { return localStorage.getItem(backupStatusKey()) === "1"; } catch(e) { return false; }
+      }
+      window.__luminaMarkSecurityBackup = async function(){
+        var address = String(window.__luminaUserAddress || "").toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(address)) {
+          toast(backupCopy("noWallet"));
+          return;
+        }
+        var button = document.getElementById("securityBackupConfirm");
+        if (button) {
+          button.disabled = true;
+          button.textContent = backupCopy("confirmed");
+        }
+        try {
+          var res = await fetch("/api/security-backup", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              address: address,
+              username: window.__luminaUsername || null,
+              backedUp: true
+            })
+          });
+          var data = await res.json().catch(function(){ return null; });
+          if (!res.ok || !data || data.ok !== true) throw new Error(data && data.error || "sync failed");
+          try { localStorage.setItem(backupStatusKey(), "1"); } catch(e) {}
+          window.__luminaRenderSecurityBackup();
+          toast(backupCopy("synced"), "success");
+        } catch(e) {
+          if (button) {
+            button.disabled = false;
+            button.textContent = backupCopy("confirm");
+          }
+          toast(backupCopy("failed"));
+        }
+      };
+      window.__luminaRenderSecurityBackup = function(){
+        var view = document.getElementById("view-backup");
+        if (!view) return;
+        var confirmed = hasConfirmedBackup();
+        view.innerHTML =
+          '<div class="subhead"><button class="back-btn" onclick="go(\\'me\\'); setTabByName(\\'Me\\')" aria-label="Back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button><h1>' + backupCopy("title") + '</h1></div>' +
+          '<div style="margin:0 var(--pad-screen);display:grid;gap:16px;">' +
+            '<section style="background:linear-gradient(145deg,rgba(74,222,128,.16),rgba(74,222,128,.04));border:1px solid rgba(74,222,128,.28);border-radius:22px;padding:20px;">' +
+              '<div style="width:54px;height:54px;border-radius:16px;background:rgba(74,222,128,.14);display:grid;place-items:center;color:var(--green);margin-bottom:14px;"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-5"/></svg></div>' +
+              '<h2 style="font-size:24px;line-height:1.15;margin:0 0 10px;">' + backupCopy("title") + '</h2>' +
+              '<p style="color:var(--text-dim);font-size:14px;line-height:1.65;margin:0;">' + backupCopy("intro") + '</p>' +
+            '</section>' +
+            '<section style="background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:12px;">' +
+              '<strong style="font-size:16px;">' + backupCopy("localOnly") + '</strong>' +
+              '<p style="color:var(--text-mute);font-size:13px;line-height:1.65;margin:0;">' + backupCopy("localOnlyBody") + '</p>' +
+            '</section>' +
+            '<section style="background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;gap:10px;color:var(--text-dim);font-size:14px;line-height:1.55;">' +
+              '<div>' + backupCopy("step1") + '</div>' +
+              '<div>' + backupCopy("step2") + '</div>' +
+              '<div>' + backupCopy("step3") + '</div>' +
+            '</section>' +
+            '<button id="securityBackupConfirm" class="send-submit" style="margin:6px 0 0;" onclick="window.__luminaMarkSecurityBackup && window.__luminaMarkSecurityBackup()" ' + (confirmed ? "disabled" : "") + '>' + (confirmed ? backupCopy("confirmed") : backupCopy("confirm")) + '</button>' +
+          '</div>';
+      };
+      var previousGo = typeof go === "function" ? go : null;
+      if (previousGo && !window.__luminaBackupGoWrapped) {
+        window.__luminaBackupGoWrapped = true;
+        go = function(name){
+          previousGo(name);
+          if (name === "backup") setTimeout(function(){ window.__luminaRenderSecurityBackup && window.__luminaRenderSecurityBackup(); }, 0);
+        };
+      }
+      window.revealPhrase = function(){
+        window.__luminaRenderSecurityBackup && window.__luminaRenderSecurityBackup();
+      };
+      if (document.getElementById("view-backup") && document.getElementById("view-backup").classList.contains("active")) {
+        window.__luminaRenderSecurityBackup();
+      }
+    })();
+  `;
+  runInPrototypeScope(source, "Failed to enhance security backup");
 }
 
 /**
