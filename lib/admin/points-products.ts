@@ -7,6 +7,7 @@ const POINTS_PRODUCTS_KEY = "points_products";
 const POINTS_PRODUCTS_PUBLIC_KEY = "points_products_public";
 const POINTS_ORDERS_KEY = "points_orders";
 const POINTS_ADJUSTMENTS_KEY = "points_adjustments";
+const ICO_BOX_STANDARD_REWARD_SYMBOLS = new Set(["USDC", "WLD", "DOGE", "SUI", "XRP"]);
 const BLIND_BOX_STOCK_ALIASES: Record<string, string[]> = {
   "rookie-chest": ["open-your-new-user-mystery-box"],
   "open-your-new-user-mystery-box": ["rookie-chest"],
@@ -151,11 +152,11 @@ function defaultProducts(): PointsProductConfig[] {
       description: "Users who reserved LUMINA in the ICO can open once.",
       descriptionI18n: { en: "Users who reserved LUMINA in the ICO can open once.", "zh-CN": "只要参与过 ICO 认购，就可以开启一次。", "zh-TW": "只要參與過 ICO 認購，就可以開啟一次。", ja: "ICOに参加したユーザーは1回開けられます。", fr: "Les utilisateurs ayant participé à l'ICO peuvent l'ouvrir une fois." },
       rewards: [
-        { id: "usdc", name: "USDC", value: null, symbol: "USDC", minAmount: 0.001, maxAmount: 1, rareMaxOdds: 0.01, odds: 2200, stock: null },
+        { id: "usdc", name: "USDC", value: null, symbol: "USDC", minAmount: 0.01, maxAmount: 1, rareMaxOdds: 0.01, odds: 2200, stock: null },
         { id: "wld", name: "WLD", value: null, symbol: "WLD", minAmount: 0.01, maxAmount: 1, rareMaxOdds: 0.01, odds: 2200, stock: null },
         { id: "doge", name: "DOGE", value: null, symbol: "DOGE", minAmount: 0.01, maxAmount: 1, odds: 1900, stock: null },
-        { id: "sui", name: "SUI", value: null, symbol: "SUI", minAmount: 0.01, maxAmount: 2, odds: 1900, stock: null },
-        { id: "xrp", name: "XRP", value: null, symbol: "XRP", minAmount: 0.1, maxAmount: 10, odds: 1800, stock: null },
+        { id: "sui", name: "SUI", value: null, symbol: "SUI", minAmount: 0.01, maxAmount: 1, odds: 1900, stock: null },
+        { id: "xrp", name: "XRP", value: null, symbol: "XRP", minAmount: 0.01, maxAmount: 1, odds: 1800, stock: null },
       ],
     },
     {
@@ -282,7 +283,7 @@ function parseProducts(value: unknown): PointsProductConfig[] {
       return {
         ...product,
         rewards: product.rewards?.map((reward) =>
-          reward.symbol === "DOGE" || reward.id === "doge"
+          ICO_BOX_STANDARD_REWARD_SYMBOLS.has(String(reward.symbol || reward.id || "").toUpperCase())
             ? { ...reward, minAmount: 0.01, maxAmount: 1 }
             : reward,
         ),
