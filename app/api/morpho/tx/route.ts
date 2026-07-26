@@ -2,13 +2,14 @@ import { NextRequest } from "next/server";
 import { isAddress, parseUnits, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
+import { readWorldChainWithFallback } from "@/lib/chain";
 import {
   EARN_WITHDRAW_FEE_BPS,
   EARN_WITHDRAW_FEE_RECIPIENT,
   buildDepositTx,
   buildRedeemTxs,
-  buildWithdrawTxs,
 } from "@/lib/morpho/transactions";
+import { METAMORPHO_ABI } from "@/lib/morpho/abi";
 import { getVaultByAddress } from "@/lib/morpho/vaults";
 
 export const dynamic = "force-dynamic";
@@ -63,12 +64,39 @@ export async function POST(req: NextRequest) {
 
     if (body.type === "withdraw") {
       const amount = parseTokenAmount(body.amount, vault.asset.decimals);
+      const [shares, ownedShares, maxWithdraw] = await Promise.all([
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address,
+          abi: METAMORPHO_ABI,
+          functionName: "previewWithdraw",
+          args: [amount],
+        })),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address,
+          abi: METAMORPHO_ABI,
+          functionName: "balanceOf",
+          args: [body.userAddress as Address],
+        })),
+        readWorldChainWithFallback((client) => client.readContract({
+          address: vault.address,
+          abi: METAMORPHO_ABI,
+          functionName: "maxWithdraw",
+          args: [body.userAddress as Address],
+        })),
+      ]);
+      if (amount > maxWithdraw || shares > ownedShares) {
+        return jsonResponse({ error: "Requested amount exceeds the withdrawable position." }, { status: 400 });
+      }
       return jsonResponse({
-        transactions: buildWithdrawTxs(vault, amount, body.userAddress as Address),
+        transactions: buildRedeemTxs(vault, shares, body.userAddress as Address),
         fee: {
           businessType: "earn",
           bps: EARN_WITHDRAW_FEE_BPS,
           recipient: EARN_WITHDRAW_FEE_RECIPIENT,
+        },
+        debug: {
+          requestedAssets: amount.toString(),
+          redeemShares: shares.toString(),
         },
       });
     }

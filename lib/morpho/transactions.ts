@@ -31,20 +31,6 @@ const depositAbi = [
   },
 ] as const;
 
-const withdrawAbi = [
-  {
-    name: "withdraw",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs: [
-      { name: "assets", type: "uint256" },
-      { name: "receiver", type: "address" },
-      { name: "owner", type: "address" },
-    ],
-    outputs: [{ name: "shares", type: "uint256" }],
-  },
-] as const;
-
 const redeemAbi = [
   {
     name: "redeem",
@@ -112,30 +98,6 @@ export function calculateEarnWithdrawalFeeAmounts(grossAmount: bigint) {
     feeAmount,
     netAmount: grossAmount - feeAmount,
   };
-}
-
-export function buildWithdrawTxs(vault: MorphoVault, amount: bigint, userAddress: Address) {
-  const { feeAmount, netAmount } = calculateEarnWithdrawalFeeAmounts(amount);
-  if (feeAmount <= 0n || netAmount <= 0n) throw new Error("Withdrawal amount is too small.");
-
-  return [
-    {
-      to: vault.address,
-      data: encodeFunctionData({
-        abi: withdrawAbi,
-        functionName: "withdraw",
-        args: [netAmount, userAddress, userAddress],
-      }),
-    },
-    {
-      to: vault.address,
-      data: encodeFunctionData({
-        abi: withdrawAbi,
-        functionName: "withdraw",
-        args: [feeAmount, EARN_WITHDRAW_FEE_RECIPIENT, userAddress],
-      }),
-    },
-  ];
 }
 
 export function buildRedeemTxs(vault: MorphoVault, shares: bigint, userAddress: Address) {
