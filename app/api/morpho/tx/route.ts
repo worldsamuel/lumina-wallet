@@ -7,7 +7,7 @@ import {
   EARN_WITHDRAW_FEE_BPS,
   EARN_WITHDRAW_FEE_RECIPIENT,
   buildDepositTx,
-  buildRedeemTxs,
+  buildRedeemWithFeeTxs,
 } from "@/lib/morpho/transactions";
 import { METAMORPHO_ABI } from "@/lib/morpho/abi";
 import { getVaultByAddress } from "@/lib/morpho/vaults";
@@ -87,8 +87,9 @@ export async function POST(req: NextRequest) {
       if (amount > maxWithdraw || shares > ownedShares) {
         return jsonResponse({ error: "Requested amount exceeds the withdrawable position." }, { status: 400 });
       }
+      const grossAssets = await previewRedeem(vault.address, shares);
       return jsonResponse({
-        transactions: buildRedeemTxs(vault, shares, body.userAddress as Address),
+        transactions: buildRedeemWithFeeTxs(vault, shares, grossAssets, body.userAddress as Address),
         fee: {
           businessType: "earn",
           bps: EARN_WITHDRAW_FEE_BPS,
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         debug: {
           requestedAssets: amount.toString(),
           redeemShares: shares.toString(),
+          grossAssets: grossAssets.toString(),
         },
       });
     }
@@ -104,12 +106,26 @@ export async function POST(req: NextRequest) {
     if (body.type === "redeem") {
       const shares = BigInt(String(body.shares ?? "0"));
       if (shares <= 0n) return jsonResponse({ error: "Invalid share amount." }, { status: 400 });
+      const ownedShares = await readWorldChainWithFallback((client) => client.readContract({
+        address: vault.address,
+        abi: METAMORPHO_ABI,
+        functionName: "balanceOf",
+        args: [body.userAddress as Address],
+      }));
+      if (shares > ownedShares) {
+        return jsonResponse({ error: "Requested shares exceed the withdrawable position." }, { status: 400 });
+      }
+      const grossAssets = await previewRedeem(vault.address, shares);
       return jsonResponse({
-        transactions: buildRedeemTxs(vault, shares, body.userAddress as Address),
+        transactions: buildRedeemWithFeeTxs(vault, shares, grossAssets, body.userAddress as Address),
         fee: {
           businessType: "earn",
           bps: EARN_WITHDRAW_FEE_BPS,
           recipient: EARN_WITHDRAW_FEE_RECIPIENT,
+        },
+        debug: {
+          redeemShares: shares.toString(),
+          grossAssets: grossAssets.toString(),
         },
       });
     }
@@ -119,6 +135,15 @@ export async function POST(req: NextRequest) {
     console.error("Failed to build Morpho tx", error);
     return jsonResponse({ error: "Unable to build Morpho transaction." }, { status: 400 });
   }
+}
+
+function previewRedeem(vaultAddress: Address, shares: bigint) {
+  return readWorldChainWithFallback((client) => client.readContract({
+    address: vaultAddress,
+    abi: METAMORPHO_ABI,
+    functionName: "previewRedeem",
+    args: [shares],
+  }));
 }
 
 function parseTokenAmount(amount: unknown, decimals: number) {

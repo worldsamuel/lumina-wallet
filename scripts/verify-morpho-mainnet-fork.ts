@@ -21,7 +21,7 @@ import {
   EARN_WITHDRAW_FEE_BPS,
   EARN_WITHDRAW_FEE_RECIPIENT,
   buildDepositTx,
-  buildRedeemTxs,
+  buildRedeemWithFeeTxs,
 } from "../lib/morpho/transactions";
 import type { MorphoVault } from "../lib/morpho/vaults";
 
@@ -179,12 +179,17 @@ async function main() {
   const treasuryBalanceBeforeRedeem = await snapshot("treasury USDC before redeem", () =>
     readUsdcBalance(EARN_WITHDRAW_FEE_RECIPIENT),
   );
-  const redeemTxRequests = buildRedeemTxs(vault, sharesAfterDeposit.value, account.address);
+  const redeemTxRequests = buildRedeemWithFeeTxs(
+    vault,
+    sharesAfterDeposit.value,
+    assetsAfterWait.value,
+    account.address,
+  );
   const redeemTxs: TxResult[] = [];
   for (const [index, redeemTxRequest] of redeemTxRequests.entries()) {
     redeemTxs.push(
       await sendAndRecord(
-        index === 0 ? "redeem net Re7 USDC shares to user" : "redeem fee Re7 USDC shares to treasury",
+        index === 0 ? "redeem Re7 USDC shares to user" : "transfer withdrawal fee to treasury",
         redeemTxRequest.to,
         redeemTxRequest.data,
       ),

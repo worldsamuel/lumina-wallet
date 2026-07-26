@@ -168,6 +168,13 @@ export const METAMORPHO_ABI = [
   },
   {
     type: "function",
+    name: "previewRedeem",
+    stateMutability: "view",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "assets", type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "maxDeposit",
     stateMutability: "view",
     inputs: [{ name: "receiver", type: "address" }],
