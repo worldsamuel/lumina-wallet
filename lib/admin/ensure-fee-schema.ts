@@ -8,10 +8,14 @@ export const DEFAULT_FEE_CONFIGS = [
   },
   {
     businessType: "swap",
+    percent: "0.005",
+    recipient: "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
+  },
+  {
+    businessType: "earn",
     percent: "0.1",
     recipient: "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
   },
-  { businessType: "earn", percent: "0.004", recipient: null },
 ] as const;
 
 let ensured: Promise<void> | null = null;

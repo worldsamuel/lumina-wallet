@@ -1777,7 +1777,8 @@ function enhancePrototypeEarn() {
           wallet: "Wallet balance",
           yearly: "Estimated yearly yield",
           daily: "Estimated daily yield",
-          fee: "Fee",
+          depositFee: "Deposit fee",
+          withdrawalFee: "Withdrawal fee",
           provider: "Provider",
           curator: "Re7 Labs (Vault curator)",
           deposit: "Deposit",
@@ -1818,7 +1819,8 @@ function enhancePrototypeEarn() {
             '<div><span>' + copy.wallet + '</span><strong>' + wallet + '</strong></div>' +
             '<div><span>' + copy.yearly + '</span><strong id="morphoAnnual">' + annual + '</strong></div>' +
             '<div><span>' + copy.daily + '</span><strong id="morphoDaily">' + daily + '</strong></div>' +
-            '<div><span>' + copy.fee + '</span><strong>0</strong></div>' +
+            '<div><span>' + copy.depositFee + '</span><strong>0</strong></div>' +
+            '<div><span>' + copy.withdrawalFee + '</span><strong>10%</strong></div>' +
             '<div><span>' + copy.provider + '</span><strong>Morpho</strong></div>' +
           '</div>' +
           '<div class="morpho-provider-note">' + copy.curator + '</div>' +

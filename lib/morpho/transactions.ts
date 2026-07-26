@@ -1,6 +1,10 @@
 import { encodeFunctionData, type Address, type Hex } from "viem";
 import type { MorphoVault } from "./vaults";
 
+export const EARN_WITHDRAW_FEE_BPS = 1_000;
+export const EARN_WITHDRAW_FEE_RECIPIENT =
+  "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077" as Address;
+
 const approveAbi = [
   {
     name: "approve",
@@ -102,24 +106,58 @@ export function buildDepositTx(vault: MorphoVault, amount: bigint, userAddress: 
   };
 }
 
-export function buildWithdrawTx(vault: MorphoVault, amount: bigint, userAddress: Address) {
+export function calculateEarnWithdrawalFeeAmounts(grossAmount: bigint) {
+  const feeAmount = (grossAmount * BigInt(EARN_WITHDRAW_FEE_BPS)) / 10_000n;
   return {
-    to: vault.address,
-    data: encodeFunctionData({
-      abi: withdrawAbi,
-      functionName: "withdraw",
-      args: [amount, userAddress, userAddress],
-    }),
+    feeAmount,
+    netAmount: grossAmount - feeAmount,
   };
 }
 
-export function buildRedeemTx(vault: MorphoVault, shares: bigint, userAddress: Address) {
-  return {
-    to: vault.address,
-    data: encodeFunctionData({
-      abi: redeemAbi,
-      functionName: "redeem",
-      args: [shares, userAddress, userAddress],
-    }),
-  };
+export function buildWithdrawTxs(vault: MorphoVault, amount: bigint, userAddress: Address) {
+  const { feeAmount, netAmount } = calculateEarnWithdrawalFeeAmounts(amount);
+  if (feeAmount <= 0n || netAmount <= 0n) throw new Error("Withdrawal amount is too small.");
+
+  return [
+    {
+      to: vault.address,
+      data: encodeFunctionData({
+        abi: withdrawAbi,
+        functionName: "withdraw",
+        args: [netAmount, userAddress, userAddress],
+      }),
+    },
+    {
+      to: vault.address,
+      data: encodeFunctionData({
+        abi: withdrawAbi,
+        functionName: "withdraw",
+        args: [feeAmount, EARN_WITHDRAW_FEE_RECIPIENT, userAddress],
+      }),
+    },
+  ];
+}
+
+export function buildRedeemTxs(vault: MorphoVault, shares: bigint, userAddress: Address) {
+  const { feeAmount: feeShares, netAmount: netShares } = calculateEarnWithdrawalFeeAmounts(shares);
+  if (feeShares <= 0n || netShares <= 0n) throw new Error("Redeem share amount is too small.");
+
+  return [
+    {
+      to: vault.address,
+      data: encodeFunctionData({
+        abi: redeemAbi,
+        functionName: "redeem",
+        args: [netShares, userAddress, userAddress],
+      }),
+    },
+    {
+      to: vault.address,
+      data: encodeFunctionData({
+        abi: redeemAbi,
+        functionName: "redeem",
+        args: [feeShares, EARN_WITHDRAW_FEE_RECIPIENT, userAddress],
+      }),
+    },
+  ];
 }

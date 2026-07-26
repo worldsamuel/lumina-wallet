@@ -2,7 +2,13 @@ import { NextRequest } from "next/server";
 import { isAddress, parseUnits, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { buildDepositTx, buildRedeemTx, buildWithdrawTx } from "@/lib/morpho/transactions";
+import {
+  EARN_WITHDRAW_FEE_BPS,
+  EARN_WITHDRAW_FEE_RECIPIENT,
+  buildDepositTx,
+  buildRedeemTxs,
+  buildWithdrawTxs,
+} from "@/lib/morpho/transactions";
 import { getVaultByAddress } from "@/lib/morpho/vaults";
 
 export const dynamic = "force-dynamic";
@@ -57,13 +63,27 @@ export async function POST(req: NextRequest) {
 
     if (body.type === "withdraw") {
       const amount = parseTokenAmount(body.amount, vault.asset.decimals);
-      return jsonResponse({ transactions: [buildWithdrawTx(vault, amount, body.userAddress as Address)] });
+      return jsonResponse({
+        transactions: buildWithdrawTxs(vault, amount, body.userAddress as Address),
+        fee: {
+          businessType: "earn",
+          bps: EARN_WITHDRAW_FEE_BPS,
+          recipient: EARN_WITHDRAW_FEE_RECIPIENT,
+        },
+      });
     }
 
     if (body.type === "redeem") {
       const shares = BigInt(String(body.shares ?? "0"));
       if (shares <= 0n) return jsonResponse({ error: "Invalid share amount." }, { status: 400 });
-      return jsonResponse({ transactions: [buildRedeemTx(vault, shares, body.userAddress as Address)] });
+      return jsonResponse({
+        transactions: buildRedeemTxs(vault, shares, body.userAddress as Address),
+        fee: {
+          businessType: "earn",
+          bps: EARN_WITHDRAW_FEE_BPS,
+          recipient: EARN_WITHDRAW_FEE_RECIPIENT,
+        },
+      });
     }
 
     return jsonResponse({ error: "Unsupported transaction type." }, { status: 400 });

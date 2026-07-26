@@ -17,7 +17,12 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { ERC20_APPROVE_ABI, METAMORPHO_ABI } from "../lib/morpho/abi";
-import { buildDepositTx, buildRedeemTx } from "../lib/morpho/transactions";
+import {
+  EARN_WITHDRAW_FEE_BPS,
+  EARN_WITHDRAW_FEE_RECIPIENT,
+  buildDepositTx,
+  buildRedeemTxs,
+} from "../lib/morpho/transactions";
 import type { MorphoVault } from "../lib/morpho/vaults";
 
 const WORLD_CHAIN_ID = 480;
@@ -27,7 +32,6 @@ const ONE_USDC = parseUnits("1", 6);
 const MIN_REQUIRED_USDC = parseUnits("5", 6);
 const TOP_UP_USDC = parseUnits("10", 6);
 const GAS_TOP_UP = parseEther("10");
-const FINAL_BALANCE_TOLERANCE = parseUnits("0.00001", 6);
 
 type Snapshot<T> = {
   label: string;
@@ -57,12 +61,14 @@ type ReportContext = {
   usdcBalanceBeforeDeposit: Snapshot<bigint>;
   usdcBalanceAfterDeposit: Snapshot<bigint>;
   usdcBalanceAfterRedeem: Snapshot<bigint>;
+  treasuryBalanceBeforeRedeem: Snapshot<bigint>;
+  treasuryBalanceAfterRedeem: Snapshot<bigint>;
   sharesAfterDeposit: Snapshot<bigint>;
   assetsAfterDeposit: Snapshot<bigint>;
   assetsAfterWait: Snapshot<bigint>;
   sharesAfterRedeem: Snapshot<bigint>;
   depositTx: TxResult;
-  redeemTx: TxResult;
+  redeemTxs: TxResult[];
   fundingActions: string[];
 };
 
@@ -170,21 +176,40 @@ async function main() {
     convertToAssets(sharesAfterDeposit.value),
   );
 
-  const redeemTxRequest = buildRedeemTx(vault, sharesAfterDeposit.value, account.address);
-  const redeemTx = await sendAndRecord(
-    "redeem all Re7 USDC vault shares",
-    redeemTxRequest.to,
-    redeemTxRequest.data,
+  const treasuryBalanceBeforeRedeem = await snapshot("treasury USDC before redeem", () =>
+    readUsdcBalance(EARN_WITHDRAW_FEE_RECIPIENT),
   );
+  const redeemTxRequests = buildRedeemTxs(vault, sharesAfterDeposit.value, account.address);
+  const redeemTxs: TxResult[] = [];
+  for (const [index, redeemTxRequest] of redeemTxRequests.entries()) {
+    redeemTxs.push(
+      await sendAndRecord(
+        index === 0 ? "redeem net Re7 USDC shares to user" : "redeem fee Re7 USDC shares to treasury",
+        redeemTxRequest.to,
+        redeemTxRequest.data,
+      ),
+    );
+  }
 
   const usdcBalanceAfterRedeem = await snapshot("USDC balance after redeem", () => readUsdcBalance());
+  const treasuryBalanceAfterRedeem = await snapshot("treasury USDC after redeem", () =>
+    readUsdcBalance(EARN_WITHDRAW_FEE_RECIPIENT),
+  );
   const sharesAfterRedeem = await snapshot("vault shares after redeem", () => readVaultShares());
   assert(sharesAfterRedeem.value === 0n, `Expected final vault shares to be 0, got ${sharesAfterRedeem.value}`);
+  const expectedFee = (assetsAfterWait.value * BigInt(EARN_WITHDRAW_FEE_BPS)) / 10_000n;
+  const expectedUserBalance = usdcBalanceBeforeDeposit.value - ONE_USDC + assetsAfterWait.value - expectedFee;
   assertClose(
     usdcBalanceAfterRedeem.value,
-    usdcBalanceBeforeDeposit.value,
-    FINAL_BALANCE_TOLERANCE,
-    "final USDC balance should return close to pre-deposit balance",
+    expectedUserBalance,
+    parseUnits("0.0001", 6),
+    "final USDC balance should reflect the 10% withdrawal fee",
+  );
+  assertClose(
+    treasuryBalanceAfterRedeem.value - treasuryBalanceBeforeRedeem.value,
+    expectedFee,
+    parseUnits("0.0001", 6),
+    "treasury should receive approximately 10% of redeemed assets",
   );
 
   const report: ReportContext = {
@@ -199,12 +224,14 @@ async function main() {
     usdcBalanceBeforeDeposit,
     usdcBalanceAfterDeposit,
     usdcBalanceAfterRedeem,
+    treasuryBalanceBeforeRedeem,
+    treasuryBalanceAfterRedeem,
     sharesAfterDeposit,
     assetsAfterDeposit,
     assetsAfterWait,
     sharesAfterRedeem,
     depositTx,
-    redeemTx,
+    redeemTxs,
     fundingActions,
   };
   const reportPath = await writeReport(report);
@@ -212,12 +239,12 @@ async function main() {
   console.log("Morpho Re7 USDC mainnet-fork verification completed successfully");
 }
 
-async function readUsdcBalance() {
+async function readUsdcBalance(address: Address = account.address) {
   return publicClient.readContract({
     address: WORLD_USDC,
     abi: ERC20_APPROVE_ABI,
     functionName: "balanceOf",
-    args: [account.address],
+    args: [address],
   });
 }
 
@@ -337,7 +364,7 @@ function renderReport(context: ReportContext) {
 | Step | Tx hash | Status | Gas used | On-chain timestamp | Tenderly link |
 | --- | --- | --- | ---: | --- | --- |
 | Deposit | \`${context.depositTx.hash}\` | ${context.depositTx.status} | ${context.depositTx.gasUsed} | ${context.depositTx.timestamp} (${formatUnix(context.depositTx.timestamp)}) | ${txLink(context.depositTx.hash, context.explorerBaseUrl)} |
-| Redeem | \`${context.redeemTx.hash}\` | ${context.redeemTx.status} | ${context.redeemTx.gasUsed} | ${context.redeemTx.timestamp} (${formatUnix(context.redeemTx.timestamp)}) | ${txLink(context.redeemTx.hash, context.explorerBaseUrl)} |
+${context.redeemTxs.map((tx, index) => `| Redeem ${index === 0 ? "to user" : "fee to treasury"} | \`${tx.hash}\` | ${tx.status} | ${tx.gasUsed} | ${tx.timestamp} (${formatUnix(tx.timestamp)}) | ${txLink(tx.hash, context.explorerBaseUrl)} |`).join("\n")}
 
 ## Position Snapshots
 
@@ -349,9 +376,11 @@ function renderReport(context: ReportContext) {
 ## Final Balance Reconciliation
 
 - ${formatSnapshot(context.usdcBalanceAfterRedeem, formatUsdc)}
+- ${formatSnapshot(context.treasuryBalanceBeforeRedeem, formatUsdc)}
+- ${formatSnapshot(context.treasuryBalanceAfterRedeem, formatUsdc)}
 - ${formatSnapshot(context.sharesAfterRedeem, (value) => value.toString())}
 - Expected final vault shares: 0
-- Expected final USDC balance: close to ${formatUsdc(context.usdcBalanceBeforeDeposit.value)} with tolerance ${formatUsdc(FINAL_BALANCE_TOLERANCE)}
+- Expected withdrawal fee: ${EARN_WITHDRAW_FEE_BPS / 100}% of redeemed assets
 
 Verified on: Tenderly Virtual TestNet (fork from World Chain mainnet block ${context.forkBlockNumber}).
 `;
