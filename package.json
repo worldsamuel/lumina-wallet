@@ -14,6 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:deploy:prod": "dotenv -e .env.production -- npx prisma migrate deploy",
     "db:seed:prod": "dotenv -e .env.production -- tsx prisma/seed.ts",
+    "fees:sync:prod": "dotenv -e .env.production -- tsx scripts/sync-transfer-fees.ts",
     "verify:morpho:fork": "dotenv -e .env.test -- tsx scripts/verify-morpho-mainnet-fork.ts"
   },
   "dependencies": {
