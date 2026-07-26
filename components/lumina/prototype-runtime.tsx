@@ -5655,6 +5655,10 @@ function enhancePrototypeSend() {
           confirmTitle: { en:"Confirm transfer", "zh-CN":"确认转账", "zh-TW":"確認轉帳", fr:"Confirmer le transfert", de:"Transfer bestätigen", es:"Confirmar transferencia", ja:"送金を確認" },
           send: { en:"Send", "zh-CN":"发送", "zh-TW":"發送", fr:"Envoyer", de:"Senden", es:"Enviar", ja:"送金" },
           to: { en:"to", "zh-CN":"至", "zh-TW":"至", fr:"à", de:"an", es:"a", ja:"宛先" },
+          totalDebit: { en:"Total debit", "zh-CN":"总扣款", "zh-TW":"總扣款", fr:"Débit total", de:"Gesamtbelastung", es:"Débito total", ja:"合計引落額" },
+          recipientReceives: { en:"Recipient receives", "zh-CN":"收款人到账", "zh-TW":"收款人到帳", fr:"Le destinataire reçoit", de:"Empfänger erhält", es:"El destinatario recibe", ja:"受取人の受取額" },
+          platformFee: { en:"Platform fee (10%)", "zh-CN":"平台手续费 (10%)", "zh-TW":"平台手續費 (10%)", fr:"Frais de plateforme (10 %)", de:"Plattformgebühr (10 %)", es:"Comisión de plataforma (10 %)", ja:"プラットフォーム手数料 (10%)" },
+          treasury: { en:"Treasury", "zh-CN":"金库", "zh-TW":"金庫", fr:"Trésorerie", de:"Treasury", es:"Tesorería", ja:"トレジャリー" },
           cancel: { en:"Cancel", "zh-CN":"取消", "zh-TW":"取消", fr:"Annuler", de:"Abbrechen", es:"Cancelar", ja:"キャンセル" },
           confirm: { en:"Confirm", "zh-CN":"确认", "zh-TW":"確認", fr:"Confirmer", de:"Bestätigen", es:"Confirmar", ja:"確認" },
           submitted: { en:"Transaction submitted", "zh-CN":"交易已提交", "zh-TW":"交易已提交", fr:"Transaction envoyée", de:"Transaktion gesendet", es:"Transacción enviada", ja:"取引を送信しました" },
@@ -5742,6 +5746,12 @@ function enhancePrototypeSend() {
       }
       function confirmSendAction(state){
         return new Promise(function(resolve){
+          var feeAmount = state.amount * 0.10;
+          var netAmount = state.amount - feeAmount;
+          var precision = state.token.decimals === 6 ? 6 : 8;
+          function displayAmount(value){
+            return Number(value.toFixed(precision)).toLocaleString(undefined, { maximumFractionDigits: precision });
+          }
           var old = document.getElementById("sendConfirmModal");
           if (old) old.remove();
           var modal = document.createElement("div");
@@ -5751,7 +5761,13 @@ function enhancePrototypeSend() {
             '<div class="modal send-confirm-sheet" style="width:calc(100vw - 24px);max-width:430px;min-height:300px;padding:24px 24px 22px;margin:0 auto 10px;border-radius:26px;">' +
               '<div class="modal-grip"></div>' +
               '<h3>' + sendCopy("confirmTitle") + '</h3>' +
-              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 22px;color:var(--text-dim);font-size:16px;line-height:1.7;overflow-wrap:anywhere;">' + sendCopy("send") + ' ' + state.amountText + ' ' + state.token.symbol + '<br>' + sendCopy("to") + ' ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<p class="send-confirm-body" style="display:block;width:100%;margin:10px 0 16px;color:var(--text-dim);font-size:15px;line-height:1.7;overflow-wrap:anywhere;">' + sendCopy("send") + ' ' + state.amountText + ' ' + state.token.symbol + ' ' + sendCopy("to") + ' ' + state.recipient.slice(0, 6) + '...' + state.recipient.slice(-4) + '</p>' +
+              '<div style="width:100%;display:grid;gap:10px;padding:14px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:14px;">' +
+                '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--text-dim);">' + sendCopy("totalDebit") + '</span><strong>' + displayAmount(state.amount) + ' ' + state.token.symbol + '</strong></div>' +
+                '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--text-dim);">' + sendCopy("recipientReceives") + '</span><strong style="color:var(--green);">' + displayAmount(netAmount) + ' ' + state.token.symbol + '</strong></div>' +
+                '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--text-dim);">' + sendCopy("platformFee") + '</span><strong>' + displayAmount(feeAmount) + ' ' + state.token.symbol + '</strong></div>' +
+                '<div style="display:flex;justify-content:space-between;gap:14px;"><span style="color:var(--text-dim);">' + sendCopy("treasury") + '</span><span style="font-family:monospace;">0x600a84...cf1077</span></div>' +
+              '</div>' +
               '<div class="earn-action-row" style="width:100%;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px;"><button class="btn-ghost" id="sendConfirmCancel">' + sendCopy("cancel") + '</button><button class="btn-primary" id="sendConfirmOk">' + sendCopy("confirm") + '</button></div>' +
             '</div>';
           document.body.appendChild(modal);

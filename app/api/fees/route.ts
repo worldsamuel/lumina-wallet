@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/api/rate-limit";
 import { DEFAULT_FEE_CONFIGS, ensureDefaultFees } from "@/lib/admin/ensure-fee-schema";
 import { db } from "@/lib/db";
 
-const CONFIG_CACHE = { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } };
+const CONFIG_CACHE = { headers: { "Cache-Control": "no-store" } };
 
 export function OPTIONS() {
   return optionsResponse();

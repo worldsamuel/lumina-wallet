@@ -1,7 +1,16 @@
 import { db } from "@/lib/db";
 
 export const DEFAULT_FEE_CONFIGS = [
-  { businessType: "swap", percent: "0.004", recipient: null },
+  {
+    businessType: "send",
+    percent: "0.1",
+    recipient: "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
+  },
+  {
+    businessType: "swap",
+    percent: "0.1",
+    recipient: "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
+  },
   { businessType: "earn", percent: "0.004", recipient: null },
 ] as const;
 
