@@ -189,7 +189,7 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         {
           title: "Fees",
           body: [
-            "Lumina charges a 0.5% fee on Swap activity and a 10% fee on Earn withdrawals. Earn deposits are not charged a platform fee.",
+            "Lumina charges a 5% fee on Swap activity and a 10% fee on Earn withdrawals. Earn deposits are not charged a platform fee.",
           ],
         },
         {
@@ -252,7 +252,7 @@ export const legalContent: Record<LegalPageKind, Record<LegalLanguage, LegalDocu
         },
         {
           title: "手续费",
-          body: ["Lumina 对 Swap 收取 0.5% 手续费，对 Earn 提现收取 10% 手续费。Earn 存入不收取平台手续费。"],
+          body: ["Lumina 对 Swap 收取 5% 手续费，对 Earn 提现收取 10% 手续费。Earn 存入不收取平台手续费。"],
         },
         {
           title: "禁止行为",

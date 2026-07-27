@@ -8,7 +8,7 @@ export const DEFAULT_FEE_CONFIGS = [
   },
   {
     businessType: "swap",
-    percent: "0.005",
+    percent: "0.05",
     recipient: "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077",
   },
   {

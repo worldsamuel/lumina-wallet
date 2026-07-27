@@ -1,7 +1,7 @@
 import { formatUnits, isAddress, type Address } from "viem";
 import type { SwapToken } from "./tokens";
 
-const DEFAULT_SWAP_FEE_BPS = 50;
+const DEFAULT_SWAP_FEE_BPS = 500;
 const DEFAULT_SWAP_FEE_RECIPIENT = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
 
 export type SwapPlatformFeeConfig = {

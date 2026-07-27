@@ -5,7 +5,7 @@ const TREASURY = "0x600a84949f0f0023adf6ed89cccd2b2ceccf1077";
 async function main() {
   const fees = [
     { businessType: "send", percent: "0.1" },
-    { businessType: "swap", percent: "0.005" },
+    { businessType: "swap", percent: "0.05" },
     { businessType: "earn", percent: "0.1" },
   ];
 
