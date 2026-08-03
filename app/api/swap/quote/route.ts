@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
   const enableHoldstationReference =
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_EXECUTION === "true" ||
     process.env.NEXT_PUBLIC_SWAP_HOLDSTATION_REFERENCE === "true";
-  const enableV4Reference = process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE !== "false";
+  const enableV4Reference = process.env.NEXT_PUBLIC_SWAP_V4_REFERENCE === "true";
   const [holdstation, v3, v4, chainlink, coingecko, gasPrice] = await Promise.all([
     enableHoldstationReference
       ? withTimeout(buildHoldstationQuote(parsed.from, parsed.to, parsed.amountText, parsed.slippageBps), 3_500).catch((error) => {
@@ -162,10 +162,9 @@ export async function POST(req: NextRequest) {
   const amountOut = formatUnits(netAmountOut, parsed.to.decimals);
   const amountOutNumber = Number(amountOut);
   const quoteRate = amountInNumber > 0 ? amountOutNumber / amountInNumber : null;
-  const roundTripLossPercent =
-    hasCommunityToken || !reliableImpactReference
-      ? await estimateRoundTripLossPercent(parsed.from, parsed.to, amountIn, netAmountOut)
-      : null;
+  const roundTripLossPercent = hasCommunityToken
+    ? await estimateRoundTripLossPercent(parsed.from, parsed.to, amountIn, netAmountOut)
+    : null;
   const quoteMeta = main.quote as SwapQuoteResult;
   const apiPriceImpactPercent = typeof quoteMeta.priceImpactPercent === "number" ? quoteMeta.priceImpactPercent : null;
   const deviationValues = reliableImpactReference && apiPriceImpactPercent === null
@@ -214,7 +213,7 @@ export async function POST(req: NextRequest) {
     expiresAt: Date.now() + QUOTE_CACHE_TTL_MS,
     staleUntil: Date.now() + QUOTE_CACHE_STALE_MS,
   });
-  await writeQuoteFileCache(cacheKey, quoteCache.get(cacheKey)!);
+  void writeQuoteFileCache(cacheKey, quoteCache.get(cacheKey)!);
   if (quoteCache.size > 400) {
     const now = Date.now();
     for (const [key, value] of quoteCache) {
@@ -248,8 +247,8 @@ async function buildPrimaryUniswapQuote(
   slippageBps: number,
   userAddress: string | null,
 ): Promise<SourceQuote | null> {
-  try {
-    const quote = await withTimeout(
+  const candidates = [
+    withTimeout(
       quoteBestUniswapApi({
         fromToken: from,
         toToken: to,
@@ -257,19 +256,30 @@ async function buildPrimaryUniswapQuote(
         slippageBps,
         swapper: userAddress as `0x${string}` | null,
       }),
-      2_500,
-    );
-    if (quote.bestQuote && Number(quote.bestQuote.amountOut) > 0) {
-      return { source: "uniswap-v3", ...quote };
-    }
-  } catch (error) {
-    console.warn("[SWAP] Uniswap API quote failed", error);
+      1_800,
+    ).then((quote) => executableSourceQuote(quote)),
+    withTimeout(quoteBestV3(from, to, amountIn), 2_500).then((quote) => executableSourceQuote(quote)),
+  ].map((candidate) =>
+    candidate.then((quote) => {
+      if (!quote) throw new Error("quote_unavailable");
+      return quote;
+    }),
+  );
+
+  try {
+    return await Promise.any(candidates);
+  } catch {
+    return buildV3QuoteWithRetry(from, to, amountIn);
   }
-  return buildV3QuoteWithRetry(from, to, amountIn);
+}
+
+function executableSourceQuote(quote: SwapQuoteSet): SourceQuote | null {
+  if (!quote.bestQuote || Number(quote.bestQuote.amountOut) <= 0) return null;
+  return { source: "uniswap-v3", ...quote };
 }
 
 async function buildV3QuoteWithRetry(from: SwapToken, to: SwapToken, amountIn: bigint): Promise<SourceQuote | null> {
-  const attempts = [3_500, 3_000];
+  const attempts = [2_500, 1_800];
   for (let index = 0; index < attempts.length; index += 1) {
     try {
       const quote = await withTimeout(quoteBestV3(from, to, amountIn), attempts[index]);

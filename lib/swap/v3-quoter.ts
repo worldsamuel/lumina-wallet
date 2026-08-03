@@ -1,5 +1,5 @@
 import { encodePacked, formatUnits, type Address } from "viem";
-import { publicClient } from "@/lib/chain";
+import { readWorldChainWithFallback } from "@/lib/chain";
 import type { SwapQuoteResult, SwapQuoteSet } from "./quote-types";
 import { SWAP_TOKENS, type SwapToken } from "./tokens";
 
@@ -72,20 +72,22 @@ export async function quoteV3(
   amountIn: bigint,
   feeTier: (typeof FEE_TIERS)[number],
 ): Promise<SwapQuoteResult> {
-  const simulated = await publicClient.simulateContract({
-    address: UNISWAP_V3_QUOTER_V2,
-    abi: quoterV2Abi,
-    functionName: "quoteExactInputSingle",
-    args: [
-      {
-        tokenIn: fromToken.address,
-        tokenOut: toToken.address,
-        amountIn,
-        fee: feeTier,
-        sqrtPriceLimitX96: 0n,
-      },
-    ],
-  });
+  const simulated = await readWorldChainWithFallback((client) =>
+    client.simulateContract({
+      address: UNISWAP_V3_QUOTER_V2,
+      abi: quoterV2Abi,
+      functionName: "quoteExactInputSingle",
+      args: [
+        {
+          tokenIn: fromToken.address,
+          tokenOut: toToken.address,
+          amountIn,
+          fee: feeTier,
+          sqrtPriceLimitX96: 0n,
+        },
+      ],
+    }),
+  );
   const [amountOut, sqrtPriceX96After, , gasEstimate] = simulated.result;
   return {
     amountOut: formatUnits(amountOut, toToken.decimals),
@@ -124,12 +126,14 @@ export async function quoteBestV3(fromToken: SwapToken, toToken: SwapToken, amou
 }
 
 async function quoteV3Path(tokens: SwapToken[], fees: number[], amountIn: bigint, outDecimals: number): Promise<SwapQuoteResult> {
-  const simulated = await publicClient.simulateContract({
-    address: UNISWAP_V3_QUOTER_V2,
-    abi: quoterV2Abi,
-    functionName: "quoteExactInput",
-    args: [encodeV3Path(tokens, fees), amountIn],
-  });
+  const simulated = await readWorldChainWithFallback((client) =>
+    client.simulateContract({
+      address: UNISWAP_V3_QUOTER_V2,
+      abi: quoterV2Abi,
+      functionName: "quoteExactInput",
+      args: [encodeV3Path(tokens, fees), amountIn],
+    }),
+  );
   const [amountOut, , , gasEstimate] = simulated.result;
   return {
     amountOut: formatUnits(amountOut, outDecimals),

@@ -1,5 +1,5 @@
 import { formatUnits, zeroAddress, type Address } from "viem";
-import { publicClient } from "@/lib/chain";
+import { readWorldChainWithFallback } from "@/lib/chain";
 import type { SwapQuoteResult, SwapQuoteSet } from "./quote-types";
 import type { SwapToken } from "./tokens";
 
@@ -52,25 +52,27 @@ export async function quoteV4(
   feeTier: (typeof FEE_TIERS)[number],
 ): Promise<SwapQuoteResult> {
   const [currency0, currency1] = sortCurrencies(fromToken.address, toToken.address);
-  const simulated = await publicClient.simulateContract({
-    address: UNISWAP_V4_QUOTER,
-    abi: v4QuoterAbi,
-    functionName: "quoteExactInputSingle",
-    args: [
-      {
-        poolKey: {
-          currency0,
-          currency1,
-          fee: feeTier,
-          tickSpacing: TICK_SPACING_BY_FEE[feeTier],
-          hooks: zeroAddress,
+  const simulated = await readWorldChainWithFallback((client) =>
+    client.simulateContract({
+      address: UNISWAP_V4_QUOTER,
+      abi: v4QuoterAbi,
+      functionName: "quoteExactInputSingle",
+      args: [
+        {
+          poolKey: {
+            currency0,
+            currency1,
+            fee: feeTier,
+            tickSpacing: TICK_SPACING_BY_FEE[feeTier],
+            hooks: zeroAddress,
+          },
+          zeroForOne: fromToken.address.toLowerCase() === currency0.toLowerCase(),
+          exactAmount: amountIn,
+          hookData: "0x",
         },
-        zeroForOne: fromToken.address.toLowerCase() === currency0.toLowerCase(),
-        exactAmount: amountIn,
-        hookData: "0x",
-      },
-    ],
-  });
+      ],
+    }),
+  );
   const [amountOut, gasEstimate] = simulated.result;
   return {
     amountOut: formatUnits(amountOut, toToken.decimals),

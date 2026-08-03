@@ -1,5 +1,5 @@
 import { formatUnits, type Address } from "viem";
-import { publicClient } from "./chain";
+import { readWorldChainWithFallback } from "./chain";
 import { PRICE_SYMBOLS, type OnchainPricesResponse, type PriceSymbol } from "./prices";
 
 export const CHAINLINK_FEEDS: Record<PriceSymbol, Address> = {
@@ -41,8 +41,8 @@ export type OraclePrice = {
 export async function readOraclePrice(symbol: PriceSymbol): Promise<OraclePrice> {
   const address = CHAINLINK_FEEDS[symbol];
   const [decimals, latest] = await Promise.all([
-    publicClient.readContract({ address, abi: aggregatorV3Abi, functionName: "decimals" }),
-    publicClient.readContract({ address, abi: aggregatorV3Abi, functionName: "latestRoundData" }),
+    readWorldChainWithFallback((client) => client.readContract({ address, abi: aggregatorV3Abi, functionName: "decimals" })),
+    readWorldChainWithFallback((client) => client.readContract({ address, abi: aggregatorV3Abi, functionName: "latestRoundData" })),
   ]);
   return {
     price: latest[1],
@@ -65,10 +65,12 @@ export async function readOraclePrices(): Promise<OnchainPricesResponse> {
     },
   ]);
 
-  const results = await publicClient.multicall({
-    allowFailure: false,
-    contracts,
-  });
+  const results = await readWorldChainWithFallback((client) =>
+    client.multicall({
+      allowFailure: false,
+      contracts,
+    }),
+  );
 
   const payload: OnchainPricesResponse = {
     WLD: null,

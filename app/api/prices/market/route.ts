@@ -7,9 +7,9 @@ export const revalidate = 0;
 
 const CACHE_TTL_MS = 3_000;
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
-  "CDN-Cache-Control": "no-store",
-  "Vercel-CDN-Cache-Control": "no-store",
+  "Cache-Control": "public, max-age=2, s-maxage=3, stale-while-revalidate=15",
+  "CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
   "Content-Type": "application/json",
 };
 const COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
@@ -59,6 +59,7 @@ async function fetchCoinGeckoMarket(): Promise<MarketPricesResponse> {
   const response = await fetch(`${COINGECKO_SIMPLE_PRICE_URL}?${params}`, {
     headers,
     cache: "no-store",
+    signal: AbortSignal.timeout(2_500),
   });
   if (!response.ok) throw new Error(`CoinGecko simple/price responded ${response.status}`);
 

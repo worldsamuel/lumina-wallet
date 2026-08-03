@@ -4508,8 +4508,8 @@ function enhancePrototypeSwapQuote() {
 	      var latestQuoteAt = 0;
 	      var activeQuotePromise = null;
 	      var quoteCountdownTimer = null;
-	      var SWAP_QUOTE_TTL_SECONDS = 180;
-	      var SWAP_QUOTE_REFRESH_SECONDS = 180;
+	      var SWAP_QUOTE_TTL_SECONDS = 20;
+	      var SWAP_QUOTE_REFRESH_SECONDS = 20;
 	      var swapSubmitting = false;
 	      var highImpactAcknowledged = false;
 	      var swapExecutionEnabled = ${process.env.NEXT_PUBLIC_SWAP_ENABLED === "true" ? "true" : "false"};
@@ -7960,7 +7960,7 @@ function enhancePrototypeDetail() {
         }
         asset.__detailPriceRefreshAt = now;
         Promise.all([
-          fetch("/api/prices/market?t=" + now, { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; }),
+          fetch("/api/prices/market", { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : null; }).catch(function(){ return null; }),
           fetch("/api/tokens/top?mode=all&t=" + now, { cache: "no-store" }).then(function(res){ return res.ok ? res.json() : []; }).catch(function(){ return []; })
         ])
           .then(function(results){

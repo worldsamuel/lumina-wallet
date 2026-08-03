@@ -7,9 +7,9 @@ export const revalidate = 0;
 
 const CACHE_TTL_MS = 3_000;
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
-  "CDN-Cache-Control": "no-store",
-  "Vercel-CDN-Cache-Control": "no-store",
+  "Cache-Control": "public, max-age=2, s-maxage=3, stale-while-revalidate=15",
+  "CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
 };
 
 let cachedOnchain: { expiresAt: number; data: OnchainPricesResponse } | null = null;
