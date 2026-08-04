@@ -2157,6 +2157,15 @@ function enhancePrototypeEarn() {
         window.__luminaMorphoRefreshTimer = setInterval(function(){
           if (!window.__luminaUserAddress) return;
           if (!morphoStarted) return;
+          loadMorphoVaults().then(function(){
+            renderProducts();
+            renderHomeEarningPositions();
+            if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+              openEarn(activeEarnIndex);
+            }
+          }).catch(function(e){
+            console.log("[EARN] Periodic vault refresh failed:", e);
+          });
           window.__luminaRefreshMorphoPositions().catch(function(e){
             console.log("[EARN] Periodic position refresh failed:", e);
           });
