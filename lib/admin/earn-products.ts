@@ -21,7 +21,19 @@ export type EarnProductConfig = {
 
 export type EarnProductPayload = EarnProductConfig & {
   liveData: VaultLiveData;
+  displayApy: number | null;
 };
+
+export function parseDisplayApy(value: string | null | undefined): number | null {
+  if (value == null) return null;
+  const normalized = String(value).trim();
+  if (!normalized) return null;
+  const hasPercentSign = normalized.endsWith("%");
+  const numeric = Number(hasPercentSign ? normalized.slice(0, -1).trim() : normalized);
+  if (!Number.isFinite(numeric) || numeric < 0) return null;
+  if (hasPercentSign || numeric > 1) return numeric / 100;
+  return numeric;
+}
 
 function defaultConfigs(): EarnProductConfig[] {
   return RE7_VAULTS.map((vault, index) => ({
@@ -124,6 +136,7 @@ export function productToVault(product: EarnProductConfig): MorphoVault {
     riskLevel: product.riskLevel,
     enabled: product.enabled,
     imageUrl: product.imageUrl ?? null,
+    displayApy: parseDisplayApy(product.apyOverride),
     description: product.description,
   };
 }
@@ -144,14 +157,10 @@ export async function getEarnProductsWithLiveData(): Promise<EarnProductPayload[
         totalAssetsUsd: null,
         totalAssets: null,
       }));
-      const override = product.apyOverride === null ? null : Number(product.apyOverride);
       return {
         ...product,
-        liveData: {
-          ...liveData,
-          netApy: Number.isFinite(override) ? override : liveData.netApy,
-          apy: Number.isFinite(override) ? override : liveData.apy,
-        },
+        displayApy: parseDisplayApy(product.apyOverride),
+        liveData,
       };
     }),
   );

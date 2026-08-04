@@ -1428,6 +1428,13 @@ function enhancePrototypeEarn() {
         if (!Number.isFinite(n)) return "—";
         return (n * 100).toFixed(2) + "%";
       }
+      function displayedVaultApy(vault){
+        if (vault && vault.displayApy != null) {
+          var configured = Number(vault.displayApy);
+          if (Number.isFinite(configured) && configured >= 0) return configured;
+        }
+        return vault && vault.liveData ? vault.liveData.netApy : null;
+      }
       function fmtCompactUsd(value){
         var n = Number(value);
         if (!Number.isFinite(n)) return "—";
@@ -1656,7 +1663,7 @@ function enhancePrototypeEarn() {
         if (!positions.length) {
           var firstVault = morphoVaults && morphoVaults.length ? morphoVaults[0] : null;
           var title = morphoLoading ? "Loading Earn..." : (firstVault ? "Earn with Morpho" : "Earn");
-          var subtitle = morphoError || (firstVault ? ((firstVault.displayName || "Re7 vaults") + (firstVault.liveData ? " · " + fmtPct(firstVault.liveData.netApy) + " APY" : "")) : "View yield products");
+          var subtitle = morphoError || (firstVault ? ((firstVault.displayName || "Re7 vaults") + (displayedVaultApy(firstVault) != null ? " · " + fmtPct(displayedVaultApy(firstVault)) + " APY" : "")) : "View yield products");
           box.innerHTML = '<div class="asset" onclick="go(\\'earn\\'); setTabByName(\\'Earn\\')">' +
             '<div class="coin morpho-vault-ic">' + (firstVault ? vaultIcon(firstVault) : '<span>E</span>') + '</div>' +
             '<div class="name"><div class="sym">' + title + '</div><div class="full">' + subtitle + '</div></div>' +
@@ -1673,7 +1680,7 @@ function enhancePrototypeEarn() {
           var displaySym = positionDisplaySymbol(pos, sym);
           var price = typeof prices !== "undefined" ? Number(prices[sym] || 0) : 0;
           var usd = price ? " ≈ " + formatMoney(positionAmount(pos) * price) : "";
-          var apy = vault.liveData ? " · " + fmtPct(vault.liveData.netApy) + " APY" : "";
+          var apy = displayedVaultApy(vault) != null ? " · " + fmtPct(displayedVaultApy(vault)) + " APY" : "";
           var idx = morphoVaults.findIndex(function(v){
             return String(v.address).toLowerCase() === String(pos.vaultAddress).toLowerCase();
           });
@@ -1703,7 +1710,7 @@ function enhancePrototypeEarn() {
         box.innerHTML = morphoVaults.map(function(vault, i){
           var pos = positionFor(vault);
           var deposited = pos ? positionDisplayAmount(pos, 6) + " " + positionDisplaySymbol(pos, vault.asset.symbol) : "—";
-          var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
+          var apy = displayedVaultApy(vault) != null ? fmtPct(displayedVaultApy(vault)) : "—";
           return '<div class="prod" onclick="openEarn(' + i + ')">' +
             '<div class="top">' +
               '<div class="ic morpho-vault-ic">' + vaultIcon(vault) + '</div>' +
@@ -1877,7 +1884,7 @@ function enhancePrototypeEarn() {
         var ic = document.getElementById("edIc");
         ic.innerHTML = vaultIcon(p);
         ic.className = "ed-ic morpho-vault-ic";
-        document.getElementById("edApy").textContent = p.liveData ? fmtPct(p.liveData.netApy) : "—";
+        document.getElementById("edApy").textContent = displayedVaultApy(p) != null ? fmtPct(displayedVaultApy(p)) : "—";
         document.getElementById("edRisk").innerHTML = '<span class="risk ' + riskClass(p.riskLevel) + '">' + riskText(p.riskLevel) + '</span>';
         document.getElementById("edLock").textContent = "Anytime, subject to vault liquidity";
         document.getElementById("edTvl").textContent = p.liveData ? fmtCompactUsd(p.liveData.totalAssetsUsd) : "—";
@@ -1896,7 +1903,7 @@ function enhancePrototypeEarn() {
         if (!vault || !Number.isFinite(n) || n <= 0) return toast("Enter an amount");
         if (vault.depositsPaused) return toast("Deposits are temporarily paused. Withdrawals remain available.");
         if (walletBalanceForVault(vault, pos) < n) return toast("Insufficient " + vault.asset.symbol + " balance");
-        var apy = vault.liveData ? fmtPct(vault.liveData.netApy) : "—";
+        var apy = displayedVaultApy(vault) != null ? fmtPct(displayedVaultApy(vault)) : "—";
         var confirmed = await confirmMorphoDeposit("You are depositing " + amount + " " + vault.asset.symbol + " into " + vault.displayName + " Vault. Current APY " + apy + ".");
         if (!confirmed) return;
         var awaitingReceipt = false;

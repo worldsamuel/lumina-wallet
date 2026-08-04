@@ -21,6 +21,8 @@ export interface MorphoVault {
   enabled: boolean;
   /** Optional admin-uploaded image shown in Earn product cards. */
   imageUrl?: string | null;
+  /** Optional admin-configured APY used for display only. */
+  displayApy?: number | null;
   /** Localized description copy. */
   description: {
     "zh-CN": string;
