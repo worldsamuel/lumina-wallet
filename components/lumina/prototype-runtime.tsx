@@ -6595,7 +6595,7 @@ function enhancePrototypeMe() {
           '<div id="feedbackReplies" class="support-messages"><div class="support-empty">Start a conversation with Lumina Support.</div></div>' +
           '<div id="supportImagePreview" class="support-image-preview"></div>' +
           '<div class="support-composer"><input id="supportImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="selectSupportImage(this)" />' +
-          '<button type="button" class="support-upload-btn" onclick="document.getElementById(\'supportImageInput\').click()" aria-label="Add image">＋</button>' +
+          '<button type="button" class="support-upload-btn" onclick="document.getElementById(\\'supportImageInput\\').click()" aria-label="Add image">＋</button>' +
           '<textarea id="feedbackText" maxlength="2000" rows="1"></textarea>' +
           '<button id="feedbackSendBtn" onclick="sendFeedback()"></button></div></div>';
         document.body.appendChild(modal);
