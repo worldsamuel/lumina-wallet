@@ -6161,7 +6161,7 @@ function enhancePrototypeMe() {
         var lang = window.currentLang || "en";
         var labels = {
           support: { en:"Support", fr:"Assistance", de:"Support", es:"Soporte", ja:"サポート", "zh-CN":"支持", "zh-TW":"支援" },
-          feedback: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
+          feedback: { en:"Online Support", fr:"Assistance en ligne", de:"Online-Support", es:"Soporte en línea", ja:"オンラインサポート", "zh-CN":"在线客服", "zh-TW":"線上客服" },
           points: { en:"Points", fr:"Points", de:"Punkte", es:"Puntos", ja:"ポイント", "zh-CN":"积分", "zh-TW":"積分" },
           pointsCenter: { en:"Lumina Points", fr:"Lumina Points", de:"Lumina Points", es:"Lumina Points", ja:"Lumina Points", "zh-CN":"Lumina Points", "zh-TW":"Lumina Points" },
           pointsRule: { en:"Earn 1 point for every $1 traded.", fr:"Gagnez 1 point par 1 $ échangé.", de:"1 Punkt pro gehandeltem $1.", es:"Gana 1 punto por cada $1 negociado.", ja:"取引 $1 ごとに 1 ポイント獲得。", "zh-CN":"交易 1 美元获得 1 积分。", "zh-TW":"交易 1 美元獲得 1 積分。" },
@@ -6225,15 +6225,14 @@ function enhancePrototypeMe() {
           version: { en:"Version", fr:"Version", de:"Version", es:"Versión", ja:"バージョン", "zh-CN":"版本", "zh-TW":"版本" },
           connected: { en:"World App connected", fr:"World App connecté", de:"World App verbunden", es:"World App conectado", ja:"World App 接続済み", "zh-CN":"World App 已连接", "zh-TW":"World App 已連接" },
           notConnected: { en:"Not connected", fr:"Non connecté", de:"Nicht verbunden", es:"No conectado", ja:"未接続", "zh-CN":"未连接", "zh-TW":"未連接" },
-          feedbackTitle: { en:"Feedback", fr:"Retour", de:"Feedback", es:"Comentarios", ja:"フィードバック", "zh-CN":"在线反馈", "zh-TW":"線上回饋" },
-          feedbackHint: { en:"Tell us what went wrong or what you want improved. Feedback is saved for the Lumina team.", fr:"Dites-nous ce qui ne va pas ou ce que vous voulez améliorer.", de:"Sag uns, was nicht funktioniert oder verbessert werden soll.", es:"Cuéntanos qué falló o qué quieres mejorar.", ja:"問題や改善してほしい点をお知らせください。", "zh-CN":"告诉我们哪里出错了，或你希望改进什么。反馈会保存给 Lumina 团队。", "zh-TW":"告訴我們哪裡出錯，或你希望改善什麼。" },
-          feedbackPlaceholder: { en:"Tell us what happened...", fr:"Dites-nous ce qui s'est passé...", de:"Beschreibe, was passiert ist...", es:"Cuéntanos qué pasó...", ja:"何が起きたか入力...", "zh-CN":"请输入你的反馈...", "zh-TW":"請輸入你的回饋..." },
-          contactPlaceholder: { en:"Telegram / email (optional)", fr:"Telegram / e-mail (facultatif)", de:"Telegram / E-Mail (optional)", es:"Telegram / email (opcional)", ja:"Telegram / email（任意）", "zh-CN":"联系方式 / Telegram / email（可选）", "zh-TW":"聯絡方式 / Telegram / email（選填）" },
-          send: { en:"Send feedback", fr:"Envoyer", de:"Senden", es:"Enviar", ja:"送信", "zh-CN":"发送反馈", "zh-TW":"送出回饋" },
+          feedbackTitle: { en:"24/7 Online Support", fr:"Assistance en ligne 24 h/24", de:"24/7 Online-Support", es:"Soporte en línea 24/7", ja:"24時間オンラインサポート", "zh-CN":"24小时在线客服", "zh-TW":"24小時線上客服" },
+          feedbackHint: { en:"Choose a language and chat with the Lumina support team.", fr:"Choisissez une langue et discutez avec l'équipe Lumina.", de:"Sprache wählen und mit dem Lumina-Support chatten.", es:"Elige un idioma y habla con el equipo de Lumina.", ja:"言語を選んで Lumina サポートにご相談ください。", "zh-CN":"选择语言，与 Lumina 客服实时沟通。", "zh-TW":"選擇語言，與 Lumina 客服即時溝通。" },
+          feedbackPlaceholder: { en:"Type a message...", fr:"Écrivez un message...", de:"Nachricht schreiben...", es:"Escribe un mensaje...", ja:"メッセージを入力...", "zh-CN":"输入消息...", "zh-TW":"輸入訊息..." },
+          send: { en:"Send", fr:"Envoyer", de:"Senden", es:"Enviar", ja:"送信", "zh-CN":"发送", "zh-TW":"送出" },
           sending: { en:"Sending...", fr:"Envoi...", de:"Wird gesendet...", es:"Enviando...", ja:"送信中...", "zh-CN":"发送中...", "zh-TW":"送出中..." },
-          tooShort: { en:"Please enter at least 3 characters.", fr:"Saisissez au moins 3 caractères.", de:"Bitte mindestens 3 Zeichen eingeben.", es:"Introduce al menos 3 caracteres.", ja:"3文字以上入力してください。", "zh-CN":"请输入至少 3 个字的反馈内容", "zh-TW":"請至少輸入 3 個字" },
-          sent: { en:"Feedback sent", fr:"Retour envoyé", de:"Feedback gesendet", es:"Comentarios enviados", ja:"送信しました", "zh-CN":"反馈已发送", "zh-TW":"回饋已送出" },
-          failed: { en:"Unable to send feedback. Please try again.", fr:"Impossible d'envoyer. Réessayez.", de:"Senden fehlgeschlagen. Bitte erneut versuchen.", es:"No se pudo enviar. Inténtalo de nuevo.", ja:"送信できません。もう一度お試しください。", "zh-CN":"发送失败，请稍后重试", "zh-TW":"送出失敗，請稍後再試" }
+          tooShort: { en:"Type a message or add an image.", fr:"Écrivez un message ou ajoutez une image.", de:"Nachricht schreiben oder Bild hinzufügen.", es:"Escribe un mensaje o añade una imagen.", ja:"メッセージまたは画像を追加してください。", "zh-CN":"请输入消息或添加图片", "zh-TW":"請輸入訊息或加入圖片" },
+          sent: { en:"Message sent", fr:"Message envoyé", de:"Nachricht gesendet", es:"Mensaje enviado", ja:"送信しました", "zh-CN":"消息已发送", "zh-TW":"訊息已送出" },
+          failed: { en:"Unable to send. Please try again.", fr:"Impossible d'envoyer. Réessayez.", de:"Senden fehlgeschlagen. Bitte erneut versuchen.", es:"No se pudo enviar. Inténtalo de nuevo.", ja:"送信できません。もう一度お試しください。", "zh-CN":"发送失败，请稍后重试", "zh-TW":"送出失敗，請稍後再試" }
         };
         var out = {};
         Object.keys(labels).forEach(function(key){
@@ -6564,34 +6563,25 @@ function enhancePrototypeMe() {
         var title = modal.querySelector("h3");
         var hint = modal.querySelector(".feedback-hint");
         var text = document.getElementById("feedbackText");
-        var contact = document.getElementById("feedbackContact");
         var btn = document.getElementById("feedbackSendBtn");
         if (title) title.textContent = c.feedbackTitle;
         if (hint) hint.textContent = c.feedbackHint;
         if (text) text.setAttribute("placeholder", c.feedbackPlaceholder);
-        if (contact) contact.setAttribute("placeholder", c.contactPlaceholder);
         if (btn && !btn.disabled) btn.textContent = c.send;
       }
-      function feedbackReadKey(){
-        return "lumina_feedback_read_at_" + (window.__luminaUserAddress || "guest").toLowerCase();
-      }
-      function getFeedbackReadAt(){
-        try { return Number(localStorage.getItem(feedbackReadKey()) || "0"); } catch(e) { return 0; }
-      }
-      function setFeedbackReadAt(value){
-        try { localStorage.setItem(feedbackReadKey(), String(value || Date.now())); } catch(e) {}
-      }
-      function replyTime(item){
-        var at = item && item.repliedAt ? new Date(item.repliedAt).getTime() : 0;
-        return Number.isFinite(at) ? at : 0;
-      }
-      function updateFeedbackUnread(rows){
+      var supportConversation = null;
+      var supportPendingFile = null;
+      var supportPollTimer = null;
+      function updateFeedbackUnread(conversation){
         var dot = document.getElementById("feedbackUnreadDot");
         if (!dot) return;
-        var readAt = getFeedbackReadAt();
-        var count = (rows || []).filter(function(item){ return item && item.reply && replyTime(item) > readAt; }).length;
+        var readAt = conversation && conversation.lastUserReadAt ? new Date(conversation.lastUserReadAt).getTime() : 0;
+        var count = conversation && Array.isArray(conversation.messages) ? conversation.messages.filter(function(item){ return item.sender === "admin" && new Date(item.createdAt).getTime() > readAt; }).length : 0;
         dot.textContent = String(Math.min(count, 9));
         dot.style.display = count > 0 ? "grid" : "none";
+      }
+      function supportLanguages(){
+        return [{code:"en",name:"English"},{code:"zh-CN",name:"简体中文"},{code:"zh-TW",name:"繁體中文"},{code:"fr",name:"Français"},{code:"de",name:"Deutsch"},{code:"es",name:"Español"},{code:"ja",name:"日本語"}];
       }
       function ensureFeedbackModal(){
         if (document.getElementById("feedbackModal")) { updateFeedbackCopy(); return; }
@@ -6600,70 +6590,105 @@ function enhancePrototypeMe() {
         modal.id = "feedbackModal";
         modal.onclick = function(event){ if(event.target === modal) closeFeedback(); };
         modal.innerHTML =
-          '<div class="modal feedback-sheet"><div class="modal-grip"></div><h3></h3>' +
-          '<p class="feedback-hint"></p>' +
-          '<textarea id="feedbackText" maxlength="1200"></textarea>' +
-          '<input id="feedbackContact" maxlength="120" />' +
-          '<button id="feedbackSendBtn" onclick="sendFeedback()"></button>' +
-          '<div id="feedbackReplies" style="margin-top:14px;"></div></div>';
+          '<div class="modal feedback-sheet support-sheet"><div class="modal-grip"></div><div class="support-head"><div><h3></h3><p class="feedback-hint"></p></div><span class="support-online"><i></i>24/7</span></div>' +
+          '<label class="support-language-label"><span>Language</span><select id="supportLanguage"></select></label>' +
+          '<div id="feedbackReplies" class="support-messages"><div class="support-empty">Start a conversation with Lumina Support.</div></div>' +
+          '<div id="supportImagePreview" class="support-image-preview"></div>' +
+          '<div class="support-composer"><input id="supportImageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="selectSupportImage(this)" />' +
+          '<button type="button" class="support-upload-btn" onclick="document.getElementById(\'supportImageInput\').click()" aria-label="Add image">＋</button>' +
+          '<textarea id="feedbackText" maxlength="2000" rows="1"></textarea>' +
+          '<button id="feedbackSendBtn" onclick="sendFeedback()"></button></div></div>';
         document.body.appendChild(modal);
+        var select = document.getElementById("supportLanguage");
+        select.innerHTML = supportLanguages().map(function(item){ return '<option value="'+item.code+'">'+item.name+'</option>'; }).join("");
+        select.value = window.currentLang || "en";
+        select.onchange = function(){ fetch("/api/support",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({language:select.value})}).catch(function(){}); };
         updateFeedbackCopy();
       }
       window.loadFeedbackReplies = async function(markRead){
         var box = document.getElementById("feedbackReplies");
-        if (!box || !window.__luminaUserAddress) return;
+        if (!box) return;
         try {
-          var res = await fetch("/api/feedback?address=" + encodeURIComponent(window.__luminaUserAddress), { cache: "no-store" });
-          var rows = await res.json().catch(function(){ return []; });
-          if (!res.ok || !Array.isArray(rows) || !rows.length) { box.innerHTML = ""; updateFeedbackUnread([]); return; }
-          if (markRead) {
-            var latestReplyAt = rows.reduce(function(max, item){ return Math.max(max, replyTime(item)); }, 0);
-            if (latestReplyAt) setFeedbackReadAt(latestReplyAt);
+          var res = await fetch("/api/support", { cache: "no-store" });
+          var data = await res.json().catch(function(){ return {}; });
+          if (!res.ok) throw new Error(data.error || "Unable to load support.");
+          supportConversation = data.conversation || null;
+          updateFeedbackUnread(supportConversation);
+          var messages = supportConversation && Array.isArray(supportConversation.messages) ? supportConversation.messages : [];
+          box.innerHTML = messages.length ? messages.map(function(item){
+            var image = item.imageUrl ? '<img src="'+safeAttr(item.imageUrl)+'" alt="Support attachment" />' : '';
+            var text = item.text ? '<p>'+escapeHtml(item.text)+'</p>' : '';
+            var name = item.sender === "admin" ? (item.senderName || "Lumina Support") : "You";
+            return '<div class="support-message '+(item.sender === "admin" ? "admin" : "user")+'"><small>'+escapeHtml(name)+' · '+new Date(item.createdAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</small>'+image+text+'</div>';
+          }).join('') : '<div class="support-empty">Start a conversation with Lumina Support.</div>';
+          box.scrollTop = box.scrollHeight;
+          if (markRead && supportConversation) {
+            await fetch("/api/support",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({markRead:true})});
+            supportConversation.lastUserReadAt = new Date().toISOString();
+            updateFeedbackUnread(supportConversation);
           }
-          updateFeedbackUnread(rows);
-          box.innerHTML = '<div style="font-size:12px;color:var(--text-mute);margin-bottom:8px;">Team replies</div>' + rows.map(function(item){
-            var reply = item.reply ? '<div style="margin-top:8px;padding:10px;border-radius:12px;background:rgba(74,222,128,.12);color:var(--text);"><strong>Lumina:</strong> ' + escapeHtml(item.reply) + '</div>' : '';
-            return '<div style="border-top:1px solid var(--line);padding:10px 0;font-size:13px;line-height:1.5;"><div style="color:var(--text-dim);">' + escapeHtml(item.message) + '</div>' + reply + '</div>';
-          }).join('');
         } catch(e) {
-          box.innerHTML = "";
+          box.innerHTML = '<div class="support-empty">'+escapeHtml(e && e.message ? e.message : "Unable to load support.")+'</div>';
         }
+      };
+      window.selectSupportImage = function(input){
+        supportPendingFile = input && input.files && input.files[0] ? input.files[0] : null;
+        if (supportPendingFile && supportPendingFile.size > 1024 * 1024) { supportPendingFile = null; input.value = ""; toast("Image must be smaller than 1MB"); }
+        var preview = document.getElementById("supportImagePreview");
+        if (!preview) return;
+        preview.innerHTML = supportPendingFile ? '<span>'+escapeHtml(supportPendingFile.name)+'<button type="button" onclick="clearSupportImage()">×</button></span>' : '';
+      };
+      window.clearSupportImage = function(){
+        supportPendingFile = null;
+        var input = document.getElementById("supportImageInput"); if (input) input.value = "";
+        var preview = document.getElementById("supportImagePreview"); if (preview) preview.innerHTML = "";
       };
       window.openFeedback = function(){
         ensureFeedbackModal();
         updateFeedbackCopy();
         document.getElementById("feedbackText").value = "";
-        document.getElementById("feedbackContact").value = "";
+        clearSupportImage();
         document.getElementById("feedbackModal").classList.add("open");
         if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(true);
+        clearInterval(supportPollTimer);
+        supportPollTimer = setInterval(function(){ loadFeedbackReplies(true); }, 5000);
       };
       window.closeFeedback = function(){
         var modal = document.getElementById("feedbackModal");
         if (modal) modal.classList.remove("open");
+        clearInterval(supportPollTimer); supportPollTimer = null;
       };
       window.sendFeedback = async function(){
         var c = meCopy();
         var text = (document.getElementById("feedbackText").value || "").trim();
-        var contact = (document.getElementById("feedbackContact").value || "").trim();
-        if (text.length < 3) { toast(c.tooShort); return; }
+        if (!text && !supportPendingFile) { toast(c.tooShort); return; }
         var btn = document.getElementById("feedbackSendBtn");
         btn.disabled = true;
         btn.textContent = c.sending;
         try {
-          var res = await fetch("/api/feedback", {
+          var imageUrl = null;
+          if (supportPendingFile) {
+            var form = new FormData(); form.append("file", supportPendingFile);
+            var upload = await fetch("/api/support/upload", { method:"POST", body:form });
+            var uploaded = await upload.json().catch(function(){ return {}; });
+            if (!upload.ok || !uploaded.url) throw new Error(uploaded.error || c.failed);
+            imageUrl = uploaded.url;
+          }
+          var res = await fetch("/api/support", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              message: text,
-              contact: contact,
-              address: window.__luminaUserAddress || "",
+              text: text,
+              imageUrl: imageUrl,
+              language: document.getElementById("supportLanguage").value,
               username: window.__luminaUsername || ""
             })
           });
           var data = await res.json().catch(function(){ return null; });
           if (!res.ok || !data || data.ok !== true) throw new Error((data && data.error) || c.failed);
-          if (typeof loadFeedbackReplies === "function") loadFeedbackReplies();
-          closeFeedback();
+          document.getElementById("feedbackText").value = "";
+          clearSupportImage();
+          if (typeof loadFeedbackReplies === "function") loadFeedbackReplies(true);
           toast(c.sent);
         } catch(e) {
           toast(e && e.message ? e.message : c.failed);

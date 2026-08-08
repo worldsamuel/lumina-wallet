@@ -964,6 +964,11 @@
       <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
       交易记录
     </a>
+    <a class="nav-item" data-page="support" onclick="nav(this)">
+      <span class="ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a4 4 0 01-4 4H8l-5 3V7a4 4 0 014-4h10a4 4 0 014 4z"/><path d="M8 9h8M8 13h5"/></svg></span>
+      在线客服
+      <span class="badge" id="supportBadge" style="display:none">0</span>
+    </a>
     
     <div class="nav-group">系统</div>
     <a class="nav-item" data-page="fees" onclick="nav(this)">
@@ -1877,6 +1882,13 @@
         </div>
         <div class="card empty">交易记录模块开发中</div>
       </section>
+
+      <section class="page" id="page-support">
+        <div class="page-head">
+          <div><div class="title">在线客服</div><div class="sub">24小时客服会话</div></div>
+        </div>
+        <div class="card empty">客服会话加载中</div>
+      </section>
       
       <section class="page" id="page-announce">
         <div class="page-head">
@@ -1927,6 +1939,7 @@
     risk: "风控审核",
     users: "用户管理",
     txns: "交易记录",
+    support: "在线客服",
     fees: "手续费设置",
     announce: "公告管理",
     content: "内容页管理",
@@ -1973,6 +1986,9 @@
   .admin-modal h2{font-size:18px;margin-bottom:10px}.admin-modal textarea{min-height:180px;resize:vertical}
   .bridge-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}.bridge-muted{color:var(--text-3);font-size:12px}.bridge-loader{padding:28px;color:var(--text-3);text-align:center}
   .bridge-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.bridge-form-grid .wide{grid-column:1/-1}
+  .support-admin-messages{height:340px;overflow:auto;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:14px 0}
+  .support-admin-msg{width:fit-content;max-width:78%;padding:9px 11px;border-radius:12px;background:#fff;border:1px solid var(--border);margin-bottom:10px;overflow-wrap:anywhere}
+  .support-admin-msg.admin{margin-left:auto;background:#ecfdf3;border-color:#bbf7d0}.support-admin-msg small{display:block;color:var(--text-3);font-size:10px;margin-bottom:4px}.support-admin-msg p{white-space:pre-wrap;margin:0;font-size:13px;line-height:1.45}.support-admin-msg img{display:block;max-width:260px;max-height:240px;object-fit:contain;border-radius:8px;margin:4px 0}
 </style>
 <div class="admin-login-mask" id="adminLoginMask">
   <div class="admin-login-card">
@@ -1990,7 +2006,8 @@
 <div class="admin-modal-mask" id="adminModalMask" onclick="if(event.target===this)LuminaAdmin.closeModal()"><div class="admin-modal" id="adminModalBox"></div></div>
 <script>
 (function(){
-  var state={me:null,dashboard:null,earn:[],tokens:[],fees:[],ann:[],users:[],txns:[],rates:[],config:null,contentKey:"help",content:{},alpha:null,ico:null,security:null};
+  var state={me:null,dashboard:null,earn:[],tokens:[],fees:[],ann:[],users:[],txns:[],rates:[],config:null,contentKey:"help",content:{},alpha:null,ico:null,security:null,support:{conversations:[],agents:[]},activeSupportId:null,supportReplyImage:null};
+  var supportAdminTimer=null;
   function $(s,r){return (r||document).querySelector(s)}
   function $all(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))}
   function html(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]})}
@@ -2000,7 +2017,7 @@
   function money(v){var n=Number(v||0);if(!Number.isFinite(n))return"—";return "$"+n.toLocaleString(undefined,{maximumFractionDigits:n>=1000?0:2})}
   function toast(msg){ if(window.showToast) window.showToast(msg); else alert(msg); }
   function modal(markup){$("#adminModalBox").innerHTML=markup;$("#adminModalMask").classList.add("open")}
-  function closeModal(){$("#adminModalMask").classList.remove("open")}
+  function closeModal(){state.activeSupportId=null;state.supportReplyImage=null;$("#adminModalMask").classList.remove("open")}
   function api(url,opt){
     opt=opt||{};
     var headers=Object.assign({},opt.headers||{});
@@ -2040,6 +2057,7 @@
     replacePage("currency",'<div class="page-head"><div><div class="title">货币与汇率</div><div class="sub">数据库 CurrencyRate 表,用户端本币显示通过 /api/currency-rates 同步</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.syncRates()">从默认行情同步</button><button class="btn primary sm" onclick="LuminaAdmin.saveRates()">保存汇率</button></div></div><div class="table-wrap"><table><thead><tr><th>代码</th><th>名称</th><th>符号</th><th>汇率</th></tr></thead><tbody id="bridgeRateRows"></tbody></table></div>');
     replacePage("users",'<div class="page-head"><div><div class="title">用户管理</div><div class="sub">数据库 User 表</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadUsers()">刷新</button></div></div><div class="table-wrap"><table><thead><tr><th>地址</th><th>World ID</th><th>创建时间</th><th>最后登录</th></tr></thead><tbody id="bridgeUserRows"></tbody></table></div>');
     replacePage("txns",'<div class="page-head"><div><div class="title">交易记录</div><div class="sub">最近登录用户链上活动解析</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadTxns()">刷新</button></div></div><div class="table-wrap"><table><thead><tr><th>类型</th><th>用户</th><th>金额</th><th>哈希</th><th>区块</th><th>状态</th></tr></thead><tbody id="bridgeTxnRows"></tbody></table></div>');
+    replacePage("support",'<div class="page-head"><div><div class="title">在线客服</div><div class="sub">24小时在线会话，可按语言和客服分配处理。</div></div><div class="actions"><button class="btn sm" onclick="LuminaAdmin.loadSupport()">刷新</button></div></div><div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px"><div class="kpi"><div class="k">待回复</div><div class="v" id="supportKpiOpen">0</div></div><div class="kpi"><div class="k">处理中</div><div class="v" id="supportKpiPending">0</div></div><div class="kpi"><div class="k">已解决</div><div class="v" id="supportKpiResolved">0</div></div></div><div class="toolbar"><select class="select" id="supportStatusFilter" onchange="LuminaAdmin.renderSupport()"><option value="">全部状态</option><option value="open">待回复</option><option value="pending">处理中</option><option value="resolved">已解决</option></select><select class="select" id="supportLanguageFilter" onchange="LuminaAdmin.renderSupport()"><option value="">全部语言</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="ja">日本語</option></select><select class="select" id="supportAgentFilter" onchange="LuminaAdmin.renderSupport()"><option value="">全部客服</option></select></div><div class="table-wrap"><table><thead><tr><th>用户</th><th>语言</th><th>最新消息</th><th>分配客服</th><th>状态</th><th>更新时间</th><th style="text-align:right">操作</th></tr></thead><tbody id="supportRows"></tbody></table></div>');
     replacePage("settings",'<div class="page-head"><div><div class="title">系统设置</div><div class="sub">数据库 system_config,用户端启动时同步</div></div><div class="actions"><button class="btn primary sm" onclick="LuminaAdmin.saveConfig()">保存设置</button></div></div><div class="card" style="max-width:760px"><div id="bridgeSettings"></div></div>');
     replacePage("risk",'<div class="page-head"><div><div class="title">风控审核</div><div class="sub">待审核代币来自数据库 Token.status=pending</div></div></div><div class="table-wrap"><table><thead><tr><th>对象</th><th>合约</th><th>风险</th><th style="text-align:right">操作</th></tr></thead><tbody id="bridgeRiskRows"></tbody></table></div>');
   }
@@ -2141,6 +2159,30 @@
   function loadTxns(){return api("/api/admin/txns").then(function(x){state.txns=x;renderTxns();renderDashboardTxns()})}
   function txnHashCell(hash){hash=String(hash||""); if(/^0x[a-fA-F0-9]{16,}$/.test(hash))return '<a href="https://worldscan.org/tx/'+attr(hash)+'" target="_blank" rel="noreferrer">'+html(short(hash))+'</a>'; return html(short(hash)||"—")}
   function renderTxns(){var tb=$("#bridgeTxnRows"); if(!tb)return; tb.innerHTML=state.txns.map(function(t){return '<tr><td><span class="pill '+(t.direction==="in"?"green":"blue")+'">'+html(t.typeT||t.type)+'</span></td><td class="mono">'+html(t.user)+'</td><td>'+html(t.amount)+'</td><td class="mono">'+txnHashCell(t.hash)+'</td><td>'+html(t.time||new Date(t.createdAt).toLocaleString())+'</td><td><span class="pill green">'+html(t.statusT||t.status)+'</span></td></tr>'}).join("")||'<tr><td colspan="6" class="bridge-loader">暂无链上记录</td></tr>'; renderDashboardTxns()}
+  function supportStatusLabel(value){return value==="open"?"待回复":value==="pending"?"处理中":"已解决"}
+  function supportLanguageLabel(value){return ({"zh-CN":"简体中文","zh-TW":"繁體中文",en:"English",fr:"Français",de:"Deutsch",es:"Español",ja:"日本語"})[value]||value||"—"}
+  function supportUnread(row){var read=row.lastAdminReadAt?new Date(row.lastAdminReadAt).getTime():0;return (row.messages||[]).filter(function(m){return m.sender==="user"&&new Date(m.createdAt).getTime()>read}).length}
+  function supportMessagesHtml(row){return (row.messages||[]).map(function(m){return '<div class="support-admin-msg '+(m.sender==="admin"?"admin":"user")+'"><small>'+html(m.sender==="admin"?(m.senderName||"客服"):(row.username||short(row.address)))+' · '+new Date(m.createdAt).toLocaleString()+'</small>'+(m.imageUrl?'<img src="'+attr(m.imageUrl)+'" alt="客服图片">':'')+(m.text?'<p>'+html(m.text)+'</p>':'')+'</div>'}).join("")||'<div class="bridge-loader">暂无消息</div>'}
+  function refreshSupportMessages(){if(!state.activeSupportId)return;var row=(state.support.conversations||[]).find(function(x){return x.id===Number(state.activeSupportId)});var box=$("#supportAdminMessages");if(row&&box){box.innerHTML=supportMessagesHtml(row);box.scrollTop=box.scrollHeight}}
+  function loadSupport(){return api("/api/admin/support").then(function(x){state.support=x||{conversations:[],agents:[]};renderSupport();refreshSupportMessages()})}
+  function renderSupport(){
+    var data=state.support||{};var rows=data.conversations||[];var open=rows.filter(function(x){return x.status==="open"}).length;var pending=rows.filter(function(x){return x.status==="pending"}).length;var resolved=rows.filter(function(x){return x.status==="resolved"}).length;
+    if($("#supportKpiOpen"))$("#supportKpiOpen").textContent=open;if($("#supportKpiPending"))$("#supportKpiPending").textContent=pending;if($("#supportKpiResolved"))$("#supportKpiResolved").textContent=resolved;
+    var badge=$("#supportBadge");if(badge){badge.textContent=open;badge.style.display=open?"inline-flex":"none"}
+    var agentFilter=$("#supportAgentFilter");if(agentFilter){var selected=agentFilter.value;agentFilter.innerHTML='<option value="">全部客服</option><option value="__none__">未分配</option>'+(data.agents||[]).map(function(a){return '<option value="'+attr(a.username)+'">'+html(a.username)+'</option>'}).join("");agentFilter.value=selected}
+    var sf=$("#supportStatusFilter"),lf=$("#supportLanguageFilter"),af=$("#supportAgentFilter");var status=sf?sf.value:"",language=lf?lf.value:"",agent=af?af.value:"";
+    rows=rows.filter(function(row){return (!status||row.status===status)&&(!language||row.language===language)&&(!agent||(agent==="__none__"?!row.assignedTo:row.assignedTo===agent))});
+    var tb=$("#supportRows");if(!tb)return;tb.innerHTML=rows.map(function(row){var messages=row.messages||[];var last=messages[messages.length-1]||{};var unread=supportUnread(row);return '<tr><td><strong>'+html(row.username||short(row.address))+'</strong><div class="mono text-3">'+html(short(row.address))+'</div></td><td>'+html(supportLanguageLabel(row.language))+'</td><td>'+html((last.text|| (last.imageUrl?"[图片]":"—")).slice(0,80))+(unread?'<span class="pill red" style="margin-left:8px">'+unread+' 新</span>':'')+'</td><td>'+html(row.assignedTo||"未分配")+'</td><td><span class="pill '+(row.status==="open"?"red":row.status==="pending"?"amber":"green")+'">'+supportStatusLabel(row.status)+'</span></td><td class="text-3">'+new Date(row.updatedAt).toLocaleString()+'</td><td style="text-align:right"><button class="btn sm primary" onclick="LuminaAdmin.openSupport('+row.id+')">处理</button></td></tr>'}).join("")||'<tr><td colspan="7" class="bridge-loader">暂无客服会话</td></tr>';
+  }
+  function openSupport(id){state.activeSupportId=Number(id);state.supportReplyImage=null;renderSupportConversation(id);api("/api/admin/support/"+id,{method:"PATCH",body:JSON.stringify({markRead:true})}).then(loadSupport).catch(function(e){toast(e.message)})}
+  function renderSupportConversation(id){
+    var row=(state.support.conversations||[]).find(function(x){return x.id===Number(id)});if(!row)return;var agents=state.support.agents||[];var messages=supportMessagesHtml(row);
+    modal('<h2>在线客服 · '+html(row.username||short(row.address))+'</h2><div class="sub mono">'+html(row.address)+'</div><div class="bridge-form-grid"><div><label>语言</label><select class="select" id="supportEditLanguage"><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="en">English</option><option value="fr">Français</option><option value="de">Deutsch</option><option value="es">Español</option><option value="ja">日本語</option></select></div><div><label>分配客服</label><select class="select" id="supportEditAgent"><option value="">未分配</option>'+agents.map(function(a){return '<option value="'+attr(a.username)+'">'+html(a.username)+'</option>'}).join("")+'</select></div><div class="wide"><label>状态</label><select class="select" id="supportEditStatus"><option value="open">待回复</option><option value="pending">处理中</option><option value="resolved">已解决</option></select></div></div><div class="support-admin-messages" id="supportAdminMessages">'+messages+'</div><label>回复消息</label><textarea class="input" id="supportReplyText" maxlength="2000" placeholder="输入回复内容" style="min-height:90px"></textarea><div id="supportReplyPreview" class="bridge-muted" style="margin-top:8px"></div><input type="file" id="supportReplyFile" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="LuminaAdmin.uploadSupportImage(this)"><div class="bridge-actions"><button class="btn" onclick="document.getElementById(\'supportReplyFile\').click()">上传图片</button><button class="btn" onclick="LuminaAdmin.saveSupport('+row.id+')">保存分配</button><button class="btn primary" onclick="LuminaAdmin.sendSupportReply('+row.id+')">发送回复</button></div>');
+    $("#supportEditLanguage").value=row.language||"en";$("#supportEditAgent").value=row.assignedTo||"";$("#supportEditStatus").value=row.status||"open";var box=$("#supportAdminMessages");if(box)box.scrollTop=box.scrollHeight;
+  }
+  function saveSupport(id){return api("/api/admin/support/"+id,{method:"PATCH",body:JSON.stringify({language:$("#supportEditLanguage").value,assignedTo:$("#supportEditAgent").value||null,status:$("#supportEditStatus").value,markRead:true})}).then(function(){toast("客服会话已更新");return loadSupport()}).catch(function(e){toast(e.message)})}
+  function uploadSupportImage(input){var file=input&&input.files&&input.files[0];if(!file)return;if(file.size>1024*1024){toast("图片必须小于1MB");input.value="";return}var form=new FormData();form.append("file",file);form.append("type","support");api("/api/admin/upload",{method:"POST",body:form}).then(function(x){state.supportReplyImage=x.url;var p=$("#supportReplyPreview");if(p)p.textContent="已添加图片："+file.name}).catch(function(e){toast(e.message)})}
+  function sendSupportReply(id){var text=($("#supportReplyText").value||"").trim();if(!text&&!state.supportReplyImage){toast("请输入回复或上传图片");return}api("/api/admin/support/"+id+"/messages",{method:"POST",body:JSON.stringify({text:text,imageUrl:state.supportReplyImage})}).then(function(){state.supportReplyImage=null;if($("#supportReplyText"))$("#supportReplyText").value="";if($("#supportReplyPreview"))$("#supportReplyPreview").textContent="";toast("回复已发送");return loadSupport()}).catch(function(e){toast(e.message)})}
   function loadIco(){return api("/api/admin/ico").then(function(x){state.ico=x;renderIco()})}
   function renderIco(){
     var data=state.ico||{}; var stats=data.stats||{};
@@ -2206,8 +2248,8 @@
   function applyAdminBrand(){var c=state.config||{}; if(c.faviconUrl){var fav=document.querySelector("link[rel='icon']")||document.createElement("link"); fav.rel="icon"; fav.href=c.faviconUrl; if(!fav.parentNode)document.head.appendChild(fav)} if(c.adminLogoUrl){$all(".brand .logo").forEach(function(el){el.innerHTML='<img src="'+attr(c.adminLogoUrl)+'" alt="Lumina" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block">'})}}
   function renderConfig(){var c=state.config||{}; applyAdminBrand(); renderPointsRules(); renderTasks(); var box=$("#bridgeSettings"); if(!box)return; box.innerHTML='<div style="display:grid;gap:16px"><label style="display:flex;align-items:center;justify-content:space-between">维护模式 <button id="cfgMaintenance" class="toggle '+(c.maintenance?"on":"")+'" onclick="this.classList.toggle(\'on\')"></button></label><label style="display:flex;align-items:center;justify-content:space-between">Earn 存款开关 <button id="cfgMorpho" class="toggle '+(c.morphoDepositEnabled?"on":"")+'" onclick="this.classList.toggle(\'on\')"></button></label><div><label>后台/WorldApp Logo URL</label><input class="input" id="cfgLogo" value="'+attr(c.adminLogoUrl||"")+'"></div><div><label>Favicon URL</label><input class="input" id="cfgFavicon" value="'+attr(c.faviconUrl||"")+'"></div><div><label>Swap Network fee 展示文案</label><input class="input" id="cfgSwapNetworkFee" value="'+attr(c.swapNetworkFeeLabel||"")+'" placeholder="~$0.00 或 Network fee: ~$0.02"><div class="bridge-muted" style="margin-top:6px">用户端 Swap 页会显示这里填写的值；只填 ~$0.00 时前端自动加当前语言的 Network fee 标签。</div></div><div class="bridge-muted">保存后后台立即换 Logo/Favicon,WorldApp 端会通过 /api/system-config 自动同步维护模式、Logo 和 Swap Network fee。</div></div>'}
   function saveConfig(){api("/api/admin/system-config",{method:"PATCH",body:JSON.stringify({maintenance:$("#cfgMaintenance").classList.contains("on"),morphoDepositEnabled:$("#cfgMorpho").classList.contains("on"),adminLogoUrl:$("#cfgLogo").value||null,faviconUrl:$("#cfgFavicon").value||null,swapNetworkFeeLabel:$("#cfgSwapNetworkFee").value||null})}).then(function(){toast("系统设置已保存");loadConfig()})}
-  function loadAll(){renderShells();return Promise.all([loadDashboard(),loadEarn(),loadTokens(),loadFees(),loadAnnouncements(),loadContent("help"),loadRates(),loadUsers(),loadTxns(),loadAlpha(),loadIco(),loadSecurity(),loadConfig()].map(function(p){return p.catch(function(e){if(e.status===401)$("#adminLoginMask").classList.add("open");})}))}
-  window.LuminaAdmin={login:login,logout:logout,closeModal:closeModal,openEarn:openEarn,saveEarn:saveEarn,toggleEarn:toggleEarn,deleteEarn:deleteEarn,loadTokens:loadTokens,renderTokens:renderTokens,openToken:openToken,saveToken:saveToken,openBatchTokens:openBatchTokens,saveBatchTokens:saveBatchTokens,patchToken:patchToken,deleteToken:deleteToken,savePointsRules:savePointsRules,addCustomPointRule:addCustomPointRule,editCustomPointRule:editCustomPointRule,saveCustomPointRule:saveCustomPointRule,deleteCustomPointRule:deleteCustomPointRule,openTask:openTask,saveTask:saveTask,deleteTask:deleteTask,saveFees:saveFees,openAnnouncement:openAnnouncement,saveAnnouncement:saveAnnouncement,deleteAnnouncement:deleteAnnouncement,switchContent:switchContent,saveContent:saveContent,syncRates:syncRates,saveRates:saveRates,loadUsers:loadUsers,loadTxns:loadTxns,loadAlpha:loadAlpha,loadIco:loadIco,loadSecurity:loadSecurity,saveConfig:saveConfig,loadAll:loadAll};
+  function loadAll(){renderShells();clearInterval(supportAdminTimer);supportAdminTimer=setInterval(function(){if(state.me)loadSupport().catch(function(){})},8000);return Promise.all([loadDashboard(),loadEarn(),loadTokens(),loadFees(),loadAnnouncements(),loadContent("help"),loadRates(),loadUsers(),loadTxns(),loadSupport(),loadAlpha(),loadIco(),loadSecurity(),loadConfig()].map(function(p){return p.catch(function(e){if(e.status===401)$("#adminLoginMask").classList.add("open");})}))}
+  window.LuminaAdmin={login:login,logout:logout,closeModal:closeModal,openEarn:openEarn,saveEarn:saveEarn,toggleEarn:toggleEarn,deleteEarn:deleteEarn,loadTokens:loadTokens,renderTokens:renderTokens,openToken:openToken,saveToken:saveToken,openBatchTokens:openBatchTokens,saveBatchTokens:saveBatchTokens,patchToken:patchToken,deleteToken:deleteToken,savePointsRules:savePointsRules,addCustomPointRule:addCustomPointRule,editCustomPointRule:editCustomPointRule,saveCustomPointRule:saveCustomPointRule,deleteCustomPointRule:deleteCustomPointRule,openTask:openTask,saveTask:saveTask,deleteTask:deleteTask,saveFees:saveFees,openAnnouncement:openAnnouncement,saveAnnouncement:saveAnnouncement,deleteAnnouncement:deleteAnnouncement,switchContent:switchContent,saveContent:saveContent,syncRates:syncRates,saveRates:saveRates,loadUsers:loadUsers,loadTxns:loadTxns,loadSupport:loadSupport,renderSupport:renderSupport,openSupport:openSupport,saveSupport:saveSupport,uploadSupportImage:uploadSupportImage,sendSupportReply:sendSupportReply,loadAlpha:loadAlpha,loadIco:loadIco,loadSecurity:loadSecurity,saveConfig:saveConfig,loadAll:loadAll};
   document.addEventListener("DOMContentLoaded",function(){renderShells();ensureLoggedIn().then(function(ok){if(ok)loadAll();}); var p=new URLSearchParams(location.search).get("page"); if(p){var navItem=document.querySelector('.nav-item[data-page="'+p+'"]'); if(navItem&&window.nav) nav(navItem);}});
 })();
 </script>
