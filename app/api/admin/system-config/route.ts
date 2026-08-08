@@ -27,6 +27,7 @@ export async function PATCH(req: NextRequest) {
     pointsHomeBanner?: unknown;
     welcomeBox?: unknown;
     ico?: unknown;
+    support?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
     alphaRules?: unknown;
@@ -51,6 +52,7 @@ export async function PATCH(req: NextRequest) {
         : undefined,
     welcomeBox: typeof body.welcomeBox === "object" && body.welcomeBox !== null ? body.welcomeBox : undefined,
     ico: typeof body.ico === "object" && body.ico !== null ? body.ico : undefined,
+    support: typeof body.support === "object" && body.support !== null ? body.support : undefined,
     pointsHomeBanner: typeof body.pointsHomeBanner === "object" && body.pointsHomeBanner !== null ? body.pointsHomeBanner : undefined,
     pointsRules: typeof body.pointsRules === "object" && body.pointsRules !== null ? body.pointsRules : undefined,
     pointsTasks: Array.isArray(body.pointsTasks) ? body.pointsTasks : undefined,

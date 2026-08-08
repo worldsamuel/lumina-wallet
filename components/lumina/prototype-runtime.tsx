@@ -6570,8 +6570,54 @@ function enhancePrototypeMe() {
         if (btn && !btn.disabled) btn.textContent = c.send;
       }
       var supportConversation = null;
+      var supportSettings = null;
       var supportPendingFile = null;
       var supportPollTimer = null;
+      function supportAccess(){
+        var address = String(window.__luminaUserAddress || "").toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(address)) return null;
+        var key = "lumina_support_token_" + address;
+        var token = "";
+        try { token = localStorage.getItem(key) || ""; } catch(e) {}
+        if (!/^[a-zA-Z0-9_-]{32,160}$/.test(token)) {
+          var bytes = new Uint8Array(32);
+          if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+          else for (var i=0;i<bytes.length;i++) bytes[i] = Math.floor(Math.random()*256);
+          token = Array.from(bytes).map(function(value){ return value.toString(16).padStart(2,"0"); }).join("");
+          try { localStorage.setItem(key, token); } catch(e) {}
+        }
+        return { address: address, token: token };
+      }
+      function supportHeaders(json){
+        var access = supportAccess();
+        var headers = json ? {"Content-Type":"application/json"} : {};
+        if (access) { headers["X-Support-Address"] = access.address; headers["X-Support-Token"] = access.token; }
+        return headers;
+      }
+      function supportUiCopy(){
+        var all = {
+          en:{start:"Start a conversation with Lumina Support.",online:"Online",offline:"Offline",reply:"Usually replies within {n} min",connect:"Connect World App to contact support."},
+          "zh-CN":{start:"发送消息，开始与 Lumina 客服沟通。",online:"在线",offline:"离线",reply:"通常在 {n} 分钟内回复",connect:"请先连接 World App，再联系客服。"},
+          "zh-TW":{start:"傳送訊息，開始與 Lumina 客服溝通。",online:"在線",offline:"離線",reply:"通常在 {n} 分鐘內回覆",connect:"請先連接 World App，再聯絡客服。"},
+          fr:{start:"Envoyez un message pour démarrer la conversation.",online:"En ligne",offline:"Hors ligne",reply:"Répond généralement sous {n} min",connect:"Connectez World App pour contacter l’assistance."},
+          de:{start:"Senden Sie eine Nachricht, um den Chat zu starten.",online:"Online",offline:"Offline",reply:"Antwortet normalerweise in {n} Min.",connect:"Verbinden Sie World App, um den Support zu kontaktieren."},
+          es:{start:"Envía un mensaje para iniciar la conversación.",online:"En línea",offline:"Fuera de línea",reply:"Suele responder en {n} min",connect:"Conecta World App para contactar con soporte."},
+          ja:{start:"メッセージを送信してチャットを開始してください。",online:"オンライン",offline:"オフライン",reply:"通常 {n} 分以内に返信",connect:"サポートに連絡するには World App を接続してください。"}
+        };
+        return all[window.currentLang] || all.en;
+      }
+      function renderSupportSettings(){
+        var settings = supportSettings || {};
+        var ui = supportUiCopy();
+        var title = document.getElementById("supportDisplayName");
+        var logo = document.getElementById("supportLogo");
+        var online = document.getElementById("supportOnlineState");
+        var response = document.getElementById("supportResponseTime");
+        if (title) title.textContent = settings.displayName || meCopy().feedbackTitle;
+        if (logo) { logo.src = settings.logoUrl || "/points/lumina-points-icon.png"; logo.style.display = "block"; }
+        if (online) { online.classList.toggle("offline", settings.online === false); online.innerHTML = '<i></i>' + (settings.online === false ? ui.offline : ui.online); }
+        if (response) response.textContent = ui.reply.replace("{n}", String(settings.responseTimeMinutes || 5));
+      }
       function updateFeedbackUnread(conversation){
         var dot = document.getElementById("feedbackUnreadDot");
         if (!dot) return;
@@ -6590,7 +6636,7 @@ function enhancePrototypeMe() {
         modal.id = "feedbackModal";
         modal.onclick = function(event){ if(event.target === modal) closeFeedback(); };
         modal.innerHTML =
-          '<div class="modal feedback-sheet support-sheet"><div class="modal-grip"></div><div class="support-head"><div><h3></h3><p class="feedback-hint"></p></div><span class="support-online"><i></i>24/7</span></div>' +
+          '<div class="modal feedback-sheet support-sheet"><div class="modal-grip"></div><div class="support-head"><div class="support-agent"><img id="supportLogo" alt="" /><div><h3 id="supportDisplayName"></h3><p class="feedback-hint"></p><p id="supportResponseTime" class="support-response-time"></p></div></div><span id="supportOnlineState" class="support-online"><i></i>Online</span></div>' +
           '<label class="support-language-label"><span>Language</span><select id="supportLanguage"></select></label>' +
           '<div id="feedbackReplies" class="support-messages"><div class="support-empty">Start a conversation with Lumina Support.</div></div>' +
           '<div id="supportImagePreview" class="support-image-preview"></div>' +
@@ -6602,17 +6648,21 @@ function enhancePrototypeMe() {
         var select = document.getElementById("supportLanguage");
         select.innerHTML = supportLanguages().map(function(item){ return '<option value="'+item.code+'">'+item.name+'</option>'; }).join("");
         select.value = window.currentLang || "en";
-        select.onchange = function(){ fetch("/api/support",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({language:select.value})}).catch(function(){}); };
+        select.onchange = function(){ fetch("/api/support",{method:"PATCH",headers:supportHeaders(true),body:JSON.stringify({language:select.value})}).catch(function(){}); };
         updateFeedbackCopy();
+        renderSupportSettings();
       }
       window.loadFeedbackReplies = async function(markRead){
         var box = document.getElementById("feedbackReplies");
         if (!box) return;
         try {
-          var res = await fetch("/api/support", { cache: "no-store" });
+          if (!supportAccess()) throw new Error(supportUiCopy().connect);
+          var res = await fetch("/api/support", { cache: "no-store", headers:supportHeaders(false) });
           var data = await res.json().catch(function(){ return {}; });
           if (!res.ok) throw new Error(data.error || "Unable to load support.");
           supportConversation = data.conversation || null;
+          supportSettings = data.settings || supportSettings;
+          renderSupportSettings();
           updateFeedbackUnread(supportConversation);
           var messages = supportConversation && Array.isArray(supportConversation.messages) ? supportConversation.messages : [];
           box.innerHTML = messages.length ? messages.map(function(item){
@@ -6620,10 +6670,10 @@ function enhancePrototypeMe() {
             var text = item.text ? '<p>'+escapeHtml(item.text)+'</p>' : '';
             var name = item.sender === "admin" ? (item.senderName || "Lumina Support") : "You";
             return '<div class="support-message '+(item.sender === "admin" ? "admin" : "user")+'"><small>'+escapeHtml(name)+' · '+new Date(item.createdAt).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})+'</small>'+image+text+'</div>';
-          }).join('') : '<div class="support-empty">Start a conversation with Lumina Support.</div>';
+          }).join('') : '<div class="support-empty">'+escapeHtml(supportUiCopy().start)+'</div>';
           box.scrollTop = box.scrollHeight;
           if (markRead && supportConversation) {
-            await fetch("/api/support",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({markRead:true})});
+            await fetch("/api/support",{method:"PATCH",headers:supportHeaders(true),body:JSON.stringify({markRead:true})});
             supportConversation.lastUserReadAt = new Date().toISOString();
             updateFeedbackUnread(supportConversation);
           }
@@ -6669,14 +6719,14 @@ function enhancePrototypeMe() {
           var imageUrl = null;
           if (supportPendingFile) {
             var form = new FormData(); form.append("file", supportPendingFile);
-            var upload = await fetch("/api/support/upload", { method:"POST", body:form });
+            var upload = await fetch("/api/support/upload", { method:"POST", headers:supportHeaders(false), body:form });
             var uploaded = await upload.json().catch(function(){ return {}; });
             if (!upload.ok || !uploaded.url) throw new Error(uploaded.error || c.failed);
             imageUrl = uploaded.url;
           }
           var res = await fetch("/api/support", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: supportHeaders(true),
             body: JSON.stringify({
               text: text,
               imageUrl: imageUrl,

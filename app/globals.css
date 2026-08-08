@@ -1235,9 +1235,15 @@
   .feedback-sheet button:disabled { background: var(--surface-3); color: var(--text-mute); }
   .support-sheet { height: min(720px, calc(100dvh - 86px)); display: flex; flex-direction: column; overflow: hidden; }
   .support-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .support-agent { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  .support-agent > img { display: none; width: 42px; height: 42px; flex: 0 0 42px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface-2); object-fit: cover; }
+  .support-agent h3 { margin-top: 4px; overflow-wrap: anywhere; }
   .support-head .feedback-hint { margin-bottom: 10px; }
+  .support-response-time { margin: -5px 0 9px; color: var(--text-mute); font-size: 11px; }
   .support-online { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; margin-top: 9px; padding: 7px 10px; border: 1px solid rgba(74,222,128,.25); border-radius: 999px; color: var(--green); font-size: 12px; font-weight: 800; }
   .support-online i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(74,222,128,.12); }
+  .support-online.offline { color: var(--text-mute); border-color: var(--line); }
+  .support-online.offline i { background: var(--text-mute); box-shadow: none; }
   .support-language-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-dim); font-size: 12px; }
   .support-language-label select { width: auto; min-width: 148px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); color: var(--text); padding: 8px 28px 8px 10px; font-size: 12px; }
   .support-messages { flex: 1; min-height: 220px; margin: 12px -4px 0; padding: 12px 4px; overflow-y: auto; border-top: 1px solid var(--line); }

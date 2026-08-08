@@ -41,6 +41,15 @@ export type SystemConfig = {
     headlineI18n: Record<string, string>;
     subtitleI18n: Record<string, string>;
   };
+  support: {
+    enabled: boolean;
+    online: boolean;
+    displayName: string;
+    logoUrl: string | null;
+    responseTimeMinutes: number;
+    autoReplyEnabled: boolean;
+    autoReplies: Record<string, string>;
+  };
   pointsRules: PointsRulesConfig;
   pointsTasks: PointsTaskConfig[];
   alphaRules: AlphaRulesConfig;
@@ -96,10 +105,11 @@ export type SocialLinkConfig = {
   logoUrl: string | null;
 };
 
-type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "ico" | "pointsHomeBanner" | "pointsRules" | "pointsTasks" | "alphaRules">> & {
+type SystemConfigPatch = Partial<Omit<SystemConfig, "socialLinks" | "welcomeBox" | "ico" | "support" | "pointsHomeBanner" | "pointsRules" | "pointsTasks" | "alphaRules">> & {
   socialLinks?: unknown;
   welcomeBox?: unknown;
   ico?: unknown;
+  support?: unknown;
   pointsHomeBanner?: unknown;
   pointsRules?: unknown;
   pointsTasks?: unknown;
@@ -148,6 +158,23 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
     subtitleI18n: {
       en: "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.",
       "zh-CN": "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。",
+    },
+  },
+  support: {
+    enabled: true,
+    online: true,
+    displayName: "Lumina Support",
+    logoUrl: null,
+    responseTimeMinutes: 5,
+    autoReplyEnabled: true,
+    autoReplies: {
+      en: "Thanks for contacting Lumina Support. We received your message and will reply shortly.",
+      "zh-CN": "感谢联系 Lumina 客服。我们已收到您的消息，将尽快回复。",
+      "zh-TW": "感謝聯絡 Lumina 客服。我們已收到您的訊息，將儘快回覆。",
+      fr: "Merci d'avoir contacté l'assistance Lumina. Nous avons reçu votre message et vous répondrons rapidement.",
+      de: "Vielen Dank für Ihre Nachricht an den Lumina-Support. Wir antworten Ihnen in Kürze.",
+      es: "Gracias por contactar con el soporte de Lumina. Recibimos tu mensaje y responderemos pronto.",
+      ja: "Lumina サポートへのお問い合わせありがとうございます。メッセージを受信しました。まもなく返信いたします。",
     },
   },
   pointsRules: {
@@ -299,10 +326,29 @@ function normalizeSystemConfig(value: unknown): SystemConfig {
     pointsHomeBanner: normalizePointsHomeBanner(source.pointsHomeBanner),
     welcomeBox: normalizeWelcomeBox(source.welcomeBox),
     ico: normalizeIco(source.ico),
+    support: normalizeSupport(source.support),
     pointsRules: normalizePointsRules(source.pointsRules),
     pointsTasks: normalizePointsTasks(source.pointsTasks),
     alphaRules: normalizeAlphaRules(source.alphaRules),
     socialLinks: normalizeSocialLinks(source.socialLinks),
+  };
+}
+
+function normalizeSupport(value: unknown): SystemConfig["support"] {
+  const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["support"]> : {};
+  const fallback = DEFAULT_SYSTEM_CONFIG.support;
+  const replies = cleanI18n(source.autoReplies, fallback.autoReplies.en);
+  Object.entries(fallback.autoReplies).forEach(([language, text]) => {
+    if (!replies[language]) replies[language] = text;
+  });
+  return {
+    enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
+    online: typeof source.online === "boolean" ? source.online : fallback.online,
+    displayName: String(source.displayName || fallback.displayName).trim().slice(0, 80) || fallback.displayName,
+    logoUrl: cleanImageUrl(source.logoUrl),
+    responseTimeMinutes: Math.max(1, Math.min(1440, Math.floor(Number(source.responseTimeMinutes ?? fallback.responseTimeMinutes)))),
+    autoReplyEnabled: typeof source.autoReplyEnabled === "boolean" ? source.autoReplyEnabled : fallback.autoReplyEnabled,
+    autoReplies: replies,
   };
 }
 
@@ -556,6 +602,14 @@ function cleanUrl(value: unknown) {
   return null;
 }
 
+function cleanImageUrl(value: unknown) {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (/^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(trimmed)) return trimmed.slice(0, 2_800_000);
+  return cleanUrl(trimmed);
+}
+
 function cleanTaskUrl(value: unknown) {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -581,6 +635,7 @@ function mergeSystemConfigPatch(
     socialLinks?: unknown;
     welcomeBox?: unknown;
     ico?: unknown;
+    support?: unknown;
     pointsHomeBanner?: unknown;
     pointsRules?: unknown;
     pointsTasks?: unknown;
@@ -594,6 +649,10 @@ function mergeSystemConfigPatch(
 
   if (isRecord(cleaned.ico)) {
     next.ico = { ...current.ico, ...cleanUndefinedFields(cleaned.ico) };
+  }
+
+  if (isRecord(cleaned.support)) {
+    next.support = { ...current.support, ...cleanUndefinedFields(cleaned.support) };
   }
 
   if (isRecord(cleaned.pointsHomeBanner)) {

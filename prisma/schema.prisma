@@ -93,6 +93,7 @@ model Feedback {
 model SupportConversation {
   id              Int              @id @default(autoincrement())
   address         String
+  accessTokenHash String?
   username        String?
   language        String           @default("en")
   status          String           @default("open")
@@ -104,6 +105,7 @@ model SupportConversation {
   messages        SupportMessage[]
 
   @@index([address, updatedAt])
+  @@index([address, accessTokenHash])
   @@index([status, updatedAt])
   @@index([assignedTo, updatedAt])
 }

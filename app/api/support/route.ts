@@ -1,41 +1,41 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getSessionFromRequest } from "@/lib/auth/session";
+import { getSystemConfig } from "@/lib/admin/system-config";
 import { db } from "@/lib/db";
+import { supportConversationWhere, supportIdentity } from "@/lib/support/auth";
 import { cleanSupportText, supportLanguage, validSupportImage } from "@/lib/support/validation";
 
 export function OPTIONS() {
   return optionsResponse();
 }
 
-function addressFrom(req: NextRequest) {
-  return getSessionFromRequest(req)?.address.toLowerCase() || null;
-}
-
-async function latestConversation(address: string) {
-  return db.supportConversation.findFirst({
-    where: { address },
+async function latestConversation(req: NextRequest) {
+  const identity = supportIdentity(req);
+  if (!identity) return { identity: null, conversation: null };
+  const conversation = await db.supportConversation.findFirst({
+    where: supportConversationWhere(identity),
     orderBy: { updatedAt: "desc" },
     include: { messages: { orderBy: { createdAt: "asc" }, take: 200 } },
   });
+  return { identity, conversation };
 }
 
 export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:support:get", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
-  const address = addressFrom(req);
-  if (!address) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
-  return jsonResponse({ conversation: await latestConversation(address) });
+  const [{ identity, conversation }, config] = await Promise.all([latestConversation(req), getSystemConfig()]);
+  if (!identity) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  return jsonResponse({ conversation, settings: config.support });
 }
 
 export async function POST(req: NextRequest) {
   if (!rateLimit(req, "public:support:post", 30).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
-  const address = addressFrom(req);
-  if (!address) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  const identity = supportIdentity(req);
+  if (!identity) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
 
   const body = (await req.json().catch(() => null)) as {
     text?: string;
@@ -50,15 +50,36 @@ export async function POST(req: NextRequest) {
 
   const language = supportLanguage(body?.language);
   const username = cleanSupportText(body?.username, 80) || null;
+  const where = supportConversationWhere(identity);
   let conversation = await db.supportConversation.findFirst({
-    where: { address, status: { not: "resolved" } },
+    where: { ...where, status: { not: "resolved" } },
     orderBy: { updatedAt: "desc" },
   });
+  let created = false;
   if (!conversation) {
-    conversation = await db.supportConversation.create({ data: { address, username, language } });
+    if (!identity.sessionAuthenticated) {
+      const claimed = await db.supportConversation.findFirst({
+        where: { address: identity.address, status: { not: "resolved" } },
+        select: { id: true },
+      });
+      if (claimed) return jsonResponse({ error: "Support session is already linked on another device." }, { status: 409 });
+    }
+    conversation = await db.supportConversation.create({
+      data: {
+        address: identity.address,
+        accessTokenHash: identity.accessTokenHash,
+        username,
+        language,
+      },
+    });
+    created = true;
   }
 
-  await db.$transaction([
+  const config = await getSystemConfig();
+  const autoReply = config.support.autoReplyEnabled
+    ? config.support.autoReplies[language] || config.support.autoReplies.en
+    : "";
+  const operations = [
     db.supportMessage.create({
       data: { conversationId: conversation.id, sender: "user", senderName: username, text: text || null, imageUrl },
     }),
@@ -66,15 +87,33 @@ export async function POST(req: NextRequest) {
       where: { id: conversation.id },
       data: { username, language, status: "open", updatedAt: new Date() },
     }),
-  ]);
-  return jsonResponse({ ok: true, conversation: await latestConversation(address) });
+  ];
+  if (created && autoReply) {
+    operations.push(db.supportMessage.create({
+      data: {
+        conversationId: conversation.id,
+        sender: "admin",
+        senderName: config.support.displayName,
+        text: autoReply,
+      },
+    }) as typeof operations[number]);
+  }
+  await db.$transaction(operations);
+  const current = await db.supportConversation.findUnique({
+    where: { id: conversation.id },
+    include: { messages: { orderBy: { createdAt: "asc" }, take: 200 } },
+  });
+  return jsonResponse({ ok: true, conversation: current, settings: config.support });
 }
 
 export async function PATCH(req: NextRequest) {
-  const address = addressFrom(req);
-  if (!address) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  const identity = supportIdentity(req);
+  if (!identity) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
   const body = (await req.json().catch(() => null)) as { markRead?: boolean; language?: string } | null;
-  const conversation = await db.supportConversation.findFirst({ where: { address }, orderBy: { updatedAt: "desc" } });
+  const conversation = await db.supportConversation.findFirst({
+    where: supportConversationWhere(identity),
+    orderBy: { updatedAt: "desc" },
+  });
   if (!conversation) return jsonResponse({ ok: true });
   await db.supportConversation.update({
     where: { id: conversation.id },

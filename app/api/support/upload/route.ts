@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getSessionFromRequest } from "@/lib/auth/session";
+import { supportIdentity } from "@/lib/support/auth";
 
 const TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 
@@ -10,7 +10,7 @@ export function OPTIONS() {
 }
 
 export async function POST(req: NextRequest) {
-  if (!getSessionFromRequest(req)) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
+  if (!supportIdentity(req)) return jsonResponse({ error: "Unauthorized." }, { status: 401 });
   if (!rateLimit(req, "public:support:upload", 10).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429 });
   }
