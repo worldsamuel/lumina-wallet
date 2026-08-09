@@ -6277,6 +6277,15 @@ function enhancePrototypeMe() {
         var toggle = document.getElementById("luminaNotificationToggle");
         if (toggle) toggle.classList.toggle("on", !!granted);
       }
+      async function persistNotificationPermission(granted){
+        try {
+          await fetch("/api/notifications/permission", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ enabled: !!granted })
+          });
+        } catch(e) {}
+      }
       window.__luminaSyncNotificationPermission = async function(){
         try {
           if (!MiniKit.isInstalled()) {
@@ -6288,9 +6297,11 @@ function enhancePrototypeMe() {
           var permissions = payload.permissions || {};
           var granted = notificationPermissionGranted(permissions.notifications);
           updateNotificationToggle(granted);
+          await persistNotificationPermission(granted);
           return granted;
         } catch(e) {
           updateNotificationToggle(false);
+          await persistNotificationPermission(false);
           return false;
         }
       };
@@ -6318,6 +6329,8 @@ function enhancePrototypeMe() {
             }
             throw new Error(code);
           }
+          var verified = await window.__luminaSyncNotificationPermission();
+          if (!verified) throw new Error("Notification permission was not granted.");
           updateNotificationToggle(true);
           toast("Notifications enabled", "success");
           return true;

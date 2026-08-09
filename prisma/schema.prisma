@@ -7,14 +7,17 @@ datasource db {
 }
 
 model User {
-  id          String    @id @default(cuid())
-  worldId     String?   @unique
-  address     String    @unique
-  createdAt   DateTime  @default(now())
-  lastLoginAt DateTime?
+  id                     String    @id @default(cuid())
+  worldId                String?   @unique
+  address                String    @unique
+  notificationsEnabled   Boolean   @default(false)
+  notificationsUpdatedAt DateTime?
+  createdAt              DateTime  @default(now())
+  lastLoginAt            DateTime?
 
   @@index([createdAt])
   @@index([lastLoginAt])
+  @@index([notificationsEnabled, notificationsUpdatedAt])
 }
 
 model Token {
