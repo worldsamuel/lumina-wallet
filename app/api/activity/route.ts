@@ -2,7 +2,12 @@ import { NextRequest } from "next/server";
 import { formatUnits, isAddress, parseAbi, parseAbiItem, type Address } from "viem";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getStoredActivitiesForAddress, recordActivity } from "@/lib/admin/activity-store";
+import {
+  getActivitySnapshot,
+  getStoredActivitiesForAddress,
+  recordActivity,
+  saveActivitySnapshot,
+} from "@/lib/admin/activity-store";
 import { publicClient } from "@/lib/chain";
 import { ERC20_TOKENS } from "@/lib/tokens";
 import { VERIFIED_SWAP_TOKENS } from "@/lib/swap/tokens";
@@ -101,15 +106,23 @@ async function getIndexedActivity(address: Address) {
   const pending = activitySyncPending.get(key);
   if (pending) return pending;
 
-  const request = publicClient
-    .getBlockNumber()
-    .then((latest) => fetchAlchemyAssetTransfers(address, latest))
-    .then((rows) => {
-      const deduped = dedupeTransferRows(rows);
-      activitySyncCache.set(key, { rows: deduped, expiresAt: Date.now() + ACTIVITY_SYNC_TTL_MS });
-      return deduped;
-    })
-    .finally(() => activitySyncPending.delete(key));
+  const request = (async () => {
+    const shared = await getActivitySnapshot<ActivityTransferRow[]>(key, ACTIVITY_SYNC_TTL_MS).catch(() => null);
+    if (shared) {
+      activitySyncCache.set(key, {
+        rows: shared.data,
+        expiresAt: shared.updatedAt.getTime() + ACTIVITY_SYNC_TTL_MS,
+      });
+      return shared.data;
+    }
+
+    const latest = await publicClient.getBlockNumber();
+    const rows = await fetchAlchemyAssetTransfers(address, latest);
+    const deduped = dedupeTransferRows(rows);
+    activitySyncCache.set(key, { rows: deduped, expiresAt: Date.now() + ACTIVITY_SYNC_TTL_MS });
+    await saveActivitySnapshot(key, deduped).catch(() => console.warn("[activity] snapshot cache unavailable"));
+    return deduped;
+  })().finally(() => activitySyncPending.delete(key));
   activitySyncPending.set(key, request);
   return request;
 }

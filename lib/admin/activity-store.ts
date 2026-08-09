@@ -20,6 +20,11 @@ type ActivityDbRow = {
   createdAt: Date;
 };
 
+type ActivitySnapshotRow = {
+  data: unknown;
+  updatedAt: Date;
+};
+
 let ensured: Promise<void> | null = null;
 
 export function ensureActivityLogTable() {
@@ -44,9 +49,43 @@ export function ensureActivityLogTable() {
         CREATE INDEX IF NOT EXISTS "ActivityLog_createdAt_idx"
         ON "ActivityLog" ("createdAt" DESC)
       `),
+      db.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "ActivitySnapshot" (
+          "address" TEXT PRIMARY KEY,
+          "data" JSONB NOT NULL,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+      `),
     ]))
     .then(() => undefined);
   return ensured;
+}
+
+export async function getActivitySnapshot<T>(address: string, maxAgeMs: number) {
+  await ensureActivityLogTable();
+  const lower = address.toLowerCase();
+  const cutoff = new Date(Date.now() - maxAgeMs);
+  const rows = await db.$queryRaw<ActivitySnapshotRow[]>`
+    SELECT "data", "updatedAt"
+    FROM "ActivitySnapshot"
+    WHERE "address" = ${lower} AND "updatedAt" >= ${cutoff}
+    LIMIT 1
+  `;
+  const row = rows[0];
+  return row ? { data: row.data as T, updatedAt: row.updatedAt } : null;
+}
+
+export async function saveActivitySnapshot(address: string, data: unknown) {
+  await ensureActivityLogTable();
+  const lower = address.toLowerCase();
+  const json = JSON.stringify(data);
+  await db.$executeRaw`
+    INSERT INTO "ActivitySnapshot" ("address", "data", "updatedAt")
+    VALUES (${lower}, ${json}::jsonb, CURRENT_TIMESTAMP)
+    ON CONFLICT ("address") DO UPDATE SET
+      "data" = EXCLUDED."data",
+      "updatedAt" = CURRENT_TIMESTAMP
+  `;
 }
 
 export async function recordActivity(input: ActivityInput) {
