@@ -55,8 +55,7 @@ type BalanceTokenConfig = {
   aliasOf?: string;
 };
 
-const WORLD_CHAIN_ALCHEMY_RPC =
-  process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
+const WORLD_CHAIN_ALCHEMY_RPC = resolveAlchemyRpcUrl();
 const ALCHEMY_BALANCE_TIMEOUT_MS = 3_500;
 const ALCHEMY_METADATA_TIMEOUT_MS = 2_500;
 const BALANCE_TOKEN_CONFIG_TTL_MS = 300_000;
@@ -74,6 +73,14 @@ const LEGACY_BALANCE_TOKENS: BalanceTokenConfig[] = [
     aliasOf: "ORB",
   },
 ];
+
+function resolveAlchemyRpcUrl() {
+  const dedicated = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL;
+  const generic = process.env.WORLD_CHAIN_RPC_URL;
+  if (dedicated) return dedicated;
+  if (generic && /(?:^|\.)alchemy\.com(?:\/|$)/i.test(generic)) return generic;
+  return "https://worldchain-mainnet.g.alchemy.com/public";
+}
 
 function toBalance(token: BalanceTokenConfig | (typeof TOKENS)[number], balance: bigint): ChainBalance {
   const formatted = formatUnits(balance, token.decimals);

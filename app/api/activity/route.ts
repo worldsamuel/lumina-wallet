@@ -16,7 +16,7 @@ const activityLogChunkBlocks = 200_000n;
 const priorityActivityLookbackBlocks = 150_000n;
 const universalActivityLookbackBlocks = 80_000n;
 const universalActivityLogChunkBlocks = 10_000n;
-const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
+const worldChainAlchemyRpc = resolveAlchemyRpcUrl();
 const ACTIVITY_CHAIN_TIMEOUT_MS = 2_200;
 const ACTIVITY_INDEXER_TIMEOUT_MS = 1_800;
 const ACTIVITY_SYNC_TTL_MS = 60_000;
@@ -70,6 +70,14 @@ type AlchemyAssetTransfer = {
     blockTimestamp?: string;
   };
 };
+
+function resolveAlchemyRpcUrl() {
+  const dedicated = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL;
+  const generic = process.env.WORLD_CHAIN_RPC_URL;
+  if (dedicated) return dedicated;
+  if (generic && /(?:^|\.)alchemy\.com(?:\/|$)/i.test(generic)) return generic;
+  return "https://worldchain-mainnet.g.alchemy.com/public";
+}
 
 export function OPTIONS() {
   return optionsResponse();
