@@ -25,7 +25,7 @@ type BalancesResponse = {
 };
 
 const fetcher = async <T,>(url: string) => {
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url);
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(body?.error ?? "Unable to read on-chain data.");
@@ -40,16 +40,16 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   const balances = useSWR<BalancesResponse>(
     enabled && userAddress ? `/api/balances?address=${userAddress}` : null,
     fetcher,
-    { dedupingInterval: 1_000, refreshInterval: 5_000, revalidateOnFocus: true, refreshWhenHidden: false },
+    { dedupingInterval: 30_000, refreshInterval: 30_000, revalidateOnFocus: true, refreshWhenHidden: false },
   );
   const market = useSWR<MarketPricesResponse>(enabled ? "/api/prices/market" : null, fetcher, {
-    dedupingInterval: 5_000,
-    refreshInterval: 5_000,
+    dedupingInterval: 15_000,
+    refreshInterval: 15_000,
     revalidateOnFocus: true,
   });
   const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
-    dedupingInterval: 5_000,
-    refreshInterval: 5_000,
+    dedupingInterval: 15_000,
+    refreshInterval: 15_000,
     revalidateOnFocus: true,
   });
 

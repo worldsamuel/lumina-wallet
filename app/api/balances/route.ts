@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAddress, type Address } from "viem";
+import { rateLimit } from "@/lib/api/rate-limit";
 import { fetchBalances } from "@/lib/balances";
 
-const CACHE_TTL_MS = 1_000;
+const CACHE_TTL_MS = 30_000;
 const STALE_CACHE_TTL_MS = 10 * 60_000;
 
 type CachedBalances = {
@@ -12,13 +13,17 @@ type CachedBalances = {
 };
 
 const balanceCache = new Map<string, CachedBalances>();
+const pendingBalanceReads = new Map<string, Promise<CachedBalances["data"]>>();
 
 const BALANCE_CACHE_HEADERS = {
-  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+  "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
   "CDN-Cache-Control": "no-store",
   "Vercel-CDN-Cache-Control": "no-store",
 };
-const FRESH_BALANCE_HEADERS = BALANCE_CACHE_HEADERS;
+const FRESH_BALANCE_HEADERS = {
+  ...BALANCE_CACHE_HEADERS,
+  "Cache-Control": "private, no-store, max-age=0, must-revalidate",
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -34,6 +39,9 @@ function serializeBalances(balances: Awaited<ReturnType<typeof fetchBalances>>) 
  * Returns World Chain balances for a wallet address.
  */
 export async function GET(request: NextRequest) {
+  if (!rateLimit(request, "public:balances", 120).ok) {
+    return NextResponse.json({ error: "Too many requests." }, { status: 429, headers: FRESH_BALANCE_HEADERS });
+  }
   const address = request.nextUrl.searchParams.get("address");
   const refresh = request.nextUrl.searchParams.get("refresh") === "1";
 
@@ -48,7 +56,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = serializeBalances(await fetchBalances(address as Address));
+    const data = refresh
+      ? await readFreshBalances(cacheKey, address as Address)
+      : await readBalancesOnce(cacheKey, address as Address);
     balanceCache.set(cacheKey, {
       data,
       expiresAt: Date.now() + CACHE_TTL_MS,
@@ -73,4 +83,19 @@ export async function GET(request: NextRequest) {
       { status: 502, headers: BALANCE_CACHE_HEADERS },
     );
   }
+}
+
+async function readFreshBalances(cacheKey: string, address: Address) {
+  pendingBalanceReads.delete(cacheKey);
+  return serializeBalances(await fetchBalances(address));
+}
+
+async function readBalancesOnce(cacheKey: string, address: Address) {
+  const pending = pendingBalanceReads.get(cacheKey);
+  if (pending) return pending;
+  const next = fetchBalances(address)
+    .then(serializeBalances)
+    .finally(() => pendingBalanceReads.delete(cacheKey));
+  pendingBalanceReads.set(cacheKey, next);
+  return next;
 }

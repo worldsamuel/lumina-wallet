@@ -23,8 +23,7 @@ type ActivityDbRow = {
 let ensured: Promise<void> | null = null;
 
 export function ensureActivityLogTable() {
-  ensured ??= db
-    .$executeRawUnsafe(`
+  ensured ??= db.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "ActivityLog" (
         "id" SERIAL PRIMARY KEY,
         "type" TEXT NOT NULL,
@@ -36,6 +35,16 @@ export function ensureActivityLogTable() {
         "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
       )
     `)
+    .then(() => Promise.all([
+      db.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "ActivityLog_address_createdAt_idx"
+        ON "ActivityLog" (LOWER(COALESCE("address", '')), "createdAt" DESC)
+      `),
+      db.$executeRawUnsafe(`
+        CREATE INDEX IF NOT EXISTS "ActivityLog_createdAt_idx"
+        ON "ActivityLog" ("createdAt" DESC)
+      `),
+    ]))
     .then(() => undefined);
   return ensured;
 }

@@ -12,6 +12,9 @@ model User {
   address     String    @unique
   createdAt   DateTime  @default(now())
   lastLoginAt DateTime?
+
+  @@index([createdAt])
+  @@index([lastLoginAt])
 }
 
 model Token {
@@ -28,6 +31,10 @@ model Token {
   canSwap      Boolean  @default(true)
   onTopRanking Boolean  @default(false)
   createdAt    DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([canSwap, status])
+  @@index([onTopRanking, status])
 }
 
 model Announcement {
@@ -36,6 +43,8 @@ model Announcement {
   titleI18n   Json
   bodyI18n    Json
   publishedAt DateTime @default(now())
+
+  @@index([publishedAt])
 }
 
 model ContentPage {
@@ -75,6 +84,8 @@ model AuditLog {
   target    String?
   payload   Json?
   createdAt DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model Feedback {
@@ -88,6 +99,8 @@ model Feedback {
   repliedAt DateTime?
   repliedBy String?
   createdAt DateTime  @default(now())
+
+  @@index([status, createdAt])
 }
 
 model SupportConversation {

@@ -19,6 +19,9 @@ const universalActivityLogChunkBlocks = 10_000n;
 const worldChainAlchemyRpc = process.env.WORLD_CHAIN_ALCHEMY_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/public";
 const ACTIVITY_CHAIN_TIMEOUT_MS = 2_200;
 const ACTIVITY_INDEXER_TIMEOUT_MS = 1_800;
+const ACTIVITY_SYNC_TTL_MS = 60_000;
+const activitySyncCache = new Map<string, { expiresAt: number; rows: ActivityTransferRow[] }>();
+const activitySyncPending = new Map<string, Promise<ActivityTransferRow[]>>();
 const activityTokenAddresses = Array.from(
   new Set(
     [
@@ -77,9 +80,30 @@ function activityResponse(data: unknown, init?: ResponseInit) {
     ...init,
     headers: {
       ...(init?.headers ?? {}),
-      "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+      "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
     },
   });
+}
+
+async function getIndexedActivity(address: Address) {
+  const key = address.toLowerCase();
+  const cached = activitySyncCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.rows;
+
+  const pending = activitySyncPending.get(key);
+  if (pending) return pending;
+
+  const request = publicClient
+    .getBlockNumber()
+    .then((latest) => fetchAlchemyAssetTransfers(address, latest))
+    .then((rows) => {
+      const deduped = dedupeTransferRows(rows);
+      activitySyncCache.set(key, { rows: deduped, expiresAt: Date.now() + ACTIVITY_SYNC_TTL_MS });
+      return deduped;
+    })
+    .finally(() => activitySyncPending.delete(key));
+  activitySyncPending.set(key, request);
+  return request;
 }
 
 function shortAddress(address: string) {
@@ -396,7 +420,7 @@ export async function GET(req: NextRequest) {
 
   const url = new URL(req.url);
   const address = url.searchParams.get("address") ?? "";
-  const fast = url.searchParams.get("fast") === "1";
+  const sync = url.searchParams.get("sync") === "1";
   if (!isAddress(address)) return activityResponse([]);
   const storedRows = await getStoredActivitiesForAddress(address, 120)
     .then((rows) =>
@@ -415,63 +439,15 @@ export async function GET(req: NextRequest) {
     )
     .catch(() => []);
 
-  if (fast) {
+  if (!sync) {
     return activityResponse(storedRows.slice(0, 80), {
-      headers: { "Cache-Control": "private, no-store, max-age=0" },
+      headers: { "Cache-Control": "private, max-age=30, stale-while-revalidate=60" },
     });
   }
 
   try {
-    const latest = await publicClient.getBlockNumber();
-    const lower = address.toLowerCase();
-    const [universalIncoming, universalOutgoing, priorityIncoming, priorityOutgoing, incoming, outgoing, indexedTransfers] = await Promise.all([
-      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "in"), [], "incoming-universal-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
-      withActivityTimeout(getRecentUniversalTransferLogs(address as Address, latest, "out"), [], "outgoing-universal-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
-      withActivityTimeout(getRecentPriorityTransferLogs(address as Address, latest, "in"), [], "incoming-priority-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
-      withActivityTimeout(getRecentPriorityTransferLogs(address as Address, latest, "out"), [], "outgoing-priority-logs", ACTIVITY_CHAIN_TIMEOUT_MS),
-      withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "in"), [], "incoming-token-logs"),
-      withActivityTimeout(getTransferLogsForAddress(address as Address, latest, "out"), [], "outgoing-token-logs"),
-      fetchAlchemyAssetTransfers(address as Address, latest).catch(() => {
-        console.warn("[activity] indexed transfers unavailable");
-        return [] as ActivityTransferRow[];
-      }),
-    ]);
-    const seen = new Set<string>();
-    const logs: ActivityTransferRow[] = await Promise.all(
-      [...universalIncoming, ...universalOutgoing, ...priorityIncoming, ...priorityOutgoing, ...incoming, ...outgoing]
-        .filter((log) => {
-          const value = log.args.value ?? 0n;
-          if (value <= 0n) return false;
-          const key = `${log.transactionHash}-${log.logIndex}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .map(async (log) => {
-          const from = String(log.args.from ?? "");
-          const to = String(log.args.to ?? "");
-          const incomingTx = to.toLowerCase() === lower;
-          const direction: "in" | "out" = incomingTx ? "in" : "out";
-          const value = log.args.value ?? 0n;
-          const [meta, createdAt] = await Promise.all([getTokenMeta(log.address), getBlockTime(log.blockNumber)]);
-          return {
-            hash: log.transactionHash,
-            type: direction,
-            title: incomingTx ? `Received ${meta.symbol}` : `Sent ${meta.symbol}`,
-            subtitle: incomingTx ? `From ${shortAddress(from)}` : `To ${shortAddress(to)}`,
-            amount: `${incomingTx ? "+" : "-"}${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
-            tokenText: `${formatTokenAmount(value, meta.decimals)} ${meta.symbol}`,
-            tokenAmount: Number(formatUnits(value, meta.decimals)),
-            direction,
-            status: "Completed",
-            createdAt,
-            blockNumber: Number(log.blockNumber),
-            logIndex: Number(log.logIndex),
-          };
-        }),
-    );
-
-    const merged = mergeSwapActivity(dedupeTransferRows([...logs, ...indexedTransfers]));
+    const indexedTransfers = await getIndexedActivity(address as Address);
+    const merged = mergeSwapActivity(indexedTransfers);
     const allRows = [...storedRows, ...merged];
     allRows.sort((a, b) => {
       const at = "createdAt" in a ? new Date(String(a.createdAt)).getTime() : 0;
@@ -479,7 +455,9 @@ export async function GET(req: NextRequest) {
       return bt - at || b.blockNumber - a.blockNumber || b.logIndex - a.logIndex;
     });
     const output = allRows.slice(0, 80);
-    return activityResponse(output);
+    return activityResponse(output, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch {
     console.warn("[activity] real activity unavailable");
     return activityResponse(storedRows.slice(0, 80));

@@ -4519,6 +4519,7 @@ function enhancePrototypeSwapQuote() {
 	    (function(){
 	      var quoteTimer = null;
 	      var quoteSeq = 0;
+	      var quoteAbortController = null;
 	      var latestSwapQuote = null;
 	      var latestQuoteKey = "";
 	      var latestQuoteAt = 0;
@@ -4924,6 +4925,9 @@ function enhancePrototypeSwapQuote() {
           return;
         }
         var seq = ++quoteSeq;
+        if (quoteAbortController) quoteAbortController.abort();
+        quoteAbortController = new AbortController();
+        var quoteSignal = quoteAbortController.signal;
         var requestedQuoteKey = currentQuoteKey(amount);
         if (latestSwapQuote && latestQuoteKey !== requestedQuoteKey) {
           latestSwapQuote = null;
@@ -4943,6 +4947,7 @@ function enhancePrototypeSwapQuote() {
             method: "POST",
             cache: "no-store",
             headers: { "content-type": "application/json" },
+            signal: quoteSignal,
             body: JSON.stringify({
               fromToken: tokenInputForQuote(swapState.sell),
               toToken: tokenInputForQuote(swapState.buy),
@@ -4965,6 +4970,7 @@ function enhancePrototypeSwapQuote() {
         try {
           return await promise;
         } catch(e) {
+          if (e && e.name === "AbortError") return;
           if (seq !== quoteSeq) return;
           var msg = e && e.message ? e.message : "Quote failed";
           if (/No Uniswap|No quote|not supported|Cannot resolve|No executable/i.test(msg)) msg = swapCopy("noRoute");
@@ -4983,6 +4989,7 @@ function enhancePrototypeSwapQuote() {
           setQuoteState(msg, "impact-high");
         } finally {
           if (activeQuotePromise === promise) activeQuotePromise = null;
+          if (quoteAbortController && quoteAbortController.signal === quoteSignal) quoteAbortController = null;
         }
       }
       function scheduleQuote(){
@@ -6123,16 +6130,16 @@ function enhancePrototypeActivity() {
           renderActivity();
           return;
         }
-        fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
+        fetch("/api/activity?address=" + encodeURIComponent(address))
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });
         setTimeout(function(){
-          fetch("/api/activity?address=" + encodeURIComponent(address) + "&t=" + Date.now(), { cache: "no-store" })
+          fetch("/api/activity?address=" + encodeURIComponent(address) + "&sync=1", { cache: "no-store" })
             .then(function(res){ return res.ok ? res.json() : []; })
             .then(function(rows){ activityItems = mergeActivityRows(localActivity(), Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
             .catch(function(){});
-        }, 250);
+        }, 500);
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {
         window.__luminaActivityGoWrapped = true;

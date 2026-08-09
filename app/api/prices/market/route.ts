@@ -5,11 +5,11 @@ import { type MarketPrice, type MarketPricesResponse, PRICE_SYMBOLS } from "@/li
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-const CACHE_TTL_MS = 3_000;
+const CACHE_TTL_MS = 15_000;
 const MARKET_CACHE_HEADERS = {
-  "Cache-Control": "public, max-age=2, s-maxage=3, stale-while-revalidate=15",
-  "CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
-  "Vercel-CDN-Cache-Control": "public, s-maxage=3, stale-while-revalidate=15",
+  "Cache-Control": "public, max-age=10, s-maxage=15, stale-while-revalidate=60",
+  "CDN-Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
+  "Vercel-CDN-Cache-Control": "public, s-maxage=15, stale-while-revalidate=60",
   "Content-Type": "application/json",
 };
 const COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price";
