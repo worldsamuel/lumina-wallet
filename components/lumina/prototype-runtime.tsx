@@ -1462,7 +1462,8 @@ function enhancePrototypeEarn() {
       }
       function vaultDesc(vault){
         var lang = window.currentLang || "en";
-        return (vault.description && (vault.description[lang] || vault.description.en)) || "";
+        var normalized = lang === "ko-KR" ? "ko" : lang;
+        return (vault.description && (vault.description[normalized] || vault.description.en)) || "";
       }
       function positionAmount(pos){
         if (!pos) return 0;
@@ -6647,7 +6648,7 @@ function enhancePrototypeMe() {
         dot.style.display = count > 0 ? "grid" : "none";
       }
       function supportLanguages(){
-        return [{code:"en",name:"English"},{code:"zh-CN",name:"简体中文"},{code:"zh-TW",name:"繁體中文"},{code:"fr",name:"Français"},{code:"de",name:"Deutsch"},{code:"es",name:"Español"},{code:"ja",name:"日本語"}];
+        return [{code:"en",name:"English"},{code:"zh-CN",name:"简体中文"},{code:"zh-TW",name:"繁體中文"},{code:"fr",name:"Français"},{code:"de",name:"Deutsch"},{code:"es",name:"Español"},{code:"ja",name:"日本語"},{code:"ko",name:"한국어"}];
       }
       function ensureFeedbackModal(){
         if (document.getElementById("feedbackModal")) { updateFeedbackCopy(); return; }
@@ -7670,8 +7671,12 @@ function enhancePrototypeMe() {
       window.__luminaRenderMe = renderMe;
       if (!window.__luminaMeLangPatch && typeof applyLang === "function") {
         window.__luminaMeLangPatch = true;
+        if (typeof languages !== "undefined" && !languages.some(function(item){ return item.code === "ko"; })) {
+          languages.push({ code:"ko", name:"한국어", flag:"🇰🇷" });
+        }
         var previousApplyLang = applyLang;
         applyLang = function(code){
+          if (code !== "en") previousApplyLang("en");
           previousApplyLang(code);
           if (window.__luminaLanguageChoiceActive) {
             try {

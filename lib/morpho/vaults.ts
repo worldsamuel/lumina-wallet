@@ -4,6 +4,11 @@
 
 export type RiskLevel = "low" | "medium" | "high";
 
+export type VaultDescription = Record<string, string> & {
+  en: string;
+  "zh-CN": string;
+};
+
 export interface MorphoVault {
   /** Vault contract address (ERC-4626). */
   address: `0x${string}`;
@@ -24,10 +29,7 @@ export interface MorphoVault {
   /** Optional admin-configured APY used for display only. */
   displayApy?: number | null;
   /** Localized description copy. */
-  description: {
-    "zh-CN": string;
-    en: string;
-  };
+  description: VaultDescription;
 }
 
 export const WORLD_CHAIN_ID = 480;
@@ -47,7 +49,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: true,
     description: {
       "zh-CN": "稳定币 USDC 借贷理财,由 Re7 Labs 策展,Morpho 协议底层",
+      "zh-TW": "USDC 穩定幣借貸理財，由 Re7 Labs 策展，基於 Morpho 協議",
       en: "USDC stablecoin lending vault, curated by Re7 Labs on Morpho",
+      fr: "Coffre de prêt USDC, sélectionné par Re7 Labs sur Morpho",
+      de: "USDC-Kredit-Vault, kuratiert von Re7 Labs auf Morpho",
+      es: "Bóveda de préstamos USDC, seleccionada por Re7 Labs en Morpho",
+      ja: "Re7 Labs が選定した Morpho 上の USDC ステーブルコイン貸付 Vault",
+      ko: "Re7 Labs가 선별한 Morpho 기반 USDC 스테이블코인 대출 Vault",
     },
   },
   {
@@ -62,7 +70,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: true,
     description: {
       "zh-CN": "WLD 借贷理财,由 Re7 Labs 策展,Morpho 协议底层",
+      "zh-TW": "WLD 借貸理財，由 Re7 Labs 策展，基於 Morpho 協議",
       en: "WLD lending vault, curated by Re7 Labs on Morpho",
+      fr: "Coffre de prêt WLD, sélectionné par Re7 Labs sur Morpho",
+      de: "WLD-Kredit-Vault, kuratiert von Re7 Labs auf Morpho",
+      es: "Bóveda de préstamos WLD, seleccionada por Re7 Labs en Morpho",
+      ja: "Re7 Labs が選定した Morpho 上の WLD 貸付 Vault",
+      ko: "Re7 Labs가 선별한 Morpho 기반 WLD 대출 Vault",
     },
   },
   {
@@ -77,7 +91,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: true,
     description: {
       "zh-CN": "WETH 借贷理财,由 Re7 Labs 策展,Morpho 协议底层",
+      "zh-TW": "WETH 借貸理財，由 Re7 Labs 策展，基於 Morpho 協議",
       en: "WETH lending vault, curated by Re7 Labs on Morpho",
+      fr: "Coffre de prêt WETH, sélectionné par Re7 Labs sur Morpho",
+      de: "WETH-Kredit-Vault, kuratiert von Re7 Labs auf Morpho",
+      es: "Bóveda de préstamos WETH, seleccionada por Re7 Labs en Morpho",
+      ja: "Re7 Labs が選定した Morpho 上の WETH 貸付 Vault",
+      ko: "Re7 Labs가 선별한 Morpho 기반 WETH 대출 Vault",
     },
   },
   {
@@ -92,7 +112,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: true,
     description: {
       "zh-CN": "欧元稳定币 EURC 借贷理财",
+      "zh-TW": "EURC 歐元穩定幣借貸理財",
       en: "EURC (Euro stablecoin) lending vault",
+      fr: "Coffre de prêt EURC (stablecoin en euros)",
+      de: "EURC-Kredit-Vault (Euro-Stablecoin)",
+      es: "Bóveda de préstamos EURC (stablecoin en euros)",
+      ja: "EURC（ユーロ・ステーブルコイン）貸付 Vault",
+      ko: "EURC(유로 스테이블코인) 대출 Vault",
     },
   },
   {
@@ -107,7 +133,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: false,
     description: {
       "zh-CN": "阿根廷比索 wARS 借贷理财(高波动)",
+      "zh-TW": "阿根廷披索 wARS 借貸理財（高波動）",
       en: "wARS (Argentine Peso) lending vault - high volatility",
+      fr: "Coffre de prêt wARS (peso argentin) - forte volatilité",
+      de: "wARS-Kredit-Vault (Argentinischer Peso) - hohe Volatilität",
+      es: "Bóveda de préstamos wARS (peso argentino) - alta volatilidad",
+      ja: "wARS（アルゼンチン・ペソ）貸付 Vault - 高ボラティリティ",
+      ko: "wARS(아르헨티나 페소) 대출 Vault - 높은 변동성",
     },
   },
   {
@@ -122,7 +154,13 @@ export const RE7_VAULTS: MorphoVault[] = [
     enabled: false,
     description: {
       "zh-CN": "WBTC 借贷理财(暂无收益,流动性不足)",
+      "zh-TW": "WBTC 借貸理財（目前無收益，流動性不足）",
       en: "WBTC vault - currently no yield (low liquidity)",
+      fr: "Coffre WBTC - aucun rendement actuellement (faible liquidité)",
+      de: "WBTC-Vault - derzeit keine Rendite (geringe Liquidität)",
+      es: "Bóveda WBTC - actualmente sin rendimiento (baja liquidez)",
+      ja: "WBTC Vault - 現在利回りなし（低流動性）",
+      ko: "WBTC Vault - 현재 수익률 없음(낮은 유동성)",
     },
   },
 ];

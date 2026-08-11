@@ -50,6 +50,11 @@ function defaultConfigs(): EarnProductConfig[] {
   }));
 }
 
+function builtInDescription(address: string, fallback?: MorphoVault["description"]) {
+  const vault = RE7_VAULTS.find((item) => item.address.toLowerCase() === address.toLowerCase());
+  return vault?.description || fallback || { en: "", "zh-CN": "" };
+}
+
 function parseConfigs(value: unknown): EarnProductConfig[] {
   if (!Array.isArray(value)) return defaultConfigs();
   const defaults = defaultConfigs();
@@ -68,7 +73,7 @@ function parseConfigs(value: unknown): EarnProductConfig[] {
       enabled: product.enabled !== false,
       imageUrl: typeof product.imageUrl === "string" ? product.imageUrl : null,
       apyOverride: product.apyOverride ?? null,
-      description: product.description || { en: "", "zh-CN": "" },
+      description: builtInDescription(String(product.address), product.description),
       sortOrder: Number(product.sortOrder ?? byAddress.size + 1),
     });
   }
@@ -111,7 +116,7 @@ export async function upsertEarnProduct(input: Partial<EarnProductConfig> & { ad
     enabled: input.enabled ?? existing?.enabled ?? true,
     imageUrl: input.imageUrl === undefined ? existing?.imageUrl ?? null : input.imageUrl,
     apyOverride: input.apyOverride === undefined ? existing?.apyOverride ?? null : input.apyOverride,
-    description: input.description || existing?.description || { en: "", "zh-CN": "" },
+    description: builtInDescription(input.address, input.description || existing?.description),
     sortOrder: Number(input.sortOrder ?? existing?.sortOrder ?? products.length + 1),
   };
   if (index >= 0) products[index] = next;
