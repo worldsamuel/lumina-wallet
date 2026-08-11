@@ -9,6 +9,7 @@ const STATEMENT = "Sign in to Lumina";
 const MOCK_ADDRESS = "0x4a3a000000000000000000000000000000006f2d";
 const MOCK_USERNAME = "lumina-demo";
 const NOTIFICATION_PERMISSION = "notifications" as Parameters<typeof MiniKit.requestPermission>[0]["permission"];
+let entryNotificationPermissionSync: Promise<boolean> | null = null;
 
 type WalletAuthStatus = "checking" | "not-installed" | "authenticating" | "authenticated" | "error";
 
@@ -101,6 +102,13 @@ async function syncNotificationPermission(requestIfMissing: boolean) {
   }
 }
 
+function syncNotificationPermissionOnEntry() {
+  if (!entryNotificationPermissionSync) {
+    entryNotificationPermissionSync = syncNotificationPermission(true);
+  }
+  return entryNotificationPermissionSync;
+}
+
 /**
  * Runs the World MiniKit walletAuth login flow and stores the authenticated wallet address.
  */
@@ -142,7 +150,7 @@ export function useWalletAuth() {
         null;
       setUser({ address: userAddress, username });
       setStatus("authenticated");
-      void syncNotificationPermission(true);
+      void syncNotificationPermissionOnEntry();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Wallet authentication failed.");
       setStatus("error");
@@ -172,7 +180,7 @@ export function useWalletAuth() {
         setUser({ address: session.address, username: null });
         setStatus("authenticated");
         setError(null);
-        void syncNotificationPermission(true);
+        void syncNotificationPermissionOnEntry();
         return;
       }
       await login();
@@ -182,6 +190,13 @@ export function useWalletAuth() {
       cancelled = true;
     };
   }, [address, login, setUser]);
+
+  useEffect(() => {
+    if (mockMode || !address) return;
+    MiniKit.install(process.env.NEXT_PUBLIC_WORLD_APP_ID);
+    if (!MiniKit.isInstalled()) return;
+    void syncNotificationPermissionOnEntry();
+  }, [address, mockMode]);
 
   return {
     address,
