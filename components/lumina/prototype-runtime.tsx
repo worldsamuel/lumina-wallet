@@ -2063,15 +2063,16 @@ function enhancePrototypeEarn() {
         }
         if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
       }
-      async function loadMorphoPositions(){
+      async function loadMorphoPositions(force){
         var address = window.__luminaUserAddress || "";
         if (!address) {
           morphoPositions = [];
           window.__luminaEarnTotalUsd = 0;
           if (typeof window.__luminaRecomputeTotalWithEarn === "function") window.__luminaRecomputeTotalWithEarn();
-          return;
+          return false;
         }
-        var res = await fetch("/api/morpho/position/" + address, { cache: "no-store" });
+        var positionUrl = "/api/morpho/position/" + address + (force ? "?refresh=1" : "");
+        var res = await fetch(positionUrl, { cache: "no-store" });
         var data = await res.json();
         if (!res.ok) throw new Error(data.error || "Unable to load positions");
         var nextPositions = Array.isArray(data.positions) ? data.positions : [];
@@ -2085,7 +2086,7 @@ function enhancePrototypeEarn() {
             });
             updateHomeEarnTotal();
             console.log("[EARN] Empty position response ignored for address:", address);
-            return;
+            return false;
           }
         }
         morphoPositions = nextPositions.map(function(pos){
@@ -2095,14 +2096,16 @@ function enhancePrototypeEarn() {
         updateHomeEarnTotal();
         console.log("[EARN] Positions address:", address);
         console.log("[EARN] Positions response:", data);
+        return true;
       }
-      window.__luminaRefreshMorphoPositions = async function(){
-        await loadMorphoPositions();
+      window.__luminaRefreshMorphoPositions = async function(force){
+        var confirmed = await loadMorphoPositions(!!force);
         renderProducts();
         renderHomeEarningPositions();
         if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
           openEarn(activeEarnIndex);
         }
+        return confirmed;
       };
       async function loadMorphoData(force){
         morphoStarted = true;
@@ -2119,7 +2122,7 @@ function enhancePrototypeEarn() {
           vaultFailed = true;
           console.log("[EARN] Vault refresh failed:", e);
         });
-        var positionPromise = loadMorphoPositions().then(function(){
+        var positionPromise = loadMorphoPositions(!!force).then(function(){
           renderProducts();
           renderHomeEarningPositions();
           if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
@@ -2145,32 +2148,44 @@ function enhancePrototypeEarn() {
         }
       }
       function pollMorphoPositions(){
-        var tries = 0;
-        var timer = setInterval(async function(){
-          tries += 1;
-          try {
-            await window.__luminaRefreshMorphoPositions();
-          } catch(e) {}
-          if (tries >= 18) clearInterval(timer);
-        }, 5000);
+        [4000, 12000, 30000, 60000, 120000].forEach(function(delay){
+          setTimeout(async function(){
+            if (!window.__luminaUserAddress) return;
+            if (document.visibilityState && document.visibilityState !== "visible" && delay < 30000) return;
+            try {
+              await window.__luminaRefreshMorphoPositions(true);
+            } catch(e) {}
+          }, delay);
+        });
+      }
+      function isEarnViewVisible(){
+        if (document.visibilityState && document.visibilityState !== "visible") return false;
+        var earn = document.getElementById("view-earn");
+        var detail = document.getElementById("view-earn-detail");
+        return !!((earn && earn.classList.contains("active")) || (detail && detail.classList.contains("active")));
       }
       if (!window.__luminaMorphoRefreshTimer) {
+        var morphoPeriodicTicks = 0;
         window.__luminaMorphoRefreshTimer = setInterval(function(){
           if (!window.__luminaUserAddress) return;
           if (!morphoStarted) return;
-          loadMorphoVaults().then(function(){
-            renderProducts();
-            renderHomeEarningPositions();
-            if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
-              openEarn(activeEarnIndex);
-            }
-          }).catch(function(e){
-            console.log("[EARN] Periodic vault refresh failed:", e);
-          });
+          if (!isEarnViewVisible()) return;
+          morphoPeriodicTicks += 1;
+          if (morphoPeriodicTicks % 5 === 0) {
+            loadMorphoVaults().then(function(){
+              renderProducts();
+              renderHomeEarningPositions();
+              if (document.getElementById("view-earn-detail") && document.getElementById("view-earn-detail").classList.contains("active")) {
+                openEarn(activeEarnIndex);
+              }
+            }).catch(function(e){
+              console.log("[EARN] Periodic vault refresh failed:", e);
+            });
+          }
           window.__luminaRefreshMorphoPositions().catch(function(e){
             console.log("[EARN] Periodic position refresh failed:", e);
           });
-        }, 20000);
+        }, 60000);
       }
 
       openClaimModal = function(){
@@ -4995,7 +5010,7 @@ function enhancePrototypeSwapQuote() {
       }
       function scheduleQuote(){
         clearTimeout(quoteTimer);
-        quoteTimer = setTimeout(requestQuote, 220);
+        quoteTimer = setTimeout(requestQuote, 350);
       }
 	      function tokenMeta(symbol, quoted){
 	        var meta = quoted || (customTokens && customTokens[symbol] ? customTokens[symbol] : null);
@@ -6135,11 +6150,18 @@ function enhancePrototypeActivity() {
           .then(function(res){ return res.ok ? res.json() : []; })
           .then(function(rows){ activityItems = mergeActivityRows(localRows, Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
           .catch(function(){ activityItems = mergeActivityRows(localRows, []); renderActivity(); });
+        var activitySyncKey = "lumina_activity_chain_sync_v2:" + address.toLowerCase();
+        var lastActivitySync = Number(localStorage.getItem(activitySyncKey) || 0);
+        if (Date.now() - lastActivitySync < 5 * 60 * 1000) return;
+        localStorage.setItem(activitySyncKey, String(Date.now()));
         setTimeout(function(){
           fetch("/api/activity?address=" + encodeURIComponent(address) + "&sync=1", { cache: "no-store" })
-            .then(function(res){ return res.ok ? res.json() : []; })
+            .then(function(res){
+              if (!res.ok) throw new Error("Activity sync failed");
+              return res.json();
+            })
             .then(function(rows){ activityItems = mergeActivityRows(localActivity(), Array.isArray(rows) ? rows : []); rememberReceivedAssets(activityItems); renderActivity(); if (typeof renderAssets === "function") renderAssets(); })
-            .catch(function(){});
+            .catch(function(){ localStorage.setItem(activitySyncKey, String(Date.now() - 4 * 60 * 1000)); });
         }, 500);
       };
       if (!window.__luminaActivityGoWrapped && typeof go === "function") {

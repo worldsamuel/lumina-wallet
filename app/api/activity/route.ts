@@ -24,7 +24,7 @@ const universalActivityLogChunkBlocks = 10_000n;
 const worldChainAlchemyRpc = resolveAlchemyRpcUrl();
 const ACTIVITY_CHAIN_TIMEOUT_MS = 2_200;
 const ACTIVITY_INDEXER_TIMEOUT_MS = 1_800;
-const ACTIVITY_SYNC_TTL_MS = 60_000;
+const ACTIVITY_SYNC_TTL_MS = 5 * 60_000;
 const activitySyncCache = new Map<string, { expiresAt: number; rows: ActivityTransferRow[] }>();
 const activitySyncPending = new Map<string, Promise<ActivityTransferRow[]>>();
 const activityTokenAddresses = Array.from(
@@ -179,7 +179,7 @@ function isValidActivityHash(value: string) {
   return /^[a-zA-Z0-9:_-]{8,160}$/.test(value);
 }
 
-async function getTokenMeta(address: Address) {
+async function getTokenMeta(address: Address, indexed?: { symbol?: string | null; decimals?: number }) {
   const key = address.toLowerCase();
   const configured = ERC20_TOKENS.find((token) => token.contractAddress.toLowerCase() === key);
   if (configured) return { symbol: configured.symbol, decimals: configured.decimals };
@@ -187,6 +187,12 @@ async function getTokenMeta(address: Address) {
   if (swapConfigured) return { symbol: swapConfigured.symbol, decimals: swapConfigured.decimals };
   const cached = tokenMetaCache.get(key);
   if (cached) return cached;
+  const indexedSymbol = String(indexed?.symbol || "").trim().slice(0, 12);
+  if (indexedSymbol && indexedSymbol.toUpperCase() !== "TOKEN" && Number.isInteger(indexed?.decimals)) {
+    const meta = { symbol: indexedSymbol, decimals: Number(indexed?.decimals) };
+    tokenMetaCache.set(key, meta);
+    return meta;
+  }
 
   try {
     const [symbol, decimals] = await Promise.all([
@@ -343,7 +349,7 @@ async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Pro
         category: ["external", "erc20"],
         withMetadata: true,
         excludeZeroValue: true,
-        maxCount: "0x64",
+        maxCount: "0x50",
         order: "desc",
       };
       if (direction === "in") params.toAddress = address;
@@ -381,9 +387,12 @@ async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Pro
         const tokenAddress = transfer.rawContract?.address && isAddress(transfer.rawContract.address)
           ? transfer.rawContract.address as Address
           : null;
-        const configuredMeta = tokenAddress ? await getTokenMeta(tokenAddress) : null;
+        const indexedDecimals = parseAlchemyDecimals(transfer.rawContract?.decimal);
+        const configuredMeta = tokenAddress
+          ? await getTokenMeta(tokenAddress, { symbol: transfer.asset, decimals: indexedDecimals })
+          : null;
         const symbol = String(configuredMeta?.symbol || transfer.asset || (transfer.category === "external" ? "ETH" : "TOKEN")).slice(0, 12);
-        const decimals = configuredMeta?.decimals ?? parseAlchemyDecimals(transfer.rawContract?.decimal);
+        const decimals = configuredMeta?.decimals ?? indexedDecimals;
         let tokenText = "";
         let tokenAmount = 0;
         const rawValue = transfer.rawContract?.value;
@@ -417,7 +426,7 @@ async function fetchAlchemyAssetTransfers(address: Address, latest: bigint): Pro
 
       pageKey = payload.result?.pageKey;
       pages += 1;
-    } while (pageKey && pages < 3);
+    } while (pageKey && pages < 1);
   }
 
   await Promise.all([fetchDirection("in"), fetchDirection("out")]);

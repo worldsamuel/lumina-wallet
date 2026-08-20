@@ -32,15 +32,17 @@ export function AssetPage({ symbol }: AssetPageProps) {
   const balances = useSWR<BalancesResponse>(
     status === "authenticated" && address ? `/api/balances?address=${address}` : null,
     fetcher,
-    { refreshInterval: 5_000, revalidateOnFocus: true, refreshWhenHidden: false },
+    { dedupingInterval: 30_000, refreshInterval: 30_000, revalidateOnFocus: true, refreshWhenHidden: false },
   );
   const market = useSWR<MarketPricesResponse>(status === "authenticated" ? "/api/prices/market" : null, fetcher, {
-    refreshInterval: 5_000,
+    dedupingInterval: 15_000,
+    refreshInterval: 15_000,
     revalidateOnFocus: true,
     refreshWhenHidden: false,
   });
   const onchain = useSWR<OnchainPricesResponse>(status === "authenticated" ? "/api/prices/onchain" : null, fetcher, {
-    refreshInterval: 5_000,
+    dedupingInterval: 15_000,
+    refreshInterval: 15_000,
     revalidateOnFocus: true,
     refreshWhenHidden: false,
   });

@@ -1,4 +1,5 @@
 import { formatUnits, type Address } from "viem";
+import { unstable_cache } from "next/cache";
 import { readWorldChainWithFallback } from "./chain";
 import { db } from "./db";
 import { RE7_VAULTS } from "./morpho/vaults";
@@ -121,7 +122,17 @@ function toDiscoveredBalance(token: CatalogToken, balance: bigint): ChainBalance
   };
 }
 
+const fetchAlchemyTokenMetadataCached = unstable_cache(
+  fetchAlchemyTokenMetadataUncached,
+  ["lumina-alchemy-token-metadata-v1"],
+  { revalidate: 24 * 60 * 60 },
+);
+
 async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<CatalogToken | null> {
+  return fetchAlchemyTokenMetadataCached(contractAddress).catch(() => null);
+}
+
+async function fetchAlchemyTokenMetadataUncached(contractAddress: string): Promise<CatalogToken | null> {
   const response = await fetch(WORLD_CHAIN_ALCHEMY_RPC, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -132,8 +143,8 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
       params: [contractAddress],
     }),
     signal: AbortSignal.timeout(ALCHEMY_METADATA_TIMEOUT_MS),
-  }).catch(() => null);
-  if (!response?.ok) return null;
+  });
+  if (!response.ok) throw new Error(`Alchemy token metadata failed: ${response.status}`);
 
   const body = (await response.json().catch(() => null)) as {
     result?: { name?: string | null; symbol?: string | null; decimals?: number | null };
@@ -154,15 +165,20 @@ async function fetchAlchemyTokenMetadata(contractAddress: string): Promise<Catal
 export async function fetchBalances(userAddress: Address) {
   const ethToken = TOKENS.find((token) => token.native);
   const balanceTokens = await getBalanceTokens();
-  const [nativeBalance, alchemyBalances] = await Promise.all([
+  const [nativeBalance, alchemyResult] = await Promise.all([
     readWorldChainWithFallback((client) => client.getBalance({ address: userAddress })),
-    fetchAllAlchemyTokenBalances(userAddress).catch(() => [] as AlchemyTokenBalance[]),
+    fetchAllAlchemyTokenBalances(userAddress)
+      .then((data) => ({ ok: true as const, data }))
+      .catch((error) => ({ ok: false as const, data: [] as AlchemyTokenBalance[], error })),
   ]);
 
-  const configuredTokenBalances = await fetchConfiguredTokenBalances(userAddress, balanceTokens).catch((error) => {
-    console.warn("[balances] configured token multicall failed, falling back to Alchemy", error);
-    return configuredTokenBalancesFromAlchemy(balanceTokens, alchemyBalances);
-  });
+  const alchemyBalances = alchemyResult.data;
+  const configuredTokenBalances = alchemyResult.ok
+    ? configuredTokenBalancesFromAlchemy(balanceTokens, alchemyBalances)
+    : await fetchConfiguredTokenBalances(userAddress, balanceTokens).catch((error) => {
+        console.warn("[balances] token API and configured token fallback failed", alchemyResult.error, error);
+        return new Map<Address, bigint>();
+      });
   const discoveredBalances = await fetchDiscoveredTokenBalances(alchemyBalances).catch(() => [] as ChainBalance[]);
   const rawConfiguredBalances = balanceTokens.map((token) => toBalance(token, configuredTokenBalances.get(token.contractAddress) ?? 0n));
   const erc20Balances = mergeAliasBalances(rawConfiguredBalances);

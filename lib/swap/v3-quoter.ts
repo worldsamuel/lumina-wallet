@@ -19,10 +19,14 @@ type V3RouteCandidate = { tokens: SwapToken[]; fees: number[] };
 declare global {
   // eslint-disable-next-line no-var
   var __luminaV3BestRouteCache: Map<string, { expiresAt: number; route: V3RouteCandidate }> | undefined;
+  // eslint-disable-next-line no-var
+  var __luminaV3QuotePending: Map<string, Promise<SwapQuoteSet>> | undefined;
 }
 
 const bestRouteCache = globalThis.__luminaV3BestRouteCache ?? new Map<string, { expiresAt: number; route: V3RouteCandidate }>();
 globalThis.__luminaV3BestRouteCache = bestRouteCache;
+const pendingQuotes = globalThis.__luminaV3QuotePending ?? new Map<string, Promise<SwapQuoteSet>>();
+globalThis.__luminaV3QuotePending = pendingQuotes;
 
 const quoterV2Abi = [
   {
@@ -99,6 +103,16 @@ export async function quoteV3(
 }
 
 export async function quoteBestV3(fromToken: SwapToken, toToken: SwapToken, amountIn: bigint): Promise<SwapQuoteSet> {
+  const pendingKey = `${routeCacheKey(fromToken, toToken)}:${amountIn.toString()}`;
+  const pending = pendingQuotes.get(pendingKey);
+  if (pending) return pending;
+  const request = quoteBestV3Uncached(fromToken, toToken, amountIn)
+    .finally(() => pendingQuotes.delete(pendingKey));
+  pendingQuotes.set(pendingKey, request);
+  return request;
+}
+
+async function quoteBestV3Uncached(fromToken: SwapToken, toToken: SwapToken, amountIn: bigint): Promise<SwapQuoteSet> {
   const cacheKey = routeCacheKey(fromToken, toToken);
   const cachedRoute = bestRouteCache.get(cacheKey);
   if (cachedRoute && cachedRoute.expiresAt > Date.now()) {

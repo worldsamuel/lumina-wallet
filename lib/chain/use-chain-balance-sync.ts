@@ -56,9 +56,16 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
   useEffect(() => {
     if (!enabled || !userAddress) return;
 
+    let refreshPending = false;
+    let lastRefreshAt = 0;
     const refreshBalances = () => {
       if (document.visibilityState && document.visibilityState !== "visible") return;
-      void balances.mutate();
+      if (refreshPending || Date.now() - lastRefreshAt < 5_000) return;
+      refreshPending = true;
+      lastRefreshAt = Date.now();
+      void balances.mutate().finally(() => {
+        refreshPending = false;
+      });
     };
     document.addEventListener("visibilitychange", refreshBalances);
     window.addEventListener("focus", refreshBalances);
