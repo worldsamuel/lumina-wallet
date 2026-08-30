@@ -33,6 +33,7 @@ export interface SendParams {
   recipient: string;
   amountHuman: string;
   userAddress?: string;
+  applyPlatformFee?: boolean;
 }
 
 export interface SendResult {
@@ -130,45 +131,45 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
     return { status: "failed", error: "Amount must be > 0" };
   }
 
-  const { feeAmountWei, netAmountWei } = calculateSendFeeAmounts(amountWei);
-  if (feeAmountWei <= 0n || netAmountWei <= 0n) {
+  const applyPlatformFee = params.applyPlatformFee !== false;
+  const { feeAmountWei, netAmountWei } = applyPlatformFee
+    ? calculateSendFeeAmounts(amountWei)
+    : { feeAmountWei: 0n, netAmountWei: amountWei };
+  if (netAmountWei <= 0n || (applyPlatformFee && feeAmountWei <= 0n)) {
     return { status: "failed", error: "Amount is too small to apply the send fee" };
   }
 
   const netAmountHuman = formatUnits(netAmountWei, params.tokenDecimals);
   const feeAmountHuman = formatUnits(feeAmountWei, params.tokenDecimals);
-  const transactions =
-    params.tokenAddress === null
-      ? [
-          {
-            to: params.recipient,
-            value: toHex(netAmountWei),
-          },
-          {
-            to: SEND_FEE_RECIPIENT,
-            value: toHex(feeAmountWei),
-          },
-        ]
-      : [
-          {
-            to: params.tokenAddress,
-            data: encodeFunctionData({
-              abi: [erc20MinABI[0]],
-              functionName: "transfer",
-              args: [params.recipient as Address, netAmountWei],
-            }),
-            value: "0x0",
-          },
-          {
-            to: params.tokenAddress,
-            data: encodeFunctionData({
-              abi: [erc20MinABI[0]],
-              functionName: "transfer",
-              args: [SEND_FEE_RECIPIENT, feeAmountWei],
-            }),
-            value: "0x0",
-          },
-        ];
+  const transactions = params.tokenAddress === null
+    ? [
+        { to: params.recipient, value: toHex(netAmountWei) },
+        ...(applyPlatformFee ? [{ to: SEND_FEE_RECIPIENT, value: toHex(feeAmountWei) }] : []),
+      ]
+    : [
+        {
+          to: params.tokenAddress,
+          data: encodeFunctionData({
+            abi: [erc20MinABI[0]],
+            functionName: "transfer",
+            args: [params.recipient as Address, netAmountWei],
+          }),
+          value: "0x0",
+        },
+        ...(applyPlatformFee
+          ? [
+              {
+                to: params.tokenAddress,
+                data: encodeFunctionData({
+                  abi: [erc20MinABI[0]],
+                  functionName: "transfer",
+                  args: [SEND_FEE_RECIPIENT, feeAmountWei],
+                }),
+                value: "0x0",
+              },
+            ]
+          : []),
+      ];
 
   console.log("=== SEND TX DEBUG ===");
   console.log("token:", {
@@ -275,8 +276,8 @@ export async function sendToken(params: SendParams): Promise<SendResult> {
           grossAmount: params.amountHuman,
           netAmount: netAmountHuman,
           feeAmount: feeAmountHuman,
-          feeBps: SEND_FEE_BPS,
-          feeRecipient: SEND_FEE_RECIPIENT,
+          feeBps: applyPlatformFee ? SEND_FEE_BPS : 0,
+          feeRecipient: applyPlatformFee ? SEND_FEE_RECIPIENT : null,
         },
       });
     }

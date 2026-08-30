@@ -3450,6 +3450,44 @@ function enhancePrototypeHome() {
         Object.keys(vars).forEach(function(name){ text = text.replace(new RegExp("\\\\{" + name + "\\\\}", "g"), vars[name]); });
         return text;
       }
+      var reliefCopyMap = {
+        cardKicker: { en:"NEPAL RELIEF", "zh-CN":"尼泊尔救援", "zh-TW":"尼泊爾救援", fr:"SECOURS NÉPAL", de:"NEPAL-HILFE", es:"AYUDA NEPAL", ja:"ネパール支援", ko:"네팔 구호" },
+        cardTitle: { en:"Rebuild together", "zh-CN":"共同重建家园", "zh-TW":"共同重建家園", fr:"Reconstruire ensemble", de:"Gemeinsam aufbauen", es:"Reconstruir juntos", ja:"共に復興を", ko:"함께 재건해요" },
+        cardSubtitle: { en:"Food · shelter · recovery", "zh-CN":"物资 · 衣物 · 灾后重建", "zh-TW":"物資 · 衣物 · 災後重建", fr:"Vivres · abris · reconstruction", de:"Versorgung · Schutz · Wiederaufbau", es:"Suministros · refugio · recuperación", ja:"物資・衣類・復興", ko:"물품 · 의류 · 재건" },
+        donateNow: { en:"Donate now", "zh-CN":"立即捐款", "zh-TW":"立即捐款", fr:"Faire un don", de:"Jetzt spenden", es:"Donar ahora", ja:"寄付する", ko:"지금 기부" },
+        campaign: { en:"Lumina community relief campaign", "zh-CN":"Lumina 社区救援行动", "zh-TW":"Lumina 社區救援行動", fr:"Campagne solidaire Lumina", de:"Lumina-Hilfsaktion", es:"Campaña solidaria Lumina", ja:"Lumina コミュニティ支援", ko:"Lumina 커뮤니티 구호" },
+        title: { en:"Nepal Flood & Landslide Relief", "zh-CN":"尼泊尔洪灾与泥石流救援", "zh-TW":"尼泊爾洪災與土石流救援", fr:"Aide aux victimes au Népal", de:"Flut- und Erdrutschhilfe Nepal", es:"Ayuda por inundaciones en Nepal", ja:"ネパール洪水・土砂災害支援", ko:"네팔 홍수·산사태 구호" },
+        intro: { en:"Severe flash floods and landslides on August 26, 2026 affected communities in northern Nepal. This community campaign supports emergency recovery and rebuilding.", "zh-CN":"2026 年 8 月 26 日，尼泊尔北部遭遇严重山洪与泥石流。本次社区行动用于支持紧急救援、灾后恢复与家园重建。", "zh-TW":"2026 年 8 月 26 日，尼泊爾北部遭遇嚴重山洪與土石流。本次社區行動用於支持緊急救援、災後恢復與家園重建。", fr:"Le 26 août 2026, de graves crues soudaines et glissements de terrain ont touché le nord du Népal. Cette campagne soutient l'aide d'urgence et la reconstruction.", de:"Am 26. August 2026 trafen Sturzfluten und Erdrutsche Gemeinden im Norden Nepals. Diese Aktion unterstützt Nothilfe und Wiederaufbau.", es:"El 26 de agosto de 2026, inundaciones repentinas y deslizamientos afectaron el norte de Nepal. Esta campaña apoya la ayuda urgente y la reconstrucción.", ja:"2026年8月26日、ネパール北部で深刻な鉄砲水と土砂災害が発生しました。本キャンペーンは緊急支援と復興を支えます。", ko:"2026년 8월 26일 네팔 북부에 심각한 돌발 홍수와 산사태가 발생했습니다. 이 캠페인은 긴급 구호와 재건을 지원합니다." },
+        fullFund: { en:"100% reserved for documented relief and recovery", "zh-CN":"100% 专项用于有记录的救援与重建", "zh-TW":"100% 專項用於有記錄的救援與重建", fr:"100 % dédiés à l'aide et à la reconstruction documentées", de:"100 % für dokumentierte Hilfe und Wiederaufbau", es:"100 % reservado para ayuda y reconstrucción documentadas", ja:"全額を記録可能な支援・復興に充当", ko:"100% 기록 가능한 구호와 재건에 사용" },
+        useTitle: { en:"How funds will be used", "zh-CN":"资金用途", "zh-TW":"資金用途", fr:"Utilisation des fonds", de:"Verwendung der Mittel", es:"Uso de los fondos", ja:"資金の用途", ko:"기금 사용처" },
+        supplies: { en:"Emergency supplies", "zh-CN":"紧急物资", "zh-TW":"緊急物資", fr:"Fournitures d'urgence", de:"Notversorgung", es:"Suministros de emergencia", ja:"緊急物資", ko:"긴급 물품" },
+        suppliesBody: { en:"Food, safe drinking water, hygiene kits and essential medical supplies.", "zh-CN":"食品、安全饮用水、卫生用品及必要医疗物资。", "zh-TW":"食品、安全飲用水、衛生用品及必要醫療物資。", fr:"Nourriture, eau potable, kits d'hygiène et fournitures médicales.", de:"Lebensmittel, Trinkwasser, Hygiene- und Medizinbedarf.", es:"Alimentos, agua potable, kits de higiene y suministros médicos.", ja:"食料、安全な飲料水、衛生用品、医療物資。", ko:"식량, 안전한 식수, 위생 키트와 필수 의료 물품." },
+        shelter: { en:"Shelter & clothing", "zh-CN":"临时安置与衣物", "zh-TW":"臨時安置與衣物", fr:"Abris et vêtements", de:"Unterkunft und Kleidung", es:"Refugio y ropa", ja:"避難所・衣類", ko:"임시 거처와 의류" },
+        shelterBody: { en:"Temporary shelter, blankets, weather-ready clothing and family essentials.", "zh-CN":"临时住所、毛毯、防寒防雨衣物及家庭生活用品。", "zh-TW":"臨時住所、毛毯、防寒防雨衣物及家庭生活用品。", fr:"Abris temporaires, couvertures, vêtements et produits essentiels.", de:"Notunterkünfte, Decken, wetterfeste Kleidung und Haushaltsbedarf.", es:"Refugios temporales, mantas, ropa y artículos familiares.", ja:"仮設住居、毛布、防寒・防雨衣類、生活必需品。", ko:"임시 거처, 담요, 방한·방수 의류와 생활 필수품." },
+        rebuild: { en:"Recovery & rebuilding", "zh-CN":"恢复与重建", "zh-TW":"恢復與重建", fr:"Relèvement et reconstruction", de:"Erholung und Wiederaufbau", es:"Recuperación y reconstrucción", ja:"復旧・再建", ko:"복구와 재건" },
+        rebuildBody: { en:"Repairs to homes, community facilities, water systems and local delivery routes.", "zh-CN":"修复住房、社区设施、供水系统及当地物资运输通道。", "zh-TW":"修復住房、社區設施、供水系統及當地物資運輸通道。", fr:"Réparation des logements, équipements collectifs, réseaux d'eau et voies locales.", de:"Reparaturen an Häusern, Gemeindeeinrichtungen, Wassersystemen und Zufahrtswegen.", es:"Reparación de viviendas, instalaciones, sistemas de agua y rutas locales.", ja:"住宅、地域施設、給水設備、物資輸送路の修復。", ko:"주택, 공동 시설, 급수 체계와 현지 운송로 복구." },
+        transparency: { en:"Public treasury & updates", "zh-CN":"公开金库与进展披露", "zh-TW":"公開金庫與進度披露", fr:"Trésorerie publique et suivi", de:"Öffentliche Treasury und Updates", es:"Tesorería pública y actualizaciones", ja:"公開トレジャリーと報告", ko:"공개 금고와 진행 보고" },
+        transparencyBody: { en:"Donations arrive at Lumina's public treasury. Distribution updates and outgoing transaction references will be published.", "zh-CN":"捐款进入 Lumina 公开金库；后续将公布物资分配进展及转出交易记录。", "zh-TW":"捐款進入 Lumina 公開金庫；後續將公布物資分配進度及轉出交易記錄。", fr:"Les dons arrivent dans la trésorerie publique Lumina. Les distributions et transactions sortantes seront publiées.", de:"Spenden gehen an die öffentliche Lumina-Treasury. Verteilung und ausgehende Transaktionen werden veröffentlicht.", es:"Las donaciones llegan a la tesorería pública de Lumina. Se publicarán las distribuciones y transacciones salientes.", ja:"寄付はLuminaの公開トレジャリーに届き、配分状況と送金記録を公開します。", ko:"기부금은 Lumina 공개 금고로 전송되며 배분 현황과 출금 거래를 공개합니다." },
+        payWith: { en:"Donate with", "zh-CN":"选择捐款代币", "zh-TW":"選擇捐款代幣", fr:"Faire un don en", de:"Spenden mit", es:"Donar con", ja:"寄付通貨", ko:"기부 자산" },
+        balance: { en:"Available", "zh-CN":"可用余额", "zh-TW":"可用餘額", fr:"Disponible", de:"Verfügbar", es:"Disponible", ja:"利用可能", ko:"사용 가능" },
+        treasury: { en:"Relief treasury", "zh-CN":"救援金库", "zh-TW":"救援金庫", fr:"Trésorerie de secours", de:"Hilfs-Treasury", es:"Tesorería de ayuda", ja:"支援トレジャリー", ko:"구호 금고" },
+        donate: { en:"Donate {symbol}", "zh-CN":"捐款 {symbol}", "zh-TW":"捐款 {symbol}", fr:"Donner {symbol}", de:"{symbol} spenden", es:"Donar {symbol}", ja:"{symbol} を寄付", ko:"{symbol} 기부" },
+        waiting: { en:"Waiting for World App...", "zh-CN":"等待 World App 确认...", "zh-TW":"等待 World App 確認...", fr:"En attente de World App...", de:"Warten auf World App...", es:"Esperando World App...", ja:"World App を待機中...", ko:"World App 확인 대기 중..." },
+        enterAmount: { en:"Enter an amount", "zh-CN":"请输入捐款金额", "zh-TW":"請輸入捐款金額", fr:"Saisissez un montant", de:"Betrag eingeben", es:"Introduce un importe", ja:"金額を入力", ko:"금액을 입력하세요" },
+        copied: { en:"Relief treasury copied", "zh-CN":"救援金库地址已复制", "zh-TW":"救援金庫地址已複製", fr:"Adresse copiée", de:"Treasury-Adresse kopiert", es:"Dirección copiada", ja:"アドレスをコピーしました", ko:"금고 주소를 복사했습니다" },
+        success: { en:"Donation submitted. Thank you for supporting Nepal.", "zh-CN":"捐款已提交，感谢您支持尼泊尔灾区。", "zh-TW":"捐款已提交，感謝您支持尼泊爾災區。", fr:"Don envoyé. Merci de soutenir le Népal.", de:"Spende gesendet. Danke für Ihre Unterstützung.", es:"Donación enviada. Gracias por apoyar a Nepal.", ja:"寄付を送信しました。ご支援ありがとうございます。", ko:"기부가 제출되었습니다. 네팔을 지원해 주셔서 감사합니다." },
+        cancelled: { en:"Donation cancelled", "zh-CN":"已取消捐款", "zh-TW":"已取消捐款", fr:"Don annulé", de:"Spende abgebrochen", es:"Donación cancelada", ja:"寄付をキャンセルしました", ko:"기부가 취소되었습니다" },
+        disclaimer: { en:"Community-led campaign. Not affiliated with or endorsed by the Government of Nepal, UNICEF or the Red Cross. Crypto donations are irreversible and no tax receipt is provided.", "zh-CN":"本项目为社区发起的救援行动，并非尼泊尔政府、联合国儿童基金会或红十字会的官方募捐。加密资产捐款不可撤销，且不提供税务抵扣凭证。", "zh-TW":"本項目為社區發起的救援行動，並非尼泊爾政府、聯合國兒童基金會或紅十字會的官方募捐。加密資產捐款不可撤銷，且不提供稅務抵扣憑證。", fr:"Campagne communautaire non affiliée au gouvernement népalais, à l'UNICEF ou à la Croix-Rouge. Les dons crypto sont irréversibles et sans reçu fiscal.", de:"Gemeinschaftsaktion ohne Verbindung zur nepalesischen Regierung, UNICEF oder dem Roten Kreuz. Kryptospenden sind unwiderruflich; keine Spendenquittung.", es:"Campaña comunitaria no afiliada al Gobierno de Nepal, UNICEF ni Cruz Roja. Las donaciones cripto son irreversibles y no generan recibo fiscal.", ja:"ネパール政府、UNICEF、赤十字の公式募金ではありません。暗号資産の寄付は取り消せず、税控除用の領収書は発行されません。", ko:"네팔 정부, 유니세프, 적십자의 공식 모금이 아닌 커뮤니티 캠페인입니다. 암호자산 기부는 취소할 수 없으며 세금 영수증이 제공되지 않습니다." },
+        officialInfo: { en:"Official disaster information", "zh-CN":"官方灾情信息", "zh-TW":"官方災情資訊", fr:"Informations officielles", de:"Offizielle Informationen", es:"Información oficial", ja:"公的な災害情報", ko:"공식 재난 정보" }
+      };
+      function reliefCopy(key, vars){
+        var lang = window.currentLang || localStorage.getItem("ww_lang_pref_v2") || "en";
+        var row = reliefCopyMap[key] || {};
+        var text = row[lang] || row.en || key;
+        vars = vars || {};
+        Object.keys(vars).forEach(function(name){ text = text.replace(new RegExp("\\\\{" + name + "\\\\}", "g"), vars[name]); });
+        return text;
+      }
       function homeSystemConfig(){
         try { return JSON.parse(localStorage.getItem("ww_system_config") || "{}"); } catch(e) { return {}; }
       }
@@ -3609,12 +3647,13 @@ function enhancePrototypeHome() {
           slider.className = "home-promo-slider";
           section.insertAdjacentElement("beforebegin", slider);
         }
+        var promoSlides = [];
+        if (showIco) promoSlides.push({ id:"homeIcoBanner", classes:"home-points-banner home-ico-banner", label:"ICO" });
+        promoSlides.push({ id:"homeReliefBanner", classes:"home-points-banner home-relief-banner", label:reliefCopy("cardKicker") });
+        if (showPoints) promoSlides.push({ id:"homePointsBanner", classes:"home-points-banner", label:"Lumina Points" });
         slider.innerHTML =
-          '<div class="home-promo-track">' +
-            (showIco ? '<button type="button" id="homeIcoBanner" class="home-points-banner home-ico-banner"></button>' : '') +
-            (showPoints ? '<button type="button" id="homePointsBanner" class="home-points-banner"></button>' : '') +
-          '</div>' +
-          ((showIco && showPoints) ? '<div id="homePromoDots" class="home-promo-dots"><button type="button" class="active" aria-label="ICO"></button><button type="button" aria-label="Lumina Points"></button></div>' : '');
+          '<div class="home-promo-track">' + promoSlides.map(function(item){ return '<button type="button" id="' + item.id + '" class="' + item.classes + '"></button>'; }).join('') + '</div>' +
+          (promoSlides.length > 1 ? '<div id="homePromoDots" class="home-promo-dots">' + promoSlides.map(function(item, index){ return '<button type="button" class="' + (index === 0 ? 'active' : '') + '" aria-label="' + homeBannerEscape(item.label) + '"></button>'; }).join('') + '</div>' : '');
         var icoBanner = document.getElementById("homeIcoBanner");
         if (icoBanner) {
           icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
@@ -3622,6 +3661,13 @@ function enhancePrototypeHome() {
             '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
             '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
             '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
+        }
+        var reliefBanner = document.getElementById("homeReliefBanner");
+        if (reliefBanner) {
+          reliefBanner.onclick = function(){ window.openNepalRelief && window.openNepalRelief(); };
+          reliefBanner.innerHTML =
+            '<span class="home-relief-copy"><em>' + homeBannerEscape(reliefCopy("cardKicker")) + '</em><b>' + homeBannerEscape(reliefCopy("cardTitle")) + '</b><small>' + homeBannerEscape(reliefCopy("cardSubtitle")) + '</small><i>' + homeBannerEscape(reliefCopy("donateNow")) + '</i></span>' +
+            '<span class="home-relief-mark" aria-hidden="true"><i></i><b>+</b></span><span class="home-points-chev">›</span>';
         }
         var pointsBanner = document.getElementById("homePointsBanner");
         if (pointsBanner) {
@@ -3634,6 +3680,131 @@ function enhancePrototypeHome() {
         attachHomePromoSlider(slider);
         window.__luminaEnsureHomePointsBanner = ensureHomePointsBanner;
       }
+      window.openNepalRelief = function(){
+        var old = document.getElementById("luminaReliefSheet");
+        if (old) old.remove();
+        var treasury = luminaIcoDefaults.treasuryAddress;
+        var reliefTokens = [
+          { symbol:"WLD", balanceKeys:["WLD"], address:luminaIcoDefaults.wldTokenAddress, decimals:18, minAmount:0.01 },
+          { symbol:"USDC", balanceKeys:["USDC"], address:luminaIcoDefaults.usdcTokenAddress, decimals:6, minAmount:0.1 },
+          { symbol:"WBTC", balanceKeys:["WBTC","BTC"], address:luminaIcoDefaults.wbtcTokenAddress, decimals:8, minAmount:0.00001 },
+          { symbol:"ETH", balanceKeys:["ETH"], address:null, decimals:18, minAmount:0.0001 }
+        ];
+        var selectedToken = reliefTokens[0];
+        var shortTreasury = treasury.slice(0, 8) + "..." + treasury.slice(-6);
+        function balanceForToken(token){
+          for (var i = 0; i < token.balanceKeys.length; i++) {
+            var raw = balances && balances[token.balanceKeys[i]];
+            if (raw === undefined || raw === null) continue;
+            var numeric = Number(String(raw).replace(/,/g, "").replace(/^</, "").replace(/[A-Z$ ]/g, "").trim());
+            if (Number.isFinite(numeric)) return Math.max(0, numeric);
+          }
+          return 0;
+        }
+        function formatAmount(value){
+          return Number(value || 0).toLocaleString(undefined, { useGrouping:false, maximumFractionDigits:8 });
+        }
+        function maxAmount(token){
+          var available = balanceForToken(token);
+          return token.symbol === "ETH" ? Math.max(0, available - 0.0002) : available;
+        }
+        var sheet = document.createElement("div");
+        sheet.id = "luminaReliefSheet";
+        sheet.className = "modal-mask open lumina-ico-sheet lumina-relief-sheet";
+        sheet.innerHTML =
+          '<div class="lumina-relief-page">' +
+            '<button type="button" class="lumina-ico-close" id="reliefCloseBtn">×</button>' +
+            '<section class="lumina-relief-hero"><img src="/campaigns/nepal-relief-2026.jpg" alt="" /><span></span><div><em>' + homeBannerEscape(reliefCopy("campaign")) + '</em><h2>' + homeBannerEscape(reliefCopy("title")) + '</h2><p>' + homeBannerEscape(reliefCopy("intro")) + '</p></div></section>' +
+            '<section class="lumina-relief-commitment"><i>100%</i><div><b>' + homeBannerEscape(reliefCopy("fullFund")) + '</b><small>World Chain · ' + homeBannerEscape(shortTreasury) + '</small></div></section>' +
+            '<section class="lumina-relief-uses"><h3>' + homeBannerEscape(reliefCopy("useTitle")) + '</h3>' +
+              '<div class="lumina-relief-use"><i>01</i><div><b>' + homeBannerEscape(reliefCopy("supplies")) + '</b><p>' + homeBannerEscape(reliefCopy("suppliesBody")) + '</p></div></div>' +
+              '<div class="lumina-relief-use"><i>02</i><div><b>' + homeBannerEscape(reliefCopy("shelter")) + '</b><p>' + homeBannerEscape(reliefCopy("shelterBody")) + '</p></div></div>' +
+              '<div class="lumina-relief-use"><i>03</i><div><b>' + homeBannerEscape(reliefCopy("rebuild")) + '</b><p>' + homeBannerEscape(reliefCopy("rebuildBody")) + '</p></div></div>' +
+              '<div class="lumina-relief-use"><i>04</i><div><b>' + homeBannerEscape(reliefCopy("transparency")) + '</b><p>' + homeBannerEscape(reliefCopy("transparencyBody")) + '</p></div></div>' +
+            '</section>' +
+            '<section class="lumina-relief-donate">' +
+              '<label>' + homeBannerEscape(reliefCopy("payWith")) + '</label>' +
+              '<div class="lumina-ico-select-wrap"><select class="lumina-ico-select" id="reliefPayToken">' + reliefTokens.map(function(token){ return '<option value="' + token.symbol + '">' + token.symbol + '</option>'; }).join('') + '</select><span>⌄</span></div>' +
+              '<div class="lumina-ico-input"><input id="reliefAmount" inputmode="decimal" placeholder="' + homeBannerEscape(reliefCopy("enterAmount")) + '" /><button type="button" id="reliefMaxBtn">MAX</button><span id="reliefTokenSuffix">WLD</span></div>' +
+              '<div class="lumina-relief-balance"><span>' + homeBannerEscape(reliefCopy("balance")) + '</span><b id="reliefBalance">0 WLD</b></div>' +
+              '<div class="lumina-ico-address"><span>' + homeBannerEscape(reliefCopy("treasury")) + '</span><button type="button" id="reliefCopyTreasury">' + homeBannerEscape(shortTreasury) + '</button></div>' +
+              '<button type="button" class="lumina-ico-pay lumina-relief-pay" id="reliefPayBtn">' + homeBannerEscape(reliefCopy("donate", { symbol:"WLD" })) + '</button>' +
+            '</section>' +
+            '<section class="lumina-relief-disclosure"><p>' + homeBannerEscape(reliefCopy("disclaimer")) + '</p><a href="https://moha.gov.np/en/post/ha-ra-tha-ka-apa-l-11" target="_blank" rel="noopener noreferrer">' + homeBannerEscape(reliefCopy("officialInfo")) + ' ↗</a><a href="https://www.unicef.org/nepal/flooding-nepal" target="_blank" rel="noopener noreferrer">UNICEF Nepal ↗</a></section>' +
+          '</div>';
+        document.body.appendChild(sheet);
+        var input = document.getElementById("reliefAmount");
+        var tokenSelect = document.getElementById("reliefPayToken");
+        var tokenSuffix = document.getElementById("reliefTokenSuffix");
+        var balanceLabel = document.getElementById("reliefBalance");
+        var maxBtn = document.getElementById("reliefMaxBtn");
+        var payBtn = document.getElementById("reliefPayBtn");
+        function close(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); }
+        function currentToken(){
+          var symbol = tokenSelect ? String(tokenSelect.value || "WLD").toUpperCase() : "WLD";
+          return reliefTokens.find(function(token){ return token.symbol === symbol; }) || selectedToken;
+        }
+        function amount(){
+          var value = Number(String(input && input.value || "").replace(/,/g, ""));
+          return Number.isFinite(value) ? Math.max(0, value) : 0;
+        }
+        function refresh(){
+          var token = currentToken();
+          selectedToken = token;
+          var available = balanceForToken(token);
+          if (tokenSuffix) tokenSuffix.textContent = token.symbol;
+          if (balanceLabel) balanceLabel.textContent = formatAmount(available) + " " + token.symbol;
+          if (maxBtn) maxBtn.disabled = maxAmount(token) <= 0;
+          if (payBtn) {
+            payBtn.disabled = amount() < token.minAmount || amount() > maxAmount(token);
+            payBtn.textContent = reliefCopy("donate", { symbol:token.symbol });
+          }
+        }
+        sheet.onclick = function(event){ if (event.target === sheet) close(); };
+        document.getElementById("reliefCloseBtn").onclick = close;
+        document.getElementById("reliefCopyTreasury").onclick = function(){
+          if (navigator.clipboard) navigator.clipboard.writeText(treasury).then(function(){ toast(reliefCopy("copied"), "success"); });
+        };
+        input.oninput = refresh;
+        tokenSelect.onchange = function(){ input.value = ""; refresh(); };
+        maxBtn.onclick = function(){ input.value = formatAmount(maxAmount(currentToken())); refresh(); };
+        payBtn.onclick = async function(){
+          var token = currentToken();
+          var value = amount();
+          if (!window.__luminaUserAddress) { toast(icoCopy("connectWallet")); return; }
+          if (!window.__luminaSendToken) { toast(icoCopy("paymentUnavailable")); return; }
+          if (value < token.minAmount || value > maxAmount(token)) { refresh(); return; }
+          payBtn.disabled = true;
+          payBtn.textContent = reliefCopy("waiting");
+          try {
+            var result = await window.__luminaSendToken({
+              tokenSymbol: token.symbol,
+              tokenAddress: token.address,
+              tokenDecimals: token.decimals,
+              recipient: treasury,
+              amountHuman: String(value),
+              userAddress: window.__luminaUserAddress || "",
+              applyPlatformFee: false
+            });
+            if (result.status === "success") {
+              if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"Nepal Relief Donation", subtitle:"Lumina community relief campaign", amount:"-" + formatAmount(value) + " " + token.symbol, status:"Completed", hash:result.txHash || ("relief-" + Date.now()) });
+              if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
+              toast(reliefCopy("success"), "success");
+              close();
+            } else if (result.status === "user_rejected") {
+              toast(reliefCopy("cancelled"));
+              refresh();
+            } else {
+              toast(icoCopy("paymentFailed", { message:window.__luminaFriendlySendError ? window.__luminaFriendlySendError(result.error) : (result.error || "Unknown error") }));
+              refresh();
+            }
+          } catch(error) {
+            toast(icoCopy("paymentFailed", { message:window.__luminaFriendlySendError ? window.__luminaFriendlySendError(String(error && error.message || error)) : String(error && error.message || error) }));
+            refresh();
+          }
+        };
+        refresh();
+      };
       function icoCountdownParts(launchAt){
         var target = launchAt ? new Date(launchAt).getTime() : 0;
         var diff = target ? Math.max(0, target - Date.now()) : 0;
