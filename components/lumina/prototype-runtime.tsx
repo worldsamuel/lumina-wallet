@@ -68,6 +68,7 @@ declare global {
     __luminaCompleteTask?: (id: string, silent?: boolean) => void;
     __luminaIcoCountdownTimer?: ReturnType<typeof setInterval>;
     __luminaEnsureHomePointsBanner?: () => void;
+    __luminaHomePromoSlideId?: string;
     __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
@@ -3617,13 +3618,18 @@ function enhancePrototypeHome() {
         track.__luminaSliderWired = true;
         track.addEventListener("scroll", function(){
           var width = Math.max(1, track.clientWidth);
-          renderHomePromoDots(Math.round(track.scrollLeft / width));
+          var active = Math.round(track.scrollLeft / width);
+          var slide = track.children && track.children[active];
+          if (slide && slide.id) window.__luminaHomePromoSlideId = slide.id;
+          renderHomePromoDots(active);
         }, { passive: true });
         var dots = slider.querySelectorAll(".home-promo-dots button");
         dots.forEach(function(btn, index){
           btn.onclick = function(event){
             event.preventDefault();
             event.stopPropagation();
+            var slide = track.children && track.children[index];
+            if (slide && slide.id) window.__luminaHomePromoSlideId = slide.id;
             track.scrollTo({ left: index * track.clientWidth, behavior: "smooth" });
           };
         });
@@ -3632,6 +3638,12 @@ function enhancePrototypeHome() {
         var home = document.getElementById("view-home");
         if (!home) return;
         var slider = document.getElementById("homePromoSlider");
+        var previousTrack = slider && slider.querySelector(".home-promo-track");
+        if (previousTrack && previousTrack.children && previousTrack.children.length) {
+          var previousIndex = Math.round(previousTrack.scrollLeft / Math.max(1, previousTrack.clientWidth));
+          var previousSlide = previousTrack.children[previousIndex];
+          if (previousSlide && previousSlide.id) window.__luminaHomePromoSlideId = previousSlide.id;
+        }
         var ico = luminaIcoConfig();
         var points = homePointsBannerConfig();
         var showIco = ico.enabled !== false;
@@ -3648,8 +3660,8 @@ function enhancePrototypeHome() {
           section.insertAdjacentElement("beforebegin", slider);
         }
         var promoSlides = [];
-        if (showIco) promoSlides.push({ id:"homeIcoBanner", classes:"home-points-banner home-ico-banner", label:"ICO" });
         promoSlides.push({ id:"homeReliefBanner", classes:"home-points-banner home-relief-banner", label:reliefCopy("cardKicker") });
+        if (showIco) promoSlides.push({ id:"homeIcoBanner", classes:"home-points-banner home-ico-banner", label:"ICO" });
         if (showPoints) promoSlides.push({ id:"homePointsBanner", classes:"home-points-banner", label:"Lumina Points" });
         slider.innerHTML =
           '<div class="home-promo-track">' + promoSlides.map(function(item){ return '<button type="button" id="' + item.id + '" class="' + item.classes + '"></button>'; }).join('') + '</div>' +
@@ -3678,6 +3690,16 @@ function enhancePrototypeHome() {
             '<span class="home-points-chev">›</span>';
         }
         attachHomePromoSlider(slider);
+        var rememberedSlideId = window.__luminaHomePromoSlideId || "homeReliefBanner";
+        var rememberedIndex = promoSlides.findIndex(function(item){ return item.id === rememberedSlideId; });
+        if (rememberedIndex < 0) rememberedIndex = 0;
+        window.__luminaHomePromoSlideId = promoSlides[rememberedIndex] && promoSlides[rememberedIndex].id;
+        window.requestAnimationFrame(function(){
+          var track = slider && slider.querySelector(".home-promo-track");
+          if (!track) return;
+          track.scrollLeft = rememberedIndex * track.clientWidth;
+          renderHomePromoDots(rememberedIndex);
+        });
         window.__luminaEnsureHomePointsBanner = ensureHomePointsBanner;
       }
       window.openNepalRelief = function(){
