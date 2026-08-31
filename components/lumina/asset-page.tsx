@@ -41,8 +41,8 @@ export function AssetPage({ symbol }: AssetPageProps) {
     refreshWhenHidden: false,
   });
   const onchain = useSWR<OnchainPricesResponse>(status === "authenticated" ? "/api/prices/onchain" : null, fetcher, {
-    dedupingInterval: 15_000,
-    refreshInterval: 15_000,
+    dedupingInterval: 30_000,
+    refreshInterval: 30_000,
     revalidateOnFocus: true,
     refreshWhenHidden: false,
   });

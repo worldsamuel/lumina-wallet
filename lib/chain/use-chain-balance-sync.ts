@@ -48,8 +48,8 @@ export function useChainBalanceSync(enabled: boolean, userAddress: string | null
     revalidateOnFocus: true,
   });
   const onchain = useSWR<OnchainPricesResponse>(enabled ? "/api/prices/onchain" : null, fetcher, {
-    dedupingInterval: 15_000,
-    refreshInterval: 15_000,
+    dedupingInterval: 30_000,
+    refreshInterval: 30_000,
     revalidateOnFocus: true,
   });
 

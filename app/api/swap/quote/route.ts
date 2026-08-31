@@ -41,6 +41,7 @@ type QuoteCacheEntry = { expiresAt: number; staleUntil: number; data: unknown };
 
 const QUOTE_CACHE_TTL_MS = 8_000;
 const QUOTE_CACHE_STALE_MS = 90_000;
+const UNISWAP_API_HEAD_START_MS = 350;
 const QUOTE_FILE_CACHE_DIR = "/tmp/lumina-swap-quote-cache";
 const QUOTE_RESPONSE_HEADERS = {
   "Cache-Control": "private, no-store, max-age=0, must-revalidate",
@@ -247,19 +248,30 @@ async function buildPrimaryUniswapQuote(
   slippageBps: number,
   userAddress: string | null,
 ): Promise<SourceQuote | null> {
-  const candidates = [
-    withTimeout(
-      quoteBestUniswapApi({
-        fromToken: from,
-        toToken: to,
-        amountIn,
-        slippageBps,
-        swapper: userAddress as `0x${string}` | null,
-      }),
-      1_800,
-    ).then((quote) => executableSourceQuote(quote)),
-    withTimeout(quoteBestV3(from, to, amountIn), 2_500).then((quote) => executableSourceQuote(quote)),
-  ].map((candidate) =>
+  const apiQuote = withTimeout(
+    quoteBestUniswapApi({
+      fromToken: from,
+      toToken: to,
+      amountIn,
+      slippageBps,
+      swapper: userAddress as `0x${string}` | null,
+    }),
+    1_800,
+  )
+    .then((quote) => executableSourceQuote(quote))
+    .catch(() => null);
+  const earlyApiResult = await Promise.race([
+    apiQuote.then((quote) => ({ settled: true as const, quote })),
+    sleep(UNISWAP_API_HEAD_START_MS).then(() => ({ settled: false as const, quote: null })),
+  ]);
+  if (earlyApiResult.settled) {
+    return earlyApiResult.quote ?? buildV3QuoteWithRetry(from, to, amountIn);
+  }
+
+  const v3Quote = withTimeout(quoteBestV3(from, to, amountIn), 2_500)
+    .then((quote) => executableSourceQuote(quote))
+    .catch(() => null);
+  const candidates = [apiQuote, v3Quote].map((candidate) =>
     candidate.then((quote) => {
       if (!quote) throw new Error("quote_unavailable");
       return quote;

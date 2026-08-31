@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress, type Address } from "viem";
 import { rateLimit } from "@/lib/api/rate-limit";
 import { fetchBalances } from "@/lib/balances";
+import { readSharedCache, writeSharedCache, type SharedCacheEntry } from "@/lib/server/shared-file-cache";
 
 const CACHE_TTL_MS = 30_000;
 const STALE_CACHE_TTL_MS = 10 * 60_000;
 
-type CachedBalances = {
-  expiresAt: number;
-  staleUntil: number;
-  data: Awaited<ReturnType<typeof serializeBalances>>;
-};
+type CachedBalances = SharedCacheEntry<Awaited<ReturnType<typeof serializeBalances>>>;
 
 const balanceCache = new Map<string, CachedBalances>();
 const pendingBalanceReads = new Map<string, Promise<CachedBalances["data"]>>();
+const SHARED_CACHE_NAMESPACE = "wallet-balances";
 
 const BALANCE_CACHE_HEADERS = {
   "Cache-Control": "private, max-age=30, stale-while-revalidate=60",
@@ -50,19 +48,33 @@ export async function GET(request: NextRequest) {
   }
 
   const cacheKey = address.toLowerCase();
-  const cached = balanceCache.get(cacheKey);
+  let cached = balanceCache.get(cacheKey);
   if (!refresh && cached && cached.expiresAt > Date.now()) {
     return NextResponse.json({ balances: cached.data, cached: true }, { headers: BALANCE_CACHE_HEADERS });
+  }
+  if (!refresh) {
+    const shared = await readSharedCache<CachedBalances["data"]>(SHARED_CACHE_NAMESPACE, cacheKey);
+    if (shared) {
+      cached = shared;
+      balanceCache.set(cacheKey, shared);
+      if (shared.expiresAt > Date.now()) {
+        return NextResponse.json({ balances: shared.data, cached: true }, { headers: BALANCE_CACHE_HEADERS });
+      }
+    }
   }
 
   try {
     const data = refresh
       ? await readFreshBalances(cacheKey, address as Address)
       : await readBalancesOnce(cacheKey, address as Address);
-    balanceCache.set(cacheKey, {
+    const entry: CachedBalances = {
       data,
       expiresAt: Date.now() + CACHE_TTL_MS,
       staleUntil: Date.now() + STALE_CACHE_TTL_MS,
+    };
+    balanceCache.set(cacheKey, entry);
+    await writeSharedCache(SHARED_CACHE_NAMESPACE, cacheKey, entry).catch(() => {
+      console.warn("[balances] shared cache write unavailable");
     });
     return NextResponse.json({ balances: data, cached: false }, { headers: refresh ? FRESH_BALANCE_HEADERS : BALANCE_CACHE_HEADERS });
   } catch {
