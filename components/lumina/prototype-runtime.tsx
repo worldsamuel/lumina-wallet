@@ -3411,10 +3411,10 @@ function enhancePrototypeHome() {
       }
       var icoCopyMap = {
         headline: { en:"Owning LUMINA may be your smartest choice.", "zh-CN":"拥有 LUMINA，将会是你最明智的选择。", "zh-TW":"擁有 LUMINA，將會是你最明智的選擇。", fr:"Posséder LUMINA pourrait être votre meilleur choix.", de:"LUMINA zu besitzen könnte Ihre klügste Entscheidung sein.", es:"Tener LUMINA puede ser tu decisión más inteligente.", ja:"LUMINA を持つことは、あなたの賢い選択になるかもしれません。" },
-        subtitle: { en:"Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.", "zh-CN":"9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。", "zh-TW":"9 月 7 日進行代幣空投並上線交易所。每個錢包最多可分配 1000 WLD 額度。", fr:"L'airdrop et la cotation en bourse sont prévus le 7 septembre. Chaque wallet peut réserver jusqu'à 1000 WLD.", de:"Airdrop und Börsenlisting sind für den 7. September geplant. Jede Wallet kann bis zu 1000 WLD reservieren.", es:"El airdrop y la cotización en exchange están programados para el 7 de septiembre. Cada billetera puede reservar hasta 1000 WLD.", ja:"エアドロップと取引所上場は9月7日に予定されています。各ウォレットは最大1000 WLDまで予約できます。" },
+        subtitle: { en:"The ICO runs through September 30. Airdrop distribution and LUMINA trading begin October 1. Each wallet can reserve up to 1,000 WLD.", "zh-CN":"ICO 将持续至 9 月 30 日。10 月 1 日开始空投并开放 LUMINA 交易。每个钱包最多可分配 1,000 WLD 额度。", "zh-TW":"ICO 將持續至 9 月 30 日。10 月 1 日開始空投並開放 LUMINA 交易。每個錢包最多可分配 1,000 WLD 額度。", fr:"L'ICO se poursuit jusqu'au 30 septembre. L'airdrop et le trading de LUMINA débutent le 1er octobre. Chaque wallet peut réserver jusqu'à 1 000 WLD.", de:"Das ICO läuft bis zum 30. September. Airdrop und LUMINA-Handel starten am 1. Oktober. Jede Wallet kann bis zu 1.000 WLD reservieren.", es:"La ICO estará abierta hasta el 30 de septiembre. El airdrop y el trading de LUMINA comienzan el 1 de octubre. Cada billetera puede reservar hasta 1.000 WLD.", ja:"ICOは9月30日まで実施されます。10月1日からエアドロップとLUMINA取引が開始されます。各ウォレットは最大1,000 WLDまで予約できます。", ko:"ICO는 9월 30일까지 진행됩니다. 10월 1일부터 에어드롭과 LUMINA 거래가 시작됩니다. 지갑당 최대 1,000 WLD까지 예약할 수 있습니다." },
         publicAllocation: { en:"Public Allocation", "zh-CN":"公开额度", "zh-TW":"公開額度", fr:"Allocation publique", de:"Öffentliche Zuteilung", es:"Asignación pública", ja:"公開割当" },
-        september7: { en:"September 7", "zh-CN":"9 月 7 日", "zh-TW":"9 月 7 日", fr:"7 septembre", de:"7. September", es:"7 de septiembre", ja:"9月7日" },
-        airdropListing: { en:"Airdrop + Exchange Listing", "zh-CN":"空投 + 上线交易所", "zh-TW":"空投 + 上線交易所", fr:"Airdrop + cotation en bourse", de:"Airdrop + Börsenlisting", es:"Airdrop + listado en exchange", ja:"エアドロップ + 取引所上場" },
+        october1: { en:"October 1", "zh-CN":"10 月 1 日", "zh-TW":"10 月 1 日", fr:"1er octobre", de:"1. Oktober", es:"1 de octubre", ja:"10月1日", ko:"10월 1일" },
+        airdropListing: { en:"Airdrop + LUMINA Trading", "zh-CN":"空投 + 开放 LUMINA 交易", "zh-TW":"空投 + 開放 LUMINA 交易", fr:"Airdrop + trading de LUMINA", de:"Airdrop + LUMINA-Handel", es:"Airdrop + trading de LUMINA", ja:"エアドロップ + LUMINA取引開始", ko:"에어드롭 + LUMINA 거래 시작" },
         maxAllocation: { en:"Max allocation {amount} {symbol} per wallet", "zh-CN":"每个钱包最多可分配 {amount} {symbol}", "zh-TW":"每個錢包最多可分配 {amount} {symbol}", fr:"Allocation max. {amount} {symbol} par wallet", de:"Max. Zuteilung {amount} {symbol} pro Wallet", es:"Asignación máxima {amount} {symbol} por billetera", ja:"ウォレットごとの最大割当 {amount} {symbol}" },
         rate: { en:"Rate", "zh-CN":"兑换比例", "zh-TW":"兌換比例", fr:"Taux", de:"Kurs", es:"Tasa", ja:"レート" },
         yourAllocation: { en:"Your allocation", "zh-CN":"你的额度", "zh-TW":"你的額度", fr:"Votre allocation", de:"Ihre Zuteilung", es:"Tu asignación", ja:"あなたの割当" },
@@ -3431,9 +3431,10 @@ function enhancePrototypeHome() {
         maxAllocationToast: { en:"Maximum allocation is {amount} {symbol} per wallet.", "zh-CN":"每个钱包最多可分配 {amount} {symbol}。", "zh-TW":"每個錢包最多可分配 {amount} {symbol}。", fr:"L'allocation maximale est de {amount} {symbol} par wallet.", de:"Die maximale Zuteilung beträgt {amount} {symbol} pro Wallet.", es:"La asignación máxima es {amount} {symbol} por billetera.", ja:"ウォレットごとの最大割当は {amount} {symbol} です。" },
         paymentUnavailable: { en:"World App payment is unavailable.", "zh-CN":"World App 支付暂不可用。", "zh-TW":"World App 支付暫不可用。", fr:"Le paiement World App est indisponible.", de:"World App-Zahlung ist nicht verfügbar.", es:"El pago de World App no está disponible.", ja:"World App の支払いは利用できません。" },
         waitingWorldApp: { en:"Waiting for World App...", "zh-CN":"等待 World App 确认...", "zh-TW":"等待 World App 確認...", fr:"En attente de World App...", de:"Warten auf World App...", es:"Esperando World App...", ja:"World App を待機中..." },
-        launchCountdown: { en:"Launch countdown", "zh-CN":"上线倒计时", "zh-TW":"上線倒數", fr:"Compte à rebours", de:"Countdown zum Start", es:"Cuenta atrás", ja:"ローンチまで" },
+        launchCountdown: { en:"ICO ends in", "zh-CN":"ICO 结束倒计时", "zh-TW":"ICO 結束倒數", fr:"Fin de l'ICO dans", de:"ICO endet in", es:"La ICO termina en", ja:"ICO終了まで", ko:"ICO 종료까지" },
         icoStatus: { en:"ICO Status", "zh-CN":"ICO 状态", "zh-TW":"ICO 狀態", fr:"Statut ICO", de:"ICO-Status", es:"Estado ICO", ja:"ICO ステータス" },
-        live: { en:"LIVE", "zh-CN":"进行中", "zh-TW":"進行中", fr:"EN DIRECT", de:"LIVE", es:"EN VIVO", ja:"公開中" },
+        live: { en:"ENDED", "zh-CN":"已结束", "zh-TW":"已結束", fr:"TERMINÉE", de:"BEENDET", es:"FINALIZADA", ja:"終了", ko:"종료됨" },
+        icoEnded: { en:"ICO has ended", "zh-CN":"ICO 已结束", "zh-TW":"ICO 已結束", fr:"L'ICO est terminée", de:"ICO ist beendet", es:"La ICO ha finalizado", ja:"ICOは終了しました", ko:"ICO가 종료되었습니다" },
         wldPay: { en:"WLD Pay", "zh-CN":"WLD 支付", "zh-TW":"WLD 支付", fr:"Paiement WLD", de:"WLD-Zahlung", es:"Pago WLD", ja:"WLD 支払い" },
         reserve: { en:"Reserve", "zh-CN":"预留", "zh-TW":"預留", fr:"Réserver", de:"Reservieren", es:"Reservar", ja:"予約" },
         allocationReserved: { en:"LUMINA allocation reserved", "zh-CN":"LUMINA 额度已预留", "zh-TW":"LUMINA 額度已預留", fr:"Allocation LUMINA réservée", de:"LUMINA-Zuteilung reserviert", es:"Asignación LUMINA reservada", ja:"LUMINA 割当を予約しました" },
@@ -3554,7 +3555,7 @@ function enhancePrototypeHome() {
           maxWld: Math.max(0.001, Number(ico.maxWld || 1000)),
           paymentTokens: normalizeIcoPaymentTokens(ico.paymentTokens),
           hardCap: Math.max(0, Number(ico.hardCap || 1000000)),
-          launchAt: ico.launchAt || "2026-09-07T00:00:00.000Z",
+          launchAt: ico.launchAt || "2026-10-01T00:00:00.000Z",
           headline: homeBannerText(ico.headlineI18n, icoCopy("headline")),
           subtitle: homeBannerText(ico.subtitleI18n, icoCopy("subtitle"))
         };
@@ -3880,7 +3881,7 @@ function enhancePrototypeHome() {
               '<div><em>' + homeBannerEscape(icoCopy("publicAllocation")) + '</em><h2>LUMINA ICO</h2><p>' + homeBannerEscape(ico.headline) + '</p></div>' +
             '</section>' +
             '<section class="lumina-ico-countdown" id="icoCountdown"></section>' +
-            '<section class="lumina-ico-info"><b>' + homeBannerEscape(icoCopy("september7")) + '</b><span>' + homeBannerEscape(icoCopy("airdropListing")) + '</span><small id="icoMaxHint">' + homeBannerEscape(icoCopy("maxAllocation", { amount: Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: selectedToken.symbol })) + '</small></section>' +
+            '<section class="lumina-ico-info"><b>' + homeBannerEscape(icoCopy("october1")) + '</b><span>' + homeBannerEscape(icoCopy("airdropListing")) + '</span><small id="icoMaxHint">' + homeBannerEscape(icoCopy("maxAllocation", { amount: Number(selectedToken.maxAmount || 100).toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: selectedToken.symbol })) + '</small></section>' +
             '<section class="lumina-ico-stats">' +
               '<div><span>' + homeBannerEscape(icoCopy("rate")) + '</span><b id="icoRateValue">' + homeBannerEscape(tokenRateLabel(selectedToken)) + '</b></div>' +
               '<div><span>' + homeBannerEscape(icoCopy("yourAllocation")) + '</span><b id="icoAllocationValue">' + Number(allocation.lumina || 0).toLocaleString() + '</b><small>LUMINA</small></div>' +
@@ -3911,7 +3912,7 @@ function enhancePrototypeHome() {
         renderIcoCountdown(ico);
         refreshIcoProgress();
         clearInterval(window.__luminaIcoCountdownTimer);
-        window.__luminaIcoCountdownTimer = setInterval(function(){ renderIcoCountdown(ico); }, 1000);
+        window.__luminaIcoCountdownTimer = setInterval(function(){ renderIcoCountdown(ico); refresh(); }, 1000);
         function amount(){
           var value = Number(String(input.value || "").replace(/,/g, ""));
           return Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -3957,6 +3958,7 @@ function enhancePrototypeHome() {
           var token = currentToken();
           var value = amount();
           var remaining = remainingForToken(token);
+          var icoOpen = icoCountdownParts(ico.launchAt).active;
           if (tokenSuffix) tokenSuffix.textContent = token.symbol;
           if (input) input.placeholder = formatIcoRange(token);
           if (maxBtn) maxBtn.disabled = maxPayAmount(token) <= 0;
@@ -3964,8 +3966,9 @@ function enhancePrototypeHome() {
           var rateBox = document.getElementById("icoRateValue");
           if (rateBox) rateBox.textContent = rateLabel(token);
           receive.textContent = Number(receiveLumina(value, token)).toLocaleString(undefined, { maximumFractionDigits: 2 }) + " LUMINA";
-          pay.disabled = !treasury || value < token.minAmount || value > remaining;
-          if (value > remaining) pay.textContent = icoCopy("maxRemaining", { amount: remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: token.symbol });
+          pay.disabled = !icoOpen || !treasury || value < token.minAmount || value > remaining;
+          if (!icoOpen) pay.textContent = icoCopy("icoEnded");
+          else if (value > remaining) pay.textContent = icoCopy("maxRemaining", { amount: remaining.toLocaleString(undefined, { maximumFractionDigits: 8 }), symbol: token.symbol });
           else if (value < token.minAmount) pay.textContent = icoCopy("minimum", { amount: token.minAmount, symbol: token.symbol });
           else pay.textContent = treasury ? icoCopy("payReserve", { symbol: token.symbol }) : icoCopy("configureTreasury");
         }
@@ -3982,6 +3985,7 @@ function enhancePrototypeHome() {
         pay.onclick = async function(){
           var token = currentToken();
           var value = amount();
+          if (!icoCountdownParts(ico.launchAt).active) { toast(icoCopy("icoEnded")); return; }
           if (!treasury) { toast(icoCopy("noTreasury")); return; }
           if (!window.__luminaUserAddress) { toast(icoCopy("connectWallet")); return; }
           if (value < token.minAmount) { toast(icoCopy("minimum", { amount: token.minAmount, symbol: token.symbol })); return; }

@@ -150,14 +150,20 @@ export const DEFAULT_SYSTEM_CONFIG: SystemConfig = {
       { symbol: "BTC", paySymbol: "WBTC", address: "0x03c7054bcb39f7b2e5b2c7acb37583e32d70cfa3", decimals: 8, minAmount: 0.0001, maxAmount: 0.01, luminaRate: 650000000, quoteAmount: 0.001, boostMultiplier: 4 },
       { symbol: "ETH", address: null, decimals: 18, minAmount: 0.001, maxAmount: 0.5, luminaRate: 13500000, quoteAmount: 0.001, boostMultiplier: 3 },
     ],
-    launchAt: "2026-09-07T00:00:00.000Z",
+    launchAt: "2026-10-01T00:00:00.000Z",
     headlineI18n: {
       en: "Owning LUMINA may be your smartest choice.",
       "zh-CN": "拥有 LUMINA，将会是你最明智的选择。",
     },
     subtitleI18n: {
-      en: "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.",
-      "zh-CN": "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。",
+      en: "The ICO runs through September 30. Airdrop distribution and LUMINA trading begin October 1. Each wallet can reserve up to 1,000 WLD.",
+      "zh-CN": "ICO 将持续至 9 月 30 日。10 月 1 日开始空投并开放 LUMINA 交易。每个钱包最多可分配 1,000 WLD 额度。",
+      "zh-TW": "ICO 將持續至 9 月 30 日。10 月 1 日開始空投並開放 LUMINA 交易。每個錢包最多可分配 1,000 WLD 額度。",
+      fr: "L'ICO se poursuit jusqu'au 30 septembre. L'airdrop et le trading de LUMINA débutent le 1er octobre. Chaque wallet peut réserver jusqu'à 1 000 WLD.",
+      de: "Das ICO läuft bis zum 30. September. Airdrop und LUMINA-Handel starten am 1. Oktober. Jede Wallet kann bis zu 1.000 WLD reservieren.",
+      es: "La ICO estará abierta hasta el 30 de septiembre. El airdrop y el trading de LUMINA comienzan el 1 de octubre. Cada billetera puede reservar hasta 1.000 WLD.",
+      ja: "ICOは9月30日まで実施されます。10月1日からエアドロップとLUMINA取引が開始されます。各ウォレットは最大1,000 WLDまで予約できます。",
+      ko: "ICO는 9월 30일까지 진행됩니다. 10월 1일부터 에어드롭과 LUMINA 거래가 시작됩니다. 지갑당 최대 1,000 WLD까지 예약할 수 있습니다.",
     },
   },
   support: {
@@ -378,6 +384,16 @@ function cleanIsoDate(value: unknown) {
 function normalizeIco(value: unknown): SystemConfig["ico"] {
   const source = typeof value === "object" && value !== null ? value as Partial<SystemConfig["ico"]> : {};
   const fallback = DEFAULT_SYSTEM_CONFIG.ico;
+  const storedLaunchAt = cleanIsoDate(source.launchAt);
+  const launchAt = storedLaunchAt === "2026-09-07T00:00:00.000Z" ? fallback.launchAt : storedLaunchAt || fallback.launchAt;
+  const subtitleI18n = cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en);
+  const legacySubtitles = new Set([
+    "Airdrop and exchange listing are scheduled for September 7. Each wallet can reserve up to 1000 WLD.",
+    "9 月 7 日进行代币空投并上线交易所。每个钱包最多可分配 1000 WLD 额度。",
+  ]);
+  Object.entries(fallback.subtitleI18n).forEach(([language, text]) => {
+    if (!subtitleI18n[language] || legacySubtitles.has(subtitleI18n[language])) subtitleI18n[language] = text;
+  });
   return {
     enabled: typeof source.enabled === "boolean" ? source.enabled : fallback.enabled,
     treasuryAddress: cleanAddress(source.treasuryAddress, fallback.treasuryAddress),
@@ -385,9 +401,9 @@ function normalizeIco(value: unknown): SystemConfig["ico"] {
     minWld: Math.max(0.001, Number(source.minWld ?? fallback.minWld)),
     maxWld: Math.max(0.001, Number(source.maxWld ?? fallback.maxWld)),
     paymentTokens: cleanIcoPaymentTokens(source.paymentTokens, fallback.paymentTokens),
-    launchAt: cleanIsoDate(source.launchAt) || fallback.launchAt,
+    launchAt,
     headlineI18n: cleanI18n(source.headlineI18n, fallback.headlineI18n.en),
-    subtitleI18n: cleanI18n(source.subtitleI18n, fallback.subtitleI18n.en),
+    subtitleI18n,
   };
 }
 
