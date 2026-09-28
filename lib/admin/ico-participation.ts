@@ -286,25 +286,42 @@ function isChainSourcedRecord(row: IcoParticipationRecord) {
   return row.id.startsWith("ico-explorer-") || row.id.startsWith("ico-chain-");
 }
 
+function amountsMatchPaymentSplit(fullAmount: number, chainAmount: number) {
+  if (!(fullAmount > 0) || !(chainAmount > 0)) return false;
+  const tolerance = Math.max(1e-10, fullAmount * 1e-6);
+  return [fullAmount, fullAmount * 0.9, fullAmount * 0.1].some(
+    (candidate) => Math.abs(candidate - chainAmount) <= tolerance,
+  );
+}
+
+function likelyDuplicateChainRecord(row: IcoParticipationRecord, manualRows: IcoParticipationRecord[]) {
+  if (!isChainSourcedRecord(row)) return false;
+  const rowTime = Date.parse(row.createdAt);
+  return manualRows.some((manual) => {
+    if (manual.address !== row.address || manual.tokenSymbol !== row.tokenSymbol) return false;
+    const manualTime = Date.parse(manual.createdAt);
+    if (Number.isFinite(rowTime) && Number.isFinite(manualTime) && Math.abs(rowTime - manualTime) > 10 * 60_000) {
+      return false;
+    }
+    return amountsMatchPaymentSplit(manual.tokenAmount, row.tokenAmount);
+  });
+}
+
 function dedupeIcoRecords(rows: IcoParticipationRecord[]) {
   const seenTx = new Set<string>();
-  const chainKeys = new Set<string>();
+  const manualRows = rows.filter((row) => !isChainSourcedRecord(row));
   const unique: IcoParticipationRecord[] = [];
 
   for (const row of rows) {
+    if (likelyDuplicateChainRecord(row, manualRows)) continue;
     const txHash = hasRealTransactionHash(row) ? String(row.txHash).toLowerCase() : "";
     if (txHash) {
       if (seenTx.has(txHash)) continue;
       seenTx.add(txHash);
     }
-    if (isChainSourcedRecord(row)) chainKeys.add(`${row.address}:${row.tokenSymbol}`);
     unique.push(row);
   }
-
-  return unique.filter((row) => {
-    if (isChainSourcedRecord(row)) return true;
-    return !chainKeys.has(`${row.address}:${row.tokenSymbol}`);
-  });
+  return unique;
 }
 
 async function syncIcoRecordsFromChain() {
@@ -428,6 +445,37 @@ export async function getIcoProgress(options: { sync?: boolean } = {}) {
     targetLumina: ICO_TARGET_LUMINA,
     rawPercent,
     percent,
+  };
+}
+
+export async function getIcoAllocation(address: string) {
+  const normalized = normalizeAddress(address);
+  const rates = await getIcoTokenRates();
+  const rows = dedupeIcoRecords(await readRecords())
+    .filter((row) => row.address === normalized)
+    .map((row) => recalculateRecordLumina(row, rates));
+  const byToken: Record<string, number> = {};
+  let lumina = 0;
+  let wld = 0;
+  for (const row of rows) {
+    const tokenAmount = Math.max(0, Number(row.tokenAmount || 0));
+    const luminaAmount = Math.max(0, Number(row.luminaAmount || 0));
+    byToken[row.tokenSymbol] = Number(byToken[row.tokenSymbol] || 0) + tokenAmount;
+    lumina += luminaAmount;
+    if (row.tokenSymbol === "WLD") wld += tokenAmount;
+  }
+  return {
+    address: normalized,
+    wld,
+    lumina,
+    byToken,
+    orders: rows.map((row) => ({
+      tokenSymbol: row.tokenSymbol,
+      tokenAmount: row.tokenAmount,
+      lumina: row.luminaAmount,
+      hash: row.txHash || "",
+      createdAt: row.createdAt,
+    })),
   };
 }
 

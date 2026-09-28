@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonResponse, optionsResponse } from "@/lib/api/cors";
 import { rateLimit } from "@/lib/api/rate-limit";
-import { getIcoProgress, recordIcoParticipation } from "@/lib/admin/ico-participation";
+import { getIcoAllocation, getIcoProgress, recordIcoParticipation } from "@/lib/admin/ico-participation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +17,14 @@ export async function GET(req: NextRequest) {
   if (!rateLimit(req, "public:ico-progress", 120).ok) {
     return jsonResponse({ error: "Too many requests." }, { status: 429, headers: NO_STORE_HEADERS });
   }
-  return jsonResponse(await getIcoProgress({ sync: false }), { headers: NO_STORE_HEADERS });
+  const address = String(req.nextUrl.searchParams.get("address") || "");
+  const progress = await getIcoProgress({ sync: false });
+  if (!address) return jsonResponse(progress, { headers: NO_STORE_HEADERS });
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
+    return jsonResponse({ error: "Invalid wallet address." }, { status: 400, headers: NO_STORE_HEADERS });
+  }
+  const allocation = await getIcoAllocation(address);
+  return jsonResponse({ ...progress, allocation }, { headers: NO_STORE_HEADERS });
 }
 
 export async function POST(req: NextRequest) {

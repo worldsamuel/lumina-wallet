@@ -3544,6 +3544,34 @@ function enhancePrototypeHome() {
         try { localStorage.setItem(key, JSON.stringify(current)); } catch(e) {}
         return current;
       }
+      async function syncLuminaIcoAllocation(){
+        var address = String(window.__luminaUserAddress || "").toLowerCase();
+        if (!/^0x[a-f0-9]{40}$/.test(address)) return luminaIcoAllocation();
+        try {
+          var response = await fetch("/api/ico/participation?address=" + encodeURIComponent(address) + "&t=" + Date.now(), {
+            cache:"no-store",
+            headers:{ "cache-control":"no-store" }
+          });
+          var data = response.ok ? await response.json() : null;
+          var server = data && data.allocation;
+          if (!server) return luminaIcoAllocation();
+          var local = luminaIcoAllocation();
+          var merged = {
+            wld: Math.max(Number(local.wld || 0), Number(server.wld || 0)),
+            lumina: Math.max(Number(local.lumina || 0), Number(server.lumina || 0)),
+            byToken: {},
+            orders: Array.isArray(server.orders) && server.orders.length ? server.orders : (Array.isArray(local.orders) ? local.orders : [])
+          };
+          var symbols = new Set(Object.keys(local.byToken || {}).concat(Object.keys(server.byToken || {})));
+          symbols.forEach(function(symbol){
+            merged.byToken[symbol] = Math.max(Number((local.byToken || {})[symbol] || 0), Number((server.byToken || {})[symbol] || 0));
+          });
+          localStorage.setItem("lumina_ico_allocation_v1:" + address, JSON.stringify(merged));
+          return merged;
+        } catch(e) {
+          return luminaIcoAllocation();
+        }
+      }
       function localIcoProgressPercent(){
         var allocation = luminaIcoAllocation();
         var total = Number(luminaIcoDefaults.baseProgressLumina || 0) + Number(allocation.lumina || 0);
@@ -3682,7 +3710,7 @@ function enhancePrototypeHome() {
         var old = document.getElementById("luminaIcoSheet");
         if (old) old.remove();
         var ico = luminaIcoConfig();
-        var allocation = luminaIcoAllocation();
+        var allocation = await syncLuminaIcoAllocation();
         var treasury = ico.treasuryAddress;
         var selectedToken = ico.paymentTokens[0] || defaultIcoPaymentTokens()[0];
         var shortTreasury = treasury ? treasury.slice(0, 8) + "..." + treasury.slice(-6) : icoCopy("configureTreasury");
@@ -3830,10 +3858,15 @@ function enhancePrototypeHome() {
               tokenDecimals: token.decimals || 18,
               recipient: treasury,
               amountHuman: String(value),
-              userAddress: window.__luminaUserAddress || ""
+              userAddress: window.__luminaUserAddress || "",
+              applyPlatformFee: false
             });
             if (result.status === "success") {
               var luminaAmount = receiveLumina(value, token);
+              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: luminaAmount, hash: result.txHash || "", createdAt: new Date().toISOString() });
+              allocation = row;
+              var allocationValue = document.getElementById("icoAllocationValue");
+              if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               var synced = false;
               for (var attempt = 0; attempt < 2 && !synced; attempt++) {
                 try {
@@ -3859,9 +3892,6 @@ function enhancePrototypeHome() {
                 pay.textContent = icoCopy("payReserve", { symbol: token.symbol });
                 return;
               }
-              var row = saveLuminaIcoAllocation({ wld: token.symbol === "WLD" ? value : 0, tokenSymbol: token.symbol, tokenAmount: value, lumina: luminaAmount, hash: result.txHash || "", createdAt: new Date().toISOString() });
-              var allocationValue = document.getElementById("icoAllocationValue");
-              if (allocationValue) allocationValue.textContent = Number(row.lumina || 0).toLocaleString();
               if (window.__luminaAddLocalActivity) window.__luminaAddLocalActivity({ type:"out", title:"LUMINA ICO", subtitle:"Reserved " + Number(luminaAmount).toLocaleString() + " LUMINA", amount:"-" + amount() + " " + token.symbol, status:"Completed", hash:result.txHash || ("ico-" + Date.now()) });
               if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
               refreshIcoProgress();
