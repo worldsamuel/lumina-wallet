@@ -1314,6 +1314,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       };
       window.__luminaTokenLogoHtml = function(symbol, fallback){
         var sym = String(symbol || "").toUpperCase();
+        if (sym === "LUMINA") return logoImg(sym, "/tokens/lumina.png", "");
         var configured = logoUrlsBySymbol[sym];
         if (configured) return logoImg(sym, configured, "");
         return fallbackInitial(sym, fallback);
@@ -1334,6 +1335,7 @@ function enhancePrototypeBuiltinTokenLogos() {
         tokenLogo.WGEM = window.__luminaTokenLogoHtml("WGEM", "W");
         tokenLogo.HUB = window.__luminaTokenLogoHtml("HUB", "H");
         tokenLogo.USOL = window.__luminaTokenLogoHtml("USOL", "S");
+        tokenLogo.LUMINA = window.__luminaTokenLogoHtml("LUMINA", "L");
         if (typeof renderAssets === "function") renderAssets();
         if (typeof renderTokenList === "function") {
           var search = document.getElementById("tkSearch");
@@ -1352,6 +1354,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       dotColor.ORO = "linear-gradient(135deg,#203020,#314633)";
       dotColor.ORB = "linear-gradient(135deg,#203020,#314633)";
       dotColor.USOL = "linear-gradient(135deg,#1d2d28,#2f5f4d)";
+      dotColor.LUMINA = "#050805";
       prices.USDT = prices.USDT || 1;
       balances.USDT = balances.USDT || "0";
       availMap.USDT = availMap.USDT || "0 USDT";
@@ -2344,7 +2347,7 @@ function enhancePrototypeTokens() {
         return isEarnVaultSymbol(symbol) || earnVaultTokenAddressSet.has(address) || /^Re7/i.test(name);
       }
       function sortedSwapSymbols(symbols){
-        var pinned = ["WLD","USDC","USDT","WETH","WBTC","EURC"];
+        var pinned = ["LUMINA","WLD","USDC","USDT","WETH","WBTC","EURC"];
         var seen = new Set();
         return (symbols || []).filter(function(sym){
           sym = String(sym || "").toUpperCase();
@@ -2916,6 +2919,10 @@ function enhancePrototypeTokens() {
         }
         var verifiedRows = (assets || []).filter(function(a){
           return a && showAllAssetRow(a) && String(a.sym || "").toUpperCase() !== "BTC";
+        }).sort(function(a, b){
+          var aLumina = String(a && a.sym || "").toUpperCase() === "LUMINA";
+          var bLumina = String(b && b.sym || "").toUpperCase() === "LUMINA";
+          return aLumina === bLumina ? 0 : (aLumina ? -1 : 1);
         }).map(function(a){
           var i = assets.indexOf(a);
           var status = String(a.status || "").toLowerCase();
@@ -4248,6 +4255,10 @@ function enhancePrototypeHome() {
         if (search) filter = String(search.value || "").toLowerCase().trim();
         var verified = (assets || []).filter(function(a){
           return showOnHome(a) && (!filter || (a.sym + " " + a.full).toLowerCase().indexOf(filter) >= 0);
+        }).sort(function(a, b){
+          var aLumina = String(a && a.sym || "").toUpperCase() === "LUMINA";
+          var bLumina = String(b && b.sym || "").toUpperCase() === "LUMINA";
+          return aLumina === bLumina ? 0 : (aLumina ? -1 : 1);
         });
         var expanded = localStorage.getItem("lumina_home_assets_expanded") === "1";
         var visible = filter || expanded ? verified : verified.slice(0, 10);
