@@ -455,6 +455,12 @@
   .lumina-token-mark,
   .lumina-token-mark *,
   .lumina-token-img { pointer-events: none; }
+  .lumina-token-img[alt="LUMINA logo"] {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+  }
   .coin.eth .lumina-token-img,
   .detail-v2-token-icon.eth .lumina-token-img,
   .swap-panel .tk .dot2.eth .lumina-token-img,
