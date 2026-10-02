@@ -633,6 +633,7 @@
   .detail-v2-change em { font-style: normal; }
   .detail-verify-badge { display: inline-flex; align-items: center; min-height: 29px; padding: 0 10px; border-radius: 10px; font-size: 13px; font-weight: 900; font-style: normal; }
   .detail-verify-badge.ok { background: rgba(74,222,128,0.14); color: var(--green); }
+  .detail-verify-badge.official { padding: 0 8px; font-size: 11px; white-space: nowrap; }
   .detail-verify-badge.warn { background: rgba(245,196,81,0.14); color: #f5c451; }
   .detail-verify-badge.danger { background: rgba(248,113,113,0.15); color: var(--red); }
   .detail-v2-chart-card { margin: 0; background: linear-gradient(180deg, rgba(5,8,8,0.98), rgba(5,5,5,0.98)); border: 1px solid rgba(255,255,255,0.06); border-radius: 24px; overflow: hidden; box-shadow: 0 16px 46px rgba(0,0,0,0.28); }

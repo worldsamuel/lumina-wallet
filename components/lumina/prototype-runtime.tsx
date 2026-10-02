@@ -1382,6 +1382,7 @@ function enhancePrototypeBuiltinTokenLogos() {
       }
       if (typeof renderTokenList === "function") {
         function pickerVerifyBadge(sym){
+          if (String(sym || "").toUpperCase() === "LUMINA") return '<span class="custom-badge status-dot verified" title="Officially Verified Token" aria-label="Officially Verified Token"></span>';
           var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
           var meta = customTokens && customTokens[sym];
           var status = String((market && market.status) || (meta && meta.status) || "").toLowerCase();
@@ -2925,9 +2926,10 @@ function enhancePrototypeTokens() {
           return aLumina === bLumina ? 0 : (aLumina ? -1 : 1);
         }).map(function(a){
           var i = assets.indexOf(a);
+          var isLumina = String(a && a.sym || "").toUpperCase() === "LUMINA";
           var status = String(a.status || "").toLowerCase();
-          var cls = status === "rejected" || status === "high" || status === "danger" ? "high" : (status === "pending" || status === "community" || status === "unverified" ? "mid" : "low");
-          var label = cls === "high" ? "High risk" : (cls === "mid" ? "Unverified" : "Verified");
+          var cls = isLumina ? "low" : (status === "rejected" || status === "high" || status === "danger" ? "high" : (status === "pending" || status === "community" || status === "unverified" ? "mid" : "low"));
+          var label = isLumina ? "Official" : (cls === "high" ? "High risk" : (cls === "mid" ? "Unverified" : "Verified"));
           return '<div class="asset all-asset-row" onclick="openDetail(' + i + ')">' +
             assetIconHtml(a.sym, a.cls, a.logo) +
             '<div class="name"><div class="sym">' + a.sym + ' <span class="asset-risk ' + cls + '">' + label + '</span></div><div class="full">' + a.full + '</div></div>' +
@@ -4351,6 +4353,7 @@ function enhancePrototypeMarket() {
       }
       function verifyStatus(item){
         var sym = String(item && item.symbol || "").toUpperCase();
+        if (sym === "LUMINA") return "verified";
         var configured = window.__luminaBackendTokenBySymbol && window.__luminaBackendTokenBySymbol[sym];
         var market = window.__luminaMarketBySymbol && window.__luminaMarketBySymbol[sym];
         var status = String((configured && configured.status) || (market && market.status) || (item && item.status) || "").toLowerCase();
@@ -8047,6 +8050,7 @@ function enhancePrototypeDetail() {
         return copy[key] || key;
       }
       function detailVerifyMeta(asset){
+        if (String(asset && asset.sym || "").toUpperCase() === "LUMINA") return { cls:"ok official", text:"Officially Verified Token" };
         var market = marketForAsset(asset);
         var status = String((asset && asset.status) || (market && market.status) || "").toLowerCase();
         if (status === "verified") return { cls:"ok", text: detailLang() === "zh-CN" ? "已验证" : "Verified" };
