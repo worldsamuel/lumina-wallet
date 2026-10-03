@@ -2392,6 +2392,7 @@ function enhancePrototypeTokens() {
         var source = [];
         var backendBySymbol = backendTokensBySymbol();
         var builtin = [
+          { symbol:"LUMINA", name:"Lumina", contractAddr:"0x0c694f548af9d357b768995440a180e1927d08d6", poolAddress:"0xa81959444c64f905ba15e96ebfa2c3c1827e37e1", decimals:18, logoUrl:"/tokens/lumina.png", status:"verified", canSwap:true },
           { symbol:"WLD", name:"Worldcoin", contractAddr:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", decimals:18, logoUrl:null },
           { symbol:"USDC", name:"USD Coin", contractAddr:"0x79A02482A880bCE3F13e09Da970dC34db4CD24d1", decimals:6, logoUrl:null },
           { symbol:"USDT", name:"Tether USD", contractAddr:"0x102d758f688a4c1c5a80b116bd945d4455460282", decimals:6, logoUrl:null },
@@ -4507,6 +4508,11 @@ function enhancePrototypeMarket() {
         var box = document.getElementById("gainersList");
         if (!box) return;
         updateMarketTabs();
+        var lumina = markets.find(function(item){ return String(item && item.symbol || "").toUpperCase() === "LUMINA"; }) || (window.__luminaMarketBySymbol && window.__luminaMarketBySymbol.LUMINA) || {
+          symbol:"LUMINA", name:"Lumina", address:"0x0c694f548af9d357b768995440a180e1927d08d6", poolAddress:"0xa81959444c64f905ba15e96ebfa2c3c1827e37e1",
+          priceUsd:Number(prices && prices.LUMINA || 0), change24h:Number(tokenChanges24h && tokenChanges24h.LUMINA || 0), volume24hUsd:0, liquidityUsd:0, verified:true, status:"verified", decimals:18
+        };
+        markets = [lumina].concat(markets.filter(function(item){ return String(item && item.symbol || "").toUpperCase() !== "LUMINA"; }));
         if (!markets.length) {
           box.innerHTML = '<div class="import-load">' + marketCopy("emptyPrefix") + marketTabTitle() + marketCopy("emptySuffix") + '</div>';
           return;
