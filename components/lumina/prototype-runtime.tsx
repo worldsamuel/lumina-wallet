@@ -5260,9 +5260,10 @@ function enhancePrototypeSwapQuote() {
 	      function verifiedSwapToken(token){
 	        if (!token) return false;
 	        if (token.verified === true) return true;
+        var symbol = String(token.symbol || token.sym || "").toUpperCase();
+        if (symbol === "LUMINA") return true;
 	        var tokenStatus = String(token.status || token.trust || (token.safety && token.safety.status) || "").toLowerCase();
 	        if (tokenStatus === "verified") return true;
-	        var symbol = String(token.symbol || token.sym || "").toUpperCase();
 	        var address = normalizedSwapTokenAddress(token);
 	        var whitelist = typeof swapWhitelistTokens === "function" ? swapWhitelistTokens() : [];
 	        if (Array.isArray(whitelist)) {
