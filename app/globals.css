@@ -319,7 +319,8 @@
   #view-home .home-promo-slider { width: calc(100% - (var(--pad-screen) * 2)); margin: 4px var(--pad-screen) 8px; overflow: visible; }
   #view-home .home-promo-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding: 0; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
   #view-home .home-promo-track::-webkit-scrollbar { display: none; }
-  #view-home .home-promo-track .home-points-banner { flex: 0 0 100%; width: 100%; margin: 0; scroll-snap-align: start; }
+  #view-home .home-promo-track .home-points-banner,
+  #view-home .home-promo-track .home-fee-share-banner { flex: 0 0 100%; width: 100%; margin: 0; scroll-snap-align: start; }
   #view-home .home-promo-dots { height: 18px; display: flex; align-items: center; justify-content: center; gap: 6px; }
   #view-home .home-promo-dots button { width: 6px; height: 6px; padding: 0; border: 0; border-radius: 999px; background: rgba(255,255,255,.2); transition: width .18s ease, background .18s ease; }
   #view-home .home-promo-dots button.active { width: 18px; background: var(--green); }
@@ -358,6 +359,15 @@
   #view-home .home-points-spark.s3 { right: 70px; top: 32px; opacity: .62; }
   #view-home .home-points-spark.s4 { right: 58px; top: 8px; width: 2px; height: 2px; opacity: .7; }
   #view-home .home-points-chev { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); color: #fff; font-size: 34px; line-height: 1; z-index: 1; }
+  #view-home .home-fee-share-banner { position: relative; min-height: 128px; padding: 16px 48px 15px 82px; border: 1px solid rgba(215,188,95,.34); border-radius: 18px; display: grid; align-items: center; overflow: hidden; text-align: left; color: #fff; background: radial-gradient(circle at 14% 50%, rgba(218,188,71,.18), transparent 30%), radial-gradient(circle at 88% 20%, rgba(74,222,128,.16), transparent 27%), linear-gradient(112deg, #11120f, #1a1b13 58%, #0d100d); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 18px 46px rgba(0,0,0,.26); cursor: pointer; }
+  #view-home .home-fee-share-banner::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(105deg, rgba(255,224,119,.1), transparent 42%, rgba(74,222,128,.08)); }
+  #view-home .home-fee-share-mark { position: absolute; left: 18px; top: 50%; width: 50px; height: 50px; transform: translateY(-50%); border: 1px solid rgba(255,222,114,.5); border-radius: 50%; display: grid; place-items: center; color: #ffe28a; background: rgba(0,0,0,.26); box-shadow: 0 0 24px rgba(255,210,90,.18), inset 0 0 0 5px rgba(255,224,119,.06); font-size: 25px; font-weight: 950; }
+  #view-home .home-fee-share-copy { position: relative; z-index: 1; min-width: 0; display: grid; gap: 5px; }
+  #view-home .home-fee-share-copy b { font-size: 15px; line-height: 1.1; font-weight: 900; }
+  #view-home .home-fee-share-copy strong { color: #ffe28a; font-size: 24px; line-height: 1; font-weight: 950; }
+  #view-home .home-fee-share-copy small { max-width: 240px; color: #b9b8a7; font-size: 12px; line-height: 1.35; font-weight: 650; }
+  #view-home .home-fee-share-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
+  #view-home .home-fee-share-pills i { min-height: 25px; padding: 0 9px; border: 1px solid rgba(255,224,119,.2); border-radius: 13px; display: inline-flex; align-items: center; background: rgba(255,224,119,.08); color: #ffe7a4; font-size: 11px; font-style: normal; font-weight: 850; }
   #view-home .home-ico-banner { border-color: rgba(165,255,109,.28); background: radial-gradient(circle at 18% 50%, rgba(178,255,85,.24), transparent 30%), radial-gradient(circle at 86% 24%, rgba(72,222,128,.22), transparent 28%), linear-gradient(112deg, #0a0d09, #162012 55%, #09110c); }
   #view-home .home-ico-banner::before { background: linear-gradient(110deg, rgba(177,255,66,.12), transparent 44%, rgba(74,222,128,.1)), radial-gradient(circle at 72% 16%, rgba(255,255,255,.55) 0 1px, transparent 2px); }
   #view-home .home-ico-orb { position: absolute; left: 20px; top: 50%; width: 80px; height: 80px; transform: translateY(-50%); border-radius: 28px; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, rgba(206,255,92,.9), rgba(74,222,128,.35) 38%, rgba(8,14,9,.96) 70%); box-shadow: inset 0 0 0 1px rgba(185,255,112,.36), 0 0 34px rgba(95,255,126,.34); }
@@ -409,6 +419,29 @@
   .lumina-ico-pay { width: 100%; min-height: 50px; margin-top: 14px; border: 0; border-radius: 16px; background: linear-gradient(135deg, #78f08a, #caff5a); color: #041006; font-size: 14px; font-weight: 950; box-shadow: 0 16px 32px rgba(104,255,128,.2); }
   .lumina-ico-pay:disabled { opacity: .48; box-shadow: none; }
   .lumina-ico-note { margin: 14px 2px 0; color: rgba(255,255,255,.48); font-size: 12px; line-height: 1.5; }
+  .lumina-fee-share-sheet { align-items: flex-end; padding: 16px 12px 0; }
+  .lumina-fee-share-page { position: relative; width: min(430px, 100%); max-height: 82vh; margin: 0 auto; overflow: auto; border: 1px solid rgba(255,224,119,.24); border-radius: 28px 28px 0 0; background: radial-gradient(circle at 82% 0%, rgba(255,215,94,.14), transparent 32%), linear-gradient(180deg, #151710, #060706); box-shadow: 0 -24px 70px rgba(0,0,0,.6); color: #fff; }
+  .lumina-fee-share-close { position: absolute; z-index: 4; right: 16px; top: 14px; width: 36px; height: 36px; border: 1px solid rgba(255,255,255,.1); border-radius: 50%; background: rgba(255,255,255,.06); color: #fff; font-size: 24px; line-height: 1; }
+  .lumina-fee-share-hero { position: relative; min-height: 132px; padding: 22px 54px 16px 22px; display: grid; grid-template-columns: 58px 1fr; align-items: center; gap: 14px; overflow: hidden; }
+  .lumina-fee-share-hero::before { content: ""; position: absolute; right: -70px; top: -78px; width: 190px; height: 190px; border: 1px solid rgba(255,224,119,.24); border-radius: 50%; box-shadow: inset 0 0 52px rgba(255,214,89,.1); }
+  .lumina-fee-share-icon { position: relative; width: 58px; height: 58px; border: 1px solid rgba(255,224,119,.52); border-radius: 50%; display: grid; place-items: center; color: #ffe28a; background: rgba(255,224,119,.08); box-shadow: 0 0 32px rgba(255,215,90,.2); font-size: 29px; font-weight: 950; }
+  .lumina-fee-share-hero em { display: block; margin-bottom: 7px; color: #ffe28a; font-size: 11px; font-style: normal; font-weight: 900; letter-spacing: .08em; }
+  .lumina-fee-share-hero h2 { margin: 0; font-size: 24px; line-height: 1.05; font-weight: 950; }
+  .lumina-fee-share-hero p { margin: 7px 0 0; color: rgba(255,255,255,.68); font-size: 12px; line-height: 1.4; font-weight: 700; }
+  .lumina-fee-share-rule { margin: 0 16px 10px; padding: 15px; border: 1px solid rgba(255,224,119,.2); border-radius: 18px; display: grid; gap: 5px; background: rgba(255,224,119,.07); }
+  .lumina-fee-share-rule span, .lumina-fee-share-rule small, .lumina-fee-share-stats span, .lumina-fee-share-stats small { color: rgba(255,255,255,.52); font-size: 12px; font-weight: 800; }
+  .lumina-fee-share-rule strong { color: #ffe28a; font-size: 25px; line-height: 1; font-weight: 950; }
+  .lumina-fee-share-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 16px 12px; }
+  .lumina-fee-share-stats div { padding: 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 17px; background: rgba(255,255,255,.045); }
+  .lumina-fee-share-stats b { display: block; margin: 8px 0 4px; color: #fff; font-size: 18px; line-height: 1.05; font-weight: 950; }
+  .lumina-fee-share-section { margin: 0 16px 12px; padding: 15px; border: 1px solid rgba(255,255,255,.08); border-radius: 18px; background: rgba(255,255,255,.035); }
+  .lumina-fee-share-section h3 { margin-bottom: 10px; font-size: 15px; font-weight: 900; }
+  .lumina-fee-share-section ul { padding-left: 18px; color: rgba(255,255,255,.72); font-size: 13px; line-height: 1.55; }
+  .lumina-fee-share-section li + li { margin-top: 7px; }
+  .lumina-fee-share-note { margin: 0 16px 14px; padding: 13px 14px; border-left: 3px solid #ffe28a; border-radius: 0 14px 14px 0; background: rgba(255,224,119,.07); }
+  .lumina-fee-share-note strong { color: #ffe28a; font-size: 13px; }
+  .lumina-fee-share-note p { margin-top: 6px; color: rgba(255,255,255,.62); font-size: 12px; line-height: 1.5; }
+  .lumina-fee-share-action { width: calc(100% - 32px); min-height: 50px; margin: 0 16px 18px; border: 0; border-radius: 16px; background: linear-gradient(135deg, #ffe28a, #b9e875); color: #10150d; font-size: 14px; font-weight: 950; }
   @keyframes homeRingSpin { to { transform: rotate(360deg); } }
   @keyframes homeDotOrbit { from { transform: rotate(0deg) translateX(40px) rotate(0deg); } to { transform: rotate(360deg) translateX(40px) rotate(-360deg); } }
   @media (max-width: 390px) {
@@ -420,6 +453,9 @@
     #view-home .home-ico-orb { left: 12px; width: 72px; height: 72px; border-radius: 24px; }
     #view-home .home-ico-orb i { font-size: 31px; }
     #view-home .home-ico-rays { right: 18px; transform: scale(.76); transform-origin: top right; }
+    #view-home .home-fee-share-banner { padding-left: 76px; padding-right: 38px; }
+    #view-home .home-fee-share-mark { left: 12px; width: 50px; height: 50px; }
+    #view-home .home-fee-share-copy small { max-width: 195px; }
   }
   .section-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 22px 12px; }
   .section-head h2 { font-size: 19px; font-weight: 700; }

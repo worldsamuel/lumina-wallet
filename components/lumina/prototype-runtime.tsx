@@ -69,6 +69,7 @@ declare global {
     __luminaIcoCountdownTimer?: ReturnType<typeof setInterval>;
     __luminaEnsureHomePointsBanner?: () => void;
     __luminaHomePromoSlideId?: string;
+    openFeeSharePlan?: () => void;
     __luminaApplyChainBalanceRows?: (rows?: unknown[]) => void;
     __luminaAddLocalActivity?: (item: {
       type?: string;
@@ -3647,7 +3648,7 @@ function enhancePrototypeHome() {
         }
         var points = homePointsBannerConfig();
         var showPoints = points.enabled !== false;
-        if (!showPoints) { if (slider) slider.remove(); return; }
+        // The fee-share plan is a permanent homepage entry, independent of the points banner toggle.
         if (!slider) {
           var section = home.querySelector(".section-head");
           if (!section) return;
@@ -3660,6 +3661,7 @@ function enhancePrototypeHome() {
         }
         var promoSlides = [];
         if (showPoints) promoSlides.push({ id:"homePointsBanner", classes:"home-points-banner", label:"Lumina Points" });
+        promoSlides.push({ id:"homeFeeShareBanner", classes:"home-fee-share-banner", label:"Lumina Fee Share Plan" });
         slider.innerHTML =
           '<div class="home-promo-track">' + promoSlides.map(function(item){ return '<button type="button" id="' + item.id + '" class="' + item.classes + '"></button>'; }).join('') + '</div>' +
           (promoSlides.length > 1 ? '<div id="homePromoDots" class="home-promo-dots">' + promoSlides.map(function(item, index){ return '<button type="button" class="' + (index === 0 ? 'active' : '') + '" aria-label="' + homeBannerEscape(item.label) + '"></button>'; }).join('') + '</div>' : '');
@@ -3671,8 +3673,16 @@ function enhancePrototypeHome() {
             '<span class="home-points-copy"><b>' + homeBannerEscape(points.title) + '</b><strong><span id="homePointsBannerValue">' + Number(window.__luminaPoints || 0).toLocaleString() + '</span><em>Points</em></strong><small>' + homeBannerEscape(points.subtitle) + '</small><span class="home-points-actions"><i>' + homeBannerEscape(points.tasks) + '</i><i class="gift">' + homeBannerEscape(points.box) + '</i></span></span>' +
             '<span class="home-points-chev">›</span>';
         }
+        var feeShareBanner = document.getElementById("homeFeeShareBanner");
+        if (feeShareBanner) {
+          feeShareBanner.onclick = function(){ if (window.openFeeSharePlan) window.openFeeSharePlan(); };
+          feeShareBanner.innerHTML =
+            '<span class="home-fee-share-mark">%</span>' +
+            '<span class="home-fee-share-copy"><b>Lumina Fee Share Plan</b><strong>From 100 WLD</strong><small>Share in the platform fee pool. Maximum 1,000 WLD per participant.</small><span class="home-fee-share-pills"><i>1% per 100 WLD</i><i>100% fee pool</i></span></span>' +
+            '<span class="home-points-chev">›</span>';
+        }
         attachHomePromoSlider(slider);
-        var rememberedSlideId = window.__luminaHomePromoSlideId || "homePointsBanner";
+        var rememberedSlideId = window.__luminaHomePromoSlideId || (showPoints ? "homePointsBanner" : "homeFeeShareBanner");
         var rememberedIndex = promoSlides.findIndex(function(item){ return item.id === rememberedSlideId; });
         if (rememberedIndex < 0) rememberedIndex = 0;
         window.__luminaHomePromoSlideId = promoSlides[rememberedIndex] && promoSlides[rememberedIndex].id;
@@ -3684,6 +3694,28 @@ function enhancePrototypeHome() {
         });
         window.__luminaEnsureHomePointsBanner = ensureHomePointsBanner;
       }
+      window.openFeeSharePlan = function(){
+        var old = document.getElementById("luminaFeeShareSheet");
+        if (old) old.remove();
+        var sheet = document.createElement("div");
+        sheet.id = "luminaFeeShareSheet";
+        sheet.className = "modal-mask open lumina-fee-share-sheet";
+        sheet.innerHTML =
+          '<div class="lumina-fee-share-page" role="dialog" aria-modal="true" aria-labelledby="feeShareTitle">' +
+            '<button type="button" class="lumina-fee-share-close" aria-label="Close">×</button>' +
+            '<div class="lumina-fee-share-hero"><span class="lumina-fee-share-icon">%</span><div><em>COMMUNITY PROGRAM</em><h2 id="feeShareTitle">Lumina Fee Share Plan</h2><p>Participate in the planned distribution of actual platform fees.</p></div></div>' +
+            '<div class="lumina-fee-share-rule"><span>Starting allocation</span><strong>100 WLD</strong><small>Minimum per participant</small></div>' +
+            '<div class="lumina-fee-share-stats"><div><span>Share unit</span><b>1%</b><small>per 100 WLD</small></div><div><span>Maximum</span><b>1,000 WLD</b><small>per participant</small></div></div>' +
+            '<section class="lumina-fee-share-section"><h3>How it is intended to work</h3><ul><li>100% of platform fees are planned to be allocated to the distribution pool.</li><li>Each 100 WLD allocation represents one 1% share unit of that pool.</li><li>A participant may allocate up to 1,000 WLD, subject to the final program rules.</li><li>Distributions are based on actual collected fees for each settlement period.</li></ul></section>' +
+            '<section class="lumina-fee-share-note"><strong>Important</strong><p>Fee amounts vary with platform activity. This is not a fixed or guaranteed return. Participation, settlement timing, eligibility snapshots, custody, and the final smart-contract or treasury mechanism will be published in the official terms before the program opens.</p></section>' +
+            '<button type="button" class="lumina-fee-share-action">Rules and enrollment are coming soon</button>' +
+          '</div>';
+        document.body.appendChild(sheet);
+        var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
+        sheet.onclick = function(event){ if (event.target === sheet) close(); };
+        sheet.querySelector(".lumina-fee-share-close").onclick = close;
+        sheet.querySelector(".lumina-fee-share-action").onclick = function(){ toast("Official rules will be published before enrollment opens."); };
+      };
       function icoCountdownParts(launchAt){
         var target = launchAt ? new Date(launchAt).getTime() : 0;
         var diff = target ? Math.max(0, target - Date.now()) : 0;
