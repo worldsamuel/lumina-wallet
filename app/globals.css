@@ -368,6 +368,14 @@
   #view-home .home-fee-share-copy small { max-width: 240px; color: #b9b8a7; font-size: 12px; line-height: 1.35; font-weight: 650; }
   #view-home .home-fee-share-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 3px; }
   #view-home .home-fee-share-pills i { min-height: 25px; padding: 0 9px; border: 1px solid rgba(255,224,119,.2); border-radius: 13px; display: inline-flex; align-items: center; background: rgba(255,224,119,.08); color: #ffe7a4; font-size: 11px; font-style: normal; font-weight: 850; }
+  .lumina-fee-share-payment { margin-top: 16px; padding: 15px; border: 1px solid rgba(255,224,119,.18); border-radius: 18px; background: rgba(255,224,119,.045); }
+  .lumina-fee-share-payment label { display: block; margin-bottom: 8px; color: #ffe7a4; font-size: 13px; font-weight: 850; }
+  .lumina-fee-share-payment-row { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 0 14px; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: rgba(0,0,0,.22); }
+  .lumina-fee-share-payment-row input { min-width: 0; flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font: inherit; font-size: 23px; font-weight: 900; }
+  .lumina-fee-share-payment-row span { color: #ffe28a; font-size: 15px; font-weight: 900; }
+  .lumina-fee-share-payment > small { display: block; margin-top: 9px; color: #b9b8a7; font-size: 12px; line-height: 1.45; }
+  .lumina-fee-share-payment .lumina-fee-share-action { width: 100%; min-height: 48px; margin-top: 13px; border: 0; border-radius: 16px; background: linear-gradient(100deg, #ffe27c, #c9ff66); color: #16190d; font-size: 15px; font-weight: 950; cursor: pointer; }
+  .lumina-fee-share-payment .lumina-fee-share-action:disabled { opacity: .62; cursor: wait; }
   #view-home .home-ico-banner { border-color: rgba(165,255,109,.28); background: radial-gradient(circle at 18% 50%, rgba(178,255,85,.24), transparent 30%), radial-gradient(circle at 86% 24%, rgba(72,222,128,.22), transparent 28%), linear-gradient(112deg, #0a0d09, #162012 55%, #09110c); }
   #view-home .home-ico-banner::before { background: linear-gradient(110deg, rgba(177,255,66,.12), transparent 44%, rgba(74,222,128,.1)), radial-gradient(circle at 72% 16%, rgba(255,255,255,.55) 0 1px, transparent 2px); }
   #view-home .home-ico-orb { position: absolute; left: 20px; top: 50%; width: 80px; height: 80px; transform: translateY(-50%); border-radius: 28px; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, rgba(206,255,92,.9), rgba(74,222,128,.35) 38%, rgba(8,14,9,.96) 70%); box-shadow: inset 0 0 0 1px rgba(185,255,112,.36), 0 0 34px rgba(95,255,126,.34); }

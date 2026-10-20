@@ -3709,10 +3709,20 @@ function enhancePrototypeHome() {
             ja: { eyebrow:"コミュニティプログラム", title:"Lumina 手数料分配プラン", intro:"参加者は割当額を支払うだけで、Lumina が参加情報を登録・確認します。", start:"最低参加額", min:"参加者1人あたり", unit:"分配単位", per:"100 WLDごと", max:"上限", participant:"参加者1人あたり", how:"仕組み", rules:["プラットフォーム手数料の100%を分配プールに充当します。","100 WLDごとにプールの1%の分配単位となります。","参加者は支払いを完了するだけで、対象となる支払いをバックエンドが記録・確認します。","分配は毎月1回精算し、Lumina チームが手動で送付します。","枠には限りがあり、先着順です。"], important:"重要", note:"分配額は実際のプラットフォーム活動によって変動し、固定または保証されたものではありません。参加資格、月次精算、保管、手動送付は公式ルールに従います。", action:"限定枠 · 先着順"},
             ko: { eyebrow:"커뮤니티 프로그램", title:"Lumina 수수료 분배 플랜", intro:"참여자는 배정 금액만 결제하면 되며 Lumina가 참여 내역을 등록하고 확인합니다.", start:"최소 참여 금액", min:"참여자 1인 기준", unit:"분배 단위", per:"100 WLD당", max:"최대 금액", participant:"참여자 1인 기준", how:"운영 방식", rules:["플랫폼 수수료의 100%를 분배 풀에 배정합니다.","100 WLD 결제마다 풀의 1% 분배 단위가 됩니다.","참여자는 결제만 완료하면 되며 백엔드가 유효한 결제를 기록하고 확인합니다.","분배금은 매월 1회 정산하고 Lumina 팀이 수동으로 지급합니다.","한정된 수량으로 선착순 배정됩니다."], important:"중요 안내", note:"분배금은 실제 플랫폼 활동에 따라 달라지며 고정되거나 보장되지 않습니다. 참여 자격, 월별 정산, 보관 및 수동 지급은 공식 규칙에 따릅니다.", action:"한정 수량 · 선착순"}
           };
-          return copy[lang] || copy.en;
+          var selected = copy[lang] || copy.en;
+          var labels = {
+            en: { pay:"Pay with WLD", hint:"Payment is sent to the Lumina treasury. Your share is recorded for monthly manual settlement.", success:"Payment recorded. Your share is pending monthly review.", cancelled:"Payment cancelled.", failed:"Payment failed", connect:"Connect your wallet first." },
+            "zh-CN": { pay:"使用 WLD 支付", hint:"支付将发送至 Lumina 金库，分红份额会登记并等待每月人工结算。", success:"支付已登记，分红份额等待月度审核。", cancelled:"支付已取消。", failed:"支付失败", connect:"请先连接钱包。" },
+            "zh-TW": { pay:"使用 WLD 支付", hint:"支付將發送至 Lumina 金庫，分紅份額會登記並等待每月人工結算。", success:"支付已登記，分紅份額等待月度審核。", cancelled:"支付已取消。", failed:"支付失敗", connect:"請先連接錢包。" },
+            ja: { pay:"WLDで支払う", hint:"支払いは Lumina の金庫へ送られ、分配分は毎月の手動精算用に登録されます。", success:"支払いを登録しました。毎月の確認待ちです。", cancelled:"支払いをキャンセルしました。", failed:"支払いに失敗しました", connect:"先にウォレットを接続してください。" },
+            ko: { pay:"WLD로 결제", hint:"결제금은 Lumina 금고로 전송되며 분배 내역은 매월 수동 정산을 위해 등록됩니다.", success:"결제가 등록되었습니다. 월별 검토를 기다리는 중입니다.", cancelled:"결제가 취소되었습니다.", failed:"결제 실패", connect:"먼저 지갑을 연결하세요." }
+          };
+          selected.payment = labels[lang] || labels.en;
+          return selected;
         }
         function renderFeeShareSheet(){
           var copy = feeShareCopy();
+          var previousAmount = sheet.querySelector("#feeShareAmount")?.value || "100";
           sheet.innerHTML =
             '<div class="lumina-fee-share-page" role="dialog" aria-modal="true" aria-labelledby="feeShareTitle">' +
               '<button type="button" class="lumina-fee-share-close" aria-label="Close">×</button>' +
@@ -3721,12 +3731,46 @@ function enhancePrototypeHome() {
               '<div class="lumina-fee-share-stats"><div><span>' + homeBannerEscape(copy.unit) + '</span><b>1%</b><small>' + homeBannerEscape(copy.per) + '</small></div><div><span>' + homeBannerEscape(copy.max) + '</span><b>1,000 WLD</b><small>' + homeBannerEscape(copy.participant) + '</small></div></div>' +
               '<section class="lumina-fee-share-section"><h3>' + homeBannerEscape(copy.how) + '</h3><ul>' + copy.rules.map(function(rule){ return '<li>' + homeBannerEscape(rule) + '</li>'; }).join("") + '</ul></section>' +
               '<section class="lumina-fee-share-note"><strong>' + homeBannerEscape(copy.important) + '</strong><p>' + homeBannerEscape(copy.note) + '</p></section>' +
-              '<button type="button" class="lumina-fee-share-action">' + homeBannerEscape(copy.action) + '</button>' +
+              '<div class="lumina-fee-share-payment"><label for="feeShareAmount">' + homeBannerEscape(copy.start) + '</label><div class="lumina-fee-share-payment-row"><input id="feeShareAmount" inputmode="decimal" type="number" min="100" max="1000" step="100" value="100" /><span>WLD</span></div><small>' + homeBannerEscape(copy.payment.hint) + '</small><button type="button" class="lumina-fee-share-action">' + homeBannerEscape(copy.payment.pay) + '</button></div>' +
             '</div>';
+          var amountInput = sheet.querySelector("#feeShareAmount");
+          var payButton = sheet.querySelector(".lumina-fee-share-action");
+          if (amountInput) amountInput.value = previousAmount;
           var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
           sheet.onclick = function(event){ if (event.target === sheet) close(); };
           sheet.querySelector(".lumina-fee-share-close").onclick = close;
-          sheet.querySelector(".lumina-fee-share-action").onclick = function(){ toast(copy.action); };
+          payButton.onclick = async function(){
+            var amount = Number(amountInput && amountInput.value || 0);
+            if (!Number.isFinite(amount) || amount < 100 || amount > 1000 || amount % 100 !== 0) { toast("100–1,000 WLD, in 100 WLD units"); return; }
+            if (!window.__luminaUserAddress) { toast(copy.payment.connect); return; }
+            if (!window.__luminaSendToken) { toast(copy.payment.failed); return; }
+            var treasury = String((luminaIcoConfig() || {}).treasuryAddress || "").trim();
+            if (!treasury) { toast(copy.payment.failed); return; }
+            payButton.disabled = true;
+            payButton.textContent = "...";
+            try {
+              var result = await window.__luminaSendToken({ tokenSymbol:"WLD", tokenAddress:"0x2cFc85d8E48F8EAB294be644d9E25C3030863003", tokenDecimals:18, recipient:treasury, amountHuman:String(amount), userAddress:window.__luminaUserAddress || "", applyPlatformFee:false });
+              if (result.status === "success") {
+                var response = await fetch("/api/fee-share/participation", { method:"POST", cache:"no-store", headers:{"content-type":"application/json"}, body:JSON.stringify({ address:window.__luminaUserAddress || "", amountWld:amount, txHash:result.txHash || null }) });
+                if (!response.ok) throw new Error("record_failed");
+                toast(copy.payment.success, "success");
+                payButton.textContent = copy.payment.success;
+              } else if (result.status === "user_rejected") {
+                toast(copy.payment.cancelled);
+                payButton.disabled = false;
+                payButton.textContent = copy.payment.pay;
+              } else {
+                toast(copy.payment.failed);
+                payButton.disabled = false;
+                payButton.textContent = copy.payment.pay;
+              }
+            } catch (error) {
+              console.warn("[FEE_SHARE] payment failed", error);
+              toast(copy.payment.failed);
+              payButton.disabled = false;
+              payButton.textContent = copy.payment.pay;
+            }
+          };
         }
         renderFeeShareSheet();
         document.body.appendChild(sheet);
