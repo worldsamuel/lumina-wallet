@@ -3659,9 +3659,9 @@ function enhancePrototypeHome() {
           slider.className = "home-promo-slider";
           section.insertAdjacentElement("beforebegin", slider);
         }
-        var promoSlides = [];
+        // Put the fee-share plan first so it is visible immediately on the homepage.
+        var promoSlides = [{ id:"homeFeeShareBanner", classes:"home-fee-share-banner", label:"Lumina Fee Share Plan" }];
         if (showPoints) promoSlides.push({ id:"homePointsBanner", classes:"home-points-banner", label:"Lumina Points" });
-        promoSlides.push({ id:"homeFeeShareBanner", classes:"home-fee-share-banner", label:"Lumina Fee Share Plan" });
         slider.innerHTML =
           '<div class="home-promo-track">' + promoSlides.map(function(item){ return '<button type="button" id="' + item.id + '" class="' + item.classes + '"></button>'; }).join('') + '</div>' +
           (promoSlides.length > 1 ? '<div id="homePromoDots" class="home-promo-dots">' + promoSlides.map(function(item, index){ return '<button type="button" class="' + (index === 0 ? 'active' : '') + '" aria-label="' + homeBannerEscape(item.label) + '"></button>'; }).join('') + '</div>' : '');
@@ -3682,7 +3682,7 @@ function enhancePrototypeHome() {
             '<span class="home-points-chev">›</span>';
         }
         attachHomePromoSlider(slider);
-        var rememberedSlideId = window.__luminaHomePromoSlideId || (showPoints ? "homePointsBanner" : "homeFeeShareBanner");
+        var rememberedSlideId = window.__luminaHomePromoSlideId || "homeFeeShareBanner";
         var rememberedIndex = promoSlides.findIndex(function(item){ return item.id === rememberedSlideId; });
         if (rememberedIndex < 0) rememberedIndex = 0;
         window.__luminaHomePromoSlideId = promoSlides[rememberedIndex] && promoSlides[rememberedIndex].id;
