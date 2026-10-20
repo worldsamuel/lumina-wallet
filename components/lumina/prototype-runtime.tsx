@@ -3700,21 +3700,37 @@ function enhancePrototypeHome() {
         var sheet = document.createElement("div");
         sheet.id = "luminaFeeShareSheet";
         sheet.className = "modal-mask open lumina-fee-share-sheet";
-        sheet.innerHTML =
-          '<div class="lumina-fee-share-page" role="dialog" aria-modal="true" aria-labelledby="feeShareTitle">' +
-            '<button type="button" class="lumina-fee-share-close" aria-label="Close">×</button>' +
-            '<div class="lumina-fee-share-hero"><span class="lumina-fee-share-icon">%</span><div><em>COMMUNITY PROGRAM</em><h2 id="feeShareTitle">Lumina Fee Share Plan</h2><p>Participate in the planned distribution of actual platform fees.</p></div></div>' +
-            '<div class="lumina-fee-share-rule"><span>Starting allocation</span><strong>100 WLD</strong><small>Minimum per participant</small></div>' +
-            '<div class="lumina-fee-share-stats"><div><span>Share unit</span><b>1%</b><small>per 100 WLD</small></div><div><span>Maximum</span><b>1,000 WLD</b><small>per participant</small></div></div>' +
-            '<section class="lumina-fee-share-section"><h3>How it is intended to work</h3><ul><li>100% of platform fees are planned to be allocated to the distribution pool.</li><li>Each 100 WLD allocation represents one 1% share unit of that pool.</li><li>A participant may allocate up to 1,000 WLD, subject to the final program rules.</li><li>Distributions are based on actual collected fees for each settlement period.</li></ul></section>' +
-            '<section class="lumina-fee-share-note"><strong>Important</strong><p>Fee amounts vary with platform activity. This is not a fixed or guaranteed return. Participation, settlement timing, eligibility snapshots, custody, and the final smart-contract or treasury mechanism will be published in the official terms before the program opens.</p></section>' +
-            '<button type="button" class="lumina-fee-share-action">Rules and enrollment are coming soon</button>' +
-          '</div>';
+        function feeShareCopy(){
+          var lang = window.currentLang || "en";
+          var copy = {
+            en: { eyebrow:"COMMUNITY PROGRAM", title:"Lumina Fee Share Plan", intro:"Pay the allocation amount and Lumina will record and verify your participation.", start:"Starting allocation", min:"Minimum per participant", unit:"Share unit", per:"per 100 WLD", max:"Maximum", participant:"per participant", how:"How it works", rules:["100% of platform fees are allocated to the distribution pool.","Each 100 WLD allocation represents one 1% share unit of that pool.","Participants only need to complete the payment. The backend records and verifies each eligible allocation.","The pool is settled once per month and distributions are sent manually by the Lumina team.","Participation is limited and allocated on a first-come, first-served basis."], important:"Important", note:"Fee amounts depend on actual platform activity and are not fixed or guaranteed. Eligibility, monthly settlement records, custody, and the manual payment process are subject to the official program rules.", action:"Limited spots · First come, first served"},
+            "zh-CN": { eyebrow:"社区分红计划", title:"Lumina 手续费分红计划", intro:"用户只需支付认购金额，Lumina 后台将登记并审核资格。", start:"起始认购", min:"每位参与者最低金额", unit:"分红份额", per:"每 100 WLD", max:"最高认购", participant:"每位参与者", how:"计划说明", rules:["平台收取的 100% 手续费全部纳入分红池。","每支付 100 WLD 对应分红池的 1% 份额。","用户只需要完成支付，后台会登记并审核每笔有效认购。","手续费分红每月结算一次，由 Lumina 团队人工发放。","名额有限，按照先到先得原则分配。"], important:"重要说明", note:"分红金额取决于平台实际产生的手续费，不是固定或保证收益。参与资格、月度结算记录、资金保管和人工发放流程以官方规则为准。", action:"名额有限 · 先到先得"},
+            "zh-TW": { eyebrow:"社群分紅計畫", title:"Lumina 手續費分紅計畫", intro:"使用者只需支付認購金額，Lumina 後台將登記並審核資格。", start:"起始認購", min:"每位參與者最低金額", unit:"分紅份額", per:"每 100 WLD", max:"最高認購", participant:"每位參與者", how:"計畫說明", rules:["平台收取的 100% 手續費全部納入分紅池。","每支付 100 WLD 對應分紅池的 1% 份額。","使用者只需完成支付，後台會登記並審核每筆有效認購。","手續費分紅每月結算一次，由 Lumina 團隊人工發放。","名額有限，按照先到先得原則分配。"], important:"重要說明", note:"分紅金額取決於平台實際產生的手續費，並非固定或保證收益。參與資格、月度結算記錄、資金保管和人工發放流程以官方規則為準。", action:"名額有限 · 先到先得"},
+            ja: { eyebrow:"コミュニティプログラム", title:"Lumina 手数料分配プラン", intro:"参加者は割当額を支払うだけで、Lumina が参加情報を登録・確認します。", start:"最低参加額", min:"参加者1人あたり", unit:"分配単位", per:"100 WLDごと", max:"上限", participant:"参加者1人あたり", how:"仕組み", rules:["プラットフォーム手数料の100%を分配プールに充当します。","100 WLDごとにプールの1%の分配単位となります。","参加者は支払いを完了するだけで、対象となる支払いをバックエンドが記録・確認します。","分配は毎月1回精算し、Lumina チームが手動で送付します。","枠には限りがあり、先着順です。"], important:"重要", note:"分配額は実際のプラットフォーム活動によって変動し、固定または保証されたものではありません。参加資格、月次精算、保管、手動送付は公式ルールに従います。", action:"限定枠 · 先着順"},
+            ko: { eyebrow:"커뮤니티 프로그램", title:"Lumina 수수료 분배 플랜", intro:"참여자는 배정 금액만 결제하면 되며 Lumina가 참여 내역을 등록하고 확인합니다.", start:"최소 참여 금액", min:"참여자 1인 기준", unit:"분배 단위", per:"100 WLD당", max:"최대 금액", participant:"참여자 1인 기준", how:"운영 방식", rules:["플랫폼 수수료의 100%를 분배 풀에 배정합니다.","100 WLD 결제마다 풀의 1% 분배 단위가 됩니다.","참여자는 결제만 완료하면 되며 백엔드가 유효한 결제를 기록하고 확인합니다.","분배금은 매월 1회 정산하고 Lumina 팀이 수동으로 지급합니다.","한정된 수량으로 선착순 배정됩니다."], important:"중요 안내", note:"분배금은 실제 플랫폼 활동에 따라 달라지며 고정되거나 보장되지 않습니다. 참여 자격, 월별 정산, 보관 및 수동 지급은 공식 규칙에 따릅니다.", action:"한정 수량 · 선착순"}
+          };
+          return copy[lang] || copy.en;
+        }
+        function renderFeeShareSheet(){
+          var copy = feeShareCopy();
+          sheet.innerHTML =
+            '<div class="lumina-fee-share-page" role="dialog" aria-modal="true" aria-labelledby="feeShareTitle">' +
+              '<button type="button" class="lumina-fee-share-close" aria-label="Close">×</button>' +
+              '<div class="lumina-fee-share-hero"><span class="lumina-fee-share-icon">%</span><div><em>' + homeBannerEscape(copy.eyebrow) + '</em><h2 id="feeShareTitle">' + homeBannerEscape(copy.title) + '</h2><p>' + homeBannerEscape(copy.intro) + '</p></div></div>' +
+              '<div class="lumina-fee-share-rule"><span>' + homeBannerEscape(copy.start) + '</span><strong>100 WLD</strong><small>' + homeBannerEscape(copy.min) + '</small></div>' +
+              '<div class="lumina-fee-share-stats"><div><span>' + homeBannerEscape(copy.unit) + '</span><b>1%</b><small>' + homeBannerEscape(copy.per) + '</small></div><div><span>' + homeBannerEscape(copy.max) + '</span><b>1,000 WLD</b><small>' + homeBannerEscape(copy.participant) + '</small></div></div>' +
+              '<section class="lumina-fee-share-section"><h3>' + homeBannerEscape(copy.how) + '</h3><ul>' + copy.rules.map(function(rule){ return '<li>' + homeBannerEscape(rule) + '</li>'; }).join("") + '</ul></section>' +
+              '<section class="lumina-fee-share-note"><strong>' + homeBannerEscape(copy.important) + '</strong><p>' + homeBannerEscape(copy.note) + '</p></section>' +
+              '<button type="button" class="lumina-fee-share-action">' + homeBannerEscape(copy.action) + '</button>' +
+            '</div>';
+          var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
+          sheet.onclick = function(event){ if (event.target === sheet) close(); };
+          sheet.querySelector(".lumina-fee-share-close").onclick = close;
+          sheet.querySelector(".lumina-fee-share-action").onclick = function(){ toast(copy.action); };
+        }
+        renderFeeShareSheet();
         document.body.appendChild(sheet);
-        var close = function(){ sheet.classList.remove("open"); setTimeout(function(){ sheet.remove(); }, 180); };
-        sheet.onclick = function(event){ if (event.target === sheet) close(); };
-        sheet.querySelector(".lumina-fee-share-close").onclick = close;
-        sheet.querySelector(".lumina-fee-share-action").onclick = function(){ toast("Official rules will be published before enrollment opens."); };
+        window.__luminaRefreshFeeSharePlan = renderFeeShareSheet;
       };
       function icoCountdownParts(launchAt){
         var target = launchAt ? new Date(launchAt).getTime() : 0;
@@ -7809,6 +7825,7 @@ function enhancePrototypeMe() {
         if (typeof window.__luminaRenderMe === "function") window.__luminaRenderMe();
         if (typeof window.renderAssets === "function") window.renderAssets();
           if (typeof window.__luminaEnsureHomePointsBanner === "function") window.__luminaEnsureHomePointsBanner();
+          if (typeof window.__luminaRefreshFeeSharePlan === "function" && document.getElementById("luminaFeeShareSheet")) window.__luminaRefreshFeeSharePlan();
           updateFeedbackCopy();
         };
       }
