@@ -1345,6 +1345,18 @@ body {
   overscroll-behavior-y: none;
 }
 
+.lumina-maintenance-page { min-height: 100svh; display: grid; place-items: center; align-content: center; gap: 0; padding: 34px 24px; background: radial-gradient(circle at 50% 28%, rgba(74,222,128,.11), transparent 30%), #030503; color: #fff; text-align: center; }
+.lumina-maintenance-orbit { width: 82px; height: 82px; margin-bottom: 24px; border: 1px solid rgba(120,255,145,.72); border-radius: 50%; display: grid; place-items: center; color: #9aff9e; font-size: 36px; font-weight: 950; box-shadow: 0 0 0 8px rgba(74,222,128,.04), 0 0 44px rgba(74,222,128,.28), inset 0 0 24px rgba(74,222,128,.14); }
+.lumina-maintenance-eyebrow { margin: 0 0 10px; color: #8af698; font-size: 12px; font-weight: 900; letter-spacing: 2px; }
+.lumina-maintenance-page h1 { margin: 0; font-size: clamp(28px, 8vw, 42px); line-height: 1.12; font-weight: 950; letter-spacing: 0; }
+.lumina-maintenance-copy { max-width: 430px; margin: 16px auto 0; color: #aeb8b0; font-size: 15px; line-height: 1.65; }
+.lumina-maintenance-countdown { width: min(100%, 430px); margin: 28px auto 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.lumina-maintenance-countdown div { min-height: 88px; padding: 14px 8px 10px; border: 1px solid rgba(126,255,148,.16); border-radius: 16px; background: rgba(255,255,255,.045); }
+.lumina-maintenance-countdown strong { display: block; color: #8cff9a; font-size: clamp(26px, 8vw, 38px); line-height: 1; font-variant-numeric: tabular-nums; }
+.lumina-maintenance-countdown span { display: block; margin-top: 9px; color: #8d968f; font-size: 12px; font-weight: 800; }
+.lumina-maintenance-note { margin: 18px 0 0; color: #6f786f; font-size: 12px; }
+.lumina-maintenance-hidden { display: none; }
+
 button, input, select {
   font: inherit;
 }

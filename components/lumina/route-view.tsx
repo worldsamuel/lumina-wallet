@@ -1,4 +1,5 @@
 import { PrototypeRuntime } from "./prototype-runtime";
+import { MaintenanceGate } from "./maintenance-gate";
 
 type RouteViewProps = {
   view: string;
@@ -8,5 +9,9 @@ type RouteViewProps = {
  * Shared App Router bridge for each Lumina v22 prototype view.
  */
 export function RouteView({ view }: RouteViewProps) {
-  return <PrototypeRuntime initialView={view} />;
+  return (
+    <MaintenanceGate>
+      <PrototypeRuntime initialView={view} />
+    </MaintenanceGate>
+  );
 }
