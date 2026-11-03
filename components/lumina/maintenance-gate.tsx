@@ -29,7 +29,7 @@ export function MaintenanceGate({ children }: { children: React.ReactNode }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const title = useMemo(() => (remaining.closed ? "Lumina 已关闭" : "Lumina 服务维护倒计时"), [remaining.closed]);
+  const title = useMemo(() => (remaining.closed ? "Lumina is closed" : "Lumina shutdown countdown"), [remaining.closed]);
 
   if (remaining.closed) {
     return <MaintenanceScreen title={title} closed />;
@@ -54,7 +54,7 @@ function MaintenanceScreen({
         <div className="lumina-maintenance-orbit"><span>L</span></div>
         <p className="lumina-maintenance-eyebrow">LUMINA WALLET</p>
         <h1>{title}</h1>
-        <p className="lumina-maintenance-copy">Lumina Wallet 已停止运营，前台功能已关闭。感谢你曾经使用 Lumina。</p>
+        <p className="lumina-maintenance-copy">Lumina Wallet operations have ended and the public app is now closed. Thank you for using Lumina.</p>
       </main>
     );
   }
@@ -64,12 +64,12 @@ function MaintenanceScreen({
       <div className="lumina-maintenance-orbit"><span>L</span></div>
       <p className="lumina-maintenance-eyebrow">LUMINA WALLET</p>
       <h1>{title}</h1>
-      <p className="lumina-maintenance-copy">Lumina 将于今天 UTC+8 24:00 关闭前台服务。请在关闭前完成必要的资产操作。</p>
+      <p className="lumina-maintenance-copy">Lumina will close its public services today at 24:00 UTC+8. Please complete any necessary asset actions before the shutdown.</p>
       <div className="lumina-maintenance-countdown" aria-label="Maintenance countdown">
-        <div><strong>{remaining.days}</strong><span>天</span></div>
-        <div><strong>{pad(remaining.hours)}</strong><span>时</span></div>
-        <div><strong>{pad(remaining.minutes)}</strong><span>分</span></div>
-        <div><strong>{pad(remaining.seconds)}</strong><span>秒</span></div>
+        <div><strong>{remaining.days}</strong><span>Days</span></div>
+        <div><strong>{pad(remaining.hours)}</strong><span>Hours</span></div>
+        <div><strong>{pad(remaining.minutes)}</strong><span>Minutes</span></div>
+        <div><strong>{pad(remaining.seconds)}</strong><span>Seconds</span></div>
       </div>
       <p className="lumina-maintenance-note">Scheduled shutdown: 2026-11-03 24:00 (UTC+8)</p>
     </main>
